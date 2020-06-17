@@ -1,0 +1,10 @@
+(executables 
+    (names zrun)
+    (promote (until-clean) (into ..)))
+
+(ocamllex (modules lexer))
+(menhir (modules parser))
+
+(env
+ (dev
+  (flags (:standard -w -9-27-32-33-35 -warn-error -A))))
