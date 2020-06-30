@@ -227,7 +227,7 @@ let binop op =
   CoFun
     (fun v -> let* (v1, v2) = two v in let* v = lift2 op v1 v2 in return [v])
   
-  (* The initial environment *)
+(* The initial environment *)
 let genv0 =
   ["+", binop add_op;
    "-", binop minus_op;
@@ -248,5 +248,6 @@ let genv0 =
    ">=", binop gte_op]
 
 let genv0 =
-  List.fold_left (fun acc (n, v) -> Genv.add (Name n) (Gfun v) acc) Genv.empty genv0
+  List.fold_left
+    (fun acc (n, v) -> Genv.add (Name n) (Gfun v) acc) Genv.empty genv0
    
