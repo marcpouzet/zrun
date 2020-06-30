@@ -1,8 +1,8 @@
 (executables 
     (names zrun)
     (modes byte exe)
-    (promote (until-clean) (into ..)))
-
+    (promote (until-clean) (into ..)))	
+	     
 (ocamllex (modules lexer))
 (menhir (modules parser)) ;;(flags --explain))
 
