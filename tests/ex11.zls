@@ -1,0 +1,5 @@
+let node f(x) returns (o)
+    o = 1 + (0 fby x)
+
+let node main() returns (o)
+  o = f(o)
