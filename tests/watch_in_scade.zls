@@ -12,7 +12,7 @@
 -------------------------------------------------------------------
  *)
 
-let node root (stst,rst,set,md) returns (a1,a2,a3, l_, s_, sh_ )
+let node root (stst,rst,set,md) returns (a1, a2, a3, l_, s_, sh_ )
 local
   isStart default false, (* -- is the chrono started? *)
   is_w default false, (* -- is watch in clock mode? *)
@@ -31,11 +31,7 @@ and
   automaton (* -- Chrono ----------------------*)
   | Stop ->
       do
-	m = 0 -> last m
-      and
-	s = 0 -> last s
-      and
-	d = 0 -> last d
+	m, s, d = (0, 0, 0) -> (last m, last s, last d)
       unless
         (stst && not is_w) continue Start
       else (rst && not (false -> pre l_) && not is_w) then Stop
@@ -55,10 +51,10 @@ and
   | Count ->
       do
         wm = 0 -> (if (ws < last ws)
-	then last wm + 1 else last wm) mod 60
+	           then last wm + 1 else last wm) mod 60
       and
-	  wh = 0 -> (if (wm < last wm)
-	  then last wh + 1 else last wh) mod 24
+	wh = 0 -> (if (wm < last wm)
+	           then last wh + 1 else last wh) mod 24
       until (set && is_w) then Set
   | Set -> (* -- Set time *)
       local synchro default false
@@ -97,7 +93,7 @@ and
       is_w = true
     and
       a1, a2, a3 = (wh, wm, ws)
-    unless (md && not s) continue DispChr
+    unless (md && not s_) continue DispChr
   | DispChr ->(* -- display chrono *)
     local
 	lm init 0, ls init 0, ld init 0
@@ -108,7 +104,7 @@ and
 	automaton (* -- deal with lap time and current time ---*)
 	| DispTime ->
             do
-              lm,ls,ld = (m, s, d)
+              lm, ls, ld = (m, s, d)
             unless (rst && isStart) then DispLap
 	| DispLap ->
             do
