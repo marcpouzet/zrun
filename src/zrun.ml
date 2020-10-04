@@ -22,11 +22,11 @@ open Location
                
 let lexical_error err loc =
   Format.eprintf "%aIllegal character.@." output_location loc;
-  raise Error
+  raise Stdlib.Exit
 
 let syntax_error loc =
   Format.eprintf "%aSyntax error.@." output_location loc;
-  raise Error
+  raise Stdlib.Exit
 
 let parse parsing_fun lexing_fun source_name =
   let ic = open_in source_name in
@@ -46,10 +46,6 @@ let parse parsing_fun lexing_fun source_name =
 let parse_implementation_file source_name =
   parse Parser.implementation_file Lexer.main source_name
   
-let eval_error () =
-  Format.eprintf "Evaluation error1.@.";
-  raise Stdlib.Exit
-
 (* evaluate the main node [main] given by option [-s] for [n] steps *)
 (* with check *)
 let eval source_name main number check =
@@ -81,8 +77,7 @@ let eval filename =
   then 
     begin
       Location.initialize filename;
-      let r = eval filename !main_node !number_of_steps !set_check in
-      match r with | None -> eval_error () | Some _ -> ()
+      let _ = eval filename !main_node !number_of_steps !set_check in ()
     end
   else raise (Arg.Bad "Expected *.zls file.")
     

@@ -45,6 +45,9 @@ let fprint_ientry ff { cur; default } =
      Format.fprintf ff "@[{ cur = %a;@ default = Default(%a) }@]@,"
        Output.value cur Output.value v
     
+let print_number comment n =
+  if !set_verbose then Format.eprintf "@[%s %d@]@\n" comment n
+  
 let fprint_ienv ff comment env =
   Format.fprintf ff
       "@[%s (env): @,%a@]@\n" comment (Env.fprint_t fprint_ientry) env
@@ -64,12 +67,12 @@ let stop_at_location loc r_opt =
   if !set_verbose then
     match r_opt with
     | None ->
-       Format.eprintf "%aEvaluation error.@."
+       Format.eprintf "%aTyping error.@."
          Location.output_location loc;
        raise Stdlib.Exit
     | Some _ -> r_opt
   else r_opt
-  
+
 let find_value_opt x env =
   let* { cur } = Env.find_opt x env in
   return cur
@@ -187,15 +190,15 @@ let equal_values v1 v2 =
 (* bounded fixpoint combinator *)
 (* computes a pre fixpoint f^n(bot) <= fix(f) *)
 let fixpoint n equal f s bot =
-  let rec fixpoint n s' v =
+  let rec fixpoint n v =
     if n <= 0 then (* this case should not happen *)
-      return (v, s')
+      return (0, v, s)
     else
       (* compute a fixpoint for the value [v] keeping the current state *)
       let* v', s' = f s v in
-      if equal v v' then return (v, s') else fixpoint (n-1) s' v' in      
+      if equal v v' then return (n, v, s') else fixpoint (n-1) v' in      
   (* computes the next state *)
-  fixpoint (if n <= 0 then 0 else n+1) s bot
+  fixpoint n bot
   
 let equal_env env1 env2 =
   Env.equal
@@ -204,16 +207,16 @@ let equal_env env1 env2 =
 (* bounded fixpoint for a set of equations *)
 let fixpoint_eq genv env sem eq n s_eq bot =
   let sem s_eq env_in =
-    print_ienv "Before step in fixpoint (env)" env_in;
-    print_ienv "Before step in fixpoint (env_in)" env_in;
     let env = Env.append env_in env in
     let* env_out, s_eq = sem genv env eq s_eq in
-    print_ienv "After step in fixpoint (env_out)" env_out;
     let env_out = complete_with_default env env_out in
     return (env_out, s_eq) in
-  print_ienv "Before step in fixpoint (bot)" bot;
-  let* env_out, s_eq = fixpoint n equal_env sem s_eq bot in
-  print_ienv "After fixpoint" env_out;
+  print_number "Max number of iterations:" n;
+  print_ienv "Start computing a fixpoint with initial env:" bot;
+  let* m, env_out, s_eq = fixpoint n equal_env sem s_eq bot in
+  print_number "Actual number of iterations:" (n - m);
+  print_number "Max was:" n;
+  print_ienv "End of fixpoint with env:" env_out;
   return (env_out, s_eq)
  
 (* [sem genv env e = CoF f s] such that [iexp genv env e = s] *)
@@ -470,6 +473,7 @@ let rec sexp genv env { e_desc = e_desc; e_loc } s =
      (* compute a bounded fix-point in [n] steps *)
      let bot = bot_env eq_write in
      let n = size eq in
+     let n = if n <= 0 then 0 else n+1 in
      let* env_eq, s_eq = fixpoint_eq genv env seq eq n s_eq bot in
      let env = Env.append env_eq env in
      let* v, s = sexp genv env e s in
@@ -492,10 +496,8 @@ and sexp_list genv env e_list s_list =
 and seq genv env { eq_desc; eq_write; eq_loc } s =
   let r = match eq_desc, s with 
   | EQeq(p, e), s -> 
-     print_ienv "Before (eq)" env;
      let* v, s1 = sexp genv env e s in
      let* env_p1 = matching_pateq p v in
-     print_ienv "After (eq)" env_p1;
      Some (env_p1, s1) (* return (env_p, s))) *)
   | EQif(e, eq1, eq2), Stuple [se; s_eq1; s_eq2] ->
       let* v, se = sexp genv env e se in
@@ -547,7 +549,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        | (Vbot, _) | (_, Vbot) ->
           return (bot_env eq_write, ps, pr, s_list)
        | (Vnil, _) | (_, Vnil) ->
-          return (bot_env eq_write, ps, pr, s_list)
+          return (nil_env eq_write, ps, pr, s_list)
        | Value(ps), Value(pr) ->
           let* pr = boolean pr in
           sautomaton_handler_list
@@ -589,6 +591,7 @@ and sblock genv env v_list ({ eq_write; eq_loc } as eq) s_list s_eq =
       (svardec genv env) Env.empty v_list s_list (bot_list v_list) in
   let bot = complete env env_v eq_write in
   let n = size eq in
+  let n = if n <= 0 then 0 else n+1 in
   let* env_eq, s_eq = fixpoint_eq genv env seq eq n s_eq bot in
   (* store the next last value *)
   let* s_list = Opt.map2 (set_vardec env_eq) v_list s_list in
@@ -656,7 +659,7 @@ and sautomaton_handler_list is_weak genv env eq_write a_h_list ps pr s_list =
   (* automaton with weak transitions *)
   let rec body_and_transition_list a_h_list s_list =
     match a_h_list, s_list with
-    | { s_state; s_vars; s_body; s_trans } :: a_h_list,
+    | { s_state; s_vars; s_body; s_trans; s_loc } :: a_h_list,
       (Stuple [Stuple(ss_var_list); ss_body;
                Stuple(ss_trans)] as s) :: s_list ->
      let r = matching_state ps s_state in
@@ -693,38 +696,40 @@ and sautomaton_handler_list is_weak genv env eq_write a_h_list ps pr s_list =
       (Stuple [ss_var; ss_body; Stuple(ss_trans)] as s) :: s_list ->
      let r = matching_state ps s_state in
      begin match r with
-     | None ->
-        (* this is not the good state; try an other one *)
-        let* env_trans, ns, nr, s_list = transition_list a_h_list s_list in
-        return (env_trans, ns, nr, s :: s_list)            
-     | Some(env_state) ->
-        let env = Env.append env_state env in
-        (* execute the transitions *)
-        let* env_trans, (ns, nr), ss_trans =
-          sescape_list genv env s_trans ss_trans ps pr in
-        return
-          (env_trans, ns, nr,
-           Stuple [ss_var; ss_body; Stuple(ss_trans)] :: s_list) end
+       | None ->
+          (* this is not the good state; try an other one *)
+          let* env_trans, ns, nr, s_list = transition_list a_h_list s_list in
+          return (env_trans, ns, nr, s :: s_list)            
+       | Some(env_state) ->
+          let env = Env.append env_state env in
+          (* execute the transitions *)
+          let* env_trans, (ns, nr), ss_trans =
+            sescape_list genv env s_trans ss_trans ps pr in
+          return
+            (env_trans, ns, nr,
+             Stuple [ss_var; ss_body; Stuple(ss_trans)] :: s_list)
+     end
     | _ -> None in
   (* 2/ execute the body of the target state *)
   let rec body_list a_h_list ps pr s_list =
     match a_h_list, s_list with
     | { s_state; s_vars; s_body } :: a_h_list,
       (Stuple [Stuple(ss_var_list); ss_body; ss_trans] as s) :: s_list ->
-     let r = matching_state ps s_state in
-     begin match r with
-     | None ->
-        (* this is not the good state; try an other one *)
-        let* env_body, s_list = body_list a_h_list ps pr s_list in
-        return (env_body, s :: s_list)            
-     | Some(env_state) ->
-        let env = Env.append env_state env in
-        (* execute the body *)
-        let* _, env_body, ss_var_list, ss_body =
-          sblock_with_reset genv env s_vars s_body ss_var_list ss_body pr in
-        return
-          (env_body, Stuple [Stuple(ss_var_list); ss_body;
-                             ss_trans] :: s_list) end
+       let r = matching_state ps s_state in
+       begin match r with
+         | None ->
+            (* this is not the good state; try an other one *)
+            let* env_body, s_list = body_list a_h_list ps pr s_list in
+            return (env_body, s :: s_list)            
+         | Some(env_state) ->
+            let env = Env.append env_state env in
+            (* execute the body *)
+            let* _, env_body, ss_var_list, ss_body =
+              sblock_with_reset genv env s_vars s_body ss_var_list ss_body pr in
+            return
+              (env_body, Stuple [Stuple(ss_var_list); ss_body;
+                                 ss_trans] :: s_list)
+       end
    | _ -> None in
   if is_weak then
     body_and_transition_list a_h_list s_list
@@ -753,7 +758,7 @@ and sautomaton_handler_list is_weak genv env eq_write a_h_list ps pr s_list =
 and sescape_list genv env escape_list s_list ps pr =
   match escape_list, s_list with
   | [], [] -> return (Env.empty, (Value ps, Value (Vbool false)), [])
-  | { e_cond; e_reset; e_vars; e_body; e_next_state } :: escape_list,
+  | { e_cond; e_reset; e_vars; e_body; e_next_state; e_loc } :: escape_list,
     Stuple [s_cond; Stuple(s_var_list); s_body; s_next_state] :: s_list ->
       (* if [pr=true] then the transition is reset *)
      let* v, s_cond = reset iscondpat sscondpat genv env e_cond s_cond pr in
@@ -784,12 +789,13 @@ and sescape_list genv env escape_list s_list ps pr =
           return (env_body, (ns, nr),
                   Stuple [s_cond; Stuple(s_var_list);
                           s_body; s_next_state] :: s_list) in
-     return (env_body, (ns, nr), s)
+     let r = return (env_body, (ns, nr), s) in
+     stop_at_location e_loc r
   | _ -> None
     
 and sscondpat genv env e_cond s = sexp genv env e_cond s
                               
-and sstate genv env { desc } s =
+and sstate genv env { desc; loc } s =
   match desc, s with
   | Estate0(f), Sempty -> return (Value(Vstate0(f)), Sempty)
   | Estate1(f, e_list), Stuple s_list ->
@@ -828,9 +834,9 @@ let matching_in env { var_name; var_default } v =
 let matching_out env { var_name; var_default } =
   find_value_opt var_name env
   
-let funexp genv { f_kind; f_atomic; f_args; f_res; f_body } =
+let funexp genv { f_kind; f_atomic; f_args; f_res; f_body; f_loc } =
   let* si = ieq genv Env.empty f_body in
-  let* f = match f_kind with
+  let f = match f_kind with
   | Efun ->
      (* combinatorial function *)
      return
@@ -873,15 +879,15 @@ let funexp genv { f_kind; f_atomic; f_args; f_res; f_body } =
                  return (v_list,
                          (Stuple [Stuple(s_f_args); Stuple(s_f_res); s_body]))
               | _ -> None }) in
-  return f
+  stop_at_location f_loc f
 
 let exp genv env e =
   let* init = iexp genv env e in
   let step s = sexp genv env e s in
   return (CoF { init = init; step = step })
   
-let implementation genv { desc } =
-  match desc with
+let implementation genv { desc; loc } =
+  let r = match desc with
   | Eletdecl(f, e) ->
      (* [e] should be stateless, that is, [step s = v, s] *)
      let* si = iexp genv Env.empty e in
@@ -891,17 +897,36 @@ let implementation genv { desc } =
      let* fv = funexp genv fd in
      return (Genv.add (Name(f)) (Gfun(fv)) genv)
   | Etypedecl(f, td) ->
-     return genv
+     return genv in
+  stop_at_location loc r 
      
 let program genv i_list = Opt.fold implementation genv i_list
-                        
+
+(* check that a value is causally correct (non bot) *)
+(* and initialized (non nil) *)
+let not_bot_nil v_list =
+  let not_bot_nil v =
+    match v with
+    | Vbot ->
+       if !set_verbose then
+         begin Format.eprintf "Causality error.@."; raise Stdlib.Exit end;
+       None
+    | Vnil ->
+       if !set_verbose then
+         begin Format.eprintf "Initialization error.@."; raise Stdlib.Exit end;
+       None
+    | Value(v) ->
+       return v in
+  Opt.map not_bot_nil v_list
+    
 (* run a combinatorial expression *)
 let run_fun output fv n =
   let rec runrec n =
     if n = 0 then return ()
     else
-      let* v = fv [] in
-      let* _ = output v in
+      let* v_list = fv [] in
+      let* v_list = not_bot_nil v_list in
+      let* _ = output v_list in
       runrec (n-1) in
   runrec n
       
@@ -910,20 +935,19 @@ let run_node output init step n =
   let rec runrec s n =
     if n = 0 then return ()
     else
-      let* v, s = step s [] in
-      let* _ = output v in
+      let* v_list, s = step s [] in
+      let* v_list = not_bot_nil v_list in
+      let* _ = output v_list in
       runrec s (n-1) in
   runrec init n
+
 
 (* The main entry function *)
 let run genv main ff n =
   let* fv = find_gnode_opt (Name main) genv in
   (* the main function must be of type : unit -> t *)
   let output v_list =
-    (* check that [v_list] is a list of values different *)
-    (* from [bot] and [nil] *)
-    let _ = Output.value_list_and_flush ff v_list in
-    let* _ = Opt.map Initial.check_value v_list in
+    let _ = Output.pvalue_list_and_flush ff v_list in
     return () in
   match fv with
   | CoFun(fv) -> run_fun output fv n
@@ -934,7 +958,7 @@ let check genv main n =
   let* fv = find_gnode_opt (Name main) genv in
   (* the main function must be of type : unit -> bool *)
   let output v =
-    if v = [Value(Vbool(true))] then return () else None in
+    if v = [Vbool(true)] then return () else None in
   match fv with
   | CoFun(fv) -> run_fun output fv n
   | CoNode { init; step } ->

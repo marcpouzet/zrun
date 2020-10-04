@@ -11,8 +11,6 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-exception Error
-        
 let main_node = ref (None: string option)
 let set_main s = main_node := Some(s)
 
