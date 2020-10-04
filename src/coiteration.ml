@@ -212,8 +212,9 @@ let fixpoint_eq genv env sem eq n s_eq bot =
     let env_out = complete_with_default env env_out in
     return (env_out, s_eq) in
   print_number "Max number of iterations:" n;
-  print_ienv "Start computing a fixpoint with initial env:" bot;
+  print_ienv "Fixpoint. Inital env is:" bot;
   let* m, env_out, s_eq = fixpoint n equal_env sem s_eq bot in
+  print_ienv "Fixpoint. Result env is:" env_out;
   print_number "Actual number of iterations:" (n - m);
   print_number "Max was:" n;
   print_ienv "End of fixpoint with env:" env_out;
@@ -870,6 +871,7 @@ let funexp genv { f_kind; f_atomic; f_args; f_res; f_body; f_loc } =
                  print_ienv "Node before fixpoint (res)" env_res;
                  (* eprint_env env_args; *)
                  let n = Env.cardinal env_res in
+                 let n = if n <= 0 then 0 else n+1 in
                  let* env_body, s_body =
                    fixpoint_eq genv env_args seq f_body n s_body env_res in
                  (* store the next last value *)
@@ -908,13 +910,9 @@ let not_bot_nil v_list =
   let not_bot_nil v =
     match v with
     | Vbot ->
-       if !set_verbose then
-         begin Format.eprintf "Causality error.@."; raise Stdlib.Exit end;
-       None
+       Format.eprintf "Causality error.@."; raise Stdlib.Exit
     | Vnil ->
-       if !set_verbose then
-         begin Format.eprintf "Initialization error.@."; raise Stdlib.Exit end;
-       None
+       Format.eprintf "Initialization error.@."; raise Stdlib.Exit
     | Value(v) ->
        return v in
   Opt.map not_bot_nil v_list

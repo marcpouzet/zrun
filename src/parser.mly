@@ -258,7 +258,7 @@ equation_desc:
       { EQif(e, eq1, no_eq $startpos $endpos) }
   | IF e = seq_expression ELSE eq2 = equation
       { EQif(e, no_eq $startpos $endpos, eq2) }
-  | RESET eq = equation EVERY e = expression
+  | RESET eq = equation_and_list EVERY e = expression
     { EQreset(eq, e) }
   | LOCAL v_list = vardec_list DO eq = equation_and_list DONE
     { EQlocal(v_list, eq) }
