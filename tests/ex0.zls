@@ -1,0 +1,11 @@
+let node f(x) returns (o)
+  do o = 0 -> last x done
+
+let node main() returns (o)
+  local m default 0, half
+  do
+    if half then do done else do m = 42 -> pre m + 1 done
+  and o = m
+  and half = true -> not (pre half)
+  done
+      
