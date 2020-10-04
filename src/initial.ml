@@ -120,7 +120,7 @@ let lift1 op v =
      return (Value v)
 
 (* check that the input is non bot/nil *)
-let value v =
+let check_value v =
   match v with
   | Vbot | Vnil -> None
   | Value(v) -> return v

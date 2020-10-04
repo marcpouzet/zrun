@@ -5,14 +5,14 @@
 -- set : set time button
 -- md : mode selection button
 -- a1, a2, a3 : time data display
--- L : is displaying lap time
--- S : is in setting time mode
--- Sh : is in setting hour mode
--- S and not Sh : is in setting minutes mode
+-- l_ : is displaying lap time
+-- s_ : is in setting time mode
+-- sh_ : is in setting hour mode
+-- s_ and not sh_ : is in setting minutes mode
 -------------------------------------------------------------------
  *)
 
-let node root (stst,rst,set,md) returns (a1,a2,a3, l, s, sh )
+let node root (stst,rst,set,md) returns (a1,a2,a3, l_, s_, sh_ )
 local
   isStart default false, (* -- is the chrono started? *)
   is_w default false, (* -- is watch in clock mode? *)
@@ -20,13 +20,13 @@ local
   sigSh default false,
   sigL default false,
   m init 0, s init 0, d init 0, (* -- chrono timers *)
-  wh,wm,ws,w (* -- clock timers *)
+  last wh, last wm, last ws, last w (* -- clock timers *)
 do
-  l =  sigL
+  l_ =  sigL
 and
-  s =  sigS
+  s_ =  sigS
 and
-  sh =  sigSh
+  sh_ =  sigSh
 and
   automaton (* -- Chrono ----------------------*)
   | Stop ->
@@ -38,7 +38,7 @@ and
 	d = 0 -> last d
       unless
         (stst && not is_w) continue Start
-      else (rst && not (false -> pre l) && not is_w) then Stop
+      else (rst && not (false -> pre l_) && not is_w) then Stop
   | Start ->
       do
         d = (last d + 1) mod 100
@@ -74,14 +74,14 @@ and
                     else if rst then last wh +23
                     else last wh) mod 24
 	    until set then Set_mn
-	    else (set && is_w) then Set_mn
+	    (* else (set && is_w) then Set_mn *)
         | Set_mn -> (* -- then set minutes *)
             do
               wm = (if stst then last wm + 1
                     else if rst then last wm +59
                     else last wm) mod 60
 	    until set then Set_end
-	    else (set && is_w) then Set_end
+	    (* else (set && is_w) then Set_end *)
         | Set_end -> do synchro = true done
 	end
       until synchro continue Count
@@ -130,13 +130,13 @@ let node counter(n) returns (ok)
 let node main () returns (a1, a2, a3, l, s, sh)
   local stst, rst, set, md
   do
-      stst = counter(10)
+      stst = counter(5)
   and
-      rst = counter(20)
+      rst = counter(10)
   and
-      set = counter(30)
+      set = counter(20)
   and
-      md = counter(40)
+      md = counter(30)
   and
       (a1, a2, a3, l, s, sh) = root (stst, rst, set, md)
   done

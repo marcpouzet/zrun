@@ -47,20 +47,26 @@ let parse_implementation_file source_name =
   parse Parser.implementation_file Lexer.main source_name
   
 let eval_error () =
-  Format.eprintf "Evaluation error.@.";
-  raise Error
+  Format.eprintf "Evaluation error1.@.";
+  raise Stdlib.Exit
 
 (* evaluate the main node [main] given by option [-s] for [n] steps *)
 (* with check *)
 let eval source_name main number check =
   let p = parse_implementation_file source_name in
+  Coiteration.print_message "Parsing done";
+  flush stdout;
   let p = Scoping.program p in
+  Coiteration.print_message "Scoping done";
   let p = Write.program p in
+  Coiteration.print_message "Write done";
   let* genv = Coiteration.program Initial.genv0 p in
+  Coiteration.print_message "Evaluation of definitions done";
   let* r =
     match main with
     | None -> return ()
     | Some(main) ->
+         Coiteration.print_message "The main node exists";
          let* r =
            (* make [n] steps and checks that every step returns [true] *)
            if check then Coiteration.check genv main number
@@ -70,7 +76,7 @@ let eval source_name main number check =
          return r in
   return r
 
- let eval filename =
+let eval filename =
   if Filename.check_suffix filename ".zls"
   then 
     begin
@@ -101,7 +107,7 @@ let main () =
       eval
       errmsg
   with
-  | Scoping.Error -> exit 2
+  | Scoping.Error | Stdlib.Exit -> exit 2
   
 let _ = main ()
 let _ = exit 0

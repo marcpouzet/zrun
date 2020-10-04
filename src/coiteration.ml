@@ -47,12 +47,16 @@ let fprint_ientry ff { cur; default } =
     
 let fprint_ienv ff comment env =
   Format.fprintf ff
-      "%s (env): @,%a@]@\n" comment (Env.fprint_t fprint_ientry) env
+      "@[%s (env): @,%a@]@\n" comment (Env.fprint_t fprint_ientry) env
 
 let print_ienv comment env =
   if !set_verbose then
-    Format.printf
-      "%s (env): @,%a@]@\n" comment (Env.fprint_t fprint_ientry) env
+    Format.eprintf
+      "@[%s (env): @,%a@]@\n" comment (Env.fprint_t fprint_ientry) env
+
+let print_message comment =
+  if !set_verbose then
+    Format.eprintf "@[%s (env): @,@]@\n" comment 
 
 open Misc
    
@@ -62,7 +66,7 @@ let stop_at_location loc r_opt =
     | None ->
        Format.eprintf "%aEvaluation error.@."
          Location.output_location loc;
-       raise Scoping.Error
+       raise Stdlib.Exit
     | Some _ -> r_opt
   else r_opt
   
@@ -916,8 +920,10 @@ let run genv main ff n =
   let* fv = find_gnode_opt (Name main) genv in
   (* the main function must be of type : unit -> t *)
   let output v_list =
-    let* v_list = Opt.map Initial.value v_list in
-    let _ = Output.pvalue_list_and_flush ff v_list in
+    (* check that [v_list] is a list of values different *)
+    (* from [bot] and [nil] *)
+    let _ = Output.value_list_and_flush ff v_list in
+    let* _ = Opt.map Initial.check_value v_list in
     return () in
   match fv with
   | CoFun(fv) -> run_fun output fv n
