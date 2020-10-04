@@ -1,5 +1,19 @@
-let node f(x) returns (o)
-    o = 1 + (0 fby x)
+let node count(n) returns (o)
+  local cpt
+  do cpt = ((0 fby cpt) + 1) mod n
+  and o = (cpt = 0)
+  done
 
+let node f(x) returns (o)
+  local h
+  do
+    reset
+      o = 1 + (0 fby (o+x))
+    every
+      h
+  and
+      h = count(6)
+  done
+	  
 let node main() returns (o)
   o = f(o)
