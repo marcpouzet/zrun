@@ -44,17 +44,13 @@ let fprint_ientry ff { cur; default } =
   | Default(v) ->
      Format.fprintf ff "@[{ cur = %a;@ default = Default(%a) }@]@,"
        Output.value cur Output.value v
-    
+
+
 let print_number comment n =
   if !set_verbose then Format.eprintf "@[%s %d@]@\n" comment n
   
-let fprint_ienv ff comment env =
+let fprint_ienv comment ff env =
   Format.fprintf ff
-      "@[%s (env): @,%a@]@\n" comment (Env.fprint_t fprint_ientry) env
-
-let print_ienv comment env =
-  if !set_verbose then
-    Format.eprintf
       "@[%s (env): @,%a@]@\n" comment (Env.fprint_t fprint_ientry) env
 
 let print_message comment =
@@ -187,6 +183,25 @@ let equal_values v1 v2 =
   | (Vbot, Vbot) | (Vnil, Vnil) | (Value _, Value _) -> true
   | _ -> false
 
+(* Dynamic check of causality. A set of equations is causal when all defined *)
+(* variables are non bottom, provided free variables are non bottom *)
+(* this a very strong constraint. In particular, it rejects the situation *)
+(* of a variable that is bottom but not used. *)
+(* causal(genv)(env)(sem)(eq)(n)(s_eq)(bot) = 
+ *-               /\ (forall x in Dom(env), env(x) <> bot)
+ *-               /\ (env_out, _ = fixpoint_eq genv sem eq n s_eq bot)
+ *-               => (forall x in Dom(rho), env_out(x) <> bot) *)
+let causal env env_out =
+  let non_bot env =
+    Env.for_all (fun _ v -> match v with | Vbot -> false | _ -> true) env in
+  if non_bot env then non_bot env_out else true
+
+let check_causal v =
+  if not v then
+    begin
+      Format.eprintf "%a" fprintf_i env  "Causality error:"; raise Stdlib.Exit
+    end
+  
 (* bounded fixpoint combinator *)
 (* computes a pre fixpoint f^n(bot) <= fix(f) *)
 let fixpoint n equal f s bot =
