@@ -18,7 +18,6 @@ open Opt
 open Initial
 open Coiteration
 open Location
-   
                
 let lexical_error err loc =
   Format.eprintf "%aIllegal character.@." output_location loc;
@@ -50,19 +49,19 @@ let parse_implementation_file source_name =
 (* with check *)
 let eval source_name main number check =
   let p = parse_implementation_file source_name in
-  Coiteration.print_message "Parsing done";
+  Debug.print_message "Parsing done";
   flush stdout;
   let p = Scoping.program p in
-  Coiteration.print_message "Scoping done";
+  Debug.print_message "Scoping done";
   let p = Write.program p in
-  Coiteration.print_message "Write done";
+  Debug.print_message "Write done";
   let* genv = Coiteration.program Initial.genv0 p in
-  Coiteration.print_message "Evaluation of definitions done";
+  Debug.print_message "Evaluation of definitions done";
   let* r =
     match main with
     | None -> return ()
     | Some(main) ->
-         Coiteration.print_message "The main node exists";
+         Debug.print_message "The main node exists";
          let* r =
            (* make [n] steps and checks that every step returns [true] *)
            if check then Coiteration.check genv main number
@@ -87,6 +86,7 @@ let doc_number_of_steps = "\tThe number of steps"
 let doc_check = "\tCheck that the simulated node returns true"
 let doc_verbose = "\tVerbose mode"
 let doc_no_assert = "\tNo check of assertions"
+let doc_nocausality = "\tTurn off the check that are variables are non bottom"
 
 let errmsg = "Options are:"
 
@@ -98,7 +98,8 @@ let main () =
                    "-n", Arg.Int set_number, doc_number_of_steps;
                    "-check", Arg.Set set_check, doc_check;
                    "-v", Arg.Set set_verbose, doc_verbose;
-                   "-noassert", Arg.Set no_assert, doc_no_assert])
+                   "-noassert", Arg.Set no_assert, doc_no_assert;
+                   "-nocausality", Arg.Set set_nocausality, doc_nocausality])
       eval
       errmsg
   with
