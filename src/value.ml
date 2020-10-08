@@ -52,3 +52,11 @@ type ('a, 'b, 's) node =
 type gvalue =
   | Gvalue : value -> gvalue
   | Gfun : (value list, value list, state) node -> gvalue
+
+(* an input entry in the environment *)
+type 'a ientry = { cur: 'a; default : 'a default }
+
+and 'a default =
+  | Val : 'a default
+  | Last : 'a -> 'a default
+  | Default : 'a -> 'a default
