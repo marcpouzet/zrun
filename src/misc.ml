@@ -20,3 +20,7 @@ let number_of_steps = ref 0
 let set_number n = number_of_steps := n
  
 let no_assert = ref false
+
+let set_verbose = ref false
+
+let set_nocausality = ref false
