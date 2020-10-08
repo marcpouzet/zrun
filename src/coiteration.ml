@@ -23,55 +23,8 @@ open Ident
 open Ast
 open Value
 open Initial
+open Debug
    
-let set_verbose = ref false
-            
-(* an input entry in the environment *)
-type 'a ientry = { cur: 'a; default : 'a default }
-
-and 'a default =
-  | Val : 'a default
-  | Last : 'a -> 'a default
-  | Default : 'a -> 'a default
-
-let fprint_ientry ff { cur; default } =
-  match default with
-  | Val ->
-     Format.fprintf ff "@[{ cur = %a;@ default = Val }@]@," Output.value cur
-  | Last(v) ->
-     Format.fprintf ff "@[{ cur = %a;@ default = Last(%a) }@]@,"
-       Output.value cur Output.value v
-  | Default(v) ->
-     Format.fprintf ff "@[{ cur = %a;@ default = Default(%a) }@]@,"
-       Output.value cur Output.value v
-
-
-let print_number comment n =
-  if !set_verbose then Format.eprintf "@[%s %d@]@\n" comment n
-  
-let fprint_ienv comment ff env =
-  Format.fprintf ff
-      "@[%s (env): @,%a@]@\n" comment (Env.fprint_t fprint_ientry) env
-
-let print_ienv comment env =
-  if !set_verbose then Format.eprintf "%a" (fprint_ienv comment) env
-
-let print_message comment =
-  if !set_verbose then
-    Format.eprintf "@[%s (env): @,@]@\n" comment 
-
-open Misc
-   
-let stop_at_location loc r_opt =
-  if !set_verbose then
-    match r_opt with
-    | None ->
-       Format.eprintf "%aTyping error.@."
-         Location.output_location loc;
-       raise Stdlib.Exit
-    | Some _ -> r_opt
-  else r_opt
-
 let find_value_opt x env =
   let* { cur } = Env.find_opt x env in
   return cur
@@ -93,6 +46,8 @@ let find_gvalue_opt x env =
   match v with
   | Gvalue(v) -> return v
   | _ -> None
+
+let names env = Env.fold (fun n _ acc -> S.add n acc) env S.empty
 
 (* value of an immediate constant *)
 let value v =
@@ -190,19 +145,25 @@ let equal_values v1 v2 =
 (* variables are non bottom, provided free variables are non bottom *)
 (* this a very strong constraint. In particular, it rejects the situation *)
 (* of a variable that is bottom but not used. *)
-(* causal(genv)(env)(sem)(eq)(n)(s_eq)(bot) = 
+(* causal(env)(env_out)(names) =
  *-               /\ (forall x in Dom(env), env(x) <> bot)
  *-               /\ (env_out, _ = fixpoint_eq genv sem eq n s_eq bot)
- *-               => (forall x in Dom(rho), env_out(x) <> bot) *)
-let causal env env_out =
-  let non_bot env =
-    Env.for_all
-      (fun _ { cur } -> match cur with | Vbot -> false | _ -> true) env in
-  let r = if non_bot env then non_bot env_out else true in
-  if !set_verbose then
-    if not r then
+ *-               => (forall x in names /\ Dom(env_out), env_out(x) <> bot) *)
+let causal env env_out names =
+  let bot v = match v with | Vbot -> true | _ -> false in
+  let bot_name n =
+    let r = find_value_opt n env_out in
+    match r with | None -> false | Some(v) -> bot v in
+  let bot_names =
+    if Env.for_all (fun _ { cur } -> not (bot cur)) env
+    then S.filter bot_name names else S.empty in
+  let pnames ff names = S.iter (Ident.fprint_t ff) names in
+  if not !set_nocausality then
+    if S.is_empty bot_names then ()
+    else
       begin
-        Format.eprintf "%a" (fprint_ienv "Causality error:") env_out;
+        Format.eprintf "The following variables are not causal:\n\
+                        %a@." pnames bot_names;
         raise Stdlib.Exit
       end
   
@@ -495,6 +456,9 @@ let rec sexp genv env { e_desc = e_desc; e_loc } s =
      let n = size eq in
      let n = if n <= 0 then 0 else n+1 in
      let* env_eq, s_eq = fixpoint_eq genv env seq eq n s_eq bot in
+     (* a dynamic check of causality: all defined names in [eq] *)
+     (* must be non bottom provided that all free vars. are non bottom *)
+     let _ = causal env env_eq eq_write in
      let env = Env.append env_eq env in
      let* v, s = sexp genv env e s in
      return (v, Stuple [s_eq; s])
@@ -613,6 +577,8 @@ and sblock genv env v_list ({ eq_write; eq_loc } as eq) s_list s_eq =
   let n = size eq in
   let n = if n <= 0 then 0 else n+1 in
   let* env_eq, s_eq = fixpoint_eq genv env seq eq n s_eq bot in
+  (* a dynamic check of causality for [x1,...,xn] *)
+  let _ = causal env env_eq (names env_v) in
   (* store the next last value *)
   let* s_list = Opt.map2 (set_vardec env_eq) v_list s_list in
   (* remove all local variables from [env_eq] *)
