@@ -5,4 +5,4 @@ debug:
 	dune build --debug-backtraces --debug-dependency-path src/zrun.bc
 
 clean:
-	dune clean
+	dune clean; rm -f *~
