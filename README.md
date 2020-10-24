@@ -14,26 +14,25 @@ compiler (the so-called "constructively causal" programs) but rejected
 by Lustre, Lucid Synchrone, Scade, Zelus that impose stronger causality
 constraints; 4/ to prototype new language constructs for synchronous languages.
 
-The long term objective is to address all Zelus (we are far from
-that! for the moment, the input language lacks higher-order,
-arrays and is purely discrete-time). Moreover, there is no static checks.
-
-The language kernel is a subset of Zelus (and Lucid Synchrone). In particular,
-state automata can be parameterized. Paper [EMSOFT'05] defines a semantics
-by translation into a small data-flow kernel from an input language that is
-very close to what zrun executes; [EMSOFT'06] defines a relational semantics. Here,
-the semantics is denotational and executable following what paper
-"The semantics and execution of a synchronous block-diagram language",
-Edwards and Lee, Science of Computer Programming 2006.
+The language kernel is a first-order subset of Zelus (and Lucid Synchrone). In
+particular, state automata can be parameterized (they are described in
+[EMSOFT'06] which gives a relational semantics). Zrun defines a
+denotational and executable semantics that computes a fix-point at
+every instant.
 
 The internal mechanics of the semantics and interpreter is based on
 (an old) paper "A Coiterative Characterization of Synchronous Stream
 Functions", by Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report,
-1997).
+1997). A fix-point semantics was also exposed in "The semantics and
+execution of a synchronous block-diagram language", Edwards and Lee,
+Science of Computer Programming 2006.
 
-If you find this work useful or have any comment/criticism,
-please send a mail to Marc.Pouzet@ens.fr.
+The long term objective is to treat all Zelus programs. We are far away from
+that! For the moment, the input language lacks higher-order,
+arrays and is purely discrete-time. 
 
+If you find this work useful or have any
+comment/question/criticism, please send a mail to Marc.Pouzet@ens.fr.
 
 ## Getting Started
 
