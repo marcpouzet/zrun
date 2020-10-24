@@ -22,17 +22,17 @@ synchronous languages.
 The language kernel is a first-order subset of Zelus (and Lucid
 Synchrone). In particular, state automata can be parameterized, a
 feature that does not exist in Scade (this construct was described in
-[EMSOFT'06] together with a relational semantics). Zrun defines an
-executable denotational semantics.
+[EMSOFT'06] together with a relational semantics).
 
-The internal mechanics of the semantics and interpreter is based on
-(an old) paper "A Coiterative Characterization of Synchronous Stream
-Functions", by Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report,
-1997). This semantics was based on the computation of a fix-point at
-every instant that was realised by a shallow embedding of language
-constructs in Haskell. A fix-point semantics was also exposed in "The
-semantics and execution of a synchronous block-diagram language",
-Edwards and Lee, Science of Computer Programming 2006.
+Zrun gives an executable denotational semantics.  The internal
+mechanics of the semantics and interpreter is based on (an old) paper
+"A Coiterative Characterization of Synchronous Stream Functions", by
+Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997). This
+semantics was based on the computation of a fix-point at every instant
+that was realised by a shallow embedding of language constructs in
+Haskell. A fix-point semantics was also exposed in "The semantics and
+execution of a synchronous block-diagram language", Edwards and Lee,
+Science of Computer Programming 2006.
 
 The long term objective is to treat all Zelus programs. We are far away from
 that! For the moment, the input language lacks higher-order,
