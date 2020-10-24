@@ -45,7 +45,7 @@ comment/question/criticism, please send a mail to Marc.Pouzet@ens.fr.
 
 ## Getting Started
 
-The interpreter is written in OCaml.
+The interpreter is written in OCaml mostly in purely functional style.
 The simplest way to install the dependencies is via [OPAM](https://opam.ocaml.org/).
 
 ```bash
