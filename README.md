@@ -30,7 +30,7 @@ mechanics of the semantics and interpreter is based on (an old) paper
 Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997). This
 semantics was realised by a shallow embedding in Haskell. The
 semantics of mutually recursive stream equations was defined by a
-fix-point computed at every step. The idea of computing a
+fix-point computed at every instant. The idea of computing a
 fix-point at every instant is exposed in the paper "The semantics and
 execution of a synchronous block-diagram language", Edwards and Lee,
 Science of Computer Programming 2006.
@@ -227,7 +227,6 @@ To run this example for 30 steps:
 ./zrun.exe -s main -n 30 tests/watch_in_scade.zls
 ```
 
-```
 The following is a classical example of a cyclic program that is
 statically rejected by the Lustre/Scade/Lucid Synchrone/Zelus compilers
 while it is a valid Esterel program. This example is due to Robert
@@ -236,6 +235,7 @@ an example to illustrate the fixpoint semantics presented in the
 paper: "The semantics and execution of a synchronous block-diagram
 language", Stephen Edwards and Edward Lee, SCP, 2003.
 
+```
 (* file arbiter.zls *)
 let node and_gate(x,y) returns (z)
     if x then z = y else z = false
@@ -283,7 +283,7 @@ let node main() returns (grant1, grant2, grant3)
   and
     grant1, grant2, grant3 = arbiter_three(request1, request2, request3)
   done
-
+```
 
 See other examples in directory tests/
 
