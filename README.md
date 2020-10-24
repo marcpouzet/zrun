@@ -2,7 +2,7 @@
 
 ZRun is an interpreter for a synchronous data-flow language which allows
 for mixing data-flow equations (a la Lustre) and hierarchical automata (a la
-Lucid Synchrone). The input language is a first-order subset of Zelus that is
+Lucid Synchrone). The input language is a first-order subset of Zelus and is
 only discrete-time.
 
 The purpose of this prototype is to give a reference and executable semantics for a
