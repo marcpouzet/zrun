@@ -73,6 +73,8 @@ Consider for instance the simple chronometer in `tests/chrono_in_scade.zls`
 
 ```
 (*
+This example is adapted from a classical example from Scade
+
 -------------------------- Watch Interface-------------------------
 -- stst : start/stop button
 -- rst : reset button
