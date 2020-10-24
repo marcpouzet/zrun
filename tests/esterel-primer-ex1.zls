@@ -1,0 +1,48 @@
+(* Example from the Esterel primer v5.91, Berry, 2000 :
+ *- Section 5.1.4
+   module P13:
+     input I;
+     output O1, O2;
+     present I then
+        present O2 then emit O1 end
+     else
+        present O1 then emit O2 end
+     end present
+   end module *)
+(* This program is said to be constructive causal *)
+
+let node p13(i) returns (o1 default false, o2 default false)
+  do
+  if i then
+    do if o2 then o1 = true done
+  else
+    do if o1 then o2 = true done
+  done
+
+(* This may appear counter-intuitive. In fact, no as the previous
+ *- writting is a short-cut for the following one as variable o1 and o2
+ *- are implicitly completed with a default value
+ *- The following is executed by zrun without producing bottom; as it is also
+ *- the case for p13_default *)
+let node p13_default(i) returns (o1, o2)
+  do
+  if i then
+    do if o2 then o1 = true else o1 = false
+    and o2 = false done
+  else
+    do if o1 then o2 = true else o2 = false
+    and o1 = true
+    done
+  done
+
+let node main() returns (ok)
+  local i, o11, o22, o111, o222
+  do
+    i = true fby not i
+  and
+    (o11, o22) = p13(i)
+  and
+    (o111, o222) = p13_default(i)
+  and
+    ok = (o11 = o111) && (o22 = o222)
+  done
