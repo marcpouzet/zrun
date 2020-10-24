@@ -28,7 +28,7 @@ the semantics is denotational and executable following what paper
 Edwards and Lee, Science of Computer Programming 2006.
 
 The internal mechanics of the semantics and interpreter is based on
-paper "A Co-iterative Characterization of Synchronous Stream
+(an old) paper "A Coiterative Characterization of Synchronous Stream
 Functions", by Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report,
 1997).
 
