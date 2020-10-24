@@ -37,7 +37,7 @@ Science of Computer Programming 2006.
 
 The long term objective is to treat all Zelus programs. We are far away from
 that! For the moment, the input language lacks higher-order,
-arrays and is purely discrete-time. 
+arrays, valued signals and is purely discrete-time. 
 
 If you find this work useful or have any
 comment/question/criticism, please send a mail to Marc.Pouzet@ens.fr.
