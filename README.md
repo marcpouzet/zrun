@@ -6,11 +6,12 @@ Lucid Synchrone). The input language is a first-order subset of Zelus and is
 only discrete-time.
 
 The purpose of this prototype is to give a reference and executable semantics for a
-language like Scade that can be used 1/ for compiler testing; 2/ to prove
+language like Scade that serves several objectives: 1/ for compiler testing; 2/ to prove
 compilation steps (e.g., that a well typed program does not lead to a
 type error; or source-to-source transformations like static scheduling
-or the compilation of automata); 3/ to execute unfinished
-programs or programs that are possibly cyclic and accepted by an Esterel
+or the compilation of automata); 3/ to execute possibly unfinished
+programs or programs that are rejected by the existing static
+analyses but are correct programs. Examples are cyclic circuits accepted by an Esterel
 compiler (the so-called "constructively causal" programs) but rejected
 by Lustre, Lucid Synchrone, Scade, Zelus that impose stronger causality
 constraints; 4/ to prototype new language constructs for synchronous languages.
