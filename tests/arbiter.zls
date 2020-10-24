@@ -1,0 +1,39 @@
+(* The example of a cyclic token ring arbiter from Robert de Simone (mentionned in
+ *- the Esterel primer V5 by Berry. Used as an example to illustrate the
+ *- fixpoint semantics presented in the paper:
+ *- The semantics and execution of a synchronous block-diagram language,
+ *- Stephen Edwards and Edward Lee, SCP, 2003 *)
+
+(* the two operators are sequential, not symetric as in Edwards and Lee's paper *)
+let node and_gate(x,y) returns (z)
+    if x then z = y else z = false
+
+let node or_gate(x,y) returns (z)
+    if x then z = true else z = y
+
+let node arbiter(request, pass_in token_in) returns (grant, pass_out, token_out)
+  local o
+  do
+    grant = and_gate(request, o)
+  and
+    pass_out = and_gate(not request, o)
+  and
+    o = or_gate(pass_in, token_in)
+  and
+    token_out = false fby token_in
+  done
+      
+let node arbiter_three(request1, request2, request3) returns (grant1, grant2, grant3)
+  local pass_out1,
+        pass_out2,
+        pass_out3,
+        token_out1,
+        token_out2,
+        token_out3
+  do
+    grant1, pass_out1, token_out1 = arbiter(request1, pass_out3, token_out3)
+  and
+    grant2, pass_out2, token_out2 = arbiter(request2, pass_out1, token_out1)
+  and
+    grant3, pass_out3, token_out3 = arbiter(request3, pass_out2, token_out2)
+  done
