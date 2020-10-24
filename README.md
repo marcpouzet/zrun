@@ -31,7 +31,7 @@ Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997). This
 semantics was realised by a shallow embedding in Haskell. The
 semantics of mutually recursive stream equations was defined by a
 fix-point on values computed at every step. The idea of computing a
-fix-point at every instant was also exposed in the paper "The semantics and
+fix-point at every instant was exposed in the paper "The semantics and
 execution of a synchronous block-diagram language", Edwards and Lee,
 Science of Computer Programming 2006.
 
