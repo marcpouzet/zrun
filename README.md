@@ -5,29 +5,34 @@ for mixing data-flow equations (a la Lustre) and hierarchical automata (a la
 Lucid Synchrone). The input language is a first-order subset of Zelus and is
 only discrete-time.
 
-The purpose of this prototype is to give a reference and executable semantics for a
-language like Scade that serves several objectives: 1/ for compiler testing; 2/ to prove
-compilation steps (e.g., that a well typed program does not lead to a
-type error; or source-to-source transformations like static scheduling
-or the compilation of automata); 3/ to execute possibly unfinished
-programs or programs that are rejected by the existing static
-analyses but are correct programs. Examples are cyclic circuits accepted by an Esterel
-compiler (the so-called "constructively causal" programs) but rejected
-by Lustre, Lucid Synchrone, Scade, Zelus that impose stronger causality
-constraints; 4/ to prototype new language constructs for synchronous languages.
+The purpose of this prototype is to give a reference and executable
+semantics for a language like Scade. It serves several objectives: 1/
+to test an existing compiler; 2/ to prove compilation steps (e.g.,
+that a well typed/causal/initialized program does not lead to an
+error; or to prove semantics preservation of source-to-source
+transformations like static scheduling or the compilation of
+automata); 3/ to execute unfinished programs or programs that are
+semantically correct but are statically rejected by the compiler.
+Examples are cyclic circuits accepted by an Esterel compiler (the
+so-called "constructively causal" programs) but are rejected by
+Lustre, Lucid Synchrone, Scade, Zelus compilers that impose stronger
+causality constraints; 4/ to prototype new language constructs for
+synchronous languages.
 
-The language kernel is a first-order subset of Zelus (and Lucid Synchrone). In
-particular, state automata can be parameterized (they are described in
-[EMSOFT'06] which gives a relational semantics). Zrun defines a
-denotational and executable semantics that computes a fix-point at
-every instant.
+The language kernel is a first-order subset of Zelus (and Lucid
+Synchrone). In particular, state automata can be parameterized, a
+feature that does not exist in Scade (this construct was described in
+[EMSOFT'06] together with a relational semantics). Zrun defines an
+executable denotational semantics.
 
 The internal mechanics of the semantics and interpreter is based on
 (an old) paper "A Coiterative Characterization of Synchronous Stream
 Functions", by Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report,
-1997). A fix-point semantics was also exposed in "The semantics and
-execution of a synchronous block-diagram language", Edwards and Lee,
-Science of Computer Programming 2006.
+1997). This semantics was based on the computation of a fix-point at
+every instant that was realised by a shallow embedding of language
+constructs in Haskell. A fix-point semantics was also exposed in "The
+semantics and execution of a synchronous block-diagram language",
+Edwards and Lee, Science of Computer Programming 2006.
 
 The long term objective is to treat all Zelus programs. We are far away from
 that! For the moment, the input language lacks higher-order,
