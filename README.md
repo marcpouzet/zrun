@@ -14,9 +14,10 @@ by an Esterel compiler (the so-called "constructively causal" programs) but
 rejected by Lustre, Lucid Synchrone, Scade, Zelus); 4/ to experiment with
 novel language extensions.
 
-The long term objective is to get Zelus (for the moment, the input language
-of zrun lacks higher-order, arrays and is purely discrete which Zelus allows
-for mixing continuous-time and discrete-time signals).
+The long term objective is to treat all Zelus program (we are far from
+that! for the moment, the input language lacks higher-order,
+arrays and is purely discrete which Zelus allows for mixing
+continuous-time and discrete-time signals).
 
 The language kernel is a subset of Zelus (and Lucid Synchrone). In particular,
 state automata can be parameterized. Paper [EMSOFT'05] defines a semantics
