@@ -16,7 +16,7 @@ constraints; 4/ to prototype new language constructs for synchronous languages.
 
 The long term objective is to address all Zelus (we are far from
 that! for the moment, the input language lacks higher-order,
-arrays and is purely discrete-time). Moreover, there is no static checks!
+arrays and is purely discrete-time). Moreover, there is no static checks.
 
 The language kernel is a subset of Zelus (and Lucid Synchrone). In particular,
 state automata can be parameterized. Paper [EMSOFT'05] defines a semantics
