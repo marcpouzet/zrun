@@ -223,9 +223,9 @@ To run this example for 30 steps:
 
 ```
 The following is a classical example of a cyclic program that is
-statically rejected by the Lustre/Scade/Lucid Synchrone/Zelus compiler
-while it is a correct Esterel program. This example is due to Robert
-de Simone; it is given in the Esterel primer V5, Berry. It is used as
+statically rejected by the Lustre/Scade/Lucid Synchrone/Zelus compilers
+while it is a valid Esterel program. This example is due to Robert
+de Simone and is given by Berry in the Esterel primer V5.91 of 2000. It is also used as
 an example to illustrate the fixpoint semantics presented in the
 paper: "The semantics and execution of a synchronous block-diagram
 language", Stephen Edwards and Edward Lee, SCP, 2003.
