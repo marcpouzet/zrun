@@ -256,6 +256,8 @@ let node arbiter_three(request1, request2, request3) returns (grant1, grant2, gr
         token_out1,
         token_out2,
         token_out3
+  (* note that the following set of equations is cyclic if we build an
+  unconditional dependence graph *)
   do
     grant1, pass_out1, token_out1 = arbiter(request1, pass_out3, token_out3)
   and
