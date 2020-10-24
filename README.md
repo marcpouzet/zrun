@@ -73,6 +73,7 @@ Consider for instance the simple chronometer in `tests/chrono_in_scade.zls`
 
 ```
 (*
+file watch_in_scade.zls
 This example is adapted from a classical example from Scade
 
 -------------------------- Watch Interface-------------------------
@@ -213,13 +214,69 @@ let node main () returns (a1, a2, a3, l, s, sh)
       
 ```
 
-The file `tests/chrono.zls` also contains a `main` node to simulate one possible execution.
+The file `tests/watch_in_scade.zls` also contains a `main` node to simulate one possible execution.
 To run this example for 30 steps:
 
 ```bash
-./zrun.exe -s main -n 30 tests/chrono_in_scade.zls
+./zrun.exe -s main -n 30 tests/watch_in_scade.zls
 ```
 
+```
+The following is a classical example of a cyclic program that is
+statically rejected by the Lustre/Scade/Lucid Synchrone/Zelus compiler
+while it is a correct Esterel program. This example is due to Robert
+de Simone; it is given in the Esterel primer V5, Berry. It is used as
+an example to illustrate the fixpoint semantics presented in the
+paper: "The semantics and execution of a synchronous block-diagram
+language", Stephen Edwards and Edward Lee, SCP, 2003.
 
+(* file arbiter.zls *)
+let node and_gate(x,y) returns (z)
+    if x then z = y else z = false
+
+let node or_gate(x,y) returns (z)
+    if x then z = true else z = y
+
+let node arbiter(request, pass_in, token_in) returns (grant, pass_out, token_out)
+  local o
+  do
+    grant = and_gate(request, o)
+  and
+    pass_out = and_gate(not request, o)
+  and
+    o = or_gate(pass_in, token_in)
+  and
+    token_out = false fby token_in
+  done
+      
+let node arbiter_three(request1, request2, request3) returns (grant1, grant2, grant3)
+  local pass_out1,
+        pass_out2,
+        pass_out3,
+        token_out1,
+        token_out2,
+        token_out3
+  do
+    grant1, pass_out1, token_out1 = arbiter(request1, pass_out3, token_out3)
+  and
+    grant2, pass_out2, token_out2 = arbiter(request2, pass_out1, token_out1)
+  and
+    grant3, pass_out3, token_out3 = arbiter(request3, pass_out2, token_out2)
+  done
+
+let node main() returns (grant1, grant2, grant3) 
+  local request1, request2, request3
+  do
+    request1 = true
+  and
+    request2 = true
+  and
+    request3 = true
+  and
+    grant1, grant2, grant3 = arbiter_three(request1, request2, request3)
+  done
+
+
+See other examples in directory tests/
 
 
