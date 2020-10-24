@@ -25,12 +25,13 @@ feature that does not exist in Scade (this construct was described in
 [EMSOFT'06] together with a relational semantics).
 
 Zrun gives an executable denotational semantics.  The internal
-mechanics of the semantics and interpreter is based on (an old) paper
+mechanics of the semantics and interpreter is based on paper
 "A Coiterative Characterization of Synchronous Stream Functions", by
 Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997). This
 semantics was realised by a shallow embedding in Haskell. The
 semantics of mutually recursive stream equations was defined by a
-fix-point computed at every instant. The idea of computing a
+fix-point computed at every instant. We do here a deep embedding instead.
+The idea of computing a
 fix-point at every instant is exposed in the paper "The semantics and
 execution of a synchronous block-diagram language", Edwards and Lee,
 Science of Computer Programming 2006.
