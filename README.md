@@ -2,7 +2,8 @@
 
 ZRun is an interpreter for a synchronous data-flow language which allows
 for mixing data-flow equations (a la Lustre) and hierarchical automata (a la
-Lucid Synchrone).
+Lucid Synchrone). The input language is a first-order subset of Zelus that is
+only discrete-time.
 
 The purpose of this prototype is to give a reference and executable semantics for a
 language like Scade that can be used 1/ for compiler testing; 2/ to prove
