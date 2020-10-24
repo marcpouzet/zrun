@@ -1,5 +1,5 @@
 (* The example of a cyclic token ring arbiter from Robert de Simone (mentionned in
- *- the Esterel primer V5 by Berry. Used as an example to illustrate the
+ *- the Esterel primer V5, Berry). Used as an example to illustrate the
  *- fixpoint semantics presented in the paper:
  *- The semantics and execution of a synchronous block-diagram language,
  *- Stephen Edwards and Edward Lee, SCP, 2003 *)
