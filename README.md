@@ -5,7 +5,7 @@ for mixing data-flow equations (a la Lustre) and hierarchical automata (a la
 Lucid Synchrone).
 
 The purpose of this prototype is to give a reference semantics for a
-language like Scade and to used it 1/ for compiler testing;
+language like Scade that can be used 1/ for compiler testing;
 2/ prove compilation steps (e.g., that a well typed program does not
 lead to a type error; or source-to-source transformations like
 static scheduling or the compilation of automata); 3/ to be able to
@@ -14,7 +14,11 @@ by an Esterel compiler (the so-called "constructively causal" programs) but
 rejected by Lustre, Lucid Synchrone, Scade, Zelus); 4/ to experiment with
 novel language extensions.
 
-The language kernel is that of Zelus (and Lucid Synchrone). In particular,
+The long term objective is to get Zelus (for the moment, the input language
+of zrun lacks higher-order, arrays and is purely discrete which Zelus allows
+for mixing continuous-time and discrete-time signals).
+
+The language kernel is a subset of Zelus (and Lucid Synchrone). In particular,
 state automata can be parameterized. Paper [EMSOFT'05] defines a semantics
 by translation into a small data-flow kernel from an input language that is
 very close to what zrun executes; [EMSOFT'06] defines a relational semantics. Here,
