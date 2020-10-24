@@ -8,7 +8,7 @@
    end module *)
 (* This program is said to be constructive causal *)
 
-let node p14(i) returns (o1 default false, o2 default false)
+let node p14() returns (o1 default false, o2 default false)
   automaton
   | Init -> do if o1 then o2 = true
             until true then After
@@ -16,7 +16,7 @@ let node p14(i) returns (o1 default false, o2 default false)
   end
   
 (* If we remove the default and complete branches *)
-let node p14_default(i) returns (o1, o2)
+let node p14_default() returns (o1, o2)
   automaton
   | Init ->
       do if o1 then o2 = true else o2 = false
@@ -28,13 +28,11 @@ let node p14_default(i) returns (o1, o2)
   end
 
 let node main() returns (ok)
-  local i, o11, o22, o111, o222
+  local o11, o22, o111, o222
   do
-    i = true fby not i
+    (o11, o22) = p14()
   and
-    (o11, o22) = p14(i)
-  and
-    (o111, o222) = p14_default(i)
+    (o111, o222) = p14_default()
   and
     ok = (o11 = o111) && (o22 = o222)
   done
