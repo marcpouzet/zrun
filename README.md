@@ -5,11 +5,14 @@ for mixing data-flow equations (a la Lustre) and hierarchical automata (a la
 Lucid Synchrone).
 
 The purpose of this prototype is to give a reference semantics for a
-language like Scade that may be used 1/ for testing an existing
-compiler; 2/ prove some compilation steps (static checks,
-source-to-source transformations); 3/ accept possibly cyclic programs
-(e.g., some that are accepted by the Esterel compiler but rejected by
-Lustre, Lucid Synchrone, Scade); 4/ debugging purposes.
+language like Scade and to used it 1/ for compiler testing;
+2/ prove compilation steps (e.g., that a well typed program does not
+lead to a type error; or source-to-source transformations like
+static scheduling or the compilation of automata); 3/ to be able to
+execute unfinished model or models that are possibly cyclic and accepted
+by an Esterel compiler (the so-called "constructively causal" programs) but
+rejected by Lustre, Lucid Synchrone, Scade, Zelus); 4/ to experiment with
+novel language extensions.
 
 The language kernel is that of Zelus (and Lucid Synchrone). In particular,
 state automata can be parameterized. Paper [EMSOFT'05] defines a semantics
