@@ -166,7 +166,7 @@ let causal env env_out names =
                         %a@." pnames bot_names;
         raise Stdlib.Exit
       end
-  
+
 (* bounded fixpoint combinator *)
 (* computes a pre fixpoint f^n(bot) <= fix(f) *)
 let fixpoint n equal f s bot =
