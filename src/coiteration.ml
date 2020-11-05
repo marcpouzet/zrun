@@ -491,7 +491,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
         | Vbot -> return (bot_env eq_write, Stuple [se; s_eq1; s_eq2])
         | Vnil -> return (nil_env eq_write, Stuple [se; s_eq1; s_eq2])
         | Value(b) ->
-           let* v = boolean b in
+           let* v = bool b in
            if v then
              let* env1, s_eq1 = seq genv env eq1 s_eq1 in
              (* complete the output environment with default *)
@@ -520,7 +520,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        | Vbot -> return (bot_env eq_write, Stuple [s_eq; se])
        | Vnil -> return (nil_env eq_write, Stuple [s_eq; se])
        | Value(v) ->
-          let* v = boolean v in
+          let* v = bool v in
           reset ieq seq genv env eq s_eq v in    
      return (env_eq, Stuple [s_eq; se])
   | EQlocal(v_list, eq), Stuple [Stuple(s_list); s_eq] ->
@@ -535,7 +535,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        | (Vnil, _) | (_, Vnil) ->
           return (nil_env eq_write, ps, pr, s_list)
        | Value(ps), Value(pr) ->
-          let* pr = boolean pr in
+          let* pr = bool pr in
           sautomaton_handler_list
             is_weak genv env eq_write a_h_list ps pr s_list in
      return (env, Stuple (Sval(ns) :: Sval(nr) :: s_list))
@@ -558,7 +558,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        match ve with
        | Vnil | Vbot -> return s
        | Value(v) ->
-          let* v = boolean v in
+          let* v = bool v in
           (* stop when [no_assert = true] *)
           if !no_assert then return s 
           else if v then return s else None in
@@ -729,7 +729,7 @@ and sautomaton_handler_list is_weak genv env eq_write a_h_list ps pr s_list =
     | (Vnil, _) | (_, Vnil) ->
        return (bot_env eq_write, ns, nr, s_list)
     | Value(vns), Value(vnr) ->
-       let* vnr = boolean vnr in
+       let* vnr = bool vnr in
        let* env_body, s_list = body_list a_h_list vns vnr s_list in
        let env_handler = Env.append env_trans env_body in
        (* complete missing entries in the environment *)
@@ -764,7 +764,7 @@ and sescape_list genv env escape_list s_list ps pr =
           (* change mais les equations ne sont evaluees que lorsque *)
           (* la condition est vraie *)
           (* le code ci-dessous ne le fait pas. *)
-          let* v = boolean v in
+          let* v = bool v in
           let* env, env_body, s_var_list, s_body =
             sblock_with_reset genv env e_vars e_body s_var_list s_body pr in
           let* ns, s_next_state = sstate genv env e_next_state s_next_state in
