@@ -18,60 +18,64 @@ open Lident
    
 module Genv = Map.Make(Lident)
 
-let boolean v =
+let bool v =
   match v with
   | Vbool(b) -> return b
   | _ -> None
 
-let integer v =
+let int v =
   match v with
   | Vint(i) -> return i | _ -> None
 
+let float v =
+  match v with
+  | Vfloat(i) -> return i | _ -> None
+
 let ifthenelse_op v v1 v2 =
-  let* b = boolean v in
+  let* b = bool v in
   if b then return v1 else return v2
 
 let not_op v =
-  let* v = boolean v in
+  let* v = bool v in
   return (Vbool(not v))
 
 let uminus_op v =
-  let* v = integer v in
+  let* v = int v in
   return (Vint(- v))
 
 let and_op v1 v2 =
-  let* v1 = boolean v1 in
-  let* v2 = boolean v2 in
+  let* v1 = bool v1 in
+  let* v2 = bool v2 in
   return (Vbool(v1 && v2))
 
 let or_op v1 v2 =
-  let* v1 = boolean v1 in
-  let* v2 = boolean v2 in
+  let* v1 = bool v1 in
+  let* v2 = bool v2 in
   return (Vbool(v1 || v2))
 
 let add_op v1 v2 =
-  let* v1 = integer v1 in
-  let* v2 = integer v2 in
+  let* v1 = int v1 in
+  let* v2 = int v2 in
   return (Vint(v1 + v2))
 
 let minus_op v1 v2 =
-  let* v1 = integer v1 in
-  let* v2 = integer v2 in
+  let* v1 = int v1 in
+  let* v2 = int v2 in
   return (Vint(v1 - v2))
     
 let mult_op v1 v2 =
-  let* v1 = integer v1 in
-  let* v2 = integer v2 in
+  let* v1 = int v1 in
+  let* v2 = int v2 in
   return (Vint(v1 * v2))
 
 let div_op v1 v2 =
-  let* v1 = integer v1 in
-  let* v2 = integer v2 in
+  let* v1 = int v1 in
+  let* v2 = int v2 in
   return (Vint(v1 / v2))
 
 let mod_op v1 v2 =
-  let* v1 = integer v1 in
-  let* v2 = integer v2 in
+  let* v1 = int v1 in
+  let* v2 = int v2 in
   return (Vint(v1 mod v2))
 
 let eq_op v1 v2 =
@@ -220,7 +224,25 @@ let unop op =
 let binop op =
   CoFun
     (fun v -> let* (v1, v2) = two v in let* v = lift2 op v1 v2 in return [v])
-  
+
+(* state processes *)
+let unop_process op s =
+  CoNode
+    { init = s;
+      step =
+        fun s (_: value list) ->
+        let* v = op s in
+        return ([v], s) }
+
+let binop_process op s =
+  CoNode
+    { init = s;
+      step =
+        fun s v ->
+        let* v = one v in
+        let* v = lift1 (op s) v in
+        return ([v], s) }
+
 (* The initial environment *)
 let genv0 =
   ["+", binop add_op;
@@ -244,4 +266,43 @@ let genv0 =
 let genv0 =
   List.fold_left
     (fun acc (n, v) -> Genv.add (Name n) (Gfun v) acc) Genv.empty genv0
-   
+  
+ 
+let _ = Random.int 0
+
+let random_bool_op (_: pvalue) = return (Vbool(Random.bool()))
+let random_int_op v =
+  let* v = int v in
+  return (Vint(Random.int v))
+let random_float_op v =
+  let* v = float v in
+  return (Vfloat(Random.float v))
+    
+let genv1 =
+  ["random_bool", unop random_bool_op;
+   "random_int", unop random_int_op;
+   "random_float", unop random_float_op]
+
+let genv0 =
+  List.fold_left
+    (fun acc (n, v) -> Genv.add (Name n) (Gfun v) acc) genv0 genv1
+
+(* A better solution is to make those function state functions *)
+(*
+let random_bool =
+  unop_process (fun s -> return (Value(Vbool(Random.State.bool s))))
+    (Random.State.make [|0|])
+
+let random_int =
+  binop_process
+    (fun s v -> let* v = int v in
+                return (Vint(Random.State.int s v)))
+    (Random.State.make [|0|])
+    
+let random_float =
+  binop_process
+    (fun s v ->
+      let* v = float v in
+      return (Vfloat(Random.State.float s v)))
+    (Random.State.make [|0|])
+ *) 
