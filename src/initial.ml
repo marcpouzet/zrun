@@ -267,7 +267,7 @@ let genv0 =
   List.fold_left
     (fun acc (n, v) -> Genv.add (Name n) (Gfun v) acc) Genv.empty genv0
   
- 
+(* 
 let _ = Random.int 0
 
 let random_bool_op (_: pvalue) = return (Vbool(Random.bool()))
@@ -287,6 +287,7 @@ let genv0 =
   List.fold_left
     (fun acc (n, v) -> Genv.add (Name n) (Gfun v) acc) genv0 genv1
 
+ *)
 (* A better solution is to make those function state functions *)
 (*
 let random_bool =

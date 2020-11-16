@@ -4,25 +4,27 @@
  *- The semantics and execution of a synchronous block-diagram language,
  *- Stephen Edwards and Edward Lee, SCP, 2003 *)
 
-(* the two operators are sequential, not symetric as in Edwards and Lee's paper *)
-(* in the current semantics all imported functions are strict, hence preventing *)
+(* the two boolean operators are sequential, not symetric as *)
+(* in Edwards and Lee's paper. In the current semantics all imported *)
+(* functions are strict, hence preventing *)
 (* to have or(true, _) = or(_, true) = true with _ possibly bot *)
 let node and_gate(x,y) returns (z)
-    if x then z = y else z = false
+    z = x & y
 
-let node or_gate(x,y) returns (z)
+let node sequential_or(x,y) returns (z)
     if x then z = true else z = y
 
-let node arbiter(request, pass_in, token_in) returns (grant, pass_out, token_out)
+(* i is the initial value of one block *)
+let node arbiter(i, request, pass_in, token_in) returns (grant, pass_out, token_out)
   local o
   do
     grant = and_gate(request, o)
   and
     pass_out = and_gate(not request, o)
   and
-    o = or_gate(pass_in, token_in)
+    o = sequential_or(token_in, pass_in)
   and
-    token_out = false fby token_in
+    token_out = i fby token_in
   done
       
 let node arbiter_three(request1, request2, request3) returns (grant1, grant2, grant3)
@@ -33,11 +35,11 @@ let node arbiter_three(request1, request2, request3) returns (grant1, grant2, gr
         token_out2,
         token_out3
   do
-    grant1, pass_out1, token_out1 = arbiter(request1, pass_out3, token_out3)
+    grant1, pass_out1, token_out1 = arbiter(true, request1, pass_out3, token_out3)
   and
-    grant2, pass_out2, token_out2 = arbiter(request2, pass_out1, token_out1)
+    grant2, pass_out2, token_out2 = arbiter(false, request2, pass_out1, token_out1)
   and
-    grant3, pass_out3, token_out3 = arbiter(request3, pass_out2, token_out2)
+    grant3, pass_out3, token_out3 = arbiter(false, request3, pass_out2, token_out2)
   done
 
 let node main() returns (grant1, grant2, grant3) 
