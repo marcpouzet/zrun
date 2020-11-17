@@ -1,37 +1,36 @@
 # The ZRun Interpreter
 
-ZRun is an interpreter for a synchronous data-flow language. For the
-moment, the input language is a first-order subset of Zelus and is
-only discrete-time. The long term goal is to treat all Zelus programs
-(we are far away from that!  constructs to deal with continuous-time,
-higher-order functions, arrays are not treated for the moment).
+ZRun is an interpreter for a synchronous data-flow language. The input
+of Zrun is a first-order subset of Zelus (with the same syntax) and is
+only discrete-time. Programs can mix data-flow equations and
+hierarchical automata as it exists in Scade. States in automata can be
+parameterized (this feature is not provided by Scade; it is described
+in the paper [EMSOFT'06] by Colaco et al.). The long term goal is to
+treat all Zelus programs (we are far away from that!).  Constructs to
+deal with continuous-time (ODE and zero-crossing events), higher-order
+functions, arrays are not considered for the moment.
 
-One goal of this work is to give a reference and executable
-semantics for a language like Scade in order to: 1/ have a reference
-interpreter to test a compiler; 2/ to prove compilation steps (e.g.,
+One objective is to give a reference and executable
+semantics for a language like Scade that can be used: to test
+an existing compiler; to prove compilation steps (e.g.,
 that a well typed/causal/initialized program does not lead to an
 error; or to prove semantics preservation of source-to-source
 transformations like static scheduling or the compilation of
-automata); 3/ to execute unfinished programs or programs that are
+automata); to execute unfinished programs or programs that are
 semantically correct but are statically rejected by the compiler.
 Examples are cyclic circuits accepted by an Esterel compiler (the
 so-called "constructively causal" programs) but are rejected by
 Lustre, Lucid Synchrone, Scade, Zelus compilers that impose stronger
-causality constraints; 4/ to prototype new language constructs.
+causality constraints; to prototype new language constructs.
 
-A the moment, the input of Zrun is a first-order subset of Zelus with
-essentially the same syntax. Programs can mix data-flow equations
-and hierarchical automata. States in automata can be parameterized
-(this feature is described in the paper [EMSOFT'06] by Colaco et al.).
 
-Zrun gives an executable denotational semantics. It builds on two
-papers: 1/ "A Coiterative Characterization of Synchronous Stream
-Functions", by Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report,
-1997), using a fix-point at every instant to compute the solution of
-recursive equations over streams; 2/ "The semantics and execution of
-a synchronous block-diagram language", by Edwards and Lee, Science of
-Computer Programming 2006. It also defines a fix-point semantics
-for a synchronous data-flow language.
+Zrun defines an executable denotational semantics. It builds on two
+papers which defines the semantics of a data-flow language through the
+computation of a fix-point at every reaction step: 1/ "A Coiterative
+Characterization of Synchronous Stream Functions", by Caspi and
+Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 2/ "The semantics and
+execution of a synchronous block-diagram language", by Edwards and
+Lee, Science of Computer Programming 2006.
 
 If you find this work useful or have any
 comment/question/criticism, please send a mail to Marc.Pouzet@ens.fr.
