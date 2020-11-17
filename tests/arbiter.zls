@@ -5,14 +5,21 @@
  *- Stephen Edwards and Edward Lee, SCP, 2003 *)
 
 (* the two boolean operators are sequential, not symetric as *)
-(* in Edwards and Lee's paper. In the current semantics all imported *)
+(* in Esterel and SCP paper. In the current semantics all imported *)
 (* functions are strict, hence preventing *)
 (* to have or(true, _) = or(_, true) = true with _ possibly bot *)
-let node and_gate(x,y) returns (z)
-    z = x & y
+let node sequential_and_gate(x,y) returns (z)
+    if x then z = y else z = false
 
-let node sequential_or(x,y) returns (z)
+let node sequential_or_gate(x,y) returns (z)
     if x then z = true else z = y
+
+let node and_gate(x,y) returns (z)
+    z = x && y
+
+let node strict_or_gate(x,y) returns (z)
+    z = x or y
+
 
 (* i is the initial value of one block *)
 let node arbiter(i, request, pass_in, token_in) returns (grant, pass_out, token_out)
@@ -22,7 +29,7 @@ let node arbiter(i, request, pass_in, token_in) returns (grant, pass_out, token_
   and
     pass_out = and_gate(not request, o)
   and
-    o = sequential_or(token_in, pass_in)
+    o = sequential_or_gate(token_in, pass_in)
   and
     token_out = i fby token_in
   done

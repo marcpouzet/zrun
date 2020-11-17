@@ -239,25 +239,36 @@ and Edward Lee, SCP, 2003.
 
 ```
 (* file arbiter.zls *)
-let node and_gate(x,y) returns (z)
+
+(* the two boolean operators are sequential, not symetric as *)
+(* in Esterel and SCP paper. In the current semantics all imported *)
+(* functions are strict, hence preventing *)
+(* to have or(true, _) = or(_, true) = true with _ possibly bot *)
+let node sequential_and_gate(x,y) returns (z)
     if x then z = y else z = false
 
-let node or_gate(x,y) returns (z)
+let node sequential_or_gate(x,y) returns (z)
     if x then z = true else z = y
 
-let node arbiter(request, pass_in, token_in) returns (grant, pass_out, token_out)
+let node and_gate(x,y) returns (z)
+    z = x && y
+
+let node strict_or_gate(x,y) returns (z)
+    z = x or y
+
+let node arbiter(i, request, pass_in, token_in) returns (grant, pass_out, token_out)
   local o
   do
     grant = and_gate(request, o)
   and
     pass_out = and_gate(not request, o)
   and
-    o = or_gate(pass_in, token_in)
+    o = or_gate(token_in, pass_in)
   and
-    token_out = false fby token_in
+    token_out = i fby token_in
   done
       
-let node arbiter_three(request1, request2, request3) returns (grant1, grant2, grant3)
+let node arbiter_three(i, request1, request2, request3) returns (grant1, grant2, grant3)
   local pass_out1,
         pass_out2,
         pass_out3,
