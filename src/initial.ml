@@ -206,6 +206,12 @@ let tuple v_list =
   | _ -> return (Value(Vtuple(v_list)))
       
 
+(* check that v is an empty list *)
+let zero v =
+  match v with
+  | [] -> return ()
+  | _ -> None
+
 (* check that v is a list of length one *)
 let one v =
   match v with
@@ -218,6 +224,9 @@ let two v =
   | [v1;v2] -> return (v1, v2)
   | _ -> None
        
+let zerop op =
+  CoFun (fun v -> let* _ = zero v in let* v = op () in return [Value v])
+
 let unop op =
   CoFun (fun v -> let* v = one v in let* v = lift1 op v in return [v])
 
@@ -267,10 +276,9 @@ let genv0 =
   List.fold_left
     (fun acc (n, v) -> Genv.add (Name n) (Gfun v) acc) Genv.empty genv0
   
-(* 
-let _ = Random.int 0
+let _ = Random.init 0
 
-let random_bool_op (_: pvalue) = return (Vbool(Random.bool()))
+let random_bool_op () = return (Vbool(Random.bool()))
 let random_int_op v =
   let* v = int v in
   return (Vint(Random.int v))
@@ -279,31 +287,10 @@ let random_float_op v =
   return (Vfloat(Random.float v))
     
 let genv1 =
-  ["random_bool", unop random_bool_op;
+  ["random_bool", zerop random_bool_op;
    "random_int", unop random_int_op;
    "random_float", unop random_float_op]
 
 let genv0 =
   List.fold_left
     (fun acc (n, v) -> Genv.add (Name n) (Gfun v) acc) genv0 genv1
-
- *)
-(* A better solution is to make those function state functions *)
-(*
-let random_bool =
-  unop_process (fun s -> return (Value(Vbool(Random.State.bool s))))
-    (Random.State.make [|0|])
-
-let random_int =
-  binop_process
-    (fun s v -> let* v = int v in
-                return (Vint(Random.State.int s v)))
-    (Random.State.make [|0|])
-    
-let random_float =
-  binop_process
-    (fun s v ->
-      let* v = float v in
-      return (Vfloat(Random.State.float s v)))
-    (Random.State.make [|0|])
- *) 

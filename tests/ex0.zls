@@ -1,4 +1,4 @@
-let node main() returns (o)
+let node main1() returns (o)
   local m default 0, half, last r
   do
     if half then do done else do m = 42 -> pre m + 1 done

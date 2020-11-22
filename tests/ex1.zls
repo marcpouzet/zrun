@@ -25,4 +25,3 @@ let node f2() returns (o)
 let node main() returns (o)
     do o = f1() done (*  = f2() done *)
 
-	
