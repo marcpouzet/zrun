@@ -1,6 +1,6 @@
 let node f(i1, i2) returns (o1, o2)
-  do o1 = i1 + 1 and o2 = i2 + 1 done
+  o1 = i1 + 1 and o2 = i2 + 1
 
 let node main() returns (o1, o2)
-  do (o1, o2) = f(0 fby o1, 1) done
+  (o1, o2) = f(0 fby o1, 1)
     

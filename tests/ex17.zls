@@ -12,10 +12,3 @@ let node main () returns (t)
 let node main1() returns (t)
   do t = if false then t else 0 done
 	   
-(*      x^0 = 0 z^0 = bot  t^0 = bot
-
-      x^1 = 0 z^1 = 0    t^1 = bot
-
-      x^2 = 0 z^2 = 0    t^2 = 0
-			      *)
-
