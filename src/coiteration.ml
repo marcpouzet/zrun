@@ -924,9 +924,9 @@ let run_node output init step n =
       let v =
         let* v_list, s = step s [] in
         let* v_list = not_bot_nil v_list in
-        output v_list in
-      if Option.is_none v then i
-      else runrec s (i+1) in
+        let* _ = output v_list in
+        return s in
+      match v with | None -> i | Some(s) -> runrec s (i+1) in
   runrec init 0
 
 (* The main entry function *)
