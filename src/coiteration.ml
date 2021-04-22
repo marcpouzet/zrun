@@ -903,27 +903,31 @@ let not_bot_nil v_list =
   Opt.map not_bot_nil v_list
     
 (* run a combinatorial expression *)
+(* returns the number of successful iterations *)
 let run_fun output fv n =
-  let rec runrec n =
-    if n = 0 then return ()
+  let rec runrec i =
+    if i = n then i
     else
-      let* v_list = fv [] in
-      let* v_list = not_bot_nil v_list in
-      let* _ = output v_list in
-      runrec (n-1) in
-  runrec n
+      let v =
+        let* v_list = fv [] in
+        let* v_list = not_bot_nil v_list in
+        output v_list in
+      if Option.is_none v then i
+      else runrec (i+1) in
+  runrec 0
       
 (* run a stream process *)
 let run_node output init step n =
-  let rec runrec s n =
-    if n = 0 then return ()
+  let rec runrec s i =
+    if i = n then i
     else
-      let* v_list, s = step s [] in
-      let* v_list = not_bot_nil v_list in
-      let* _ = output v_list in
-      runrec s (n-1) in
-  runrec init n
-
+      let v =
+        let* v_list, s = step s [] in
+        let* v_list = not_bot_nil v_list in
+        output v_list in
+      if Option.is_none v then i
+      else runrec s (i+1) in
+  runrec init 0
 
 (* The main entry function *)
 let run genv main ff n =
@@ -933,9 +937,12 @@ let run genv main ff n =
     let _ = Output.pvalue_list_and_flush ff v_list in
     return () in
   match fv with
-  | CoFun(fv) -> run_fun output fv n
+  | CoFun(fv) ->
+     let _ = run_fun output fv n in
+     return ()
   | CoNode { init; step } ->
-     run_node output init step n
+     let _ = run_node output init step n in
+     return ()
 
 let check genv main n =
   let* fv = find_gnode_opt (Name main) genv in
@@ -943,7 +950,12 @@ let check genv main n =
   let output v =
     if v = [Vbool(true)] then return () else None in
   match fv with
-  | CoFun(fv) -> run_fun output fv n
+  | CoFun(fv) ->
+     let i = run_fun output fv n in
+     if i < n then Format.printf "Test failed: only %i iterations.\n" i;
+     return ()
   | CoNode { init; step } ->
-     run_node output init step n
+     let i = run_node output init step n in
+     if i < n then Format.printf "Test failed: only %i iterations.\n" i;
+     return ()
  
