@@ -1,4 +1,5 @@
 *.exe
+*.bc
 *.run
 *.ok
 *.output
