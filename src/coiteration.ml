@@ -166,7 +166,7 @@ let causal env env_out names =
                         %a@." pnames bot_names;
         raise Stdlib.Exit
       end
-
+       
 (* bounded fixpoint combinator *)
 (* computes a pre fixpoint f^n(bot) <= fix(f) *)
 let fixpoint n equal f s bot =
@@ -176,6 +176,7 @@ let fixpoint n equal f s bot =
     else
       (* compute a fixpoint for the value [v] keeping the current state *)
       let* v', s' = f s v in
+      Debug.incr_nb_fix ();
       if equal v v' then return (n, v, s') else fixpoint (n-1) v' in      
   (* computes the next state *)
   fixpoint n bot
@@ -183,7 +184,10 @@ let fixpoint n equal f s bot =
 let equal_env env1 env2 =
   Env.equal
     (fun { cur = cur1} { cur = cur2 } -> equal_values cur1 cur2) env1 env2
-    
+
+(* let sum = ref 0
+let max = ref 0 *)
+        
 (* bounded fixpoint for a set of equations *)
 let fixpoint_eq genv env sem eq n s_eq bot =
   let sem s_eq env_in =
@@ -196,6 +200,8 @@ let fixpoint_eq genv env sem eq n s_eq bot =
   let* m, env_out, s_eq = fixpoint n equal_env sem s_eq bot in
   print_ienv "Fixpoint. Result env is:" env_out;
   print_number "Actual number of iterations:" (n - m);
+  (* sum := !sum + (n - m + 1);
+  max := !max + n; *)
   print_number "Max was:" n;
   print_ienv "End of fixpoint with env:" env_out;
   return (env_out, s_eq)
@@ -929,6 +935,7 @@ let run_node output init step n =
       match v with | None -> i | Some(s) -> runrec s (i+1) in
   runrec init 0
 
+
 (* The main entry function *)
 let run genv main ff n =
   let* fv = find_gnode_opt (Name main) genv in
@@ -942,6 +949,9 @@ let run genv main ff n =
      return ()
   | CoNode { init; step } ->
      let _ = run_node output init step n in
+     (* Debug.print_nb_fix ();
+     Printf.eprintf "Number of steps = %d\n" !sum;
+     Printf.eprintf "Max number of steps = %d\n" !max; *)
      return ()
 
 let check genv main n =

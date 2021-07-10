@@ -15,6 +15,13 @@ open Misc
 open Ident
 open Value
 
+(* cummulative number of iterations to reach a fix point *)
+let nb_fix = ref 0
+let reset_nb_fix () = nb_fix := 0
+let incr_nb_fix () = incr nb_fix
+let print_nb_fix () =
+  Format.eprintf "Number of steps (fix-point): %d\n" !nb_fix
+  
 let fprint_ientry ff { cur; default } =
   match default with
   | Val ->

@@ -1,3 +1,6 @@
 *.exe
+*.run
+*.ok
+*.output
 .merlin
 _build/
