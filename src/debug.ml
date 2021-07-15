@@ -15,7 +15,7 @@ open Misc
 open Ident
 open Value
 
-(* cummulative number of iterations to reach a fix point *)
+(* cumulative number of iterations to reach a fix point *)
 let nb_fix = ref 0
 let reset_nb_fix () = nb_fix := 0
 let incr_nb_fix () = incr nb_fix

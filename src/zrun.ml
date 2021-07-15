@@ -76,7 +76,11 @@ let eval filename =
   then 
     begin
       Location.initialize filename;
-      let _ = eval filename !main_node !number_of_steps !set_check in ()
+      let _ = eval filename !main_node !number_of_steps !set_check in
+      if !print_number_of_fixpoint_iterations
+      then Format.eprintf
+             "@[The number of fixpoint iterations is : %d@]@\n"
+             !number_of_fixpoint_iterations
     end
   else raise (Arg.Bad "Expected *.zls file.")
     
@@ -87,6 +91,8 @@ let doc_check = "\tCheck that the simulated node returns true"
 let doc_verbose = "\tVerbose mode"
 let doc_no_assert = "\tNo check of assertions"
 let doc_nocausality = "\tTurn off the check that are variables are non bottom"
+let doc_number_of_fixpoint_iterations =
+  "\tPrint the number of steps for fixpoints"
 
 let errmsg = "Options are:"
 
@@ -95,11 +101,14 @@ let main () =
   try
     Arg.parse (Arg.align
                  [ "-s", Arg.String set_main, doc_main;
-                   "-n", Arg.Int set_number, doc_number_of_steps;
+                   "-n", Arg.Int set_number_of_steps, doc_number_of_steps;
                    "-check", Arg.Set set_check, doc_check;
                    "-v", Arg.Set set_verbose, doc_verbose;
                    "-noassert", Arg.Set no_assert, doc_no_assert;
-                   "-nocausality", Arg.Set set_nocausality, doc_nocausality])
+                   "-nocausality", Arg.Set set_nocausality, doc_nocausality;
+                   "-fix", Arg.Set print_number_of_fixpoint_iterations,
+                   doc_number_of_fixpoint_iterations;
+                   ])
       eval
       errmsg
   with

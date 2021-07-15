@@ -134,11 +134,11 @@ let complete_with_default env env_handler =
       | Some { default } -> Env.add x { entry with default = default } acc)
     env_handler Env.empty
 
- (* equality of values in the fixpoint iteration. Because of monotonicity *)
-(* only compare bot/nil with non bot/nil values *)
+(* equality of values in the fixpoint iteration. Because of monotonicity *)
+(* only compare bot/nil with non bot/nil values. *)
 let equal_values v1 v2 =
   match v1, v2 with
-  | (Vbot, Vbot) | (Vnil, Vnil) | (Value _, Value _) -> true
+  | (Vbot, Vbot) | (Vnil, Vnil) | (Value _ , Value _) -> true
   | _ -> false
 
 (* Dynamic check of causality. A set of equations is causal when all defined *)
@@ -169,21 +169,28 @@ let causal env env_out names =
        
 (* bounded fixpoint combinator *)
 (* computes a pre fixpoint f^n(bot) <= fix(f) *)
-let fixpoint n equal f s bot =
+let fixpoint n stop f s bot =
   let rec fixpoint n v =
     if n <= 0 then (* this case should not happen *)
       return (0, v, s)
     else
       (* compute a fixpoint for the value [v] keeping the current state *)
       let* v', s' = f s v in
-      Debug.incr_nb_fix ();
-      if equal v v' then return (n, v, s') else fixpoint (n-1) v' in      
+      if stop v v' then return (n, v', s') else fixpoint (n-1) v' in      
   (* computes the next state *)
   fixpoint n bot
   
 let equal_env env1 env2 =
   Env.equal
-    (fun { cur = cur1} { cur = cur2 } -> equal_values cur1 cur2) env1 env2
+    (fun { cur = cur1} { cur = cur2 } ->
+      (equal_values cur1 cur2))
+    env1 env2
+  
+let max_env env =
+  Env.for_all (fun _ { cur } -> match cur with | Vbot -> false | _ -> true) env
+
+let equal_env env1 env2 =
+  (max_env env2) || (equal_env env1 env2)
 
 (* let sum = ref 0
 let max = ref 0 *)
@@ -204,6 +211,7 @@ let fixpoint_eq genv env sem eq n s_eq bot =
   max := !max + n; *)
   print_number "Max was:" n;
   print_ienv "End of fixpoint with env:" env_out;
+  incr_number_of_fixpoint_iterations (n - m + 1);
   return (env_out, s_eq)
  
 (* [sem genv env e = CoF f s] such that [iexp genv env e = s] *)
