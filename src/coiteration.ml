@@ -180,18 +180,12 @@ let fixpoint n stop f s bot =
   (* computes the next state *)
   fixpoint n bot
   
+(* stop the fixpoint when two successive environments are equal *)
 let equal_env env1 env2 =
   Env.equal
-    (fun { cur = cur1} { cur = cur2 } ->
-      (equal_values cur1 cur2))
+    (fun { cur = cur1} { cur = cur2 } -> (equal_values cur1 cur2))
     env1 env2
   
-let max_env env =
-  Env.for_all (fun _ { cur } -> match cur with | Vbot -> false | _ -> true) env
-
-let equal_env env1 env2 =
-  (max_env env2) || (equal_env env1 env2)
-
 (* let sum = ref 0
 let max = ref 0 *)
         
@@ -612,7 +606,8 @@ and sblock_with_reset genv env v_list eq s_list s_eq r =
       (* keep the current one *)
       return (s_list, s_eq) in
   sblock genv env v_list eq s_list s_eq
-  
+
+
 and svardec genv env acc { var_name; var_default; var_loc } s v =
   let* default, s =
     match var_default, s with
