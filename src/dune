@@ -1,3 +1,5 @@
+;dune build --display verbose
+
 (executables 
     (names zrun)
     (modes byte exe)
