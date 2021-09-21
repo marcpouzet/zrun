@@ -1,0 +1,17 @@
+let node pause() returns (o)
+  do o = () done
+
+let node f() returns (s01 default false, s02 default false, o default 42)
+  local sl1 default false, sl2 default false, sl3 default false
+  do
+    if sl1 then
+      if sl2 then s01 = true else sl3 = true
+    else
+      if sl2 then s02 = true else sl3 = true
+  and
+      sl2 = true
+  and
+      if sl3 then o = 1 else do done
+  and sl1 = true
+  done
+      
