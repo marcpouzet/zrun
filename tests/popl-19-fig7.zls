@@ -8,6 +8,7 @@ let node f() returns (s01 default false, s02 default false, o default 42)
       if sl2 then s01 = true else sl3 = true
     else
       if sl2 then s02 = true else sl3 = true
+  (* pas exactement l'exemple du papier; celui du papier produit bottom *)
   and
       sl2 = true
   and
