@@ -490,7 +490,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQeq(p, e), s -> 
      let* v, s1 = sexp genv env e s in
      let* env_p1 = matching_pateq p v in
-     Some (env_p1, s1) (* return (env_p, s))) *)
+     return (env_p1, s1)
   | EQif(e, eq1, eq2), Stuple [se; s_eq1; s_eq2] ->
       let* v, se = sexp genv env e se in
       let* env_eq, s =
