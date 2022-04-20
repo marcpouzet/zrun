@@ -128,12 +128,6 @@ and eq_desc =
   | EQempty : eq_desc
   | EQassert : exp -> eq_desc
   
-and kind =
-  | Efun : kind
-  | Enode : kind
-
-and is_atomic = bool
-
 type funexp =
   { f_kind: kind;
     f_atomic: is_atomic;
@@ -143,7 +137,11 @@ type funexp =
     f_loc: Location.t
   }
 
-type name = String.t
+and kind =
+  | Efun : kind
+  | Enode : kind
+
+and is_atomic = bool
 
 (** Declarations *)
 type implementation = implementation_desc localized
