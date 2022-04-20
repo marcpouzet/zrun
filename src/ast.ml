@@ -161,5 +161,7 @@ and constr_decl = constr_decl_desc localized
 and constr_decl_desc =
   | Econstr0decl : name -> constr_decl_desc
 
+and name = String.t
+
 type program = implementation list
 
