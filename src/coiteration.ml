@@ -208,7 +208,7 @@ let fixpoint_eq genv env sem eq n s_eq bot =
   incr_number_of_fixpoint_iterations (n - m + 1);
   return (env_out, s_eq)
  
-(* [sem genv env e = CoF f s] such that [iexp genv env e = s] *)
+(* [exp genv env e = CoF f s] such that [iexp genv env e = s] *)
 (* and [sexp genv env e = f] *)
 (* initial state *)
 let rec iexp genv env { e_desc; e_loc } =
