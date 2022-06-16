@@ -1,3 +1,9 @@
+let node up_down () returns (o1, o2)
+ do   o1 = (0 fby o2) + 1
+ and o2 = o1 + 1
+ done   
+
+
 let node g() returns (y,m)
     local z, k, r
     do y = 0 fby y + 1 and z = k+1
@@ -23,5 +29,5 @@ let node f2() returns (o)
       fby 39 fby 38 done
 
 let node main() returns (o)
-    do o = f1() done (*  = f2() done *)
+    do o = f1() = f2() done
 
