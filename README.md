@@ -19,13 +19,21 @@ The long term goal of this work is to define an executable semantics that deal w
 
 
 Zrun defines an executable denotational semantics. It was inspired by
-three main works. The most important is the pioneering work of Gonthier who introduced a computational semantics for Esterel. This semantics defines the reaction of an Esterel program as the fix-point. This idea was then exploited in a different setting, for a stream (or data-flow) synchronous language. 1/ "A Coiterative Characterization of Synchronous Stream Functions", by Caspi and
-Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 2/ "The semantics and
-execution of a synchronous block-diagram language", by Edwards and
-Lee, Science of Computer Programming 2006. For short, we have reformulated the semantics of 1/ so that the semantics can be expressed in a statically typed, purely functional language that has strong normalization property (all programs terminate).
+several works. The PhD. thesis of G.~Gonthier who introduced a
+computational semantics for the language Esterel; the paper 1/ "A
+Coiterative Characterization of Synchronous Stream Functions", by
+Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 2/ the
+paper "The semantics and execution of a synchronous block-diagram
+language", by Edwards and Lee, Science of Computer Programming
+2006. We have reformulated the semantics of 1/ so that it can be
+expressed in a statically typed, purely functional language that has
+strong normalization property (all programs terminate). Your can read
+the companion paper "A Constructive State-based Semantics for a
+Synchronous Data-flow Language with State machines" presented at
+EMSOFT'2023.
 
 If you find this work useful or have any
-comment/question/criticism, please send a mail to Marc.Pouzet@ens.fr.
+comment, please send a mail to Marc.Pouzet@ens.fr.
 
 ## Getting Started
 
