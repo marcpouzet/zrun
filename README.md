@@ -1,36 +1,28 @@
-# The ZRun Interpreter
+# The ZRun Synchronous Language Interpreter
 
-ZRun is an interpreter for a synchronous data-flow language. The input
-of Zrun is a first-order subset of Zelus (with the same syntax) and is
-only discrete-time. Programs can mix data-flow equations and
-hierarchical automata as it exists in Scade. States in automata can be
-parameterized (this feature is not provided by Scade; it is described
-in the paper [EMSOFT'06] by Colaco et al.). The long term goal is to
-treat all Zelus programs (we are far away from that!).  Constructs to
-deal with continuous-time (ODE and zero-crossing events), higher-order
-functions, arrays are not considered for the moment.
+ZRun is an executable semantics, in the form of a purely functional interpreter of a synchronous data-flow language. The programming constructs and programming style is that of Lustre: a discrete-time signal is an infinite stream, a synchronous system is defined as a length-preserving stream function. It provides languages features from Lucid Synchrone and Scade, like by-case definition of streams with default values, the mix of stream equations and hierarchical automata, etc. It provides a generalized form of by-case definitions (with a pattern-matching feature) and parameterized state machines (see paper [EMSOFT'06] by Colaco et al.) introduced in Lucid Synchrone and used in Zélus.
 
-One objective is to give a reference and executable
-semantics for a language like Scade that can be used: to test
-an existing compiler; to prove compilation steps (e.g.,
+The objective is this prototype is to give a reference and executable
+semantics that can be used: (1) As an oracle for
+testing an existing compiler; (2) to prove compilation steps (e.g.,
 that a well typed/causal/initialized program does not lead to an
-error; or to prove semantics preservation of source-to-source
+error; (3) to prove semantics preservation of source-to-source
 transformations like static scheduling or the compilation of
-automata); to execute unfinished programs or programs that are
+automata); (4) to execute unfinished programs or programs that are
 semantically correct but are statically rejected by the compiler.
 Examples are cyclic circuits accepted by an Esterel compiler (the
 so-called "constructively causal" programs) but are rejected by
 Lustre, Lucid Synchrone, Scade, Zelus compilers that impose stronger
-causality constraints; to prototype new language constructs.
+causality constraints; (5) to prototype new language constructs.
+
+The long term goal of this work is to define an executable semantics that deal with all the features of a language like Zélus that provides construct to model discrete-time and continuous-time signals defined by ODEs and zero-crossing events. Continuous-time features are not delt with for the moment.
 
 
-Zrun defines an executable denotational semantics. It builds on two
-papers which defines the semantics of a data-flow language through the
-computation of a fix-point at every reaction step: 1/ "A Coiterative
-Characterization of Synchronous Stream Functions", by Caspi and
+Zrun defines an executable denotational semantics. It was inspired by
+three main works. The most important is the pioneering work of Gonthier who introduced a computational semantics for Esterel. This semantics defines the reaction of an Esterel program as the fix-point. This idea was then exploited in a different setting, for a stream (or data-flow) synchronous language. 1/ "A Coiterative Characterization of Synchronous Stream Functions", by Caspi and
 Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 2/ "The semantics and
 execution of a synchronous block-diagram language", by Edwards and
-Lee, Science of Computer Programming 2006.
+Lee, Science of Computer Programming 2006. For short, we have reformulated the semantics of 1/ so that the semantics can be expressed in a statically typed, purely functional language that has strong normalization property (all programs terminate).
 
 If you find this work useful or have any
 comment/question/criticism, please send a mail to Marc.Pouzet@ens.fr.
@@ -55,13 +47,19 @@ This will generate a `zrun.exe` executable.
 ```bash
  ./zrun.exe --help
 Options are:
-  -s         The main node to evaluate
-  -n         The number of steps
-  -check     Check that the simulated node returns true
-  -v         Verbose mode
-  -noassert  No check of assertions
-  -help      Display this list of options
-  --help     Display this list of options
+  -s            The main node to evaluate
+  -all          Evaluate all nodes
+  -n            The number of steps
+  -v            Verbose mode
+  -vv           Set even more verbose mode
+  -iv           Print values
+  -noassert     No check of assertions
+  -nocausality  Turn off the check that are variables are non bottom
+  -fix          Print the number of steps for fixpoints
+  -esterel      Sets the interpretation of if/then/else to that of Esterel
+  -lustre       Sets the interpretation of if/then/else to that of Lustre
+  -help         Display this list of options
+  --help        Display this list of options
 ```
 
 ## Examples
