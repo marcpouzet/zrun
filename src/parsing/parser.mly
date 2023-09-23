@@ -87,27 +87,27 @@ let scond_true start_pos end_pos =
        start_pos end_pos
 
 (* building a function *)
-(* let node (const x1 ... xn) (static y1 ... ym) m1 mk -> e in ... *)
-(* is represented as fun (const x1...xn) -> fun (static y1...ym) 
-                                         -> fun m1...mk -> e *)
-let fun_one_desc is_atomic k v p_list result startpos endpos =
-  Efun(make { f_atomic = is_atomic; f_vkind = v;
-              f_kind = k; f_args = p_list;
+(* [let node (const x1 ... xn) (static y1 ... ym) m1 mk -> e in ... ] *)
+(* is represented as *)
+(* [let f = fun (const x1...xn) -> fun (static y1...ym) -> fun m1...mk -> e in ...]*)
+let fun_one_desc is_atomic kind vkind p_list result startpos endpos =
+  Efun(make { f_atomic = is_atomic; f_vkind = vkind;
+              f_kind = kind; f_args = p_list;
 	      f_body = result }
 	    startpos endpos)
 
-let rec funexp_desc is_atomic k p_list_list result startpos endpos =
-  match p_list_list with
+let rec funexp_desc is_atomic kind v_p_list_list result startpos endpos =
+  match v_p_list_list with
   | [] -> assert false
-  | [v, p_list] ->
-       fun_one_desc is_atomic k v p_list result startpos endpos         
-  | (v, p_list) :: p_list_list ->
-       fun_one_desc is_atomic (Kfun(Kany)) v p_list
-               (make (Exp (funexp is_atomic k p_list_list result startpos endpos))
+  | [vkind, p_list] ->
+       fun_one_desc is_atomic kind vkind p_list result startpos endpos         
+  | (vkind, p_list) :: v_p_list_list ->
+       fun_one_desc is_atomic (Kfun(Kany)) vkind p_list
+               (make (Exp (funexp is_atomic kind v_p_list_list result startpos endpos))
 		     startpos endpos)
                startpos endpos
-and funexp is_atomic k p_list_list result startpos endpos =
-  make (funexp_desc is_atomic k p_list_list result startpos endpos)
+and funexp is_atomic kind v_p_list_list result startpos endpos =
+  make (funexp_desc is_atomic kind v_p_list_list result startpos endpos)
        startpos endpos
 
 (* building a for loop *)
@@ -589,9 +589,9 @@ equation_desc:
       { EQinit(i, e) }
   | p = pattern EQUAL e = seq_expression
       { EQeq(p, e) }
-  | a = is_atomic k = fun_kind ide = ide p_list_list = param_list_list r = result
+  | a = is_atomic k = fun_kind ide = ide v_p_list_list = param_list_list r = result
     { EQeq(make (Evarpat ide) $startpos(ide) $endpos(ide),
-	   funexp a k p_list_list r $startpos $endpos) }
+	   funexp a k v_p_list_list r $startpos $endpos) }
   | DER i = ide EQUAL e = seq_expression opt = optional(init_expression)
       { EQder(i, e, opt, []) }
   | DER i = ide EQUAL e = seq_expression opt = optional(init_expression)
