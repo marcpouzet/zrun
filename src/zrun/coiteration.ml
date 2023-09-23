@@ -708,23 +708,23 @@ let rec sexp genv env { e_desc; e_loc } s =
              let* v2, s2 = sexp genv env e2 s2 in
              let* v = Combinatorial.concat e_loc v1 v2 in
              return (v, Slist [s1; s2])
-          | Eget, [e; i], s ->
-             let* v, s = sexp genv env e s in
+          | Eget, [e; i], Slist [s1; s2] ->
+             let* v, s1 = sexp genv env e s1 in
              let* i = Combinatorial.exp genv env i in
              let* v = Combinatorial.get e_loc v i in
-             return (v, s)
+             return (v, Slist [s1; s2])
           | Eget_with_default, [e; ei; default], Slist [se; si; s_default] ->
              let* v, se = sexp genv env e se in
              let* vi, si = sexp genv env ei si in
              let* default, s_default = sexp genv env default s_default in
              let* v = Combinatorial.get_with_default e_loc v vi default in
              return (v, s)
-          | Eslice, [e; i1; i2], s ->
+          | Eslice, [e; i1; i2], Slist [s; s1; s2] ->
              let* v, s = sexp genv env e s in
              let* i1 = Combinatorial.exp genv env i1 in
              let* i2 = Combinatorial.exp genv env i2 in
              let* v = Combinatorial.slice e_loc v i1 i2 in
-             return (v, s)        
+             return (v, Slist [s; s1; s2])        
           | Eupdate, (e :: arg :: i_list), Slist (s :: s_arg :: s_list) ->
              (* [| e with i1,..., in <- arg |] *)
              let* v, s = sexp genv env e s in
