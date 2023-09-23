@@ -6,7 +6,7 @@
 (* Forward and back substitution to compute the inverse of a *)
 (* left triangular matrix *)
 
-let mat = fun (n,v) -> fun () =>
+let mat = fun (n,v) -> node () ->
   foreach i in 0 to n-1 do foreach i in 0 to n-1 do v done done
 
 let node main1() = run (mat(5, 0.0))()
@@ -90,7 +90,7 @@ let node main18() =
        [| -8.;  5.;  3. |] |] in
   assert (m_result = m_expected)
 
-let vec n = fun v => foreach i in 0 to n-1 do v done
+let vec n = node v -> foreach i in 0 to n-1 do v done
 
 (* https://en.wikipedia.org/wiki/Triangular_matrix#Forward_and_back_substitution*)
 (* Forward subsitution *)

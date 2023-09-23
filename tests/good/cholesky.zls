@@ -2,7 +2,7 @@
 (* triangular matrix such that [l * (transpose l) = a] *)
 (* not very elegant. Repetitions. Not efficient because [n x n] steps *)
 (* instead of [n x n-1 / 2] *)
-let mat = fun (n, v) -> fun () =>
+let mat = fun (n, v) -> node () ->
   foreach i in 0 to n-1 do foreach i in 0 to n-1 do v done done
 
 let node main14() = run (mat(5, 0.0))()
