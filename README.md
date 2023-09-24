@@ -30,7 +30,7 @@ computation of a fix-point at every reaction step: 1/ "A Coiterative
 Characterization of Synchronous Stream Functions", by Caspi and
 Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 2/ "The semantics and
 execution of a synchronous block-diagram language", by Edwards and
-Lee, Science of Computer Programming 2006.
+Lee, Science of Computer Programming 2003.
 
 If you find this work useful or have any
 comment/question/criticism, please send a mail to Marc.Pouzet@ens.fr.
