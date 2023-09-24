@@ -84,9 +84,6 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
   "to", TO;
   "true", BOOL(true); 
   "type", TYPE;
-  "transpose", TRANSPOSE;
-  "reverse", REVERSE;
-  "flatten", FLATTEN;
   "static", STATIC;
   "unless", UNLESS;
   "until", UNTIL;
@@ -153,6 +150,9 @@ rule main = parse
   | [' ' '\010' '\013' '\009' '\012'] +   { main lexbuf }
   | "."  { DOT }
   | ".."  { DOTDOT }
+  | ".T" { TRANSPOSE }
+  | ".R" { REVERSE }
+  | ".F" { FLATTEN }
   | "("  { LPAREN }
   | ")"  { RPAREN }
   | "["  { LBRACKET }

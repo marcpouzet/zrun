@@ -1073,11 +1073,11 @@ expression_desc:
     { Eop(Earray(Eget_with_default), [e1; e2; e3]) }
   | e1 = expression PLUSPLUS e2 = expression 
       { Eop(Earray(Econcat), [e1; e2]) }
-  | TRANSPOSE e = simple_expression
+  | e = simple_expression TRANSPOSE 
       { Eop(Earray(Etranspose), [e]) }
-  | FLATTEN e = simple_expression
+  | e = simple_expression FLATTEN 
       { Eop(Earray(Eflatten), [e]) }
-  | REVERSE e = simple_expression
+  | e = simple_expression REVERSE 
       { Eop(Earray(Ereverse), [e]) }
   
 ;
