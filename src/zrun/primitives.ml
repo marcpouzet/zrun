@@ -172,11 +172,11 @@ let rec compare_pvalue v1 v2 =
   | Vstate1(id1, p_list1), Vstate1(id2, p_list2) ->
      let v = Ident.compare id1 id2 in
      if v = 0 then compare_list compare_pvalue p_list1 p_list2 else return v
+  | Varray(v1), Varray(v2) -> compare_array compare_pvalue v1 v2
   | Vrecord _, Vrecord _ -> none
   | Vtuple _, Vtuple _ -> none
   | Vfun _, Vfun _ -> none
   | Vclosure _, Vclosure _ -> none
-  | Varray _, Varray _ -> none
   | _ -> none
 
 and compare_list compare p_list1 p_list2 =
@@ -187,6 +187,19 @@ and compare_list compare p_list1 p_list2 =
      if v = 0 then compare_list compare p_list1 p_list2 else return v
   | _ -> none
 
+and compare_array compare a1 a2 =
+  (* compare the elements of two arrays, from left to right *)
+  let rec compare_n i n a1 a2 =
+    if i <= n then
+      let* v = compare_pvalue (a1.(i)) (a2.(i)) in
+      if v = 0 then compare_n (i+1) n a1 a2 else return v
+    else return 0 in
+  match a1, a2 with
+  | Vflat(a1), Vflat(a2) ->
+     let n1 = Array.length a1 in
+     if n1 = Array.length a2 then compare_n 0 (n1-1) a1 a2 else none
+  | _ -> none
+     
 let eq_op v1 v2 =
   let* v = compare_pvalue v1 v2 in
   return (Vbool(v = 0))
