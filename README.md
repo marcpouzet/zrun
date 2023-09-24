@@ -33,13 +33,13 @@ Characterization of Synchronous Stream Functions", by Caspi and
 Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 3/ the paper "The
 semantics and execution of a synchronous block-diagram language", by
 Edwards and Lee, Science of Computer Programming 2006. All are based
-on the fix-point computation of a monotone function on a
-domain with bounded height. We have reformulated the semantics of 2/
-so that it can be expressed in a statically typed, purely functional
-language that has strong normalization property (all programs
-terminate). You can read the companion paper "A Constructive
-State-based Semantics for a Synchronous Data-flow Language with State
-machines" presented at EMSOFT'2023.
+on the fix-point computation of a monotone function on a domain with
+bounded height. We have reformulated the semantics of 2/ so that it
+can be expressed in a statically typed, purely functional language
+that has strong normalization property (all programs terminate). You
+can read the companion paper "A Constructive State-based Semantics for
+a Synchronous Data-flow Language with State machines" presented at
+EMSOFT'2023 (https://www.di.ens.fr/~pouzet/bib/emsoft23b-extended.pdf).
 
 If you find this work useful, please cite the above paper. If you have any
 comment, please send a mail to Marc.Pouzet@ens.fr.
