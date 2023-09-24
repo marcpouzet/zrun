@@ -26,7 +26,7 @@ The long term goal of this work is to define an executable semantics
 that deal with all the language features of Zélus. Continuous-time
 features (ODEs and zero-crossings) are not treated for the moment.
 
-Zrun was inspired by several works. The PhD. thesis of G.~Gonthier 1/
+Zrun was inspired by several works. The PhD. thesis of Gonthier 1/
 "Sémantiques et modèles d'exécution des langages réactifs synchrones :
 application à Esterel", 1988; 2/ the paper "A Coiterative
 Characterization of Synchronous Stream Functions", by Caspi and
