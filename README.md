@@ -38,7 +38,7 @@ bounded height. We have reformulated the semantics of 2/ so that it
 can be expressed in a statically typed, purely functional language
 that has strong normalization property (all programs terminate). You
 can read the companion paper "[A Constructive State-based Semantics
-for a Synchronous Data-flow Language with State
+and Interpreter for a Synchronous Data-flow Language with State
 machines](https://www.di.ens.fr/~pouzet/bib/emsoft23b-extended.pdf)"
 presented at EMSOFT'2023.
 
