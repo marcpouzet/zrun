@@ -7,6 +7,18 @@ let mat = fun (n, v) -> node () ->
 
 let node main14() = run (mat(5, 0.0))()
 
+let node main_14() =
+  let v = [|1;2|] in
+  (v.R).R = v
+let node main_15() =
+  let v = [|[|1;2|];[|3;4|];[|5;6|]|] in
+  v.T
+let node main_16() =
+  let x = [|1;2|] in
+  let y = x.R in [|y.(0); y.(1)|]
+let node main_17() =
+  let v = [|[|1;2|];[|3;4|];[|5;6|]|] in v.F
+    
 (* cholesky *)
 let node cholesky_exp(n)(a) returns (l)
   do l =
