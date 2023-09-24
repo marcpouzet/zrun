@@ -1,6 +1,5 @@
 (***********************************************************************)
 (*                                                                     *)
-(*                                                                     *)
 (*                        The ZRun Interpreter                         *)
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
@@ -35,24 +34,28 @@ let (and+) v1 v2 =
   | (Vnil, _) | (_, Vnil) -> Vnil
   | Value(v1), Value(v2) -> Value(v1, v2)
 
-let bool v =
+let is_bool v =
   match v with
   | Vbool(b) -> return b
   | _ -> None
 
-let int v =
+let is_int v =
   match v with
   | Vint(i) -> return i | _ -> None
 
-let float v =
+let is_float v =
   match v with
   | Vfloat(i) -> return i | _ -> None
 
-let vfloat v =
+let is_vfloat v =
   match v with
   | Value(Vfloat(i)) -> return i | _ -> None
 
-let get_present v =
+let is_array v =
+  match v with
+  | Varray(v) -> return v | _ -> None
+
+let is_present v =
   match v with
   | Vpresent(v) -> return v
   | _ -> None
@@ -73,96 +76,136 @@ let get_record r =
   | _ -> None
        
 let ifthenelse_op v v1 v2 =
-  let* b = bool v in
+  let* b = is_bool v in
   if b then return v1 else return v2
 
 let not_op v =
-  let* v = bool v in
+  let* v = is_bool v in
   return (Vbool(not v))
 
 let uminus_op v =
-  let* v = int v in
+  let* v = is_int v in
   return (Vint(- v))
 
 let and_op v1 v2 =
-  let* v1 = bool v1 in
-  let* v2 = bool v2 in
+  let* v1 = is_bool v1 in
+  let* v2 = is_bool v2 in
   return (Vbool(v1 && v2))
 
 let or_op v1 v2 =
-  let* v1 = bool v1 in
-  let* v2 = bool v2 in
+  let* v1 = is_bool v1 in
+  let* v2 = is_bool v2 in
   return (Vbool(v1 || v2))
 
 let on_op v1 v2 = or_op v1 v2
 
 let add_op v1 v2 =
-  let* v1 = int v1 in
-  let* v2 = int v2 in
+  let* v1 = is_int v1 in
+  let* v2 = is_int v2 in
   return (Vint(v1 + v2))
 
 let minus_op v1 v2 =
-  let* v1 = int v1 in
-  let* v2 = int v2 in
+  let* v1 = is_int v1 in
+  let* v2 = is_int v2 in
   return (Vint(v1 - v2))
     
 let mult_op v1 v2 =
-  let* v1 = int v1 in
-  let* v2 = int v2 in
+  let* v1 = is_int v1 in
+  let* v2 = is_int v2 in
   return (Vint(v1 * v2))
 
 let div_op v1 v2 =
-  let* v1 = int v1 in
-  let* v2 = int v2 in
+  let* v1 = is_int v1 in
+  let* v2 = is_int v2 in
   return (Vint(v1 / v2))
 
 let add_float_op v1 v2 =
-  let* v1 = float v1 in
-  let* v2 = float v2 in
+  let* v1 = is_float v1 in
+  let* v2 = is_float v2 in
   return (Vfloat(v1 +. v2))
 
 let uminus_float_op v =
-  let* v = float v in
+  let* v = is_float v in
   return (Vfloat(-. v))
   
 let minus_float_op v1 v2 =
-  let* v1 = float v1 in
-  let* v2 = float v2 in
+  let* v1 = is_float v1 in
+  let* v2 = is_float v2 in
   return (Vfloat(v1 -. v2))
     
 let mult_float_op v1 v2 =
-  let* v1 = float v1 in
-  let* v2 = float v2 in
+  let* v1 = is_float v1 in
+  let* v2 = is_float v2 in
   return (Vfloat(v1 *. v2))
 
 let div_float_op v1 v2 =
-  let* v1 = float v1 in
-  let* v2 = float v2 in
+  let* v1 = is_float v1 in
+  let* v2 = is_float v2 in
   return (Vfloat(v1 /. v2))
 
 let sqrt_op v =
-  let* v = float v in
+  let* v = is_float v in
   return (Vfloat(sqrt v))
 
 let mod_op v1 v2 =
-  let* v1 = int v1 in
-  let* v2 = int v2 in
+  let* v1 = is_int v1 in
+  let* v2 = is_int v2 in
   return (Vint(v1 mod v2))
 
+let rec compare_pvalue v1 v2 =
+  match v1, v2 with
+  | Vint i1, Vint i2 -> return (compare i1 i2)
+  | Vbool b1, Vbool b2 -> return (compare b1 b2)
+  | Vfloat f1, Vfloat f2 -> return (compare f1 f2)
+  | Vchar c1, Vchar c2 -> return (compare c1 c2)
+  | Vstring s1, Vstring s2 -> return (compare s1 s2)
+  | Vvoid, Vvoid -> return 0
+  | Vconstr0(id1), Vconstr0(id2) -> return (Lident.compare id1 id2)
+  | Vconstr1(id1, p_list1), Vconstr1(id2, p_list2) ->
+     let v = Lident.compare id1 id2 in
+     if v = 0 then
+       compare_list compare_pvalue p_list1 p_list2 else return v
+  | Vpresent(v1), Vpresent(v2) -> compare_pvalue v1 v2
+  | Vabsent, Vabsent -> return 0
+  | Vstuple(p_list1), Vstuple(p_list2) -> compare_list compare_pvalue p_list1 p_list2
+  | Vstate0(id1), Vstate0(id2) -> return (Ident.compare id1 id2)
+  | Vstate1(id1, p_list1), Vstate1(id2, p_list2) ->
+     let v = Ident.compare id1 id2 in
+     if v = 0 then compare_list compare_pvalue p_list1 p_list2 else return v
+  | Vrecord _, Vrecord _ -> none
+  | Vtuple _, Vtuple _ -> none
+  | Vfun _, Vfun _ -> none
+  | Vclosure _, Vclosure _ -> none
+  | Varray _, Varray _ -> none
+  | _ -> none
+
+and compare_list compare p_list1 p_list2 =
+  match p_list1, p_list2 with
+  | [], [] -> return 0
+  | p1 :: p_list1, p2 :: p_list2 ->
+     let* v = compare p1 p2 in
+     if v = 0 then compare_list compare p_list1 p_list2 else return v
+  | _ -> none
+
 let eq_op v1 v2 =
-  return (Vbool(v1 = v2))
+  let* v = compare_pvalue v1 v2 in
+  return (Vbool(v = 0))
 
 let lt_op v1 v2 =
-  return (Vbool(v1 < v2))
+  let* v = compare_pvalue v1 v2 in
+  return (Vbool(v = -1))
 
 let gt_op v1 v2 =
-  return (Vbool(v1 > v2))
+  let* v = compare_pvalue v1 v2 in
+  return (Vbool(v = 1))
 
 let lte_op v1 v2 =
-  return (Vbool(v1 <= v2))
+  let* v = compare_pvalue v1 v2 in
+  return (Vbool(v <= 0))
 
 let gte_op v1 v2 =
-  return (Vbool(v1 >= v2))
+  let* v = compare_pvalue v1 v2 in
+  return (Vbool(v >= 0))
 
 let length v =
   match v with
@@ -359,10 +402,10 @@ let _ = Random.init 0
 let random_bool_op _ =
   return (Vbool(Random.bool()))
 let random_int_op v =
-  let* v = int v in
+  let* v = is_int v in
   return (Vint(Random.int v))
 let random_float_op v =
-  let* v = float v in
+  let* v = is_float v in
   return (Vfloat(Random.float v))
     
 

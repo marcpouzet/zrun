@@ -119,7 +119,7 @@ let spresent_handler_list loc sscondpat bot nil sbody genv env p_h_list s_list =
             return (Opt.return nil, Slist [s_cond; s_body] :: s_list)
          | Value(v) ->
             let* v =
-              Opt.to_result ~none:{ kind = Etype; loc = p_loc } (bool v) in
+              Opt.to_result ~none:{ kind = Etype; loc = p_loc } (is_bool v) in
             if v then
               (* this is the good handler *)
               let env = Env.append env_pat env in
@@ -189,9 +189,9 @@ let rec iexp genv env { e_desc; e_loc  } =
         (* [e1] and [e2] must be static *)
         let* v1 = Combinatorial.exp genv env e1 in
         let* v2 = Combinatorial.exp genv env e2 in
-        let* v1 = vfloat v1 |>
+        let* v1 = is_vfloat v1 |>
                     Opt.to_result ~none: { kind = Etype; loc = e_loc} in
-        let* v2 = vfloat v2 |>
+        let* v2 = is_vfloat v2 |>
                     Opt.to_result ~none: { kind = Etype; loc = e_loc} in
         return
           (Speriod
@@ -276,7 +276,7 @@ and ifor_kind genv env for_size for_kind s_body =
      (* [e] must be a static expression *)
      let* v = Combinatorial.exp genv env e in          
      (* and an integer value *)
-     let* v = Combinatorial.int e_loc v in
+     let* v = Combinatorial.is_int e_loc v in
      let s_size = Sopt(Some(Value(Vint(v)))) in
      let s_body = ialloc_foreach_loop v for_kind s_body in 
      return (s_size, s_body)
@@ -302,7 +302,7 @@ and ifor_index genv env { desc; loc } =
        | Some(e) ->
           (* [by] must be static and an integer *)
           let* v = Combinatorial.exp genv env e in
-          let* v = Combinatorial.int e.e_loc v in
+          let* v = Combinatorial.is_int e.e_loc v in
           return (Sval(Value(Vint(v)))) in
      return (Slist [se; se_opt])
   | Eindex { e_left; e_right } ->
@@ -696,7 +696,7 @@ let rec sexp genv env { e_desc; e_loc } s =
           | Vnil -> return (Vnil, Slist [Shorizon(h); s])
           | Value(v) ->
              let* horizon =
-               float v |> Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
+               is_float v |> Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
              return
                (Value(Vbool(zin)), Slist [Shorizon { h with horizon }; s])
         else
@@ -738,18 +738,18 @@ let rec sexp genv env { e_desc; e_loc } s =
              return
                (Primitives.lift (fun v -> Varray(Vflat(Array.of_list v))) v_list,
                 Slist s_list)
-          | Etranspose, [e], s ->
+          | Etranspose, [e], Slist [s] ->
              let* v, s = sexp genv env e s in
              let*v = Combinatorial.transpose e_loc v in
-             return (v, s)
-          | Eflatten, [e], s ->
+             return (v, Slist [s])
+          | Eflatten, [e], Slist [s] ->
              let* v, s = sexp genv env e s in
              let*v = Combinatorial.flatten e_loc v in
-             return (v, s)
-          | Ereverse, [e], s ->
+             return (v, Slist [s])
+          | Ereverse, [e], Slist [s] ->
              let* v, s = sexp genv env e s in
              let*v = Combinatorial.reverse e_loc v in
-             return (v, s)
+             return (v, Slist [s])
           | _ -> error { kind = Etype; loc = e_loc }
         end
      | _ -> error { kind = Etype; loc = e_loc }
@@ -833,7 +833,7 @@ let rec sexp genv env { e_desc; e_loc } s =
        | Vnil -> return (Vnil, Snil)
        | Value(v) ->
           let* v =
-            bool v |> Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
+            is_bool v |> Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
           reset iexp sexp genv env e_body s_body v in
      return (v_body, Slist [s_body; s_res])
   | Eassert(e_body), s ->
@@ -1225,7 +1225,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
         (* Slist [se; s_eq1; s_eq2]) *)
         | Value(b) ->
            let* v =
-             bool b |> Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
+             is_bool b |> Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
            if v then
              let* env1, s_eq1 = seq genv env eq1 s_eq1 in
              (* complete the output environment with default *)
@@ -1258,7 +1258,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        | Vnil -> return (nil_env eq_write, Slist [s_eq; se])
        | Value(v) ->
           let* v =
-            bool v |> Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
+            is_bool v |> Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
           reset ieq seq genv env eq s_eq v in    
      return (env_eq, Slist [s_eq; se])
   | EQlocal(b_eq), s_eq ->
@@ -1292,7 +1292,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
           return (nil_env eq_write, ps, pr, s_list)
        | Value(ps), Value(pr) ->
           let* pr =
-            bool pr |> Opt.to_result ~none:{ kind = Etype; loc = eq_loc } in
+            is_bool pr |> Opt.to_result ~none:{ kind = Etype; loc = eq_loc } in
           sautomaton_handler_list eq_loc
             is_weak genv env eq_write handlers ps pr s_list in
      return (env, Slist (Sval(ns) :: Sval(nr) :: si :: s_list))
@@ -1652,7 +1652,7 @@ and sautomaton_handler_list
        return (bot_env eq_write, ns, nr, s_list)
     | Value(vns), Value(vnr) ->
        let* vnr =
-         bool vnr |>
+         is_bool vnr |>
            Opt.to_result ~none:{ kind = Etype; loc = loc } in
        let* env_body, s_list = body_list a_h_list vns vnr s_list in
        let env_handler = Env.append env_trans env_body in
@@ -1691,7 +1691,7 @@ and sescape_list loc genv env escape_list s_list ps pr =
           (* la condition est vraie *)
           (* le code ci-dessous ne le fait pas. *)
           let* v =
-            bool v |> Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
+            is_bool v |> Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
           (* execute the local lets *)
           let* env, ss_let = slets e_loc genv env e_let ss_let in
           let* env, env_body, s_body =
@@ -1721,9 +1721,9 @@ and sscondpat
       | (Vnil, _) | (_, Vnil) -> return ((Vnil, Env.empty), s)
       | Value(v1), Value(v2) ->
          let* v1 =
-           bool v1 |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
+           is_bool v1 |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
          let* v2 =
-           bool v2 |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
+           is_bool v2 |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
          (* v1 && v2 *) 
          return ((Value(Vbool(v1 && v2)), env_sc), s))
   | Econdor(sc1, sc2), Slist [s1; s2] ->
@@ -1735,9 +1735,9 @@ and sscondpat
       | (Vnil, _) | (_, Vnil) -> return ((Vnil, Env.empty), s)
       | Value(v1), Value(v2) ->
          let* v1 =
-           bool v1 |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
+           is_bool v1 |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
          let* v2 =
-           bool v2 |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
+           is_bool v2 |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
          (* v1 or v2 *) 
          return ((Value(Vbool(v1 || v2)), env_sc), s))
   | Econdexp(e_cond), s ->
@@ -1758,9 +1758,9 @@ and sscondpat
       | (Vnil, _) | (_, Vnil) -> return ((Vnil, env_sc), s)
       | Value(v), Value(ve) ->
          let* v =
-           bool v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
+           is_bool v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
          let* ve =
-           bool ve |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
+           is_bool ve |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
          (* v on ve *) 
          return ((Value(Vbool(v && ve)), env_sc), s))
   | _ -> error { kind = Estate; loc = loc }

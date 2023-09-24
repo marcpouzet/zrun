@@ -214,7 +214,7 @@ let forward_i_with_exit_condition loc n write f cond acc_env0 s =
          let f_env = nil_env write in return ([f_env], acc_env, s)
       | Value(v) ->
            let* b =
-             Opt.to_result ~none:{ kind = Etype; loc = loc } (bool v) in
+             Opt.to_result ~none:{ kind = Etype; loc = loc } (is_bool v) in
            if b then
              let* f_env, acc_env, s = f i acc_env s in
              let* env_list, acc_env, s = for_rec (i+1) acc_env s in

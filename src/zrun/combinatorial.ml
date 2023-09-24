@@ -56,7 +56,7 @@ let check_assertion loc ve ret =
   match ve with
   | Vnil | Vbot -> return ret
   | Value(v) ->
-     let* v = bool v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
+     let* v = is_bool v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
      (* stop when [no_assert = true] *)
      if !no_assert || v then return ret 
      else error { kind = Eassert_failure; loc = loc }
@@ -117,6 +117,12 @@ let get_in_array loc a i =
   | Vmap { m_length; m_u } ->
      if (i >= 0) && (i < m_length) then m_u i
      else error { kind = Earray_size { size = m_length; index = i }; loc }
+
+let geti loc v i =
+  match v with
+  | Varray(a) ->
+     get_in_array loc a i
+  | _ -> error { kind = Etype; loc }
 
 let get loc v i =
   let+ v = v and+ i = i in
@@ -216,79 +222,74 @@ let flat_of_map_array loc v =
             let* v = fill m_length a m_u in
             return (Vflat v)
 
-(* transpose. [transpose v = \j:[n].\i:[m].v[i][j]] *)
-let dim v =
+let dim loc v =
   match v with
-    | Vflat(a) -> Array.length a, fun i -> return a.(i)
-    | Vmap { m_length; m_u } -> m_length, m_u
-  
-(* [v i j] *)
-let get_get loc v i j =
-  let* v = get_in_array loc v i in
-  match v with
-  | Varray(v) -> get_in_array loc v j
+  | Varray v ->
+     let v = match v with
+       | Vflat(a) -> Array.length a
+       | Vmap { m_length } -> m_length in
+     return v
   | _ -> error { kind = Etype; loc }
 
-let dim_dim loc a =
-  let m, u_v = dim a in
-  let* a = u_v 0 in
-  match a with
-  | Varray(v) -> let n, _ = dim v in return (m, n)
-  | _ -> error { kind = Etype; loc }
-
-let transpose loc v =
-  let+ v = v in
+let dim_dim loc v =
   match v with
   | Varray(v) ->
-     let* m, n = dim_dim loc v in
-     return
-       (Value
-          (Varray
-             (Vmap
-                { m_length = n;
-                  m_u = fun j ->
-                        return
-                          (Varray(Vmap { m_length = m;
-                                         m_u = fun i ->
-                                               get_get loc v i j })) })))
+     let r = match v with
+       | Vflat(a) ->
+          let* m = dim loc (a.(0)) in
+          return (Array.length a, m)
+       | Vmap { m_length; m_u } ->
+          let* v = m_u 0 in
+          let* m = dim loc v in
+          return (m_length, m) in
+     r
   | _ -> error { kind = Etype; loc }
- 
+
+(* [v i j] *)
+let get_get loc v i j =
+  let* v = geti loc v i in
+  geti loc v j
+
+(* transpose: input: ['n]['m]t. output: ['m]['n]t such that *)
+(* output.(j).(i) = input.(i).(j) [i < 'n, j < 'm] *)
+let transpose loc v =
+  let+ v = v in
+  let* n_i, m_j = dim_dim loc v in
+  return
+    (Value
+       (Varray
+          (Vmap
+             { m_length = m_j;
+               m_u = fun j -> return (Varray(Vmap { m_length = n_i;
+                                                    m_u = fun i -> get_get loc v i j }))
+    })))
 
 (* flatten: imposes that the size of internal arrays are the same, that is *)
 (* flatten : 'n,'m. ['n]['m]'a -> ['n * 'm]'a *)
+(* flatten [|[| x_11; ...; x_1m |];...; [|x_n1;...;x_nm|]|] =
+                             x_11; ...; x_1m; x_21;...; x_n1;...;x_nm *)
 let flatten loc v =
   let+ v = v in
-  match v with
-  | Varray(v) ->
-     let* m, n = dim_dim loc v in
-     return
-       (Value(Varray
-                (Vmap
-                   { m_length = m * n;
-                     m_u = fun i -> let q = i / n in
-                                    let r = i mod n in
-                                    get_get loc v q r })))
-  | _ -> error { kind = Etype; loc }
+  let* n_i, m_j = dim_dim loc v in
+  return
+    (Value(Varray (Vmap { m_length = n_i * m_j;
+                          m_u = fun i -> let q = i / n_i in
+                                         let r = i mod m_j in
+                                         get_get loc v q r })))
      
 (* reverse *)
+(* reverse [|x0;...;x_{n-1}|] = [|x_{n-1};...;x_0|] *)
 let reverse loc v =
   let+ v = v in
-  match v with
-  | Varray(v) ->
-     let n, u = dim v in
-     return
-       (Value(Varray
-                (Vmap
-                   { m_length = n;
-                     m_u = fun i -> get_in_array loc v (n - i) })))
-  | _ -> error { kind = Etype; loc }
+  let* n = dim loc v in
+  return (Value(Varray(Vmap { m_length = n; m_u = fun i -> geti loc v (n-1-i) })))
  
 (* check that a value is an integer *)
-let int loc v =
+let is_int loc v =
   let* v = Primitives.pvalue v |>
              Opt.to_result ~none: { kind = Etype; loc } in
   (* and an integer value *)
-  Primitives.int v |> Opt.to_result ~none: { kind = Etype; loc}
+  Primitives.is_int v |> Opt.to_result ~none: { kind = Etype; loc}
   
 (* Pattern matching *)
 let match_handler_list loc body genv env ve handlers =
@@ -495,7 +496,7 @@ and eval_eq genv env { eq_desc; eq_write; eq_loc } =
        | Vnil -> return (nil_env eq_write)
        | Value(b) ->
           let* v =
-            bool b |> Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
+            is_bool b |> Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
           if v then
             eval_eq genv env eq1
           else eval_eq genv env eq2 in
@@ -516,7 +517,7 @@ and eval_eq genv env { eq_desc; eq_write; eq_loc } =
        | Vnil -> return (nil_env eq_write)
        | Value(v) ->
           let* _ =
-            bool v |> Option.to_result ~none:{ kind = Etype; loc = e.e_loc } in
+            is_bool v |> Option.to_result ~none:{ kind = Etype; loc = e.e_loc } in
           eval_eq genv env eq in    
      return env_eq
   | EQempty -> return Env.empty
