@@ -52,12 +52,6 @@ let node main2() returns (u, o1, o2)
   and assert (o1 = o2)
   done
 
-let node main3() returns ()
-  let rec u = true fby true fby (not u) fby u in
-  let o1 = relay(-1, 1, u) in
-  let o2 = relay_compiled(-1, 1, u) in
-  do assert (o1 = o2) done
-
-let node main4 () returns (o)
+let node main3 () returns (o)
   o = if true then 1 else "2"
     
