@@ -32,7 +32,7 @@ application à Esterel", 1988; 2/ the paper "A Coiterative
 Characterization of Synchronous Stream Functions", by Caspi and
 Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 3/ the paper "The
 semantics and execution of a synchronous block-diagram language", by
-Edwards and Lee, Science of Computer Programming 2006. All are based
+Edwards and Lee, Science of Computer Programming 2003. All are based
 on the fix-point computation of a monotone function on a domain with
 bounded height. We have reformulated the semantics of 2/ so that it
 can be expressed in a statically typed, purely functional language
