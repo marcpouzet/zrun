@@ -1,36 +1,45 @@
 # The ZRun Synchronous Language Interpreter
 
-ZRun is an executable semantics, in the form of a purely functional interpreter of a synchronous data-flow language. The programming constructs and programming style is that of Lustre: a discrete-time signal is an infinite stream, a synchronous system is defined as a length-preserving stream function. It provides languages features from Lucid Synchrone and Scade, like by-case definition of streams with default values, the mix of stream equations and hierarchical automata, etc. It provides a generalized form of by-case definitions (with a pattern-matching feature) and parameterized state machines (see paper [EMSOFT'06] by Colaco et al.) introduced in Lucid Synchrone and used in Zélus.
+ZRun is an executable denotational semantics, in the form of a purely
+functional interpreter of a synchronous data-flow language. The input
+of Zrun is a subset of Zelus (with the same syntax) and is only
+discrete-time. It borrows the programming model of Lustre: a
+discrete-time signal is an infinite stream and a synchronous system is
+defined as a stream function. The language
+provides richer features, not in Lustre: by-case definition of streams with default
+values, the last value of a signals, the mix of stream equations and
+hierarchical automata, and array operations.
 
-The objective is this prototype is to give a reference and executable
-semantics that can be used: (1) As an oracle for
-testing an existing compiler; (2) to prove compilation steps (e.g.,
-that a well typed/causal/initialized program does not lead to an
-error; (3) to prove semantics preservation of source-to-source
-transformations like static scheduling or the compilation of
-automata); (4) to execute unfinished programs or programs that are
-semantically correct but are statically rejected by the compiler.
-Examples are cyclic circuits accepted by an Esterel compiler (the
-so-called "constructively causal" programs) but are rejected by
-Lustre, Lucid Synchrone, Scade, Zelus compilers that impose stronger
-causality constraints; (5) to prototype new language constructs.
+The objective is this prototype is to serve as an oracle for testing
+an existing compiler; to prove compilation steps (e.g., that a
+well typed/causal/initialized program does not lead to an error;
+to prove semantics preservation of source-to-source transformations
+like static scheduling or the compilation of automata); to execute
+unfinished programs or programs that are semantically correct but are
+statically rejected by the compiler.  Examples are cyclic circuits
+accepted by an Esterel compiler (the so-called "constructively causal"
+programs) but are rejected by Lustre/Lucid Synchrone/Scade/Zelus
+compilers that impose stronger causality constraints; to prototype
+new language constructs.
 
-The long term goal of this work is to define an executable semantics that deal with all the features of a language like Zélus that provides construct to model discrete-time and continuous-time signals defined by ODEs and zero-crossing events. Continuous-time features are not delt with for the moment.
+The long term goal of this work is to define an executable semantics
+that deal with all the language features of Zélus. Continuous-time
+features (ODEs and zero-crossings) are not treated for the moment.
 
-
-Zrun defines an executable denotational semantics. It was inspired by
-several works. The PhD. thesis of G.~Gonthier who introduced a
-computational semantics for the language Esterel; the paper 1/ "A
-Coiterative Characterization of Synchronous Stream Functions", by
-Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 2/ the
-paper "The semantics and execution of a synchronous block-diagram
-language", by Edwards and Lee, Science of Computer Programming
-2006. We have reformulated the semantics of 1/ so that it can be
-expressed in a statically typed, purely functional language that has
-strong normalization property (all programs terminate). Your can read
-the companion paper "A Constructive State-based Semantics for a
-Synchronous Data-flow Language with State machines" presented at
-EMSOFT'2023.
+Zrun was inspired by several works. The PhD. thesis of G.~Gonthier 1/
+"Sémantiques et modèles d'exécution des langages réactifs synchrones :
+application à Esterel", 1988; 2/ the paper "A Coiterative
+Characterization of Synchronous Stream Functions", by Caspi and
+Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 3/ the paper "The
+semantics and execution of a synchronous block-diagram language", by
+Edwards and Lee, Science of Computer Programming 2006. All are based
+on the computation done at every step of a monotone function on a
+domain with bounded height. We have reformulated the semantics of 2/
+so that it can be expressed in a statically typed, purely functional
+language that has strong normalization property (all programs
+terminate). Your can read the companion paper "A Constructive
+State-based Semantics for a Synchronous Data-flow Language with State
+machines" presented at EMSOFT'2023.
 
 If you find this work useful or have any
 comment, please send a mail to Marc.Pouzet@ens.fr.
