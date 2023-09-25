@@ -1,6 +1,5 @@
 (***********************************************************************)
 (*                                                                     *)
-(*                                                                     *)
 (*                        The ZRun Interpreter                         *)
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
@@ -92,6 +91,7 @@ let apply_with_close_out f o =
 let do_step comment step input = 
   let output = step input in
   Debug.print_message comment;
+  Debug.print_program output;
   output
 
 (* Evaluate all the definition in a file, store values *)
@@ -109,8 +109,7 @@ let eval_definitions_in_file modname filename =
   Debug.print_message "Parsing done";
 
   (* Scoping *)
-  let impl_list = Scoping.program impl_list in
-  Debug.print_message "Scoping done";
+  let impl_list = do_step "Scoping done" Scoping.program impl_list in
   
   (* Write defined variables for equations *)
   let impl_list = do_step "Write done" Write.program impl_list in
