@@ -18,7 +18,7 @@
   (modules
     config misc
     lexer parser parsetree
-    ident lident defnames location util ast write scoping pp_tools)
+    ident lident defnames location util ast write scoping pp_tools printer)
   (libraries menhirLib))	
 
 ; all the necessary modules to make zrun except the entry module
