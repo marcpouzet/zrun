@@ -10,7 +10,7 @@ by-case definition of streams with default values, the last value of a
 signals, the mix of stream equations and hierarchical automata, and
 array operations.
 
-The objective is this prototype is to serve as an oracle for compiler testing;
+The objective of this prototype is to serve as an oracle for compiler testing;
 to prove compilation steps (e.g., that a
 well typed/causal/initialized program does not lead to an error;
 to prove semantics preservation of source-to-source transformations
@@ -37,16 +37,17 @@ Edwards and Lee, Science of Computer Programming 2003. All are based
 on the fix-point computation of a monotone function on a domain with
 bounded height. This work build directly on 3/, reformulating the
 semantics so that it can be expressed in a statically typed, purely
-functional language that has strong normalization property (all
-programs terminate). In comparison, the original version was a shallow
-embedding in a language with call-by-need like Haskell. You can read the companion
-paper "[A Constructive State-based Semantics and Interpreter for a
-Synchronous Data-flow Language with State
+functional language that has strong normalization property (e.g., the
+programming language of Coq). In comparison, the original version was
+a shallow embedding in a language with call-by-need like Haskell. You
+can read the companion paper "[A Constructive State-based Semantics
+and Interpreter for a Synchronous Data-flow Language with State
 machines](https://www.di.ens.fr/~pouzet/bib/emsoft23b-extended.pdf)"
 presented at EMSOFT'2023.
 
-If you find this work useful, please cite the above paper. If you have any
-comment, please send a mail to Marc.Pouzet@ens.fr.
+If you find this work useful for your own work, please cite this paper. If
+your have any comment or question, please send a mail to
+Marc.Pouzet@ens.fr.
 
 ## Getting Started
 
