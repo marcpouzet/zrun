@@ -18,9 +18,9 @@
 open Location
 open Misc
 open Ast
+open Defnames
 open Pp_tools
 open Format
-open Defnames
 
 (* Infix chars are surrounded by parenthesis *)
 let is_infix =
@@ -161,14 +161,14 @@ let block exp body ff { b_vars; b_body; b_write } =
   | _ ->
      fprintf ff "@[<hov 0>local@ %a in@ %a%a@]"
        (vardec_list exp) b_vars
-       print_writes b_write
+       print_writes b_write       
        body b_body
 
 let match_handler body ff { m_pat; m_body; m_reset; m_zero } =
   fprintf ff "@[<hov 4>| %a -> %s%s@,%a@]"
     pattern m_pat (if m_reset then "(* reset *)" else "")
                 (if m_zero then "(* zero *)" else "")
-                body m_body
+    body m_body
 
 let present_handler scondpat body ff { p_cond; p_body } =
   fprintf ff "@[<hov4>| (%a) ->@ @[<v 0>%a@]@]"
@@ -220,11 +220,11 @@ let automaton_handler_list
       if is_empty_block e_body
       then
         fprintf ff "@[<v4>| %a %s@ %a@]"
-          (scondpat expression) e_cond 
+          (scondpat expression) e_cond
           (if e_reset then "then" else "continue") state e_next_state
       else
          fprintf ff "@[<v4>| %a %s@ %a in %a@]"
-           (scondpat expression) e_cond 
+           (scondpat expression) e_cond
            (if e_reset then "then" else "continue")
            body_in_escape e_body state e_next_state in
     
@@ -234,7 +234,7 @@ let automaton_handler_list
         print_list_r escape
 	  (if is_weak then "until " else "unless ") "" "" ff t_list in
     fprintf ff "@[<v 4>| %a ->@ @[<v0>%a%a@,%a@]@]"
-      statepat s_state 
+      statepat s_state
       leqs s_let body s_body escape_list s_trans in
   
   let automaton_handler_list ff s_h_list =
@@ -302,7 +302,7 @@ let rec expression ff e =
          Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
            ff for_size in
        fprintf ff
-         "@[<hov 2>%a@,%a%a@,%a@,%a@]"
+         "@[<hov 2>%a@,%a%a@,%a@,%a@ @]"
          kind_of_forloop for_kind
          size for_size
          index_list for_index
@@ -374,7 +374,7 @@ and array_operator ff op l =
   | Earray_list, l ->
      Pp_tools.print_list_l expression "[|" ";" "|]" ff l
   | Econcat, [e1; e2] ->
-     fprintf ff "[@<hov0>%a ++ @,%a@]" expression e1 expression e2
+     fprintf ff "@<hov0>%a ++ @,%a@" expression e1 expression e2
   | Eget, [e1; e2] ->
      fprintf ff "%a.(%a)" expression e1 expression e2
   | Eget_with_default, [e1; e2; e3] ->
@@ -384,13 +384,13 @@ and array_operator ff op l =
   | Eupdate, (e1 :: e2 :: i_list) ->
      (* [| e1 with i_list <- e2 |] *)
      fprintf ff "@[<hov 2>[|%a with@, %a <- %a|]@]"
-       expression e1 (print_list_r expression "" "," "") i_list expression e2
+       expression e1 (print_list_r expression "(" "," ")") i_list expression e2
   | Etranspose, [e] ->
-     fprintf ff "@[<hov 2>%a.T@]" expression e
+     fprintf ff "@[<hov 2>transpose@ %a@]" expression e
   | Ereverse, [e] ->
-     fprintf ff "@[<hov 2>%a.R@]" expression e
+     fprintf ff "@[<hov 2>reverse@ %a@]" expression e
   | Eflatten, [e] ->
-     fprintf ff "@[<hov 2>%a.F@]" expression e
+     fprintf ff "@[<hov 2>flatten@ %a@]" expression e
   | _ -> assert false
 
 and equation ff ({ eq_desc = desc } as eq) =
@@ -460,7 +460,7 @@ and equation ff ({ eq_desc = desc } as eq) =
        print_list_r for_out "" "," "" ff l in
      let comma =
        match for_index, for_out with | ([], _) | (_, []) -> "" | _ -> ", " in
-     fprintf ff  "@[<hov 2>%a%a%a%s@,%a@,%a@, %a@]"
+     fprintf ff  "@[<hov 2>%a%a%a%s@,%a@,%a@,%a@ @]"
        kind_of_forloop for_kind
        size for_size
        index_list for_index
@@ -545,17 +545,18 @@ let type_decl ff { desc = desc } =
           (print_couple shortname ptype "" " :" "") "{" ";" "}") n_ty_list
 
 let open_module ff n =
-  fprintf ff "@[open %a\n@]@." shortname n
+  fprintf ff "@[open %a@]@." shortname n
 
 let implementation ff impl =
   match impl.desc with
   | Eopen(n) -> open_module ff n
   | Etypedecl { name; ty_params; size_params; ty_decl } ->
-     fprintf ff "@[<v 2>type %a%s%a %a\n@]@."
-       print_type_params ty_params name print_size_params size_params
+     fprintf ff "@[<v 2>type %a%s%a %a@]@."
+       print_type_params ty_params
+       name print_size_params size_params
        type_decl ty_decl
   | Eletdecl { name; const; e } ->
-     fprintf ff "@[<hov2>let %s%a =@ %a\n@]@."
+     fprintf ff "@[<hov2>let %s%a =@ %a@]@."
        (if const then "const " else "") shortname name expression e
     
 let program ff imp_list = List.iter (implementation ff) imp_list
@@ -564,12 +565,13 @@ let interface ff { desc } =
   match desc with
   | Einter_open(n) -> open_module ff n
   | Einter_typedecl { name; ty_params; size_params; ty_decl } ->
-     fprintf ff "@[<v 2>type %a%s%a %a\n@]@."
-       print_type_params ty_params name print_size_params size_params
+     fprintf ff "@[<v 2>type %a%s%a %a@]@."
+       print_type_params ty_params
+       name print_size_params size_params
        type_decl ty_decl
   | Einter_constdecl { name; const; ty; info } ->
      let print_n ff n = fprintf ff "%s" n in
-     fprintf ff "@[<v 2>%s %s : %a%a\n@]@."
+     fprintf ff "@[<v 2>%s %s : %a%a@]@."
        (if const then "const" else "val") name
        ptype ty (print_list_r print_n "=[" " " "]") info
 
