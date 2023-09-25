@@ -959,6 +959,7 @@ simple_expression_desc:
 ;
 
 /* [| e with e1,...,en <- e' |] */
+/* is a short-cut for [| e with i <- [| e.(i) with j <- e' |] |] */
 update_array_comma_list:
   | e = simple_expression
     { [ e ] }
