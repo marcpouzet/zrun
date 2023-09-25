@@ -1,14 +1,14 @@
 # The ZRun Synchronous Language Interpreter
 
 ZRun is an executable semantics of a synchronous data-flow language,
-in the form of a purely functional interpreter. The input
-of Zrun is a subset of Zelus (with the same syntax) and is only
-discrete-time. It borrows the programming model of Lustre: a
-discrete-time signal is an infinite stream and a synchronous system is
-defined as a stream function. The language
-provides richer features, not in Lustre: by-case definition of streams with default
-values, the last value of a signals, the mix of stream equations and
-hierarchical automata, and array operations.
+in the form of a purely functional interpreter. The input of Zrun is a
+subset of Zelus (with the same syntax) and is only discrete-time. It
+borrows the programming model of Lustre: a discrete-time signal is an
+infinite stream and a synchronous system is defined as a stream
+function. The language provides richer features, not in Lustre:
+by-case definition of streams with default values, the last value of a
+signals, the mix of stream equations and hierarchical automata, and
+array operations.
 
 The objective is this prototype is to serve as an oracle for compiler testing;
 to prove compilation steps (e.g., that a
@@ -28,17 +28,20 @@ features (ODEs and zero-crossings) are not treated for the moment.
 
 Zrun was inspired by several works. The PhD. thesis of Gonthier 1/
 "Sémantiques et modèles d'exécution des langages réactifs synchrones :
-application à Esterel", 1988; 2/ the paper "A Coiterative
+application à Esterel", 1988; 2/ "The Constructive Semantics of Pure
+Esterel (Draft Version 3), by Berry; 3/ the paper "A Coiterative
 Characterization of Synchronous Stream Functions", by Caspi and
-Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 3/ the paper "The
+Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 4/ the paper "The
 semantics and execution of a synchronous block-diagram language", by
 Edwards and Lee, Science of Computer Programming 2003. All are based
 on the fix-point computation of a monotone function on a domain with
-bounded height. We have reformulated the semantics of 2/ so that it
-can be expressed in a statically typed, purely functional language
-that has strong normalization property (all programs terminate). You
-can read the companion paper "[A Constructive State-based Semantics
-and Interpreter for a Synchronous Data-flow Language with State
+bounded height. This work build directly on 4/, reformulating the
+semantics so that it can be expressed in a statically typed, purely
+functional language that has strong normalization property (all
+programs terminate). In comparison, the original version was a shallow
+embedding in a languge with call-by-need. You can read the companion
+paper "[A Constructive State-based Semantics and Interpreter for a
+Synchronous Data-flow Language with State
 machines](https://www.di.ens.fr/~pouzet/bib/emsoft23b-extended.pdf)"
 presented at EMSOFT'2023.
 
