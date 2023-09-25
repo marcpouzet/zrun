@@ -46,7 +46,7 @@ Synchronous Data-flow Language with State
 machines](https://www.di.ens.fr/~pouzet/bib/emsoft23b-extended.pdf)"
 presented at EMSOFT'2023.
 
-If you find this work useful for your own work, please cite this paper. If
+If you find this work useful for your own work, please cite us. If
 your have any comment or question, please send a mail to
 Marc.Pouzet@ens.fr.
 
