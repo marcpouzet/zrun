@@ -1,3 +1,11 @@
+let node main_42 () returns (l)
+  forward i in 0 to 10, l init 0 do
+    forward j in 0 to 10, l init last l do
+      l = last l + 1
+    done
+  done
+
+
 let node incr(x) returns (o)
     o = 0 fby x + 1
 

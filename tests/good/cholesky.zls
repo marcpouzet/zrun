@@ -9,7 +9,7 @@ let node main14() = run (mat(5, 0.0))()
 
 let node main_14() =
   let v = [|1;2|] in
-  (v.R).R = v
+  (v.R).R
 let node main_15() =
   let v = [|[|1;2|];[|3;4|];[|5;6|]|] in
   v.T
@@ -22,8 +22,8 @@ let node main_17() =
 (* cholesky *)
 let node cholesky_exp(n)(a) returns (l)
   do l =
-    forward i in 0 to n-1, ai in a returns (l init (run (mat (n, 0.0)) ()))
-      do l = forward j in 0 to n-1, aij in ai returns (l init last l)
+    forward i in 0 to n-1, ai in a returns (l1 init (run (mat (n, 0.0)) ()))
+      do l1 = forward j in 0 to n-1, aij in ai returns (l init last l1)
               do
                 let tmp_sum =
                   forward k in 0 to i-1 returns (cpt init 0.0)
