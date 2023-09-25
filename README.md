@@ -35,11 +35,11 @@ Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 4/ the paper "The
 semantics and execution of a synchronous block-diagram language", by
 Edwards and Lee, Science of Computer Programming 2003. All are based
 on the fix-point computation of a monotone function on a domain with
-bounded height. This work build directly on 4/, reformulating the
+bounded height. This work build directly on 3/, reformulating the
 semantics so that it can be expressed in a statically typed, purely
 functional language that has strong normalization property (all
 programs terminate). In comparison, the original version was a shallow
-embedding in a languge with call-by-need. You can read the companion
+embedding in a language with call-by-need like Haskell. You can read the companion
 paper "[A Constructive State-based Semantics and Interpreter for a
 Synchronous Data-flow Language with State
 machines](https://www.di.ens.fr/~pouzet/bib/emsoft23b-extended.pdf)"
