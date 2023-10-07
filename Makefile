@@ -13,7 +13,7 @@ clean:
 	dune clean
 
 wc:
-	wc global/*.ml \
-	parsing/parsetree.ml parsing/*.mll compiler/parsing/*.mly \
-	zrun/*.ml
+	(cd src; wc global/*.ml \
+	parsing/parsetree.ml parsing/*.mll \
+	zrun/*.ml)
 

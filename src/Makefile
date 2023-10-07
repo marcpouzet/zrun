@@ -7,8 +7,4 @@ debug:
 clean:
 	dune clean
 
-wc:
-	wc global/*.ml \
-	parsing/parsetree.ml parsing/*.mll compiler/parsing/*.mly \
-	zrun/*.ml
 
