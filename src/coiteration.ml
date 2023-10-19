@@ -208,7 +208,7 @@ let fixpoint_eq genv env sem eq n s_eq bot =
   incr_number_of_fixpoint_iterations (n - m + 1);
   return (env_out, s_eq)
  
-(* [sem genv env e = CoF f s] such that [iexp genv env e = s] *)
+(* [exp genv env e = CoF f s] such that [iexp genv env e = s] *)
 (* and [sexp genv env e = f] *)
 (* initial state *)
 let rec iexp genv env { e_desc; e_loc } =
@@ -490,7 +490,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQeq(p, e), s -> 
      let* v, s1 = sexp genv env e s in
      let* env_p1 = matching_pateq p v in
-     Some (env_p1, s1) (* return (env_p, s))) *)
+     return (env_p1, s1)
   | EQif(e, eq1, eq2), Stuple [se; s_eq1; s_eq2] ->
       let* v, se = sexp genv env e se in
       let* env_eq, s =

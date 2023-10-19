@@ -40,9 +40,9 @@ type state =
   | Sval : value -> state
   | Sopt : value option -> state
                  
-type ('a, 's) costream =
+type 'a costream =
   | CoF : { init : 's;
-            step : 's -> ('a * 's) option } -> ('a, 's) costream
+            step : 's -> ('a * 's) option } -> 'a costream
 
 type ('a, 'b, 's) node =
   | CoFun  : ('a -> 'b option) -> ('a, 'b, 's) node
