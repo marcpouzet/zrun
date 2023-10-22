@@ -6,6 +6,14 @@
   done
  *)
 
+
+let node f422(last a) returns (o)
+    o = 42 -> (last a)
+
+let node main_422() returns (o, r)
+  do r = 0 -> pre r + 1 and o = f422(r)
+  done
+
 let node incr(x) returns (o)
     o = 0 fby x + 1
 
