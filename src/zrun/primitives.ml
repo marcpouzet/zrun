@@ -147,6 +147,22 @@ let sqrt_op v =
   let* v = is_float v in
   return (Vfloat(sqrt v))
 
+let sin_op v =
+  let* v = is_float v in
+  return (Vfloat(sin v))
+
+let cos_op v =
+  let* v = is_float v in
+  return (Vfloat(cos v))
+
+let abs_float_op v =
+  let* v = is_float v in
+  return (Vfloat(abs_float v))
+
+let abs_op v =
+  let* v = is_int v in
+  return (Vint(abs v))
+
 let mod_op v1 v2 =
   let* v1 = is_int v1 in
   let* v2 = is_int v2 in
@@ -437,6 +453,10 @@ let list_of_primitives =
    "/.", binop div_float_op;
    "*.", binop mult_float_op;
    "sqrt", unop sqrt_op;
+   "sin", unop sin_op;
+   "cos", unop cos_op;
+   "abs_float", unop abs_float_op;
+   "abs", unop abs_op;
    "not", unop not_op;
    "&&", binop and_op;
    "&", binop and_op;
