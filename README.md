@@ -56,7 +56,7 @@ The interpreter is written in OCaml mostly in purely functional style.
 The simplest way to install the dependencies is via [OPAM](https://opam.ocaml.org/).
 
 ```bash
-opam install dune menhir
+opam install dune menhir alcotest
 ```
 
 Then to build the interpreter:
@@ -88,7 +88,58 @@ Options are:
 ## Examples
 
 Examples are located in the `tests` directory.
-Consider for instance the simple chronometer in `tests/chrono_in_scade.zls` 
+
+Consider for instance a simple program that computes two mutually recursive
+definitions of the sinus and cosinus (`tests/good/sin_cos.zls`).
+
+```
+(* sinus/cosinus *)
+(* file sin_cos.zls *)
+
+(* forward Euler *)
+let node euler_forward(h, x0, xprime) returns (x)
+  x = x0 -> pre(x +. h *. xprime)
+
+(* Backward Euler *)
+let node euler_backward(h, x0, xprime) returns (x)
+    x = x0 -> pre(x) +. h *. xprime
+
+let h = 0.1
+    
+(* Computation of the sinus and cosinus signals *)
+(* Note that the two equations defining [sin] and [cos] *)
+(* are causal but they are not syntactically causal. *)
+(* [euler_forward(h, 0.0, cos)] does not instantaneously depends on [cos] *)
+(* but, in order to generate statically scheduled sequential code, the *)
+(* compiler (of Lustre, Scade and Zelus) inline the functional call. *)
+
+(* This is not a problem in an interpreter. This program executes with *)
+(* no deadlock *)
+let node sin_cos() returns (sin, cos)
+  do sin = euler_forward(h, 0.0, cos)
+  and cos = euler_backward(h, 1.0, -. sin) done
+
+let b = 0.1
+
+let node main() returns
+    (sin_val, sin_ref, cos_val, cos_ref, diff_sin, diff_cos)
+  local time
+  do (sin_val, cos_val) = sin_cos()
+  and sin_ref = sin time
+  and cos_ref = cos time
+  and time = 0.0 -> pre time +. h
+  and diff_sin = abs_float (sin_val -. sin_ref)
+  and diff_cos = abs_float (cos_val -. cos_ref)
+  and assert (diff_sin <= b) && (diff_cos <= b)
+  done
+```
+
+To run this program for 1000 steps, 
+type `./zrun.exe -s main -n 1000 tests/good/sin_cos.zls`.
+	
+We now consider a more example with nested hierarchical automata
+as introduced in Lucid Synchrone and Scade 6. For
+example, the simple chronometer in `tests/good/chrono_in_scade.zls` 
 (we use small constants in the counters to speedup the outputs).
 
 ```
@@ -234,11 +285,11 @@ let node main () returns (a1, a2, a3, l, s, sh)
       
 ```
 
-The file `tests/watch_in_scade.zls` also contains a `main` node to simulate one possible execution.
+The file `tests/goog/watch_in_scade.zls` also contains a `main` node to simulate one possible execution.
 To run this example for 30 steps:
 
 ```bash
-./zrun.exe -s main -n 30 tests/watch_in_scade.zls
+./zrun.exe -s main -n 30 tests/good/watch_in_scade.zls
 ```
 
 The following is a classical example of a cyclic program that is
@@ -313,4 +364,18 @@ let node main() returns (grant1, grant2, grant3)
 
 See other examples in directory tests/
 
+## Citing Zrun
 
+```
+@InProceedings{lucy:emsoft23b,
+  author = 	 {Jean-Louis Colaco and
+                  Michael Mendler and
+		  Baptiste Pauget and
+		  Marc Pouzet},
+  title = 	 {{A Constructive State-based Semantics and Interpreter for a Synchronous Data-flow Language with State machines}},
+  booktitle = {International Conference on Embedded Software (EMSOFT'23)},
+  year = 	 2023,
+  month = 	 {September 17-22},
+  address = 	 {Hamburg, Germany},
+  organization = {ACM}}
+```
