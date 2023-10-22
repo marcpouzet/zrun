@@ -1,0 +1,29 @@
+(* sinus/cosinus *)
+
+let node euler_forward(h, x0, xprime) returns (x)
+  x = x0 -> pre(x +. h *. xprime)
+
+let node euler_backward(h, x0, xprime) returns (x)
+    x = x0 -> pre(x) +. h *. xprime
+
+let h = 0.1
+    
+let node sin_cos() returns (sin, cos)
+  do sin = euler_forward(h, 0.0, cos)
+  and cos = euler_backward(h, 1.0, -. sin) done
+
+let b = 0.1
+
+let node main() returns
+    (sin_val, sin_ref, cos_val, cos_ref, diff_sin, diff_cos)
+  local time
+  do (sin_val, cos_val) = sin_cos()
+  and sin_ref = sin time
+  and cos_ref = cos time
+  and time = 0.0 -> pre time +. h
+  and diff_sin = abs_float (sin_val -. sin_ref)
+  and diff_cos = abs_float (cos_val -. cos_ref)
+  and assert (diff_sin <= b) && (diff_cos <= b)
+  done
+  
+	
