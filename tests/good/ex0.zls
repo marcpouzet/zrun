@@ -1,10 +1,10 @@
-let node main_42 () returns (l)
+(* let node main_42 () returns (l)
   forward i in 0 to 10, l init 0 do
     forward j in 0 to 10, l init last l do
       l = last l + 1
     done
   done
-
+ *)
 
 let node incr(x) returns (o)
     o = 0 fby x + 1
@@ -48,7 +48,7 @@ let node sum(x) returns (o)
   o = forward xi in x do sum(xi) done
 
 let node sum(x, y) = o where
-  rec v = x *. y and o = (0.0 fby o) +. v
+  rec o = (0.0 fby o) +. x *. y
 
 let node scalar(t1, t2) =
   forward xi in t1, yi in t2 do
