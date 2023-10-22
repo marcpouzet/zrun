@@ -1485,7 +1485,7 @@ and sblock genv env { b_vars; b_body = ({ eq_write } as eq); b_loc } s_b =
      (* are non bottom *)
      let* _ =
        Fix.causal b_loc env env_eq (Match.names_env env_v) in
-     (* store the next last value *)
+     (* store the next last value for [svardec] *)
      let* s_list = map2 { kind = Estate; loc = b_loc }
                      (set_vardec env_eq) b_vars s_list in
      (* remove all local variables from [env_eq] *)
