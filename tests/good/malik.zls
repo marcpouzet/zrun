@@ -5,7 +5,7 @@
   causal but not causal in the Scade/Lustre/Zelus sense. 
 *)
 
-let node mux(c, x, y) returns (o)
+let node mux1(c, x, y) returns (o)
   if c then o = x else o = y
 
 let node mux(c, x, y) returns (o)
