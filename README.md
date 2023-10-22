@@ -1,26 +1,32 @@
 # The ZRun Synchronous Language Interpreter
 
 ZRun is an executable semantics of a synchronous data-flow language,
-in the form of a purely functional interpreter. The input of Zrun is a
-subset of Zelus (with the same syntax) and is only discrete-time. It
-borrows the programming model of Lustre: a discrete-time signal is an
-infinite stream and a synchronous system is defined as a stream
-function. The language provides richer features, not in Lustre:
-by-case definition of streams with default values, the last value of a
-signals, the mix of stream equations and hierarchical automata, and
-array operations.
+in the form of a purely functional interpreter. The input of Zrun is
+large subset of [Zelus|https://zelus.di.ens.fr] (with the same
+syntax). It is only discrete-time at the moment. Its timing model is
+that of Lustre: a discrete-time signal is an infinite stream and a
+synchronous system is defined as a stream function. The language
+provides richer features that are not in Lustre: by-case definition of
+streams with default values, the last value of a signal, the mix of
+stream equations and hierarchical automata, static parameters and
+values (known either at compile or instantiation time), and array
+operations.
 
-The objective of this prototype is to serve as an oracle for compiler testing;
-to prove compilation steps (e.g., that a
-well typed/causal/initialized program does not lead to an error;
-to prove semantics preservation of source-to-source transformations
-like static scheduling or the compilation of automata); to execute
-unfinished programs or programs that are semantically correct but are
-statically rejected by the compiler.  Examples are cyclic circuits
-accepted by an Esterel compiler (the so-called "constructively causal"
-programs) but are rejected by Lustre/Lucid Synchrone/Scade/Zelus
-compilers that impose stronger causality constraints; to prototype
-new language constructs.
+The objective of this prototype is serve as a reference semantics that
+is executable. It can be used as an oracle for compiler testing, to
+prove compilation steps (e.g., that a well typed/causal/initialized
+program does not lead to an error; to prove semantics preservation of
+source-to-source transformations like static scheduling or the
+compilation of automata), to execute unfinished programs or programs
+that are semantically correct but are statically rejected by the
+compiler.  Examples of such correct but rejected programs are programs
+with cyclic circuits accepted by an Esterel compiler (the so-called
+"constructively causal" programs) but that are rejected by all the
+descendent of Lustre (e.g., Lustre, Lucid Synchrone, Scade and Zelus)
+and their compilers that impose stronger causality
+constraints. Finally, being independent of a compiler, this semantics
+is useful to prototype new language constructs before considering their
+compilation.
 
 The long term goal of this work is to define an executable semantics
 that deal with all the language features of Zélus. Continuous-time
@@ -35,7 +41,7 @@ Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 4/ the paper "The
 semantics and execution of a synchronous block-diagram language", by
 Edwards and Lee, Science of Computer Programming 2003. All are based
 on the fix-point computation of a monotone function on a domain with
-bounded height that is done for every reaction. The present work build
+bounded height that is done at every reaction. The present work builds
 directly on 3/, reformulating the semantics so that it can be
 expressed in a statically typed, purely functional language that has
 strong normalization property (e.g., the programming language of
@@ -46,9 +52,9 @@ Synchronous Data-flow Language with State
 machines](https://www.di.ens.fr/~pouzet/bib/emsoft23b-extended.pdf)"
 presented at EMSOFT'2023.
 
-If you find this work useful for your own work, please cite us. If
-your have any comment or question, please send a mail to
-Marc.Pouzet@ens.fr.
+If you find this work useful for your own work, please this paper.
+The implementation given here is a lot of work! If you have any
+comment or question, please send a mail to Marc.Pouzet@ens.fr.
 
 ## Getting Started
 
@@ -135,7 +141,11 @@ let node main() returns
 ```
 
 To run this program for 1000 steps, 
-type `./zrun.exe -s main -n 1000 tests/good/sin_cos.zls`.
+type:
+
+```
+./zrun.exe -s main -n 1000 tests/good/sin_cos.zls
+```
 	
 We now consider a more example with nested hierarchical automata
 as introduced in Lucid Synchrone and Scade 6. For
