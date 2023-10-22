@@ -2,7 +2,7 @@
 
 ZRun is an executable semantics of a synchronous data-flow language,
 in the form of a purely functional interpreter. The input of Zrun is
-large subset of [Zelus|https://zelus.di.ens.fr] (with the same
+large subset of [Zelus](https://zelus.di.ens.fr)
 syntax). It is only discrete-time at the moment. Its timing model is
 that of Lustre: a discrete-time signal is an infinite stream and a
 synchronous system is defined as a stream function. The language
