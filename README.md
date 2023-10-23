@@ -10,7 +10,7 @@ function. The language provides the basic constructs of the language
 Lustre: the unit delay (pre) and initialization operator (->), the
 initialized delay (fby), streams defined by mutually recursive
 definitions. It also provides richer programming constructs introduced
-in Lucid Synchrone but that are not in Lustre: by-case definition of
+in Lucid Synchrone and Scade but that are not in Lustre: by-case definition of
 streams with default values, the last value of a signal, the mix of
 stream equations and hierarchical automata, static parameters and values that
 are known either at compile or instantiation time), and array operations.
