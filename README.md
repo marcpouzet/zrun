@@ -2,7 +2,7 @@
 
 ZRun is an executable semantics of a synchronous data-flow
 language. It takes the form of a purely functional interpreter. The
-input of Zrun is a large subset of [Zelus](https://zelus.di.ens.fr)
+input of Zrun is a large subset of [Zélus](https://zelus.di.ens.fr)
 with the same concrete syntax. It considers only the discrete-time
 subset at the moment.  A discrete-time signal is an infinite stream
 and a synchronous system is a synchronous (length-preserving) stream
@@ -10,14 +10,15 @@ function. The language provides the basic constructs of the language
 Lustre: the unit delay (pre) and initialization operator (->), the
 initialized delay (fby), streams defined by mutually recursive
 definitions. It also provides richer programming constructs introduced
-in Lucid Synchrone and Scade but that are not in Lustre: by-case definition of
+in Lucid Synchrone but that are not in Lustre: by-case definition of
 streams with default values, the last value of a signal, the mix of
 stream equations and hierarchical automata, static parameters and values that
 are known either at compile or instantiation time), and array operations.
 
 The objective of this prototype is to serve as a reference semantics that is
-also executable. It can be used as an oracle for compiler testing, to
-prove compilation steps (e.g., that a well typed/causal/initialized
+executable. This way, it can be used independently of a compiler, e.g.,
+as an oracle for compiler testing. We think it can be useful
+to prove compilation steps (e.g., that a well typed/causal/initialized
 program does not lead to an error; to prove semantics preservation of
 source-to-source transformations like static scheduling or the
 compilation of automata), to execute unfinished programs or programs
@@ -25,15 +26,16 @@ that are semantically correct but are statically rejected by the
 compiler.  Examples of such correct but rejected programs are those
 with cyclic circuits accepted by an Esterel compiler (the so-called
 "constructively causal" programs) but that are rejected by Lustre
-(and also Lucid Synchrone, Scade and Zelus) because
-the the compiler imposes stronger causality
+(and also Lucid Synchrone, Scade and Zélus) because
+the compiler imposes stronger causality
 constraints. Finally, being independent of a compiler, this semantics
 is useful to prototype new language constructs before considering their
 compilation.
 
 The long term goal of this work is to define an executable semantics
-that deal with all the language features of Zélus. Continuous-time
-features (ODEs and zero-crossings) are not treated for the moment.
+that deal with all the language features of Zélus. We are far away
+from that! Continuous-time features (ODEs and zero-crossings) are not
+treated for the moment.
 
 Zrun was inspired by several works that we recommend to read. The
 PhD. thesis of Gonthier 1/ "Sémantiques et modèles d'exécution des
