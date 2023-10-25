@@ -1,23 +1,25 @@
 # The ZRun Synchronous Language Interpreter
 
-ZRun is an executable semantics of a synchronous data-flow
-language. It takes the form of a purely functional interpreter. The
-input of Zrun is a large subset of [Zélus](https://zelus.di.ens.fr)
-with the same concrete syntax. It considers only the discrete-time
-subset at the moment.  A discrete-time signal is an infinite stream
-and a synchronous system is a synchronous (length-preserving) stream
-function. The language provides the basic constructs of the language
-Lustre: the unit delay (pre) and initialization operator (->), the
-initialized delay (fby), streams defined by mutually recursive
-definitions. It also provides richer programming constructs introduced
-in Lucid Synchrone but that are not in Lustre: by-case definition of
-streams with default values, the last value of a signal, the mix of
-stream equations and hierarchical automata, static parameters and values that
-are known either at compile or instantiation time), and array operations.
+ZRun is an executable semantics of a synchronous data-flow language.
+It takes the form of a purely functional interpreter. The input of
+Zrun is a large subset of the languages Scade 6 and
+[Zélus](https://zelus.di.ens.fr). The concrete syntax is that of
+Zélus. It considers only discrete-time signals and systems for the
+moment. A discrete-time signal is modeled as an infinite stream and a synchronous
+system is a synchronous (length-preserving) stream function. The
+language provides the basic constructs of the language Lustre: the
+unit delay (pre) and initialization operator (->), the initialized
+delay (fby), streams defined by mutually recursive definitions. It
+also provides richer programming constructs introduced in Lucid
+Synchrone that are not in Lustre: by-case definition of streams
+with default values, the last value of a signal, the mix of stream
+equations and hierarchical automata, static parameters and values that
+are known either at compile or instantiation time), and array
+operations.
 
-The objective of this prototype is to serve as a reference semantics that is
-executable. This way, it can be used independently of a compiler, e.g.,
-as an oracle for compiler testing. We think it can be useful
+The objective of this prototype is to give a reference semantics that is
+executable, to be used independently of a compiler, e.g.,
+as an oracle for compiler testing. It can be used
 to prove compilation steps (e.g., that a well typed/causal/initialized
 program does not lead to an error; to prove semantics preservation of
 source-to-source transformations like static scheduling or the
@@ -86,7 +88,7 @@ Options are:
   -all          Evaluate all nodes
   -n            The number of steps
   -v            Verbose mode
-  -vv           Set even more verbose mode
+  -debug        Set debug mode
   -iv           Print values
   -noassert     No check of assertions
   -nocausality  Turn off the check that are variables are non bottom
@@ -125,8 +127,7 @@ let h = 0.1
 (* but, in order to generate statically scheduled sequential code, the *)
 (* compiler (of Lustre, Scade and Zelus) inline the functional call. *)
 
-(* This is not a problem in an interpreter. This program executes with *)
-(* no deadlock *)
+(* Note that this program executes with zrun with no deadlock *)
 let node sin_cos() returns (sin, cos)
   do sin = euler_forward(h, 0.0, cos)
   and cos = euler_backward(h, 1.0, -. sin) done
