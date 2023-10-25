@@ -28,6 +28,11 @@ let (let+) v f =
   | Vnil -> return Vnil
   | Value(v) -> f v
 
+let (let-) v f =
+  match v with
+  | Vbot -> return Vbot
+  | _ -> f v
+
 let (and+) v1 v2 =
   match v1, v2 with
   | (Vbot, _) | (_, Vbot) -> Vbot
@@ -247,8 +252,8 @@ let length_op v =
 (* ifthenelse. this one is strict w.r.t all arguments *)
 let lustre_ifthenelse v1 v2 v3 =
   let+ v1 = v1 in
-  let+ _ = v2 in
-  let+ _ = v3 in
+  let- v2 = v2 in
+  let- v3 = v3 in
   ifthenelse_op v1 v2 v3
 
 (* ifthenelse. this one is strict w.r.t the first argument *)
