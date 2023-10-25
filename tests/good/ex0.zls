@@ -6,9 +6,17 @@
   done
  *)
 
+let node main22() returns (x)
+  do x = 0 -> pre x + 1
+  done
+
 let node ffff() returns (o)
-    o = if true then 1 else o + 1
-      
+  local y, c
+  do  o = if c then y else 2
+  and y = if c then 1 else o
+  and c = true fby not c
+  done
+
 let node f422(last a) returns (o)
     o = 42 -> (last a)
 
