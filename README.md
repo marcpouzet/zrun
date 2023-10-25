@@ -1,59 +1,67 @@
 # The ZRun Synchronous Language Interpreter
 
-ZRun is an executable semantics of a synchronous data-flow language,
-in the form of a purely functional interpreter. The input of Zrun is
-large subset of [Zelus](https://zelus.di.ens.fr)
-syntax). It is only discrete-time at the moment. Its timing model is
-that of Lustre: a discrete-time signal is an infinite stream and a
-synchronous system is defined as a stream function. The language
-provides richer features that are not in Lustre: by-case definition of
-streams with default values, the last value of a signal, the mix of
-stream equations and hierarchical automata, static parameters and
-values (known either at compile or instantiation time), and array
+ZRun is an executable semantics of a synchronous data-flow language.
+It takes the form of a purely functional interpreter. The input of
+Zrun is a large subset of the languages Scade 6 and
+[Zélus](https://zelus.di.ens.fr). The concrete syntax is that of
+Zélus. It considers only discrete-time signals and systems for the
+moment. A discrete-time signal is modeled as an infinite stream and a synchronous
+system is a synchronous (length-preserving) stream function. The
+language provides the basic constructs of the language Lustre: the
+unit delay (pre) and initialization operator (->), the initialized
+delay (fby), streams defined by mutually recursive definitions. It
+also provides richer programming constructs introduced in Lucid
+Synchrone that are not in Lustre: by-case definition of streams
+with default values, the last value of a signal, the mix of stream
+equations and hierarchical automata, static parameters and values that
+are known either at compile or instantiation time), and array
 operations.
 
-The objective of this prototype is serve as a reference semantics that
-is executable. It can be used as an oracle for compiler testing, to
-prove compilation steps (e.g., that a well typed/causal/initialized
+The objective of this prototype is to give a reference semantics that is
+executable, to be used independently of a compiler, e.g.,
+as an oracle for compiler testing. It can be used
+to prove compilation steps (e.g., that a well typed/causal/initialized
 program does not lead to an error; to prove semantics preservation of
 source-to-source transformations like static scheduling or the
 compilation of automata), to execute unfinished programs or programs
 that are semantically correct but are statically rejected by the
-compiler.  Examples of such correct but rejected programs are programs
+compiler.  Examples of such correct but rejected programs are those
 with cyclic circuits accepted by an Esterel compiler (the so-called
-"constructively causal" programs) but that are rejected by all the
-descendent of Lustre (e.g., Lustre, Lucid Synchrone, Scade and Zelus)
-and their compilers that impose stronger causality
+"constructively causal" programs) but that are rejected by Lustre
+(and also Lucid Synchrone, Scade and Zélus) because
+the compiler imposes stronger causality
 constraints. Finally, being independent of a compiler, this semantics
 is useful to prototype new language constructs before considering their
 compilation.
 
 The long term goal of this work is to define an executable semantics
-that deal with all the language features of Zélus. Continuous-time
-features (ODEs and zero-crossings) are not treated for the moment.
+that deal with all the language features of Zélus. We are far away
+from that! Continuous-time features (ODEs and zero-crossings) are not
+treated for the moment.
 
-Zrun was inspired by several works. The PhD. thesis of Gonthier 1/
-"Sémantiques et modèles d'exécution des langages réactifs synchrones :
-application à Esterel", 1988; 2/ "The Constructive Semantics of Pure
-Esterel (Draft Version 3), by Berry; 3/ the paper "A Coiterative
-Characterization of Synchronous Stream Functions", by Caspi and
-Pouzet, CMCS, 1998 (VERIMAG tech. report, 1997); 4/ the paper "The
-semantics and execution of a synchronous block-diagram language", by
-Edwards and Lee, Science of Computer Programming 2003. All are based
-on the fix-point computation of a monotone function on a domain with
-bounded height that is done at every reaction. The present work builds
-directly on 3/, reformulating the semantics so that it can be
-expressed in a statically typed, purely functional language that has
-strong normalization property (e.g., the programming language of
-Coq). In comparison, the original version was a shallow embedding in a
-language with call-by-need like Haskell. You can read the companion
-paper "[A Constructive State-based Semantics and Interpreter for a
-Synchronous Data-flow Language with State
+Zrun was inspired by several works that we recommend to read. The
+PhD. thesis of Gonthier 1/ "Sémantiques et modèles d'exécution des
+langages réactifs synchrones : application à Esterel", 1988; 2/ "The
+Constructive Semantics of Pure Esterel (Draft Version 3), by Berry; 3/
+the paper "A Coiterative Characterization of Synchronous Stream
+Functions", by Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report,
+1997); 4/ the paper "The semantics and execution of a synchronous
+block-diagram language", by Edwards and Lee, Science of Computer
+Programming 2003. All are based on the fix-point computation of a
+monotone function on a domain with bounded height that is done at
+every reaction. The present work builds directly on 3/, reformulating
+the semantics so that it can be expressed in a statically typed,
+purely functional language that has strong normalization property
+(e.g., the programming language of Coq). In comparison, the original
+version was a shallow embedding in a language with call-by-need like
+Haskell. You can read the companion paper "[A Constructive State-based
+Semantics and Interpreter for a Synchronous Data-flow Language with
+State
 machines](https://www.di.ens.fr/~pouzet/bib/emsoft23b-extended.pdf)"
 presented at EMSOFT'2023.
 
-If you find this work useful for your own work, please this paper.
-The implementation given here is a lot of work! If you have any
+If you find this work useful for your own work, please cite this paper.
+The implementation given here was a lot of work! If you have any
 comment or question, please send a mail to Marc.Pouzet@ens.fr.
 
 ## Getting Started
@@ -80,7 +88,7 @@ Options are:
   -all          Evaluate all nodes
   -n            The number of steps
   -v            Verbose mode
-  -vv           Set even more verbose mode
+  -debug        Set debug mode
   -iv           Print values
   -noassert     No check of assertions
   -nocausality  Turn off the check that are variables are non bottom
@@ -119,8 +127,7 @@ let h = 0.1
 (* but, in order to generate statically scheduled sequential code, the *)
 (* compiler (of Lustre, Scade and Zelus) inline the functional call. *)
 
-(* This is not a problem in an interpreter. This program executes with *)
-(* no deadlock *)
+(* Note that this program executes with zrun with no deadlock *)
 let node sin_cos() returns (sin, cos)
   do sin = euler_forward(h, 0.0, cos)
   and cos = euler_backward(h, 1.0, -. sin) done
