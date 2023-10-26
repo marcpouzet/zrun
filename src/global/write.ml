@@ -20,11 +20,11 @@
 open Ident
 open Ast
 open Defnames
-   
+
 let rec fv_pat acc { pat_desc } =
   match pat_desc with
   | Ewildpat | Econstr0pat _ | Econstpat _ -> acc
-  | Evarpat(x) -> 
+  | Evarpat(x) ->
      if S.mem x acc then acc else S.add x acc
   | Econstr1pat(_, pat_list) | Etuplepat(pat_list) ->
      List.fold_left fv_pat acc pat_list
@@ -32,14 +32,14 @@ let rec fv_pat acc { pat_desc } =
      List.fold_left
        (fun acc { arg } -> fv_pat acc arg) acc label_pat_list
   | Ealiaspat(p, name) ->
-     let acc = 
+     let acc =
        if S.mem name acc
        then acc else S.add name acc in
      fv_pat acc p
   | Eorpat(p1, _) -> fv_pat acc p1
   | Etypeconstraintpat(p, _) -> fv_pat acc p
 
-                          
+
 (* computes [dv] and [di] *)
 let rec equation ({ eq_desc } as eq)=
   let eq_desc, def =
@@ -152,7 +152,7 @@ and lets l =
   List.map
     (fun ({ l_eq } as leq) ->
       let l_eq, _ = equation l_eq in { leq with l_eq }) l
-  
+
 (** [returns a new block whose body is an equation [eq];
  *- [def] the defined variables in [eq] that are not local;
  *- [dv_b] the defined local variables *)
@@ -161,7 +161,7 @@ and block ({ b_vars; b_body } as b) =
   let b_body, def_body = equation b_body in
   let def = Defnames.diff def_body dv_b in
   { b with b_vars; b_body; b_write = def }, def, dv_b
-  
+
 and vardec acc ({ var_name; var_default; var_init } as v) =
   { v with var_default = Util.optional_map expression var_default;
            var_init = Util.optional_map expression var_init },
@@ -190,7 +190,7 @@ and escape acc ({ e_cond; e_let; e_body; e_next_state } as esc) =
   { esc with e_cond = e_cond; e_let; e_body = e_body;
              e_next_state = e_next_state },
   Defnames.union def_eq acc
-  
+
 and scondpat ({ desc } as scpat) =
   let desc = match desc with
     | Econdand(scpat1, scpat2) ->
@@ -204,7 +204,7 @@ and scondpat ({ desc } as scpat) =
     | Econdon(scpat, e) ->
        Econdon(scondpat scpat, expression e) in
   { scpat with desc = desc }
-          
+
 
 and expression ({ e_desc } as e) =
   let desc =
@@ -278,8 +278,8 @@ and expression ({ e_desc } as e) =
 and for_vardec acc ({ desc = ({ for_vardec } as v) } as fv) =
   let for_vardec, acc = vardec acc for_vardec in
   { fv with desc = { v with for_vardec } }, acc
- 
-and for_index_w for_index = 
+
+and for_index_w for_index =
   let index ({ desc } as i) =
     let desc = match desc with
       | Einput { id; e; by } ->
@@ -289,9 +289,9 @@ and for_index_w for_index =
                   e_right = expression e_right; dir } in
     { i with desc } in
   List.map index for_index
-       
+
 and arg acc v_list = Util.mapfold vardec acc v_list
-                   
+
 and funexp ({ f_args; f_body } as fd) =
   let f_args, _ = Util.mapfold arg S.empty f_args in
   let f_body = result f_body in
@@ -305,7 +305,7 @@ and result ({ r_desc } as r) =
        let b_eq, _, _ = block b_eq in
        Returns(b_eq) in
   { r with r_desc }
-  
+
 let implementation ({ desc } as i) =
   let desc = match desc with
     | Eopen _ -> desc
