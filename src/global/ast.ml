@@ -168,14 +168,14 @@ type ('scondpat, 'exp, 'body) present_handler =
   }
 
 type ('scondpat, 'exp, 'leq, 'body) escape =
-  { e_cond: 'scondpat; 
-    e_reset: bool; 
+  { e_cond: 'scondpat;
+    e_reset: bool;
     e_let: 'leq list;
     e_body: 'body;
     e_next_state: 'exp state;
     e_loc: Location.t;
   }
-                           
+
 type is_weak = bool
 
 type exp =
@@ -183,19 +183,19 @@ type exp =
     e_loc: Location.t; (* location *)
     }
 
-and exp_desc = 
-  | Econst : immediate -> exp_desc 
-  | Econstr0 : { mutable lname: Lident.t } -> exp_desc 
+and exp_desc =
+  | Econst : immediate -> exp_desc
+  | Econstr0 : { mutable lname: Lident.t } -> exp_desc
   | Econstr1 :
-      { mutable lname: Lident.t; arg_list: exp list } -> exp_desc 
-  | Elocal : Ident.t -> exp_desc 
+      { mutable lname: Lident.t; arg_list: exp list } -> exp_desc
+  | Elocal : Ident.t -> exp_desc
   | Eglobal :
-      { mutable lname : Lident.t } -> exp_desc 
-  | Elast : Ident.t -> exp_desc 
-  | Eop : operator * exp list -> exp_desc 
-  | Etuple : exp list -> exp_desc 
-  | Eapp : exp * exp list -> exp_desc 
-  | Elet : leq * exp -> exp_desc 
+      { mutable lname : Lident.t } -> exp_desc
+  | Elast : Ident.t -> exp_desc
+  | Eop : operator * exp list -> exp_desc
+  | Etuple : exp list -> exp_desc
+  | Eapp : exp * exp list -> exp_desc
+  | Elet : leq * exp -> exp_desc
   | Erecord_access : exp record -> exp_desc
   | Erecord : exp record list -> exp_desc
   | Erecord_with : exp * exp record list -> exp_desc
@@ -226,8 +226,8 @@ and for_exp =
       { returns : for_vardec_desc localized list;
         body : (exp, eq) block;
       } -> for_exp
-  (* [for[each|ward] ... returns (...) local ... do eq ... done] *) 
-  
+  (* [for[each|ward] ... returns (...) local ... do eq ... done] *)
+
 and for_vardec_desc =
   { for_array : int; (* 0 means x; 1 means [|x|]; 2 means [|[| x|]|]; etc *)
     for_vardec : exp vardec; (* [x [init e] [default e]] *)
@@ -250,14 +250,14 @@ and leq =
     l_eq: eq;
     l_loc : Location.t;
   }
-  
+
 and eq =
   { eq_desc: eq_desc; (* descriptor *)
     mutable eq_write: Defnames.defnames; (* set of defined variables *)
     eq_loc: Location.t; (* its location *)
   }
 
-and eq_desc = 
+and eq_desc =
   | EQeq : pattern * exp -> eq_desc  (* [p = e] *)
   | EQder :
       Ident.t * exp * exp option * (scondpat, exp, exp) present_handler list
@@ -283,12 +283,12 @@ and eq_desc =
   | EQassert : exp -> eq_desc
   | EQforloop : for_eq forloop -> eq_desc
   (* [foreach [id in e..e]* [id in e [by e],]* returns (vardec_list) do eq] *)
-  (* forward [id in e..e]* [id in e [by e],]* 
+  (* forward [id in e..e]* [id in e [by e],]*
      [while e] do e] returns (vardec_list) *)
 
 and for_eq =
   { for_out : for_out_desc localized list;
-    for_block : (exp, eq) block; (* loop body *) 
+    for_block : (exp, eq) block; (* loop body *)
   }
 
 and for_kind =
@@ -353,28 +353,28 @@ and result_desc =
 type interface = interface_desc localized
 
 and interface_desc =
-  | Einter_open : name -> interface_desc 
+  | Einter_open : name -> interface_desc
   | Einter_typedecl :
       { name: name; ty_params: name list; size_params: name list;
-        ty_decl: type_decl } -> interface_desc 
+        ty_decl: type_decl } -> interface_desc
   | Einter_constdecl :
       { name: name; const: bool; ty: type_expression; info: name list }
-      -> interface_desc 
+      -> interface_desc
 
 and type_decl = type_decl_desc localized
-    
+
 and type_decl_desc =
-  | Eabstract_type : type_decl_desc 
-  | Eabbrev : type_expression -> type_decl_desc 
-  | Evariant_type : constr_decl list -> type_decl_desc 
-  | Erecord_type : (name * type_expression) list -> type_decl_desc 
+  | Eabstract_type : type_decl_desc
+  | Eabbrev : type_expression -> type_decl_desc
+  | Evariant_type : constr_decl list -> type_decl_desc
+  | Erecord_type : (name * type_expression) list -> type_decl_desc
 
 and constr_decl = constr_decl_desc localized
 
 and constr_decl_desc =
-  | Econstr0decl : name -> constr_decl_desc 
-  | Econstr1decl : name * type_expression list -> constr_decl_desc 
-  
+  | Econstr0decl : name -> constr_decl_desc
+  | Econstr1decl : name * type_expression list -> constr_decl_desc
+
 type implementation = implementation_desc localized
 
 and implementation_desc =

@@ -1,6 +1,5 @@
 (***********************************************************************)
 (*                                                                     *)
-(*                                                                     *)
 (*                        The ZRun Interpreter                         *)
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
@@ -23,29 +22,29 @@
 (* The original version of this code is taken from the GitHub Zrun repo: *)
 (* https://github.com/marcpouzet/zrun *)
 (* zrun was programmed right after the COVID confinment, in Mai-June 2020 *)
-(* This second version includes some of the Zelus constructs: 
+(* This second version includes some of the Zelus constructs:
  *- ODEs and zero-crossing;
- *- higher order functions; 
+ *- higher order functions;
  *- the implem. was done in 2021 and updated in 2022;
  *- update during summer 2022 with array constructs inspired by that
- *- of the (beautiful!) SISAL language; they were implemented in Zelus 
+ *- of the (beautiful!) SISAL language; they were implemented in Zelus
  *- v2 (2017).
  *- w.r.t SISAL, for loops can contain stateful (stream) functions;
  *- and two style of for loop constructs are provided:
- *- 1/ foreach loop : a parallel composition - every iteration has its 
+ *- 1/ foreach loop : a parallel composition - every iteration has its
  *- own state;
  *- 2/ forward loop is an "hyper-serial" loop; iteration is done on the
  *- very same state. It is a form of bounded "clock domain" (PPDP'13) by
  *- Cedric Pasteur
  *- 3/ the size of arrays/number of iterations must be known statically.
- *- It is yet very experimental. If you find some of its ideas useful 
+ *- It is yet very experimental. If you find some of its ideas useful
  *- for your work, please cite the [EMSOFT'2023] paper and send me
  *- a mail: [Marc.Pouzet@ens.fr] *)
 
 open Misc
 open Error
 open Monad
-open Opt                                                            
+open Opt
 open Result
 open Ident
 open Genv
@@ -55,11 +54,11 @@ open Value
 open Primitives
 open Match
 open Debug
-   
+
 (* evaluation functions *)
 let (let+) = Combinatorial.(let+)
 let (and+) = Combinatorial.(and+)
-                          
+
 (* [reset init step genv env body s r] resets [step genv env body] *)
 (* when [r] is true *)
 let reset init step genv env body s r =
@@ -69,7 +68,7 @@ let reset init step genv env body s r =
 (* Pattern matching *)
 let imatch_handler ibody genv env { m_body } =
   ibody genv env m_body
-  
+
 let smatch_handler_list loc sbody genv env ve m_h_list s_list =
   let rec smatch_rec m_h_list s_list =
     match m_h_list, s_list with
@@ -151,7 +150,7 @@ let rec iexp genv env { e_desc; e_loc  } =
         let* s1 = iexp genv env e1 in
         let* s2 = iexp genv env e2 in
         return (Slist [Sopt(None); s1; s2])
-     | Eunarypre, [e] -> 
+     | Eunarypre, [e] ->
         (* un-initialized synchronous register *)
         let* s = iexp genv env e in
         return (Slist [Sval(Vnil); s])
@@ -170,7 +169,7 @@ let rec iexp genv env { e_desc; e_loc  } =
         return (Slist [s1; s2])
      | Erun _, [{ e_loc } as e1; e2] ->
         (* node instanciation. [e1] must be a static expression *)
-        let* v = Combinatorial.exp genv env e1 in          
+        let* v = Combinatorial.exp genv env e1 in
         let* v = Primitives.pvalue v |>
                    Opt.to_result ~none: { kind = Etype; loc = e_loc} in
         let* v =
@@ -198,10 +197,10 @@ let rec iexp genv env { e_desc; e_loc  } =
              { zin = false; phase = v1; period = v2; horizon = v1 +. v2 })
      | Earray _, e_list ->
         let* s_list = map (iexp genv env) e_list in
-        return (Slist s_list) 
+        return (Slist s_list)
      | _ -> error { kind = Etype; loc = e_loc }
      end
-  | Etuple(e_list) -> 
+  | Etuple(e_list) ->
      let* s_list = map (iexp genv env) e_list in
      return (Slist(s_list))
   | Eapp({ e_desc = Eglobal { lname }; e_loc }, [e]) ->
@@ -268,17 +267,17 @@ let rec iexp genv env { e_desc; e_loc  } =
      let* s_size, s_body =
        ifor_kind genv env for_size for_kind s_body in
      return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list))
-     
+
 and ifor_kind genv env for_size for_kind s_body =
   match for_size with
   | None -> return (Sopt(None), s_body)
   | Some({ e_loc } as e) ->
      (* [e] must be a static expression *)
-     let* v = Combinatorial.exp genv env e in          
+     let* v = Combinatorial.exp genv env e in
      (* and an integer value *)
      let* v = Combinatorial.is_int e_loc v in
      let s_size = Sopt(Some(Value(Vint(v)))) in
-     let s_body = ialloc_foreach_loop v for_kind s_body in 
+     let s_body = ialloc_foreach_loop v for_kind s_body in
      return (s_size, s_body)
 
 (* duplicate the memory [n] times if the loop is a foreach loop *)
@@ -288,10 +287,10 @@ and ialloc_foreach_loop size for_kind s_for_body =
      s_for_body
   | Kforeach -> (* the initial state is a list of states *)
      Slist(Util.list_of size s_for_body)
-    
+
 and iexp_opt genv env e_opt =
   match e_opt with | None -> return Sempty | Some(e) -> iexp genv env e
-                
+
 and ifor_index genv env { desc; loc } =
   match desc with
   | Einput { e; by } ->
@@ -317,7 +316,7 @@ and ifor_out genv env
   return (Slist [s_init; s_default])
 
 and ifor_vardec genv env { desc = { for_vardec } } = ivardec genv env for_vardec
-                                                   
+
 and ifor_exp genv env r =
   match r with
   | Forexp { exp } ->
@@ -502,12 +501,12 @@ let slist loc genv env sexp e_list s_list =
   slist_rec e_list s_list
 
 (* step_if_value *)
-let step_if_value f v s = 
+let step_if_value f v s =
   match v with
   | Vbot -> return (Vbot, s)
   | Vnil -> return (Vnil, s)
   | Value(v) -> f v s
-              
+
 (* an other iterator which stops when the accumulator is bot or nil *)
 let mapfold2v k_error f acc x_list s_list =
   let rec maprec acc x_list s_list =
@@ -523,7 +522,7 @@ let mapfold2v k_error f acc x_list s_list =
           let* acc, s_list = maprec v x_list s_list in
           return (acc, s :: s_list) in
   maprec acc x_list s_list
-       
+
 (* Return a value from a block. In case of a tuple, this tuple is not strict *)
 let matching_out env { b_vars; b_loc } =
   let* v_list =
@@ -589,7 +588,7 @@ let for_env_out missing env_list acc_env loc for_out =
                     (for_name, for_init, for_default) acc_env env_list in
          return (Env.add x { cur = v; last = None; default = None } acc))
     Env.empty for_out
- 
+
 
 (* The step function *)
 
@@ -598,7 +597,7 @@ let for_env_out missing env_list acc_env loc for_out =
 (* environment [env] is a step function. *)
 (* Its type is [state -> (value * state) option] *)
 let rec sexp genv env { e_desc; e_loc } s =
-  match e_desc, s with   
+  match e_desc, s with
   | _, Sbot -> return (Vbot, s) (* Voir remarque PE-Dagand *)
   | _, Snil -> return (Vnil, s)
   | Econst(v), Sempty ->
@@ -724,7 +723,7 @@ let rec sexp genv env { e_desc; e_loc } s =
              let* i1 = Combinatorial.exp genv env i1 in
              let* i2 = Combinatorial.exp genv env i2 in
              let* v = Combinatorial.slice e_loc v i1 i2 in
-             return (v, Slist [s; s1; s2])        
+             return (v, Slist [s; s1; s2])
           | Eupdate, (e :: arg :: i_list), Slist (s :: s_arg :: s_list) ->
              (* [| e with i1,..., in <- arg |] *)
              let* v, s = sexp genv env e s in
@@ -880,6 +879,7 @@ let rec sexp genv env { e_desc; e_loc } s =
           let* r, s_for_body_new, sr_list =
             sforloop_exp e_loc genv env size for_kind for_resume for_body i_env
               s_for_body sr_list in
+          (* if [for_resume = true] keep the final state *)
           let s_for_body = if for_resume then s_for_body_new
                             else s_for_body in
           return (r, size_of_for_kind for_kind size,
@@ -1849,7 +1849,7 @@ let run_node loc output n_steps { init; step } v  =
 (* Computation of the initial state *)
 
 let program genv i_list = catch (fold implementation genv i_list)
-                            
+
 (* run a unit process for [n_steps] steps *)
 let run_n n_steps init step v_list =
   let rec apply_rec s i =
@@ -1864,7 +1864,7 @@ let run_n n_steps init step v_list =
       | Ok(s) ->
          apply_rec s (i+1) in
   let _ = apply_rec init 0 in ()
-                            
+
 let run_fun loc output n_steps fv v_list =
   let step s v_list =
     let* v = Combinatorial.apply loc fv v_list in
