@@ -705,31 +705,31 @@ let rec sexp genv env { e_desc; e_loc } s =
           | Econcat, [e1; e2], Slist [s1; s2] ->
              let* v1, s1 = sexp genv env e1 s1 in
              let* v2, s2 = sexp genv env e2 s2 in
-             let* v = Combinatorial.concat e_loc v1 v2 in
+             let* v = Arrays.concat e_loc v1 v2 in
              return (v, Slist [s1; s2])
           | Eget, [e; i], Slist [s1; s2] ->
              let* v, s1 = sexp genv env e s1 in
              let* i = Combinatorial.exp genv env i in
-             let* v = Combinatorial.get e_loc v i in
+             let* v = Arrays.get e_loc v i in
              return (v, Slist [s1; s2])
           | Eget_with_default, [e; ei; default], Slist [se; si; s_default] ->
              let* v, se = sexp genv env e se in
              let* vi, si = sexp genv env ei si in
              let* default, s_default = sexp genv env default s_default in
-             let* v = Combinatorial.get_with_default e_loc v vi default in
+             let* v = Arrays.get_with_default e_loc v vi default in
              return (v, s)
           | Eslice, [e; i1; i2], Slist [s; s1; s2] ->
              let* v, s = sexp genv env e s in
              let* i1 = Combinatorial.exp genv env i1 in
              let* i2 = Combinatorial.exp genv env i2 in
-             let* v = Combinatorial.slice e_loc v i1 i2 in
+             let* v = Arrays.slice e_loc v i1 i2 in
              return (v, Slist [s; s1; s2])
           | Eupdate, (e :: arg :: i_list), Slist (s :: s_arg :: s_list) ->
              (* [| e with i1,..., in <- arg |] *)
              let* v, s = sexp genv env e s in
              let* v_arg, s_arg = sexp genv env arg s_arg in
              let* i_list, s_list = slist e_loc genv env sexp i_list s_list in
-             let* v = Combinatorial.update_list e_loc v i_list v_arg in
+             let* v = Arrays.update_list e_loc v i_list v_arg in
              return (v, Slist (s :: s_arg :: s_list))
           | Earray_list, e_list, Slist s_list ->
              let* v_list, s_list = slist e_loc genv env sexp e_list s_list in
@@ -739,15 +739,15 @@ let rec sexp genv env { e_desc; e_loc } s =
                 Slist s_list)
           | Etranspose, [e], Slist [s] ->
              let* v, s = sexp genv env e s in
-             let*v = Combinatorial.transpose e_loc v in
+             let*v = Arrays.transpose e_loc v in
              return (v, Slist [s])
           | Eflatten, [e], Slist [s] ->
              let* v, s = sexp genv env e s in
-             let*v = Combinatorial.flatten e_loc v in
+             let*v = Arrays.flatten e_loc v in
              return (v, Slist [s])
           | Ereverse, [e], Slist [s] ->
              let* v, s = sexp genv env e s in
-             let*v = Combinatorial.reverse e_loc v in
+             let*v = Arrays.reverse e_loc v in
              return (v, Slist [s])
           | _ -> error { kind = Etype; loc = e_loc }
         end
