@@ -88,24 +88,6 @@ let is_int loc v =
   (* and an integer value *)
   Primitives.is_int v |> Opt.to_result ~none: { kind = Etype; loc}
 
-(* Pattern matching *)
-let match_handler_list loc body genv env ve handlers =
-  let rec match_rec handlers =
-    match handlers with
-    | [] -> error { kind = Epattern_matching_failure; loc = loc }
-    | { m_pat; m_body } :: handlers ->
-       let r = Match.pmatch ve m_pat in
-       match r with
-       | None ->
-          (* this is not the good handler; try an other one *)
-          match_rec handlers
-       | Some(env_pat) ->
-          let env_pat = liftv env_pat in
-          let env = Env.append env_pat env in
-          body genv env m_body in
-  match_rec handlers
-
-
 (* evaluation function *)
 let rec exp genv env { e_desc; e_loc } =
   match e_desc with
@@ -150,7 +132,7 @@ let rec exp genv env { e_desc; e_loc } =
        exp genv (Env.append l_env env) e
   | Ematch { e; handlers } ->
      let*+ ve = exp genv env e in
-     match_handler_list e_loc exp genv env ve handlers
+     Match.match_handler_list e_loc exp genv env ve handlers
   | Erecord_access { label; arg } ->
      let*+ arg = exp genv env arg in
      let* v = record_access { label; arg } |>
@@ -314,7 +296,8 @@ and eval_eq genv env { eq_desc; eq_write; eq_loc } =
        | Vnil -> return (nil_env eq_write)
        | Value(v) ->
           let* _ =
-            is_bool v |> Option.to_result ~none:{ kind = Etype; loc = e.e_loc } in
+            is_bool v |> 
+              Option.to_result ~none:{ kind = Etype; loc = e.e_loc } in
           eval_eq genv env eq in
      return env_eq
   | EQempty -> return Env.empty
