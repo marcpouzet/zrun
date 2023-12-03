@@ -297,15 +297,16 @@ let rec expression ff e =
        funexp ff fe
     | Eassert(e_body) ->
        fprintf ff "@[<hov 2>assert@ %a@]" expression e_body
-    | Eforloop({ for_size; for_kind; for_index; for_body }) ->
+    | Eforloop({ for_size; for_kind; for_index; for_input; for_body }) ->
        let size ff for_size =
          Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
            ff for_size in
        fprintf ff
-         "@[<hov 2>%a@,%a%a@,%a@,%a@ @]"
+         "@[<hov 2>%a@,%a[%a](%a)@,%a@,%a@ @]"
          kind_of_forloop for_kind
          size for_size
-         index_list for_index
+         index_opt for_index
+         input_list for_input
          for_exit_condition for_kind
          for_exp for_body in
   exp ff e
@@ -314,7 +315,7 @@ and result ff { r_desc } =
   match r_desc with
   | Exp(e) -> expression ff e
   | Returns(b) -> result_block ff b
-                
+
 and result_block ff { b_vars; b_body; b_write } =
   fprintf ff "@[<hov 2>returns@ %a@ @[%a@]@[%a@]@]"
     (vardec_list expression) b_vars
@@ -446,7 +447,7 @@ and equation ff ({ eq_desc = desc } as eq) =
   | EQempty -> fprintf ff "()"
   | EQassert(e) ->
      fprintf ff "@[<hov2>assert %a@]" expression e
-  | EQforloop({ for_size; for_kind; for_index;
+  | EQforloop({ for_size; for_kind; for_index; for_input;
                 for_body = { for_out; for_block } }) ->
      let size ff for_size =
        Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
@@ -458,18 +459,15 @@ and equation ff ({ eq_desc = desc } as eq) =
          fprintf ff "@[%a%a%a@]" 
            name x (init expression) i_opt out o_opt in
        print_list_r for_out "" "," "" ff l in
-     let comma =
-       match for_index, for_out with | ([], _) | (_, []) -> "" | _ -> ", " in
-     fprintf ff  "@[<hov 2>%a%a%a%s@,%a@,%a@,%a@ @]"
+     fprintf ff  "@[<hov 2>%a[%a](%a)(%a)@,%a@,%a@,%a@ @]"
        kind_of_forloop for_kind
        size for_size
-       index_list for_index
-       comma
+       index_opt for_index
+       input_list for_input
        print_for_out for_out
        for_exit_condition for_kind
        block_of_equation for_block
 
-                               
 (* print for loops *)
 and kind_of_forloop ff for_kind =
   match for_kind with
@@ -483,8 +481,12 @@ and for_exit_condition ff for_kind =
        (fun ff e -> fprintf ff "@[<hov 2>while@ %a@ @]" expression e) ff e_opt
   | Kforeach -> ()
 
-and index_list ff l =
-  let index ff { desc = desc } =
+and index_opt ff i_opt =
+  let index ff id = fprintf ff "@[[%a]@]" name id in
+  Util.optional_unit index ff i_opt
+
+and input_list ff l =
+  let input ff { desc = desc } =
     match desc with
     | Einput {id; e; by } ->
        fprintf ff "@[%a in %a@]" name id expression e;
@@ -495,7 +497,7 @@ and index_list ff l =
 	 "@[%a in %a %s %a@]"
          name id expression e_left (if dir then "to" else "downto")
          expression e_right in
-  print_list_r index "" "," "" ff l
+  print_list_r input "" "," "" ff l
 
 and for_exp ff r =
   match r with

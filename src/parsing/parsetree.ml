@@ -20,7 +20,7 @@ type longname =
   | Modname : qualident -> longname
 
 and qualident = { qual: name; id: name }
-        
+
 (** Types *)
 type type_expression = type_expression_desc localized
 
@@ -105,7 +105,7 @@ and is_inline = bool
 type pateq = pateq_desc localized
 
 and pateq_desc = name list
- 
+
 (* declaration of a local variable [x [init e1] [default e2]] *)
 type 'exp vardec_desc =
   { var_name: name;
@@ -123,23 +123,23 @@ type ('exp, 'body) block = ('exp, 'body) block_desc localized
 and ('exp, 'body) block_desc =
     { b_vars: 'exp vardec list;
       b_body: 'body }
-         
+
 type pattern = pattern_desc localized
 
 and pattern_desc =
-  | Etuplepat : pattern list -> pattern_desc 
-  | Evarpat : name -> pattern_desc 
-  | Ewildpat : pattern_desc 
-  | Econstpat : immediate -> pattern_desc 
-  | Econstr0pat : longname -> pattern_desc 
-  | Econstr1pat : longname * pattern list -> pattern_desc 
-  | Ealiaspat : pattern * name -> pattern_desc 
-  | Eorpat : pattern * pattern -> pattern_desc 
-  | Erecordpat : (longname * pattern) list -> pattern_desc 
-  | Etypeconstraintpat : pattern * type_expression -> pattern_desc 
+  | Etuplepat : pattern list -> pattern_desc
+  | Evarpat : name -> pattern_desc
+  | Ewildpat : pattern_desc
+  | Econstpat : immediate -> pattern_desc
+  | Econstr0pat : longname -> pattern_desc
+  | Econstr1pat : longname * pattern list -> pattern_desc
+  | Ealiaspat : pattern * name -> pattern_desc
+  | Eorpat : pattern * pattern -> pattern_desc
+  | Erecordpat : (longname * pattern) list -> pattern_desc
+  | Etypeconstraintpat : pattern * type_expression -> pattern_desc
 
 type statepatdesc =
-  | Estate0pat : name -> statepatdesc 
+  | Estate0pat : name -> statepatdesc
   | Estate1pat : name * name list -> statepatdesc
 
 type statepat = statepatdesc localized
@@ -169,16 +169,16 @@ type is_weak = bool
 
 type exp = exp_desc localized
 
-and exp_desc = 
-  | Econst : immediate -> exp_desc 
-  | Econstr0 : longname -> exp_desc 
-  | Econstr1 : longname * exp list -> exp_desc 
-  | Evar : longname -> exp_desc 
-  | Elast : name -> exp_desc 
-  | Eop : operator * exp list -> exp_desc 
-  | Etuple : exp list -> exp_desc 
-  | Eapp : exp *  exp list -> exp_desc 
-  | Elet : leq * exp -> exp_desc 
+and exp_desc =
+  | Econst : immediate -> exp_desc
+  | Econstr0 : longname -> exp_desc
+  | Econstr1 : longname * exp list -> exp_desc
+  | Evar : longname -> exp_desc
+  | Elast : name -> exp_desc
+  | Eop : operator * exp list -> exp_desc
+  | Etuple : exp list -> exp_desc
+  | Eapp : exp *  exp list -> exp_desc
+  | Elet : leq * exp -> exp_desc
   | Erecord_access : exp * longname -> exp_desc
   | Erecord : (longname * exp) list -> exp_desc
   | Erecord_with : exp * (longname * exp) list -> exp_desc
@@ -192,7 +192,7 @@ and exp_desc =
 
 
 and is_rec = bool
-           
+
 and scondpat = scondpat_desc localized
 
 and scondpat_desc =
@@ -204,7 +204,7 @@ and scondpat_desc =
 
 and eq = eq_desc localized
 
-and eq_desc = 
+and eq_desc =
   | EQeq : pattern * exp -> eq_desc
   (* [p = e] *)
   | EQder :
@@ -233,14 +233,15 @@ and eq_desc =
   | EQempty : eq_desc
   | EQassert : exp -> eq_desc
   | EQforloop : for_eq forloop -> eq_desc
-  (* [foreach [id in e..e]* [id in e [by e],]* returns (vardec_list) do eq] *)
-  (* forward [id in e..e]* [id in e [by e],]* 
+  (* [foreach(s) [id in e..e]* [id in e [by e],]* returns (vardec_list) do eq] *)
+  (* forward [id in e..e]* [id in e [by e],]*
      [while e] do e] returns (vardec_list) *)
 
 and 'body forloop =
   { for_size : exp option;
     for_kind : for_kind;
-    for_index : for_index_desc localized list;
+    for_index : name option;
+    for_input : for_input_desc localized list;
     for_body : 'body;
     for_resume : bool; (* resume or restart *)
   }
@@ -251,7 +252,7 @@ and for_exp =
   (* [for[each|ward] ... do e done] *)
   | Forreturns :
       { returns : for_vardec_desc localized list; body : (exp, eq) block } -> for_exp
-  (* [for[each|ward] ... returns (...) local ... do eq ... done] *) 
+  (* [for[each|ward] ... returns (...) local ... do eq ... done] *)
 
 and for_vardec_desc =
   { for_array : int; (* 0 means x; 1 means [|x|]; 2 means [|[| x|]|]; etc *)
@@ -265,7 +266,7 @@ and for_eq =
     (* [xi] are local output; [x] is the output st [xi = x.(i)] *)
     for_block : (exp, eq) block; (* loop body *)
   }
-  
+
 and for_kind =
   | Kforeach : for_kind
   (* parallel loop *)
@@ -273,14 +274,14 @@ and for_kind =
   (* iteration during one instant. The argument is the stoping condition *)
 
 and for_exit = exp
-                                         
-(* index definition for a loop *)
-and for_index_desc =
-  | Einput : { id: name; e : exp; by : exp option } -> for_index_desc
+
+(* input definition for a loop *)
+and for_input_desc =
   (* xi in e1 [by e2], that is, xi = e1.(i * e2) *)
+  | Einput : { id: name; e : exp; by : exp option } -> for_input_desc
+  (* [i in e1 to e2] or [i in e1 downto e2]; [e1] and [e2] must be sizes *)
   | Eindex :
-      { id: name; e_left: exp; e_right : exp; dir: bool } -> for_index_desc
-  (* i in e1 to e2 or i in e1 downto e2; [e1] and [e2] must be sizes *)
+      { id: name; e_left: exp; e_right : exp; dir: bool } -> for_input_desc
 
 (* input patterns for loops *)
 (* E.g., [xi]++[yi]++[|_|] in e] *)
@@ -304,15 +305,15 @@ and for_out_desc =
   }
 
 and 'body escape_desc =
-  { e_cond: scondpat; 
-    e_reset: bool; 
+  { e_cond: scondpat;
+    e_reset: bool;
     e_let: leq list;
     e_body: 'body;
     e_next_state: exp state;
   }
 
 and 'body escape = 'body escape_desc localized
-                                    
+
 and 'body automaton_handler_desc  =
   { s_state: statepat;
     s_let: leq list;
@@ -334,7 +335,7 @@ and is_atomic = bool
 and funexp_desc =
   { f_vkind: vkind; (* the kind for the arguments *)
     f_kind: kind; (* the kind for the body *)
-    f_atomic: is_atomic; 
+    f_atomic: is_atomic;
     f_args: arg list;
     f_body: result
   }
@@ -357,28 +358,28 @@ and result_desc =
 type interface = interface_desc localized
 
 and interface_desc =
-  | Einter_open : name -> interface_desc 
+  | Einter_open : name -> interface_desc
   | Einter_typedecl :
       { name: name; ty_params: name list; size_params: name list;
-        ty_decl: type_decl } -> interface_desc 
+        ty_decl: type_decl } -> interface_desc
   | Einter_constdecl :
       { name: name; const: bool; ty: type_expression; info: name list }
-      -> interface_desc 
+      -> interface_desc
 
 and type_decl = type_decl_desc localized
-    
+
 and type_decl_desc =
-  | Eabstract_type : type_decl_desc 
-  | Eabbrev : type_expression -> type_decl_desc 
-  | Evariant_type : constr_decl list -> type_decl_desc 
-  | Erecord_type : (name * type_expression) list -> type_decl_desc 
+  | Eabstract_type : type_decl_desc
+  | Eabbrev : type_expression -> type_decl_desc
+  | Evariant_type : constr_decl list -> type_decl_desc
+  | Erecord_type : (name * type_expression) list -> type_decl_desc
 
 and constr_decl = constr_decl_desc localized
-    
+
 and constr_decl_desc =
-  | Econstr0decl : name -> constr_decl_desc 
-  | Econstr1decl : name * type_expression list -> constr_decl_desc 
-  
+  | Econstr0decl : name -> constr_decl_desc
+  | Econstr1decl : name * type_expression list -> constr_decl_desc
+
 type implementation = implementation_desc localized
 
 and implementation_desc =
@@ -388,5 +389,5 @@ and implementation_desc =
   | Etypedecl :
       { name: name; ty_params: name list; size_params: name list;
         ty_decl: type_decl } -> implementation_desc
-  
+
 type program = implementation list

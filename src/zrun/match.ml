@@ -1,6 +1,5 @@
 (***********************************************************************)
 (*                                                                     *)
-(*                                                                     *)
 (*                        The ZRun Interpreter                         *)
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
@@ -27,7 +26,7 @@ let lift f env =
 let liftid env = lift (fun x -> x) env
 let liftv env = lift (fun v -> Value(v)) env
 let unlift env = Env.map (fun { cur } -> cur) env
-               
+
 (* the set of names defined in a environment *)
 let names_env env = Env.fold (fun n _ acc -> S.add n acc) env S.empty
 
@@ -73,11 +72,11 @@ let pmatch (v : pvalue) (p : pattern) : pvalue Env.t Opt.t =
     | Vconstr1(f, v_list), Econstr1pat(g, p_list) when Lident.compare f g = 0 ->
        pmatch_list acc v_list p_list
     | _ -> none
-         
+
   and pmatch_list acc v_list p_list = Opt.fold2 pmatch acc v_list p_list in
 
   pmatch Env.empty v p
-  
+
 (* pattern matching for equations [p = e] and function application *)
 (* [v] is an star value; [p] is a pattern but pattern matching *)
 (* should not fail. In the case of a failure, this is considered as *)
@@ -108,7 +107,7 @@ let pmatcheq (v : pvalue) (p : pattern) : pvalue Env.t Opt.t =
     | [], [] -> return acc
     | v :: v_list, p :: p_list  ->
        let* acc = pmatcheq acc v p in
-       pmatcheq_list acc v_list p_list 
+       pmatcheq_list acc v_list p_list
     | _ -> none in
   pmatcheq Env.empty v p
 
@@ -120,7 +119,7 @@ let matchsig (vstate: pvalue) (p: pattern) : (pvalue * pvalue Env.t) Opt.t =
      let* env = pmatcheq v p in
      return (Vbool(true), env)
   | _ -> none
-  
+
 (* match a state f(v1,...,vn) against a state name f(x1,...,xn) *)
 let matchstate (ps : pvalue) ({ desc; loc } : statepat) : (pvalue Env.t) Opt.t =
   match ps, desc with
@@ -134,7 +133,7 @@ let matchstate (ps : pvalue) ({ desc; loc } : statepat) : (pvalue Env.t) Opt.t =
          Env.empty v_list id_list in
      return env
   | _ -> none
-  
+
 (* Auxiliary functions to lift bottom and nil to environments *)
 (* the bottom environment *)
 let bot_env (eq_write: Defnames.defnames) : 'a star ientry Env.t =
@@ -167,12 +166,12 @@ let rec distribute v acc { pat_desc } =
      let distribute_record acc { arg } = distribute v acc arg in
      List.fold_left distribute_record acc p_e_list
   | Etypeconstraintpat(p, _) -> distribute v acc p
-                                
+
 let pbot p = distribute Vbot Env.empty p
 let pnil p = distribute Vnil Env.empty p
-        
+
 (* Pattern matching for equations *)
-let matcheq (v: 'a star) (p: pattern) : 'a star ientry Env.t Opt.t = 
+let matcheq (v: 'a star) (p: pattern) : 'a star ientry Env.t Opt.t =
   let rec matchrec acc v ({ pat_desc; pat_loc } as p) =
     match v with
     | Vbot -> return (Env.append (liftid (pbot p)) acc)
@@ -187,7 +186,7 @@ let matcheq (v: 'a star) (p: pattern) : 'a star ientry Env.t Opt.t =
   and match_list acc v_list l_list =
     Opt.fold2 matchrec acc v_list l_list in
   matchrec Env.empty v p
-    
+
 let matchsig (v: 'a star) ({ pat_loc } as p : pattern) :
       ('a star * 'a star ientry Env.t) Opt.t =
   match v with
@@ -216,11 +215,11 @@ let matching_arg_in loc env arg v =
      fold2 { kind = Epattern_matching_failure; loc = loc }
        match_in env l (List.map (fun _ -> Vnil) l)
   | [], Value(Vvoid) -> return env
-  | l, Value(Vtuple(v_list)) -> 
+  | l, Value(Vtuple(v_list)) ->
      fold2
        { kind = Epattern_matching_failure; loc = loc }
        match_in env l v_list
-  | l, Value(Vstuple(v_list)) -> 
+  | l, Value(Vstuple(v_list)) ->
      fold2
        { kind = Epattern_matching_failure; loc = loc }
        (fun acc n pvalue -> match_in acc n (Value(pvalue))) env l v_list
@@ -241,5 +240,25 @@ let matching_arg_out loc env arg =
   | [] -> return Primitives.void
   | [v] -> return v
   | _ -> return (Value(Vtuple(v_list)))
-  
+
+(* Pattern matching *)
+let match_handler_list loc body genv env ve handlers =
+  let open Result in
+  let open Error in
+  let rec match_rec handlers =
+    match handlers with
+    | [] -> error { kind = Epattern_matching_failure; loc = loc }
+    | { m_pat; m_body } :: handlers ->
+       let r = pmatch ve m_pat in
+       match r with
+       | None ->
+          (* this is not the good handler; try an other one *)
+          match_rec handlers
+       | Some(env_pat) ->
+          let env_pat = liftv env_pat in
+          let env = Env.append env_pat env in
+          body genv env m_body in
+  match_rec handlers
+
+
 

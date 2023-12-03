@@ -8,7 +8,7 @@
 
 (subdir parsing
   (menhir (modules parser) (infer true) (flags --explain --table)
-  ))	  
+  ))
 
 ; all the modules necessary to generate an ast
 (library
@@ -19,7 +19,7 @@
     config misc
     lexer parser parsetree
     ident lident defnames location util ast write scoping pp_tools printer)
-  (libraries menhirLib))	
+  (libraries menhirLib))
 
 ; all the necessary modules to make zrun except the entry module
 (library
@@ -28,10 +28,10 @@
   (wrapped false)
   (modules
     error value debug genv primitives find match
-    combinatorial fix monad coiteration output
+    arrays combinatorial fix monad coiteration output
     forloop eval)
   (libraries zrun.ast_lib))
-  
+
 (executable
  (name zrun)
   (modes (byte exe))

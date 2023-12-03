@@ -40,8 +40,8 @@ let node cholesky_exp(n)(a) returns (l)
 
 (* in equational form *)
 let node cholesky(n)(a) returns (l)
-  forward i in 0 to n-1, ai in a, l init (run (mat (n, 0.0)) ()) do
-    forward j in 0 to n-1, aij in ai, l init last l do
+  forward i in 0 to n-1, ai in a returns (l init (run (mat (n, 0.0)) ())) do
+    forward j in 0 to n-1, aij in ai returns (l init last l) do
       let tmp_sum =
             forward k in 0 to i-1 returns (cpt init 0.0)
                do cpt = last cpt +. (last l).(i).(k) *. (last l).(j).(k)
@@ -131,8 +131,7 @@ let node chauds_les_skis(n)(a) =
   let rec
       l = transpose(n, n, m)
   and
-      forward j in 0 to n - 1, aj in transpose(n, n, a),
-              mj out m do
+      forward j in 0 to n - 1, aj in transpose(n, n, a) returns (mj out m) do
        at = aj.(0 .. (j-1))
      and
 	 ad = aj.(j)

@@ -44,7 +44,7 @@ let node arbiter(i, request, pass_in, token_in)
    (* grant is given when there is a request and either 
    1/ it is my round or *)
    (* my left neibour had the token but did not take it *)
-      o = sequential_or_gate (pass_in, token_in) (* (pass_in, token_in) *)
+      o = sequential_or_gate (token_in, pass_in) (* (pass_in, token_in) *)
   and
     token_out = i fby token_in
   done

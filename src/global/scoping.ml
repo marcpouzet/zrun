@@ -444,8 +444,8 @@ let rec equation env_pat env { desc; loc } =
   { Ast.eq_desc = eq_desc; Ast.eq_write = Defnames.empty;
     Ast.eq_loc = loc }
 
-and trans_for_index env i_list =
-  let index acc { desc; loc } =
+and trans_for_input env acc i_list =
+  let input acc { desc; loc } =
     let desc, acc = match desc with
       | Einput { id; e; by } ->
          if Env.mem id acc then Error.error loc (Error.Enon_linear_forloop(id))
@@ -462,7 +462,7 @@ and trans_for_index env i_list =
            let e_right = expression env e_right in
            Ast.Eindex { id = m; e_left; e_right; dir }, Env.add id m acc in
     { Ast.desc = desc; Ast.loc = loc }, acc in
-  Util.mapfold index Env.empty i_list
+  Util.mapfold input acc i_list
 
 and trans_for_out env i_env for_out =
   (* [local_out_env] is the environment for variables defined in the for loop *)
@@ -492,11 +492,15 @@ and trans_for_out env i_env for_out =
     Util.mapfold for_out_one Env.empty for_out
 
 (* translation of for loops *)
-and forloop_eq env_pat env { for_size; for_kind; for_index; for_resume;
+and forloop_eq env_pat env { for_size; for_kind; for_index; for_input; for_resume;
                              for_body = { for_out; for_block } } =
     let for_size = Util.optional_map (expression env) for_size in
     let for_index, i_env =
-      trans_for_index env for_index in
+      match for_index with
+      | None -> None, Env.empty
+      | Some(id) -> let m = fresh id in Some(m), Env.singleton id m in
+    let for_input, i_env =
+      trans_for_input env i_env for_input in
     let env = Env.append i_env env in
     let for_out, local_out_env =
       trans_for_out env i_env for_out in
@@ -511,12 +515,13 @@ and forloop_eq env_pat env { for_size; for_kind; for_index; for_resume;
     { Ast.for_size = for_size;
       Ast.for_kind = for_kind;
       Ast.for_index = for_index;
+      Ast.for_input = for_input;
       Ast.for_body = { for_out; for_block };
       Ast.for_resume = for_resume }
 
 (** Translating a sequence of local declarations *)
 and leqs env l = Util.mapfold letin env l
-  
+
 and letin env { desc = { l_kind; l_rec; l_eq }; loc } =
   let env_pat = buildeq l_eq in
   let new_env = Env.append env_pat env in
@@ -751,10 +756,15 @@ and expression env { desc; loc } =
   in
   { Ast.e_desc = desc; Ast.e_loc = loc }
   
-and forloop_exp env { for_size; for_kind; for_index; for_body; for_resume } =
+and forloop_exp env 
+    { for_size; for_kind; for_index; for_input; for_body; for_resume } =
   let for_size = Util.optional_map (expression env) for_size in
   let for_index, i_env =
-    trans_for_index env for_index in
+      match for_index with
+      | None -> None, Env.empty
+      | Some(id) -> let m = fresh id in Some(m), Env.singleton id m in
+  let for_input, i_env =
+    trans_for_input env i_env for_input in
   let env = Env.append i_env env in
   let env_body, for_body = match for_body with
     | Forexp { exp; default } ->
@@ -772,7 +782,7 @@ and forloop_exp env { for_size; for_kind; for_index; for_body; for_resume } =
     | Kforward(e_opt) ->
        Ast.Kforward(Util.optional_map (expression env_body) e_opt) in
   { Ast.for_size = for_size; Ast.for_kind = for_kind;
-    Ast.for_index = for_index; Ast.for_body = for_body;
+    Ast.for_index = for_index; Ast.for_input = for_input; Ast.for_body = for_body;
     Ast.for_resume = for_resume }
   
 and recordrec loc env label_e_list =

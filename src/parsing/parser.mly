@@ -67,7 +67,7 @@ let app f l =
   | Econstr0(id), [arg] ->
      Econstr1(id, [arg])
   | _ -> Eapp(f, l)
-		     
+
 let constr f e =
   match e.desc with
   | Etuple(arg_list) ->
@@ -100,7 +100,7 @@ let rec funexp_desc is_atomic kind v_p_list_list result startpos endpos =
   match v_p_list_list with
   | [] -> assert false
   | [vkind, p_list] ->
-       fun_one_desc is_atomic kind vkind p_list result startpos endpos         
+       fun_one_desc is_atomic kind vkind p_list result startpos endpos
   | (vkind, p_list) :: v_p_list_list ->
        fun_one_desc is_atomic (Kfun(Kany)) vkind p_list
                (make (Exp (funexp is_atomic kind v_p_list_list result startpos endpos))
@@ -111,17 +111,19 @@ and funexp is_atomic kind v_p_list_list result startpos endpos =
        startpos endpos
 
 (* building a for loop *)
-let forward_loop resume (size, index_list, opt_cond, body) =
-  { for_size = size;
+let forward_loop resume (size_opt, index_opt, input_list, opt_cond, body) =
+  { for_size = size_opt;
     for_kind = Kforward(opt_cond);
-    for_index = index_list;
+    for_index = index_opt;
+    for_input = input_list;
     for_body = body;
     for_resume = resume }
 
-let foreach_loop resume (size, index_list, body) =
-  { for_size = size;
+let foreach_loop resume (size_opt, index_opt, input_list, body) =
+  { for_size = size_opt;
     for_kind = Kforeach;
-    for_index = index_list;
+    for_index = index_opt;
+    for_input = input_list;
     for_body = body;
     for_resume = resume }
 
@@ -260,7 +262,7 @@ let foreach_loop resume (size, index_list, body) =
 %nonassoc END
 %left COMMA
 %left TO DOWNTO
-%left prec_in_index
+%left prec_in_input
 %left RPAREN
 %nonassoc prec_minus_greater
 %nonassoc FBY
@@ -449,7 +451,7 @@ implementation_file:
 decl_list(X):
   | dl = decl_list(X) x = X
       { x :: dl }
-  | x = X 
+  | x = X
       { [x] }
 ;
 
@@ -468,8 +470,8 @@ implementation:
     { let vkind = if c then Kconst else Kany in
       Eletdecl { name = ide; const = c;
 		 e = funexp a (Kfun(vkind)) [vkind, p_list] r $startpos $endpos }
-    } 
-  | LET a = is_atomic c = const k = fun_kind_opt ide = ide 
+    }
+  | LET a = is_atomic c = const k = fun_kind_opt ide = ide
         p_list_list = param_list_list r = result
     { Eletdecl { name = ide; const = c;
 		 e = funexp a k p_list_list r $startpos $endpos } }
@@ -564,7 +566,7 @@ equation_desc:
   | AUTOMATON opt_bar
     a = automaton_handlers(equation_empty_and_list) INIT e = state
     { EQautomaton(List.rev a, Some(e)) }
-  | MATCH e = seq_expression WITH opt_bar 
+  | MATCH e = seq_expression WITH opt_bar
     m = match_handlers(equation) opt_end
     { EQmatch(e, List.rev m) }
   | IF e = seq_expression THEN eq1 = equation
@@ -603,7 +605,7 @@ equation_desc:
     { EQforloop (forward_loop false f) }
   | FORWARD f = forward_loop_eq RESUME
     { EQforloop (forward_loop true f) }
-  
+
 ;
 
 /* states of an automaton in an equation*/
@@ -1072,15 +1074,15 @@ expression_desc:
   | e1 = simple_expression DOT LPAREN e2 = expression RPAREN
     DEFAULT e3 = expression
     { Eop(Earray(Eget_with_default), [e1; e2; e3]) }
-  | e1 = expression PLUSPLUS e2 = expression 
+  | e1 = expression PLUSPLUS e2 = expression
       { Eop(Earray(Econcat), [e1; e2]) }
-  | e = simple_expression TRANSPOSE 
+  | e = simple_expression TRANSPOSE
       { Eop(Earray(Etranspose), [e]) }
-  | e = simple_expression FLATTEN 
+  | e = simple_expression FLATTEN
       { Eop(Earray(Eflatten), [e]) }
-  | e = simple_expression REVERSE 
+  | e = simple_expression REVERSE
       { Eop(Earray(Ereverse), [e]) }
-  
+
 ;
 
 %inline opt_end:
@@ -1091,96 +1093,90 @@ expression_desc:
 
 /* Loops for equations */
 %inline foreach_loop_exp:
-  | s = simple_expression DO e = expression
+  /* forward (size) [i] (xi in ei,...) do e [default e] */
+  | s_opt = optional_size_expression
+    i_opt = optional(index)
+    li = empty(input_list)
+    DO e = expression
     d_opt = optional(default_expression)
-    { (Some(s), [], Forexp { exp = e; default = d_opt }) }
-  | s = simple_expression RETURNS p = for_return
+    { (s_opt, i_opt, li, Forexp { exp = e; default = d_opt }) }
+  | /* forward (size) [i] (xi in ei,...) returns (...) do
+       eq done */
+    s_opt = optional_size_expression
+    i_opt = optional(index)
+    li = empty(input_list)
+    RETURNS p = for_return
     b = block(equation_empty_and_list)
-    { (Some(s), [], Forreturns { returns = p; body = b }) }
-  | s_opt = optional(simple_expression) li = index_list DO e = expression
-    d_opt = optional(default_expression)
-    { (s_opt, li, Forexp { exp = e; default = d_opt }) }
-  | s_opt = optional(simple_expression) li = index_list RETURNS p = for_return
-    b = block(equation_empty_and_list)
-    { (s_opt, li, Forreturns { returns = p; body = b }) }
+    { (s_opt, i_opt, li, Forreturns { returns = p; body = b }) }
 ;
 
-
 %inline forward_loop_exp:
-  | s = simple_expression
-    o = opt_loop_condition DO e = expression 
+  /* forward (size) [i] (xi in ei,...) [while e] do e [default e] */
+  | s_opt = optional_size_expression
+    i_opt = optional(index)
+    li = empty(input_list)
+    o_opt = optional(loop_condition) DO e = expression
     d_opt = optional(default_expression)
-    { (Some(s), [], o, Forexp { exp = e; default = d_opt }) }
-  | s = simple_expression
+    { (s_opt, i_opt, li, o_opt, Forexp { exp = e; default = d_opt }) }
+  | /* forward (size) [i] (xi in ei,...) returns (...) [while e] do
+       eq done */
+    s_opt = optional_size_expression
+    i_opt = optional(index)
+    li = empty(input_list)
     RETURNS p = for_return
-    o = opt_loop_condition b = block(equation_empty_and_list)
-    { (Some(s), [], o, Forreturns { returns = p; body = b }) }
-  | s_opt = optional(simple_expression) li = index_list o = opt_loop_condition
-    DO e = expression 
-    d_opt = optional(default_expression)
-    { (s_opt, li, o, Forexp { exp = e; default = d_opt }) }
-  | s_opt = optional(simple_expression) li = index_list
-    RETURNS p = for_return
-    o = opt_loop_condition
+    o_opt = optional(loop_condition)
     b = block(equation_empty_and_list)
-    { (s_opt, li, o, Forreturns { returns = p; body = b }) }
+    { (s_opt, i_opt, li, o_opt, Forreturns { returns = p; body = b }) }
 ;
 
 /* Loops for equations */
 %inline foreach_loop_eq:
-  | s = simple_expression
-    f = block(equation_empty_and_list)
-    { (Some(s), [], { for_out = []; for_block = f }) }
-  | s_opt = optional(simple_expression) li = index_list
-    f = block(equation_empty_and_list)
-    { (s_opt, li, { for_out = []; for_block = f }) }
-  | s = simple_expression lo = output_list
-    f = block(equation_empty_and_list)
-    { (Some(s), [], { for_out = lo; for_block = f }) }
-  | s_opt = optional(simple_expression) li = index_list COMMA lo = output_list
-    f = block(equation_empty_and_list)
-    { (s_opt, li, { for_out = lo; for_block = f }) }
+  | s_opt = optional_size_expression i_opt = optional(index)
+    li = empty(input_list) f = block(equation_empty_and_list)
+    { (s_opt, i_opt, li, { for_out = []; for_block = f }) }
+  | s_opt = optional_size_expression i_opt = optional(index)
+    li = empty(input_list) RETURNS lo = output_list f = block(equation_empty_and_list)
+    { (s_opt, i_opt, li, { for_out = lo; for_block = f }) }
 ;
 
 %inline forward_loop_eq:
-  | s = simple_expression o = opt_loop_condition 
+  | s_opt = optional_size_expression i_opt = optional(index)
+    li = empty(input_list) o_opt = optional(loop_condition)
     f = block(equation_empty_and_list)
-    { (Some(s), [], o, { for_out = []; for_block = f}) }
-  | s_opt = optional(simple_expression) li = index_list o = opt_loop_condition 
+    { (s_opt, i_opt, li, o_opt, { for_out = []; for_block = f }) }
+  | s_opt = optional_size_expression i_opt = optional(index)
+    li = empty(input_list) RETURNS lo = output_list o_opt = optional(loop_condition)
     f = block(equation_empty_and_list)
-    { (s_opt, li, o, { for_out = []; for_block = f}) }
-  | s = simple_expression lo = output_list o = opt_loop_condition 
-    f = block(equation_empty_and_list)
-    { (Some(s), [], o, { for_out = lo; for_block = f }) }
-  | s_opt = optional(simple_expression) li = index_list COMMA lo = output_list
-    o = opt_loop_condition 
-    f = block(equation_empty_and_list)
-    { (s_opt, li, o, { for_out = lo; for_block = f }) }
+    { (s_opt, i_opt, li, o_opt, { for_out = lo; for_block = f }) }
 ;
 
-/* indexes in a for loop */
-%inline index_list:
-  | l = list_of(COMMA, localized(index_desc)) { l }
+%inline optional_size_expression:
+  | { None }
+  | LPAREN e = expression RPAREN { Some(e) }
 ;
 
-%inline index_desc:
+%inline index :
+  | LBRACKET i = ide RBRACKET { i }
+;
+
+/* input in a for loop */
+%inline input_list:
+  | LPAREN l = list_of(COMMA, localized(input_desc)) RPAREN { l }
+  | l = list_of(COMMA, localized(input_desc)) { l }
+;
+
+%inline input_desc:
+  | i = ide IN e = expression o = optional(by_expression) %prec prec_in_input
+    { Einput { id = i; e = e; by = o } }
   | i = ide IN e1 = expression TO e2 = expression
-     { Eindex { id = i; e_left = e1; e_right = e2; dir = true } }
+    { Eindex { id = i; e_left = e1; e_right = e2; dir = true } }
   | i = ide IN e1 = expression DOWNTO e2 = expression
-     { Eindex { id = i; e_left = e1; e_right = e2; dir = false } }
-  | i = ide IN e = expression o = optional(by_expression) %prec prec_in_index
-     { Einput { id = i; e = e; by = o } }
+    { Eindex { id = i; e_left = e1; e_right = e2; dir = false } }
 ;
 
 %inline by_expression:
   | BY e = simple_expression
     { e }
-;
-
-/* while condition for a forward loop */
-%inline opt_loop_condition:
-  | o = optional(loop_condition)
-    { o }
 ;
 
 %inline loop_condition:
@@ -1190,7 +1186,7 @@ expression_desc:
 
 /* outputs of a loop */
 %inline output_list:
-  | l = list_of(COMMA, localized(output_desc)) { l }
+  | LPAREN l = list_of(COMMA, localized(output_desc)) RPAREN { l }
 ;
 
 %inline out_ide:
@@ -1232,7 +1228,7 @@ expression_desc:
 ;
 constructor:
   | c = CONSTRUCTOR %prec prec_ident
-      { Name(c) } 
+      { Name(c) }
   | c1 = CONSTRUCTOR DOT c2 = CONSTRUCTOR
       { Modname({qual = c1; id = c2}) }
 ;
@@ -1299,7 +1295,7 @@ infx:
   | SUBTRACTIVE     { $1 }    | PREFIX        { $1 }
   | AMPERSAND       { "&" }   | AMPERAMPER    { "&&" }
   | OR              { "or" }  | BARBAR        { "||" }
-  | ON              { "on" }  
+  | ON              { "on" }
 ;
 
 
