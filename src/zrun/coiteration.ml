@@ -262,12 +262,11 @@ let rec iexp genv env { e_desc; e_loc  } =
      let* s_body = iexp genv env e_body in
      return s_body
   | Eforloop({ for_size; for_kind; for_input; for_body }) ->
-     let* s_input_list = map (ifor_input genv env) for_input in
-     let* s_body, s_result_list = ifor_exp genv env for_body in
+     let* si_list = map (ifor_input genv env) for_input in
+     let* s_body, sr_list = ifor_exp genv env for_body in
      let* s_size, s_body =
        ifor_kind genv env for_size for_kind s_body in
-     return
-       (Slist (s_size :: Slist(s_body :: s_result_list) :: s_input_list))
+     return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list))
 
 and ifor_kind genv env for_size for_kind s_body =
   match for_size with
@@ -500,13 +499,6 @@ let slist loc genv env sexp e_list s_list =
     | _ ->
        error { kind = Estate; loc = loc } in
   slist_rec e_list s_list
-
-(* step_if_value *)
-let if_value f v s =
-  match v with
-  | Vbot -> return (Vbot, s)
-  | Vnil -> return (Vnil, s)
-  | Value(v) -> f v s
 
 (* an other iterator which stops when the accumulator is bot or nil *)
 let mapfold2v k_error f acc x_list s_list =
@@ -895,6 +887,7 @@ let rec sexp genv env { e_desc; e_loc } s =
           let* r, s_for_body_new, sr_list =
             sforloop_exp e_loc genv env size for_kind for_resume for_body i_env
               s_for_body sr_list in
+          (* if [for_resume = true] keep the final state *)
           let s_for_body = if for_resume then s_for_body_new
                             else s_for_body in
           return (r, size_of_for_kind for_kind size,
@@ -933,7 +926,7 @@ and sforloop_exp
                       error { kind = Eloop_no_iteration; loc }
                     else
                       (* the default value is [nil] *)
-                      return Vnil 
+                      return Vnil
                  | Some(e) -> Combinatorial.exp genv env e in
                (* the final state is discarded *)
                let* ve, s_for_body_new =
@@ -941,7 +934,7 @@ and sforloop_exp
                    env i_env for_size default s_for_body in
                let s_for_body =
                  if for_resume then s_for_body_new else s_for_body in
-               return (ve, s_for_body) 
+               return (ve, s_for_body)
             | _ -> error { kind = Estate; loc } in
           return (ve, s_for_body, sr_list)
        | Forreturns { returns; body } ->
@@ -995,7 +988,7 @@ and sforloop_exp
           let* v = for_matching_out missing env_list acc_env returns in
           return (v, s_for_body, sr_list) in
      return (v, s_for_body, sr_list)
-     
+
 and sexp_opt genv env e_opt s =
   match e_opt with
   | None -> return (None, s)
@@ -1032,7 +1025,7 @@ and sfor_input size genv env (i_env: Forloop.index Env.t) { desc; loc } s =
        if a_size = size
        then return (Value(Env.add id entry i_env))
        else
-         error { kind = Earray_size { size = a_size; index = size }; loc } in 
+         error { kind = Earray_size { size = a_size; index = size }; loc } in
      return (i_env, Slist [se; se_opt])
   | Einput { id; e; by = Some _ }, Slist [se; Sval(Value(Vint(k)))] ->
      (* [id in e by k] means that in iteration [i], [id = e.(k * i)] *)
