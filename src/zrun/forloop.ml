@@ -1,6 +1,5 @@
 (***********************************************************************)
 (*                                                                     *)
-(*                                                                     *)
 (*                        The ZRun Interpreter                         *)
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
@@ -34,7 +33,7 @@ type index =
   (* j = i + e0 in the first case; j = e1 - i in the second with i in [0..n-1] *)
   | Vindex : { ve_left : int; ve_right : int; dir : bool } -> index
 
-      
+
 (* given an index environment [i_env = [x1\v1,...,xk\vk]]
  *- and index [i: [0..n-1]], returns an environment [l_env]
  *- where:
@@ -68,7 +67,7 @@ let geti_env loc i_env i =
          let* vi = geti loc ve i in
          return (Env.add x (entry vi) acc))
     Env.empty s_env
-      
+
 (* [x_to_last_x env acc_env = acc_env'] such that for every [x] *)
 (* in Dom(acc_env), replace entry [x\...] by [x\{ last = v }] *)
 (* if env(x) = { cur = v } *)
@@ -117,7 +116,7 @@ let array_of missing loc (var_name, var_init, var_default) acc_env env_list =
        let d_list = Util.list_of missing d in
        return (Primitives.lift
                  (fun v -> Varray(Vflat(Array.of_list (v @ d_list)))) v_list)
-    
+
 let (let+) v f =
   match v with
   | Vbot -> return Vbot
@@ -138,7 +137,7 @@ let input loc v by =
      let actual_size = Primitives.length a in
      return (Value(actual_size, Vinput { ve = a; by }))
   | _ -> error { kind = Etype; loc }
-     
+
 let index loc ve_left ve_right dir =
   let+ ve_left = ve_left and+ ve_right = ve_right in
   match ve_left, ve_right with
@@ -209,7 +208,7 @@ let forward_i_with_exit_condition loc n write f cond acc_env0 s =
       let* v = cond i acc_env in
       match v with
       | Vbot ->
-         let f_env = bot_env write in return ([f_env], acc_env, s) 
+         let f_env = bot_env write in return ([f_env], acc_env, s)
       | Vnil ->
          let f_env = nil_env write in return ([f_env], acc_env, s)
       | Value(v) ->
