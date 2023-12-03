@@ -7,6 +7,17 @@ let node scalar(x, y) returns (c)
           prod(xi, yi)
         done
 
+
+let node sum (x, y) returns (z)
+    z = forward xi in x, yi in y do xi + yi done
+
+let node sum_mat (x, y) returns (z)
+    forward xi in x, yi in y, zi out z do
+      forward xij in xi, yij in yi, zij out zi do
+	zij = xij + yij
+      done
+      done
+	  
 let node main() =
   let t1 = [|1.0; 2.0; 3.;4.0 |] in
   let t2 = [|1.0; 2.0; 3.;4.0 |] in
