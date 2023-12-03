@@ -34,8 +34,8 @@ let node cholesky_exp(n)(a) returns (l)
 
 (* in equational form *)
 let node cholesky(n)(a) returns (l)
-  forward i in 0 to n-1, ai in a, l init run (mat(n, 0.0))() do
-    forward j in 0 to n-1, aij in ai, l init last l do
+  forward i in 0 to n-1, ai in a returns (l init run (mat(n, 0.0))()) do
+    forward j in 0 to n-1, aij in ai returns (l init last l) do
       let tmp_sum =
             forward k in 0 to i-1 returns (cpt init 0.0)
                do cpt = last cpt +. (last l).(i).(k) *. (last l).(j).(k)
@@ -60,7 +60,7 @@ let node main3() =
 	     [| 0.0; 0.0; 1.0 |] |] in
   run (cholesky(3))(m)
  *)
-
+	  
 (*
 m2 = numpy.array ([[4.0, 12.0, -16.0],
                   [12.0, 37.0, -43.0], 
@@ -99,7 +99,7 @@ let vec n = node v -> foreach i in 0 to n-1 do v done
 (* L is a lower triangular matrix *)
 (* solve Lx = b *)
 let node forward_substitution(n)(l, b) returns (x)
-  forward i in 0 to n - 1, x init run (vec n)(0.0) do
+  forward i in 0 to n - 1 returns (x init run (vec n)(0.0)) do
     let r =
       forward j in 0 to i - 1 returns (cpt init 0.0)
         do cpt = last cpt +. l.(i).(j) *. (last x).(j) done in
@@ -112,7 +112,7 @@ let node forward_substitution(n)(l, b) returns (x)
 (* U is an upper triangular matrix *)
 (* solve Ux = b *)
 let node backward_substitution(n)(l, b) returns (x)
-  forward i in n - 1 downto 0, x init run (vec n)(0.0) do
+  forward i in n - 1 downto 0 returns (x init run (vec n)(0.0)) do
     let r =
       forward j in 0 to i - 1 returns (cpt init 0.0)
         do cpt = last cpt +. l.(i).(j) *. (last x).(j) done in

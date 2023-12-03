@@ -154,12 +154,14 @@ let node or_gate(x, y) returns (o)
 let node and_gate(x, y) returns (o)
    o = if x then y else false
 
-let node is_causal_in_esterel() returns (o)
+(**
+   let node is_causal_in_esterel() returns (o)
    (* true is put purposely on the right of the argument. Otherwise *)
    (* the lazy interpretation would give solution [o = true] *)
    (* instead of [o = bot] *)
    o = or_gate(o, true)
-
+ **)
+     
 (* To run it for 10 steps with an interpretation of the conditional such that:
 
    if _ then v else v = v
@@ -177,9 +179,11 @@ let node is_causal_in_esterel() returns (o)
    whereas we build the [or] and [and] from the conditional. The consequence
       if that some programs that we consider causal are not in Esterel. E.g. *)
 
-let node is_not_causal_in_esterel() returns (o)
+(**
+   let node is_not_causal_in_esterel() returns (o)
    o = if o then true else true
-
+ **)
+    
 (* that is not causal in Esterel because the boolean conditional
    [mux(c, x, y) = if c then x else y is translated into (c /\ x) \/
    (not c /\ y)] whose result is [bot] when [c = bot] and [x = y =
