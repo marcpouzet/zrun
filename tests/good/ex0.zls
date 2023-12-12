@@ -69,7 +69,7 @@ let node sum(x, y) = o where
   rec o = (0.0 fby o) +. x *. y
 
 let node scalar(t1, t2) =
-  forward xi in t1, yi in t2 do
+  forward (xi in t1, yi in t2) do
     sum(xi, yi)
   done
 
