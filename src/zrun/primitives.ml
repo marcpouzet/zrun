@@ -69,17 +69,17 @@ let test v =
   match v with
   | Vpresent _ -> return (Vbool(true)) | Vabsent -> return (Vbool(false))
   | _ -> None
-     
+
 let get_node v =
   match v with
   | Vclosure ({ c_funexp = { f_kind = Knode _ } } as c) -> return c
   | _ -> None
-       
+
 let get_record r =
   match r with
   | Vrecord(l) -> return l
   | _ -> None
-       
+
 let ifthenelse_op v v1 v2 =
   let* b = is_bool v in
   if b then return v1 else return v2
@@ -113,7 +113,7 @@ let minus_op v1 v2 =
   let* v1 = is_int v1 in
   let* v2 = is_int v2 in
   return (Vint(v1 - v2))
-    
+
 let mult_op v1 v2 =
   let* v1 = is_int v1 in
   let* v2 = is_int v2 in
@@ -132,12 +132,12 @@ let add_float_op v1 v2 =
 let uminus_float_op v =
   let* v = is_float v in
   return (Vfloat(-. v))
-  
+
 let minus_float_op v1 v2 =
   let* v1 = is_float v1 in
   let* v2 = is_float v2 in
   return (Vfloat(v1 -. v2))
-    
+
 let mult_float_op v1 v2 =
   let* v1 = is_float v1 in
   let* v2 = is_float v2 in
@@ -220,7 +220,7 @@ and compare_array compare a1 a2 =
      let n1 = Array.length a1 in
      if n1 = Array.length a2 then compare_n 0 (n1-1) a1 a2 else none
   | _ -> none
-     
+
 let eq_op v1 v2 =
   let* v = compare_pvalue v1 v2 in
   return (Vbool(v = 0))
@@ -298,7 +298,7 @@ let esterel_ifthenelse v1 v2 v3 =
   match v1 with
   | Value(v1) -> ifthenelse_op v1 v2 v3
   | _ -> return (if v2 = v3 then v2 else v1)
-  
+
 let esterel_ifthenelse v1 v2 v3 =
   if v2 = v3 then return v2
   else lazy_ifthenelse v1 v2 v3
@@ -315,7 +315,7 @@ Hence, [x = x or true] == [x = if x then true else true = true]
 *)
 let ifthenelse v1 v2 v3 =
   if !set_lustre then lustre_ifthenelse v1 v2 v3 else
-    if !set_esterel then esterel_ifthenelse v1 v2 v3 
+    if !set_esterel then esterel_ifthenelse v1 v2 v3
     else lazy_ifthenelse v1 v2 v3
 
 (* lift a unary operator: [op bot = bot]; [op nil = nil] *)
@@ -341,13 +341,13 @@ let list_of v =
   | Value(Vstuple(v_list)) ->
      List.map (fun v -> Value(v)) v_list
   | Vbot | Vnil | Value _ -> [v]
-  
+
 (* gets the value *)
 let pvalue v =
   match v with
   | Vnil | Vbot -> None
   | Value(v) -> return v
-                    
+
 (* if one is bot, return bot; if one is nil, return nil *)
 let rec slist v_list =
   match v_list with
@@ -359,6 +359,10 @@ let rec slist v_list =
 let stuple v_list =
   let+ v_list = slist v_list in
   return (Value(Vstuple(v_list)))
+
+let srecord l_v_list =
+  let+ l_v_list = slist l_v_list in
+  return (Value(Vrecord(l_v_list)))
 
 let constr1 f v_list =
   let+ v_list = slist v_list in
@@ -374,7 +378,7 @@ let array v_list =
 
 let lift f v =
   match v with | Vbot -> Vbot | Vnil -> Vnil | Value(v) -> Value(f v)
-                                                         
+
 (* if one component contains bot or nil, returns bot or nil *)
 (*
 let aatomic v =
@@ -399,8 +403,8 @@ let atomic v =
   match v with
   | Vtuple(l) -> stuple l
   | Vclosure _ -> none
-  | _ -> return (Value v)  
-       
+  | _ -> return (Value v)
+
 (* void *)
 let void = Value(Vvoid)
 
@@ -414,7 +418,7 @@ let unop op = Vfun op
 
 let binop op =
   Vfun(fun v1 -> return (Vfun (fun v2 -> op v1 v2)))
-    
+
 (*
 (* state processes *)
 let zerop_process op s =
@@ -430,7 +434,7 @@ let unop_process op s =
       step =
         fun s v -> let* v = lift1 (op s) v in return (v, s) }
  *)
-  
+
 let _ = Random.init 0
 
 let random_bool_op _ =
@@ -441,7 +445,7 @@ let random_int_op v =
 let random_float_op v =
   let* v = is_float v in
   return (Vfloat(Random.float v))
-    
+
 
 (* The initial Stdlib *)
 let list_of_primitives =
@@ -487,10 +491,9 @@ let list_of_esterel_primitives =
   then ["or", esterel_or_op;
         "&", esterel_and_op]
   else []
-  
+
 let stdlib_env =
   { Genv.name = "Stdlib";
     Genv.values =
       to_env (to_env Genv.E.empty list_of_primitives) list_of_random_primitives }
-    
-    
+
