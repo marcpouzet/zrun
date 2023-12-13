@@ -106,7 +106,7 @@ Examples are located in the `tests` directory.
 Consider for instance a simple program that computes two mutually recursive
 definitions of the sinus and cosinus (`tests/good/sin_cos.zls`).
 
-```
+```ocaml
 (* sinus/cosinus *)
 (* file sin_cos.zls *)
 
