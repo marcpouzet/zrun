@@ -2,20 +2,20 @@
 
 ZRun is an executable semantics of a synchronous data-flow language.
 It takes the form of a purely functional interpreter. The input of
-Zrun is a large subset of the languages Scade 6 and
+Zrun is a large subset of the language
 [Zélus](https://zelus.di.ens.fr). The concrete syntax is that of
 Zélus. It considers only discrete-time signals and systems for the
-moment. A discrete-time signal is modeled as an infinite stream and a synchronous
-system is a synchronous (length-preserving) stream function. The
-language provides the basic constructs of the language Lustre: the
-unit delay (pre) and initialization operator (->), the initialized
-delay (fby), streams defined by mutually recursive definitions. It
-also provides richer programming constructs introduced in Lucid
-Synchrone that are not in Lustre: by-case definition of streams
-with default values, the last value of a signal, the mix of stream
-equations and hierarchical automata, static parameters and values that
-are known either at compile or instantiation time), and array
-operations.
+moment. A discrete-time signal is modeled as an infinite stream and a
+synchronous system is a synchronous (length-preserving) stream
+function. The language provides the basic constructs of the language
+Lustre: the unit delay (pre) and initialization operator (->), the
+initialized delay (fby), streams defined by mutually recursive
+definitions. It also provides richer programming constructs introduced
+in Lucid Synchrone that are not in Lustre: by-case definition of
+streams with default values, the last value of a signal, the mix of
+stream equations and hierarchical automata, static parameters and
+values that are known either at compile or instantiation time), and
+array operations.
 
 The objective of this prototype is to give a reference semantics that is
 executable, to be used independently of a compiler, e.g.,
