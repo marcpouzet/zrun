@@ -50,10 +50,10 @@ block-diagram language", by Edwards and Lee, Science of Computer
 Programming 2003. All are based on the fix-point computation of a
 monotone function on a domain with bounded height that is done at
 every reaction. The present work builds directly on 3/, reformulating
-the semantics so that it can be expressed in a statically typed,
+the semantics so that it could be programmed in a statically typed,
 purely functional language that has strong normalization property
 (e.g., the programming language of Coq). In comparison, the original
-version was a shallow embedding in a language with call-by-need like
+version in 3/ was a shallow embedding in a language with call-by-need like
 Haskell. You can read the companion paper "[A Constructive State-based
 Semantics and Interpreter for a Synchronous Data-flow Language with
 State
