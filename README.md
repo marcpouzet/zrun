@@ -159,7 +159,7 @@ as introduced in Lucid Synchrone and Scade 6. For
 example, the simple chronometer in `tests/good/chrono_in_scade.zls` 
 (we use small constants in the counters to speedup the outputs).
 
-```
+```ocaml
 (*
 file watch_in_scade.zls
 This example is adapted from a classical example from Scade
@@ -318,7 +318,7 @@ fixpoint semantics presented in the paper: "The semantics and
 execution of a synchronous block-diagram language", Stephen Edwards
 and Edward Lee, SCP, 2003.
 
-```
+```ocaml
 (* file arbiter.zls *)
 
 (* the two boolean operators are sequential, not symetric as *)
