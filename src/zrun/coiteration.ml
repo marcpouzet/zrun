@@ -302,13 +302,14 @@ let rec iexp genv env { e_desc; e_loc  } =
      (* When [lname] is a global value, it can denote either a *)
      (* combinatorial function or a node; that is if [f] is a node *)
      (* [f e] is a shortcut for [run f e] *)
-     let* se = iexp genv env e in
      let* v =
        find_gvalue_opt lname genv |>
          Opt.to_result ~none: { kind = Eunbound_lident(lname); loc = e_loc} in
+     let* se = iexp genv env e in
      let* s =
        match v with
-       | Vclosure ({ c_funexp = { f_kind = Knode _ } } as c) ->
+       | Vclosure ({ c_funexp = { f_kind = Knode _; f_args = [_] } } as c) ->
+          (* [f e] with [f] a node is a short-cut for [run f e] *)
           let* si = instance e_loc c in
           return (Sinstance(si))
        | Vclosure _ | Vfun _ -> return Sempty
