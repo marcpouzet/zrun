@@ -3,36 +3,35 @@
 ZRun is an executable semantics of a synchronous data-flow language.
 It takes the form of a purely functional interpreter. The input of
 Zrun is a large subset of the language
-[Zélus](https://zelus.di.ens.fr). The concrete syntax is that of
-Zélus. It considers only discrete-time signals and systems for the
-moment. A discrete-time signal is modeled as an infinite stream and a
-synchronous system is a synchronous (length-preserving) stream
-function. The language provides the basic constructs of the language
-Lustre: the unit delay (pre) and initialization operator (->), the
-initialized delay (fby), streams defined by mutually recursive
-definitions. It also provides richer programming constructs introduced
-in Lucid Synchrone that are not in Lustre: by-case definition of
-streams with default values, the last value of a signal, the mix of
-stream equations and hierarchical automata, static parameters and
-values that are known either at compile or instantiation time), and
-array operations.
+[Zélus](https://zelus.di.ens.fr). It considers only the discrete-time
+(synchronous) subset of the language for the moment. A discrete-time
+signal is represented as infinite stream and a synchronous system as a
+length-preserving stream function. The basic primitives are those of
+Lustre: a unit non-initialized delay (pre), the initialization operator (->), the
+initialized delay (fby). Streams can be defined by mutually recursive
+definitions. It also provides richer programming constructs that were introduced
+in Lucid Synchrone but are not in Lustre: by-case definition of
+streams with a possible default and initial value, the last computed value of a 
+signal, hierarchical automata with parameters, stream function with static
+parameters that are either know at compile time or at instanciation time,
+and array operations. 
 
-The objective of this prototype is to give a reference semantics that is
-executable, to be used independently of a compiler, e.g.,
-as an oracle for compiler testing. It can be used
-to prove compilation steps (e.g., that a well typed/causal/initialized
-program does not lead to an error; to prove semantics preservation of
-source-to-source transformations like static scheduling or the
-compilation of automata), to execute unfinished programs or programs
-that are semantically correct but are statically rejected by the
-compiler.  Examples of such correct but rejected programs are those
-with cyclic circuits accepted by an Esterel compiler (the so-called
-"constructively causal" programs) but that are rejected by Lustre
-(and also Lucid Synchrone, Scade and Zélus) because
-the compiler imposes stronger causality
-constraints. Finally, being independent of a compiler, this semantics
-is useful to prototype new language constructs before considering their
-compilation.
+The objective of this prototype is to give a reference executable
+semantics. It can be used independently of a compiler, e.g., as an
+oracle for compiler testing. It can be used as a reference to prove
+the correctness of compiler steps (e.g., that a well
+typed/causal/initialized program does not lead to an error; to prove
+semantics preservation of source-to-source transformations like static
+scheduling or the compilation of automata), to execute unfinished
+programs or programs that are semantically correct but are statically
+rejected by the compiler. It is defined generically to illustrate some
+of the difference in the treatment of causality between Lustre, Lucid Synchrone/Scade/Zelus and Esterel. Examples of correct but rejected
+programs are those with cyclic circuits accepted by an Esterel
+compiler (the so-called "constructively causal" programs) but that are
+rejected by Lustre (and also Lucid Synchrone, Scade and Zélus) because
+the compiler imposes stronger causality constraints. Finally, being
+independent of a compiler, this semantics can be used to prototype new
+language constructs before considering their compilation.
 
 The long term goal of this work is to define an executable semantics
 that deal with all the language features of Zélus. We are far away
@@ -50,7 +49,7 @@ block-diagram language", by Edwards and Lee, Science of Computer
 Programming 2003. All are based on the fix-point computation of a
 monotone function on a domain with bounded height that is done at
 every reaction. The present work builds directly on 3/, reformulating
-the semantics so that it could be programmed in a statically typed,
+the semantics so that it can be implemented in a statically typed,
 purely functional language that has strong normalization property
 (e.g., the programming language of Coq). In comparison, the original
 version in 3/ was a shallow embedding in a language with call-by-need like
