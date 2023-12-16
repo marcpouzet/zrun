@@ -7,7 +7,7 @@ let node sum_(s)() returns (o)
   done
 
 let node main() = run (sum_(4)) ()
-    
+
 let node scalar(x, y) returns (o)
   forward xi in x, yi in y returns (o init 0)
     do o = p(xi, yi) done
@@ -26,14 +26,14 @@ let node map2(f)(x, y)
     forward xi in x, yi in y returns (zi out z) do
       zi = f(xi, yi)
     done
-  
+
 (* simple examples of for loops *)
 let node g x returns (y, z)
     do y = x and z = x done
 
 let node main__0 () =
   let m = g(1) in m
-    
+
 let node f x = x, x
 
 let node main_0 () =
@@ -44,7 +44,7 @@ let node main___0 () =
   let v1 = g 1 in
   let v2 = g v1 in
   assert ((=) v2 ((1, 1),(1,1)))
-	    
+
 let node f1 x =
   let rec n = 0 -> pre n + 1 in
   [| x with n <- 3 |]
@@ -56,7 +56,7 @@ let node main0 () =
   let y = f1 x in
   let v = foreach(4) yi in y do yi done in
   x, y, v
-   
+
 let node f2 x =
   let y1 = [| x with 0 <- 42 |] in
   let y2 = [| y1 with 1 <- 43 |] in
@@ -66,17 +66,16 @@ let node main00 () =
   let x = f 4 in
   let v = f2 x in
   assert (v = ([|42;4;4;4|], [|42;43;4;4|]))
-    
+
 let node g x =
-  forward(4) xi in x do 
+  forward(4) xi in x do
     let rec cpt = (0 fby cpt) + xi in
     cpt
   done
-      
-      
+
 let node gg x =
   let rec o =
-    (forward(4) xi in x do 
+    (forward(4) xi in x do
       let rec cpt = (0 fby cpt) + xi in
       cpt
      done) + (0 fby o) in
