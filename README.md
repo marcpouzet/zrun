@@ -365,7 +365,7 @@ done
 
 Depending on the way the `or` and `and` operator are defined, outputs
 of `main()` are either bottom or not. By default, Zrun considers that
-all imported primitives (here `||` and `&&&`) are strict
+all imported primitives (here `||` and `&&`) are strict
 (output is bottom whenever one input is bottom). Hence, typing:
 
 `zrun.exec -s main -n 10 arbiter.zls`
