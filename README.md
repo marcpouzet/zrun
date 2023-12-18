@@ -387,9 +387,9 @@ let node and_gate(x,y) returns (z)
 leads to a program that is causally correct. Here, the operators
 are only strict in their first argument. Note that the arbiter
 example is causally correct if
-the two boolean operators of lines (* 1 *) and (* 2 *) are strict but
-the one on line (* 3 *) is sequential (left-to-right). If the order
-of arguments in line (* 3 *) is reversed, that is:
+the two boolean operators of lines (1) and (2) are strict but
+the one on line (3) is sequential (left-to-right). If the order
+of arguments in line (3) is reversed, that is:
 
 or_gate(pass_in, token_in)
 
