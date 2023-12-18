@@ -360,7 +360,8 @@ let node main() returns (grant1, grant2, grant3) local request1,
   request2, request3 do request1 = true and request2 = true and
   request3 = true and grant1, grant2, grant3 = arbiter_three(request1,
   request2, request3) 
-done ``` 
+done 
+``` 
 
 Depending on the way the `or` and `and` operator are defined, outputs
 of `main()` are either bottom or not. By default, Zrun considers that
