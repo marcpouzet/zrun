@@ -308,42 +308,33 @@ To run this example for 30 steps:
 ./zrun.exe -s main -n 30 tests/good/watch_in_scade.zls
 ```
 
-The following is a classical example of a cyclic program that is
-statically rejected by the Lustre/Scade/Lucid Synchrone/Zelus
-compilers while it is a valid Esterel program. This example is due to
-Robert de Simone and is described by Gerard Berry in the Esterel primer
-V5.91 of 2000. It is also used as an example to illustrate the
-fixpoint semantics presented in the paper: "The semantics and
-execution of a synchronous block-diagram language", Stephen Edwards
-and Edward Lee, SCP, 2003.
+A program is dynamically causally correct is all signals are non
+bottom values. The following is a classical example of a program that
+is dynamically causal in Esterel but not in Lustre. It is used as an
+example to illustrate the fixpoint semantics presented in the paper:
+"The semantics and execution of a synchronous block-diagram language",
+Stephen Edwards and Edward Lee, SCP'2003. This example is due to
+Robert de Simone and cited by Gerard Berry in the Esterel
+primer V5.91 of 2000. The data-flow representation given below is
+adapted from that of SCP'2003 paper.
 
 ```ocaml
 (* file arbiter.zls *)
 
-(* the two boolean operators are sequential, not symetric as *)
-(* in Esterel and SCP paper. In the current semantics all imported *)
-(* functions are strict, hence preventing *)
-(* to have or(true, _) = or(_, true) = true with _ possibly bot *)
-let node sequential_and_gate(x,y) returns (z)
-    if x then z = y else z = false
-
-let node sequential_or_gate(x,y) returns (z)
-    if x then z = true else z = y
+let node or_gate(x,y) returns (z)
+    z = x || y
 
 let node and_gate(x,y) returns (z)
     z = x && y
 
-let node strict_or_gate(x,y) returns (z)
-    z = x or y
-
 let node arbiter(i, request, pass_in, token_in) returns (grant, pass_out, token_out)
   local o
   do
-    grant = and_gate(request, o)
+    grant = and_gate(request, o) (* 1 *)
   and
-    pass_out = and_gate(not request, o)
+    pass_out = and_gate(not request, o)  (* 2 *)
   and
-    o = or_gate(token_in, pass_in)
+    o = or_gate(token_in, pass_in) (* 3 *)
   and
     token_out = i fby token_in
   done
@@ -365,20 +356,56 @@ let node arbiter_three(i, request1, request2, request3) returns (grant1, grant2,
     grant3, pass_out3, token_out3 = arbiter(request3, pass_out2, token_out2)
   done
 
-let node main() returns (grant1, grant2, grant3) 
-  local request1, request2, request3
-  do
-    request1 = true
-  and
-    request2 = true
-  and
-    request3 = true
-  and
-    grant1, grant2, grant3 = arbiter_three(request1, request2, request3)
-  done
-```
+let node main() returns (grant1, grant2, grant3) local request1,
+  request2, request3 do request1 = true and request2 = true and
+  request3 = true and grant1, grant2, grant3 = arbiter_three(request1,
+  request2, request3) 
+done ``` 
 
-See other examples in directory tests/
+Depending on the way the `or` and `and` operator are defined, outputs
+of `main()` are either bottom or not. By default, Zrun considers that
+all imported primitives (here `||` and `&&&`) are strict
+(output is bottom whenever one input is bottom). Hence, typing:
+
+`zrun.exec -s main -n 10 arbiter.zls`
+
+returns a sequence of bottom values for all ouptuts. The program is
+not causally correct. Defining:
+
+```ocaml
+(* the two boolean operators below are sequential, not symetric as *)
+(* in Esterel and the SCP'2003 paper. In the current semantics all imported *)
+(* functions are strict, hence preventing *)
+(* to have or(true, x) = or(x, true) = true whenever x is bot *)
+let node or_gate(x,y) returns (z)
+    z = if x then true else y y
+
+let node and_gate(x,y) returns (z)
+    z = if x then y else false
+```
+leads to a program that is causally correct. Here, the operators
+are only strict in their first argument. Note that the arbiter
+example is causally correct if
+the two boolean operators of lines (* 1 *) and (* 2 *) are strict but
+the one on line (* 3 *) is sequential (left-to-right). If the order
+of arguments in line (* 3 *) is reversed, that is:
+
+or_gate(pass_in, token_in)
+
+the program is no more causally correct. To recover the expressiveness of
+Esterel (and the SCP'2003 paper), type:
+
+`zrun.exec -esterel -s main -n 10 arbiter.zls`
+
+the program is now causally correct. The interpreter provides three different
+interpretation of the conditional `if/then/else` that can be choosen
+on the command line.
+
+To see simple examples that illustrate the treatment of causality
+  between Lustre on one side, Lucid Synchrone/Scade/Zelus that sits in between
+  and Esterel as the most expressive, see file
+  `tests/good/lustre_versus_lucid_synchrone_versus_esterel.zls`. See
+  other examples in directory tests/
 
 ## Citing Zrun
 
