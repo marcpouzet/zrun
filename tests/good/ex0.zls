@@ -1,3 +1,8 @@
+let main_() returns (o)
+  o = forward(4) returns (v) do
+        v = 0 fby o
+      done
+
 (* let node main_42 () returns (l)
   forward i in 0 to 10, l init 0 do
     forward j in 0 to 10, l init last l do
