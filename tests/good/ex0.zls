@@ -1,7 +1,17 @@
 let main_() returns (o)
-  o = forward(4) returns (v) do
+  o = forward(1) returns (v init 42) do
         v = 0 fby o
       done
+
+let next(p)(x) = 
+  forward(2) returns (o) do o = run p (x) done
+
+let main__ () =
+  next (node x -> 42 fby x) 0
+
+let main___ () =
+  let x = 0 in
+  forward(2) returns (o init -1) do o = 42 fby x done
 
 (* let node main_42 () returns (l)
   forward i in 0 to 10, l init 0 do
