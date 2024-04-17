@@ -283,9 +283,9 @@ and eq_desc =
   | EQempty : eq_desc
   | EQassert : exp -> eq_desc
   | EQforloop : for_eq forloop -> eq_desc
-(* [foreach [id]* [id in e [by e],]* returns (vardec_list) do eq] *)
-(* forward [id]* [id in e [by e],]* [while/unless/until e] do e] 
-   returns (vardec_list) do eq *)
+(* [foreach [e]* [id in e [by e],]* returns (vardec_list) do eq] *)
+(* [forward [resume] [e]* [id in e [by e],]* returns (vardec_list) *)
+(*  do eq [while/unless/until e] e done]  *)
 
 and for_eq =
   { for_out : for_out_desc localized list;
