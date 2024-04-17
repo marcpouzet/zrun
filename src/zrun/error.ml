@@ -50,6 +50,10 @@ type kind =
                                 missing : int } -> kind
   (* the returned value for [id] should be an array of size [size]; *)
   (* [missing] elements are missing *)
+  | Earray_dimension_in_iteration : { expected_dimension: int;
+                                      actual_dimension: int } -> kind
+  (* the loop iterates on [expected_dimensions] but the input or output array *)
+  (* has dimention [actual_dimension] *)
   | Eunexpected_failure : kind (* an error that should not arrive *)
                       
 type error = { kind : kind; loc : Location.t }
@@ -135,5 +139,12 @@ let message loc kind =
      "@[%aZrun: the result should be an array of size %d but %d elements are\
         missing. Either declare %s with an init or a default value.@.@]"
       output_location loc size missing (Ident.source name)
+  | Earray_dimension_in_iteration { expected_dimension; actual_dimension } ->
+    eprintf
+      "@[%aZrun: the number of dimensions for the result is %d\n
+       while the loop iterates on %d dimensions.@.@]"
+      output_location loc actual_dimension expected_dimension
+  (* the loop iterates on [expected_dimensions] but the input or output array *)
+  (* has dimention [actual_dimension] *)
   | Eunexpected_failure ->
      eprintf "@[%aZrun: unexpected error.@.@]" output_location loc
