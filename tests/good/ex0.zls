@@ -7,7 +7,7 @@ let next(p)(x) =
   forward(2) returns (o) do o = run p (x) done
 
 let main__ () =
-  next (node x -> 42 fby x) 0
+  next (node x -> 42 fby x) 2
 
 let main___ () =
   let x = 0 in

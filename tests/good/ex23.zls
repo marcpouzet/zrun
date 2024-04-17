@@ -109,7 +109,7 @@ let node main8 () =
 let node find0 (x, a) returns (index, found)
   (index, found) =
     forward(5) i in 0 to 4, ai in a returns (index init 0, c init false)
-      while not (last c) do index = i and c = (ai = x) done
+      do index = i and c = (ai = x) while not (last c) done
 
 let node main9 () =
   let v = find0 (3, [| 0; 1; 2; 3; 4 |]) in
@@ -117,7 +117,7 @@ let node main9 () =
 
 let node find1 (x, a) returns (index, found)
   forward i in 0 to length a - 1, ai in a returns (index init 0, found init false)
-     while not (last found) do index = i and found = (ai = x) done
+     do index = i and found = (ai = x) while not (last found) done
 
 let node main10 () =
   let v = find1 (3, [| 0; 1; 2; 3; 4 |]) in
@@ -126,7 +126,7 @@ let node main10 () =
 
 let node fill_up0 (max_i) returns (s)
     s = forward(5) i in 0 to 4 returns ([|a init 0|])
-           while i < max_i do a = i done
+           do a = i while i < max_i done
 
 let node main11 () =
     let v = fill_up0 (2) in
@@ -134,7 +134,7 @@ let node main11 () =
 
 let node fill_up1 (max_i) returns (s)
     forward(5) i in 0 to 4 returns (si init 0 out s)
-           while i < max_i do si = i done
+           do si = i while i < max_i done
 
 let node main12 () =
   let v = fill_up1 (2) in

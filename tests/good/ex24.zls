@@ -15,9 +15,9 @@ let node main() =
 (* for loops in equational form *)
  let node f() returns (r)
   forward(3) i in 0 to 2 returns (ri out r) do
-   forward(5) j in 0 to 4 returns (ri init 0) while ri < 2 do
+   forward(5) j in 0 to 4 returns (ri init 0) do
       ri = last ri + 1
-     done
+     while ri < 2 done
    done
 
 let node main1() = f()
@@ -121,7 +121,7 @@ let node main9 () =
     
 let node or_n(n)(x, y) =
   forward i in 0 to n-1, xi in x, yi in y returns (o init false, index init 0)
-    while not last o do o = last o || (xi || yi) and index = i done
+    do o = last o || (xi || yi) and index = i while not last o done
 
 let node main10 () =
   run (or_n(4))([|false; false; true; false|], [| false; true; false; false |])
