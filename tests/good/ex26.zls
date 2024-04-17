@@ -1,5 +1,5 @@
 let node main1() =
-  let t = foreach i in 0 to 4 returns (o) do o = 42 done in
+  let t = foreach i in 0 to 4 returns ([|o|]) do o = 42 done in
   t
 
 let node main2() =
