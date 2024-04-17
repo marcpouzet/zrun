@@ -139,6 +139,8 @@ let matching_out env { b_vars; b_loc } =
 (* [acc_env] is the final environment for the accumulated variables *)
 (* [x init v ] : returns the accumulated value of [x] *)
 (* [[|x init v|] : returns an array of the accumulated values of [x] *)
+(* [x] : returns an array of the accumulated values of [x]; the value of *)
+(* [last x] is initialized with nil *)
 (* [|x|] : returns an array such that [x.(i) = env_list.(i).(x)] *)
 (* [non_filled] is the number of iterations not done in case of a forward loop *)
 let for_matching_out missing env_list acc_env returns =
@@ -147,15 +149,20 @@ let for_matching_out missing env_list acc_env returns =
       (fun { desc = { for_array;
                       for_vardec = { var_name; var_init; var_default } };
              loc } ->
-        match var_init with
-        | Some _ when for_array = 0 ->
-           (* accumulation. look for acc_env(last var_name) *)
-           find_last_opt var_name acc_env |>
-             Opt.to_result ~none:{ kind = Eunbound_ident(var_name); loc }
-        | _ ->
-           Forloop.array_of missing loc
-             (var_name, var_init, var_default) acc_env env_list)
-      returns in
+        match for_array with
+        | 0 ->
+          (* accumulation. look for acc_env(last var_name) *)
+          find_last_opt var_name acc_env |>
+          Opt.to_result ~none:{ kind = Eunbound_ident(var_name); loc }
+        | 1 ->
+          Forloop.array_of missing loc
+            (var_name, var_init, var_default) acc_env env_list
+        | _ -> (* this case is not treated for the moment *)
+          (* loop iteration only crosses a single dimension *)
+          error 
+            { kind = Earray_dimension_in_iteration 
+                  { expected_dimension = 1; actual_dimension = for_array };
+              loc }) returns in
   match v_list with
   | [] -> return void
   | [v] -> return v
