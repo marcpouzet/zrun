@@ -234,8 +234,8 @@ and eq_desc =
   | EQassert : exp -> eq_desc
   | EQforloop : for_eq forloop -> eq_desc
   (* [foreach(s) [id in e..e]* [id in e [by e],]* returns (vardec_list) do eq] *)
-  (* forward [id in e..e]* [id in e [by e],]*
-     [until/unless e] do e] returns (vardec_list) *)
+  (* forward [e]* [id in e..e]* [id in e [by e],]* returns (vardec_list) do
+     [until/unless e] done] *)
 
 and 'body forloop =
   { for_size : exp option;
