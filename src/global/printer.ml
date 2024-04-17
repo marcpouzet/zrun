@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -475,10 +475,15 @@ and kind_of_forloop ff for_kind =
   | Kforward _ -> fprintf ff "forward "
 
 and for_exit_condition ff for_kind =
+  let kind k =
+    match k with
+    | Ewhile -> "while" | Euntil -> "until" | Eunless -> "unless" in
   match for_kind with
   | Kforward(e_opt) ->
      Pp_tools.print_opt
-       (fun ff e -> fprintf ff "@[<hov 2>while@ %a@ @]" expression e) ff e_opt
+       (fun ff { for_exit_kind; for_exit } ->
+          fprintf ff "@[<hov 2>%s@ %a@ @]" (kind for_exit_kind)
+            expression for_exit) ff e_opt
   | Kforeach -> ()
 
 and index_opt ff i_opt =

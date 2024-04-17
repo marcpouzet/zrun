@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -284,7 +284,8 @@ and eq_desc =
   | EQassert : exp -> eq_desc
   | EQforloop : for_eq forloop -> eq_desc
 (* [foreach [id]* [id in e [by e],]* returns (vardec_list) do eq] *)
-(* forward [id]* [id in e [by e],]* [while e] do e] returns (vardec_list) *)
+(* forward [id]* [id in e [by e],]* [while/unless/until e] do e] 
+   returns (vardec_list) do eq *)
 
 and for_eq =
   { for_out : for_out_desc localized list;
@@ -297,7 +298,12 @@ and for_kind =
   | Kforward : for_exit option -> for_kind
 (* iteration during one instant. The argument is the stoping condition *)
 
-and for_exit = exp
+and for_exit = 
+  { for_exit : exp;
+    for_exit_kind : for_exit_kind }
+
+and for_exit_kind = 
+  | Ewhile | Euntil | Eunless
 
 (* input definition for a loop *)
 and for_input_desc =

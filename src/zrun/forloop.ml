@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -199,7 +199,7 @@ let forward_i_without_exit_condition:
 
 (* instantaneous for loops with an exit condition [cond] *)
 (* this condition must be combinational *)
-let forward_i_with_exit_condition loc n write f cond acc_env0 s =
+let forward_i_with_while_condition loc n write f cond acc_env0 s =
   let rec for_rec : int -> ('c star ientry Env.t as 'a) -> 'b state ->
                     ('a list * 'a * 'b state, 'e) Result.t =
     fun i acc_env s ->
@@ -219,6 +219,57 @@ let forward_i_with_exit_condition loc n write f cond acc_env0 s =
              let* env_list, acc_env, s = for_rec (i+1) acc_env s in
              return (f_env :: env_list, acc_env, s)
            else return ([], acc_env, s) in
+  for_rec 0 acc_env0 s
+
+(* instantaneous for loops with an exit condition [cond] *)
+(* this condition must be combinational *)
+let forward_i_with_unless_condition loc n write f cond acc_env0 s =
+  forward_i_with_while_condition loc n write f 
+    (fun i env -> (cond i env)) acc_env0 s
+
+let forward_i_with_unless_condition loc n write f cond acc_env0 s =
+  let rec for_rec : int -> ('c star ientry Env.t as 'a) -> 'b state ->
+                    ('a list * 'a * 'b state, 'e) Result.t =
+    fun i acc_env s ->
+    if i = n then return ([], acc_env, s)
+    else
+      let* v = cond i acc_env in
+      match v with
+      | Vbot ->
+         let f_env = bot_env write in return ([f_env], acc_env, s)
+      | Vnil ->
+         let f_env = nil_env write in return ([f_env], acc_env, s)
+      | Value(v) ->
+           let* b =
+             Opt.to_result ~none:{ kind = Etype; loc = loc } (is_bool v) in
+           if Stdlib.not b then
+             let* f_env, acc_env, s = f i acc_env s in
+             let* env_list, acc_env, s = for_rec (i+1) acc_env s in
+             return (f_env :: env_list, acc_env, s)
+           else return ([], acc_env, s) in
+  for_rec 0 acc_env0 s
+
+let forward_i_with_until_condition loc n write f cond acc_env0 s =
+  let rec for_rec : int -> ('c star ientry Env.t as 'a) -> 'b state ->
+                    ('a list * 'a * 'b state, 'e) Result.t =
+    fun i acc_env s ->
+    if i = n then return ([], acc_env, s)
+    else
+      let* f_env, acc_env, s = f i acc_env s in
+      let* v = cond i acc_env in
+      match v with
+      | Vbot ->
+         let f_env = bot_env write in return ([f_env], acc_env, s)
+      | Vnil ->
+         let f_env = nil_env write in return ([f_env], acc_env, s)
+      | Value(v) ->
+           let* b =
+             Opt.to_result ~none:{ kind = Etype; loc = loc } (is_bool v) in
+           if b then
+            return ([], acc_env, s)
+           else  
+             let* env_list, acc_env, s = for_rec (i+1) acc_env s in
+             return (f_env :: env_list, acc_env, s) in
   for_rec 0 acc_env0 s
 
 (* main entry functions *)
@@ -269,12 +320,32 @@ let forward loc sbody env i_env n default s =
 let forward_i_without_exit_condition loc sbody env i_env acc_env0 n s =
   forward_i_without_exit_condition n (step loc sbody env i_env) acc_env0 s
 
-let forward_i_with_exit_condition loc write sbody cond env i_env acc_env0 n s =
+let forward_i_with_while_condition loc write sbody cond env i_env acc_env0 n s =
   let exit_condition i acc_env =
     let* env_0 = geti_env loc i_env i in
     let env = Env.append env_0 (Env.append acc_env env) in
     cond env in
-  forward_i_with_exit_condition loc n write
+  forward_i_with_while_condition loc n write
+    (step loc sbody env i_env)
+    exit_condition
+    acc_env0 s
+
+let forward_i_with_unless_condition loc write sbody cond env i_env acc_env0 n s =
+  let exit_condition i acc_env =
+    let* env_0 = geti_env loc i_env i in
+    let env = Env.append env_0 (Env.append acc_env env) in
+    cond env in
+  forward_i_with_unless_condition loc n write
+    (step loc sbody env i_env)
+    exit_condition
+    acc_env0 s
+
+let forward_i_with_until_condition loc write sbody cond env i_env acc_env0 n s =
+  let exit_condition i acc_env =
+    let* env_0 = geti_env loc i_env i in
+    let env = Env.append env_0 (Env.append acc_env env) in
+    cond env in
+  forward_i_with_until_condition loc n write
     (step loc sbody env i_env)
     exit_condition
     acc_env0 s

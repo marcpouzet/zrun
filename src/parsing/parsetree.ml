@@ -235,7 +235,7 @@ and eq_desc =
   | EQforloop : for_eq forloop -> eq_desc
   (* [foreach(s) [id in e..e]* [id in e [by e],]* returns (vardec_list) do eq] *)
   (* forward [id in e..e]* [id in e [by e],]*
-     [while e] do e] returns (vardec_list) *)
+     [until/unless e] do e] returns (vardec_list) *)
 
 and 'body forloop =
   { for_size : exp option;
@@ -273,7 +273,12 @@ and for_kind =
   | Kforward : for_exit option -> for_kind
   (* iteration during one instant. The argument is the stoping condition *)
 
-and for_exit = exp
+and for_exit = 
+  { for_exit : exp;
+    for_exit_kind : for_exit_kind }
+
+and for_exit_kind = 
+  | Ewhile | Euntil | Eunless
 
 (* input definition for a loop *)
 and for_input_desc =

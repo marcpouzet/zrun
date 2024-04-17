@@ -402,7 +402,12 @@ let atomic v =
   let+ v = v in
   match v with
   | Vtuple(l) -> stuple l
-  | Vclosure _ -> none
+  | Vclosure _ -> 
+      (* this part should be changed into [atomic(f) = lambda x.let+ x in f x] *)
+      (* that is, even if [f] is not strict, make it a strict function *)
+      (* this is necessary to avoid unbounded recursion with f = \x. x x and f f *)
+      (* this is because Zrun applies to untyped programs *)
+    return (Value v)
   | _ -> return (Value v)
 
 (* void *)

@@ -603,7 +603,7 @@ equation_desc:
     { EQforloop (foreach_loop false f) }
   | FORWARD f = forward_loop_eq DONE
     { EQforloop (forward_loop false f) }
-  | FORWARD f = forward_loop_eq RESUME
+  | FORWARD RESUME f = forward_loop_eq DONE
     { EQforloop (forward_loop true f) }
 
 ;
@@ -1069,7 +1069,7 @@ expression_desc:
     { Eforloop (foreach_loop false f) }
   | FORWARD f = forward_loop_exp DONE
     { Eforloop (forward_loop false f) }
-  | FORWARD f = forward_loop_exp RESUME
+  | FORWARD RESUME f = forward_loop_exp DONE
     { Eforloop (forward_loop true f) }
   | e1 = simple_expression DOT LPAREN e2 = expression RPAREN
     DEFAULT e3 = expression
@@ -1093,14 +1093,14 @@ expression_desc:
 
 /* Loops for equations */
 %inline foreach_loop_exp:
-  /* forward (size) [i] (xi in ei,...) do e [default e] */
+  /* foreach (size) [i] (xi in ei,...) do e [default e] */
   | s_opt = optional_size_expression
     i_opt = optional(index)
     li = empty(input_list)
     DO e = expression
     d_opt = optional(default_expression)
     { (s_opt, i_opt, li, Forexp { exp = e; default = d_opt }) }
-  | /* forward (size) [i] (xi in ei,...) returns (...) do
+  | /* foreach (size) [i] (xi in ei,...) returns (...) do
        eq done */
     s_opt = optional_size_expression
     i_opt = optional(index)
@@ -1111,21 +1111,22 @@ expression_desc:
 ;
 
 %inline forward_loop_exp:
-  /* forward (size) [i] (xi in ei,...) [while e] do e [default e] */
+  /* forward (size) [i] (xi in ei,...) do e [default e] [while/unless/until e] done */
   | s_opt = optional_size_expression
     i_opt = optional(index)
     li = empty(input_list)
-    o_opt = optional(loop_condition) DO e = expression
+    DO e = expression
     d_opt = optional(default_expression)
+    o_opt = optional(loop_exit_condition) 
     { (s_opt, i_opt, li, o_opt, Forexp { exp = e; default = d_opt }) }
-  | /* forward (size) [i] (xi in ei,...) returns (...) [while e] do
-       eq done */
+  | /* forward (size) [i] (xi in ei,...) returns (...) do
+       eq [while/unless/until e] done */
     s_opt = optional_size_expression
     i_opt = optional(index)
     li = empty(input_list)
     RETURNS p = for_return
-    o_opt = optional(loop_condition)
     b = block(equation_empty_and_list)
+    o_opt = optional(loop_exit_condition)
     { (s_opt, i_opt, li, o_opt, Forreturns { returns = p; body = b }) }
 ;
 
@@ -1141,12 +1142,15 @@ expression_desc:
 
 %inline forward_loop_eq:
   | s_opt = optional_size_expression i_opt = optional(index)
-    li = empty(input_list) o_opt = optional(loop_condition)
+    li = empty(input_list)
     f = block(equation_empty_and_list)
+    o_opt = optional(loop_exit_condition)
     { (s_opt, i_opt, li, o_opt, { for_out = []; for_block = f }) }
   | s_opt = optional_size_expression i_opt = optional(index)
-    li = empty(input_list) RETURNS lo = output_list o_opt = optional(loop_condition)
+    li = empty(input_list) RETURNS 
+    lo = output_list 
     f = block(equation_empty_and_list)
+    o_opt = optional(loop_exit_condition) 
     { (s_opt, i_opt, li, o_opt, { for_out = lo; for_block = f }) }
 ;
 
@@ -1179,9 +1183,15 @@ expression_desc:
     { e }
 ;
 
-%inline loop_condition:
-  | WHILE e = expression
-    { e }
+%inline loop_exit_condition:
+  | k = loop_exit_condition_kind e = expression
+    { { for_exit_kind = k; for_exit = e } }
+;
+
+%inline loop_exit_condition_kind:
+| WHILE { Ewhile }
+| UNTIL { Euntil }
+| UNLESS { Eunless }
 ;
 
 /* outputs of a loop */

@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -511,7 +511,7 @@ and forloop_eq env_pat env { for_size; for_kind; for_index; for_input; for_resum
       match for_kind with
       | Kforeach -> Ast.Kforeach
       | Kforward(e_opt) ->
-         Ast.Kforward(Util.optional_map (expression env_body) e_opt) in
+         Ast.Kforward(Util.optional_map (exit_expression env_body) e_opt) in
     { Ast.for_size = for_size;
       Ast.for_kind = for_kind;
       Ast.for_index = for_index;
@@ -780,11 +780,16 @@ and forloop_exp env
     match for_kind with
     | Kforeach -> Ast.Kforeach
     | Kforward(e_opt) ->
-       Ast.Kforward(Util.optional_map (expression env_body) e_opt) in
+       Ast.Kforward(Util.optional_map (exit_expression env_body) e_opt) in
   { Ast.for_size = for_size; Ast.for_kind = for_kind;
     Ast.for_index = for_index; Ast.for_input = for_input; Ast.for_body = for_body;
     Ast.for_resume = for_resume }
-  
+
+and exit_expression env { for_exit_kind; for_exit } =
+  let k = match for_exit_kind with 
+    | Ewhile -> Ast.Ewhile | Euntil -> Ast.Euntil | Eunless -> Ast.Eunless in
+  { Ast.for_exit_kind = k; for_exit = expression env for_exit }
+   
 and recordrec loc env label_e_list =
   (* check that a label name appear only once *)
   let rec recordrec labels label_e_list =

@@ -122,7 +122,7 @@ let rec equation ({ eq_desc } as eq)=
          match for_kind with
          | Kforeach -> for_kind
          | Kforward(e_opt) ->
-            Kforward(Util.optional_map expression e_opt) in
+            Kforward(Util.optional_map exit_expression e_opt) in
        let for_input =
          for_input_w for_input in
        let for_input =
@@ -262,7 +262,7 @@ and expression ({ e_desc } as e) =
          match for_kind with
          | Kforeach -> for_kind
          | Kforward(e_opt) ->
-            Kforward(Util.optional_map expression e_opt) in
+            Kforward(Util.optional_map exit_expression e_opt) in
        let for_input = for_input_w for_input in
        let for_body =
          match for_body with
@@ -290,6 +290,9 @@ and for_input_w for_input =
                   e_right = expression e_right; dir } in
     { i with desc } in
   List.map input for_input
+
+and exit_expression ({ for_exit } as e) =
+  { e with for_exit = expression for_exit }
 
 and arg acc v_list = Util.mapfold vardec acc v_list
 

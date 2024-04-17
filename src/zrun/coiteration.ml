@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -726,7 +726,8 @@ and sexp genv env { e_desc; e_loc } s =
              let* v_list, s_list = slist e_loc genv env sexp e_list s_list in
              let v_list = Primitives.slist v_list in
              return
-               (Primitives.lift (fun v -> Varray(Vflat(Array.of_list v))) v_list,
+               (Primitives.lift 
+                  (fun v -> Varray(Vflat(Array.of_list v))) v_list,
                 Slist s_list)
           | Etranspose, [e], Slist [s] ->
              let* v, s = sexp genv env e s in
@@ -1009,16 +1010,26 @@ and sforloop_exp
                let s_for_body =
                  if for_resume then s_for_body_new else s_for_body in
                return (0, env_list, acc_env, s_for_body)
-            | Kforward(Some(e_while)), _ ->
+            | Kforward(Some { for_exit; for_exit_kind }), _ ->
                (* for the moment, the exit condition must be combinatorial *)
                let sbody env s =
                  let* _, local_env, s = sblock genv env body s in
                  return (local_env, s) in
-               let cond env = vsexp genv env e_while in
+               let cond env = vsexp genv env for_exit in
                let* env_list, acc_env, s_for_body_new =
-                 Forloop.forward_i_with_exit_condition e_while.e_loc
-                   body.b_write
-                   sbody cond env i_env acc_env for_size s_for_body in
+                  match for_exit_kind with
+                    | Ewhile ->
+                      Forloop.forward_i_with_while_condition 
+                        for_exit.e_loc body.b_write
+                        sbody cond env i_env acc_env for_size s_for_body
+                  | Eunless ->
+                    Forloop.forward_i_with_unless_condition 
+                      for_exit.e_loc body.b_write
+                      sbody cond env i_env acc_env for_size s_for_body
+                  | Euntil ->
+                    Forloop.forward_i_with_until_condition 
+                      for_exit.e_loc body.b_write
+                      sbody cond env i_env acc_env for_size s_for_body in
                (* was-it a complete iteration? *)
                let missing = for_size - List.length env_list in
                let s_for_body =
@@ -1519,16 +1530,26 @@ and sforloop_eq
           let s_for_block =
             if for_resume then s_for_block_new else s_for_block in
           return (0, env_list, acc_env, s_for_block)
-       | Kforward(Some(e_while)), _ ->
+       | Kforward(Some { for_exit; for_exit_kind }), _ ->
           (* for the moment, the exit condition must be combinatorial *)
           let sbody env s =
             let* _, local_env, s = sblock genv env for_block s in
             return (local_env, s) in
-          let cond env = vsexp genv env e_while in
+          let cond env = vsexp genv env for_exit in
           let* env_list, acc_env, s_for_block_new =
-            Forloop.forward_i_with_exit_condition e_while.e_loc
-              for_block.b_write
-              sbody cond env i_env acc_env size s_for_block in
+            match for_exit_kind with
+             | Ewhile ->
+               Forloop.forward_i_with_while_condition 
+                 for_exit.e_loc for_block.b_write
+               sbody cond env i_env acc_env size s_for_block
+             |  Eunless ->
+               Forloop.forward_i_with_unless_condition 
+                 for_exit.e_loc for_block.b_write
+                 sbody cond env i_env acc_env size s_for_block
+             |  Euntil ->
+               Forloop.forward_i_with_until_condition 
+                 for_exit.e_loc for_block.b_write
+                 sbody cond env i_env acc_env size s_for_block in
           (* was-it a complete iteration? *)
           let missing = size - List.length env_list in
           let s_for_block =
