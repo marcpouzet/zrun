@@ -297,18 +297,20 @@ let rec expression ff e =
        funexp ff fe
     | Eassert(e_body) ->
        fprintf ff "@[<hov 2>assert@ %a@]" expression e_body
-    | Eforloop({ for_size; for_kind; for_index; for_input; for_body }) ->
+    | Eforloop({ for_size; for_kind; for_index; for_input; for_body;
+               for_resume }) ->
        let size ff for_size =
          Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
            ff for_size in
        fprintf ff
-         "@[<hov 2>%a@,%a[%a](%a)@,%a@,%a@ @]"
+         "@[<hov 2>%a%a@,%a[%a](%a)@,%a@,%a@ @]"
          kind_of_forloop for_kind
+         for_resume_or_restart for_resume
          size for_size
          index_opt for_index
          input_list for_input
-         for_exit_condition for_kind
-         for_exp for_body in
+         for_exp for_body 
+         for_exit_condition for_kind in
   exp ff e
   
 and result ff { r_desc } =
@@ -447,7 +449,7 @@ and equation ff ({ eq_desc = desc } as eq) =
   | EQempty -> fprintf ff "()"
   | EQassert(e) ->
      fprintf ff "@[<hov2>assert %a@]" expression e
-  | EQforloop({ for_size; for_kind; for_index; for_input;
+  | EQforloop({ for_size; for_kind; for_index; for_input; for_resume;
                 for_body = { for_out; for_block } }) ->
      let size ff for_size =
        Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
@@ -459,20 +461,24 @@ and equation ff ({ eq_desc = desc } as eq) =
          fprintf ff "@[%a%a%a@]" 
            name x (init expression) i_opt out o_opt in
        print_list_r for_out "" "," "" ff l in
-     fprintf ff  "@[<hov 2>%a[%a](%a)(%a)@,%a@,%a@,%a@ @]"
+     fprintf ff  "@[<hov 2>%a%a[%a](%a)(%a)@,%a@,%a@,%a@ @]"
        kind_of_forloop for_kind
+       for_resume_or_restart for_resume
        size for_size
        index_opt for_index
        input_list for_input
        print_for_out for_out
-       for_exit_condition for_kind
        block_of_equation for_block
+       for_exit_condition for_kind       
 
 (* print for loops *)
 and kind_of_forloop ff for_kind =
   match for_kind with
   | Kforeach -> fprintf ff "foreach "
   | Kforward _ -> fprintf ff "forward "
+
+and for_resume_or_restart ff for_resume =
+  if for_resume then fprintf ff "resume "
 
 and for_exit_condition ff for_kind =
   let kind k =
