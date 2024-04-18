@@ -1,9 +1,19 @@
+let f() returns (o)
+  let rec nat = 0 -> pre nat + 1 in
+  do o = nat done
+
+let node main111() returns (o)
+  o = forward resume (10) returns (v) do
+        v = 0 fby (v + 1)
+      done
+
+(*
 let main_() returns (o)
   o = forward(1) returns (v init 42) do
         v = 0 fby o
       done
 
-let next(p)(x) = 
+let node next(p)(x) = 
   forward(2) returns (o) do o = run p (x) done
 
 let main__ () =
@@ -150,3 +160,4 @@ let node main5() returns ()
       assert o
   done
  
+*)
