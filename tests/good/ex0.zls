@@ -1,8 +1,17 @@
-let f() returns (o)
-  let rec nat = 0 -> pre nat + 1 in
+let f(x)(y) returns (o)
+  let rec nat = 0 -> pre nat + x in
   do o = nat done
 
-let node main111() returns (o)
+let g1() = let static m = f 42 in
+           run m 0
+
+let g2() = let static m = f 42 in
+           run m 0
+
+let g3() = let m = f 42 in
+          run m 0
+
+let main111() returns (o)
   o = forward resume (10) returns (v) do
         v = 0 fby (v + 1)
       done
