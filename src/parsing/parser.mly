@@ -87,7 +87,7 @@ let scond_true start_pos end_pos =
        start_pos end_pos
 
 (* building a function *)
-(* [let node (const x1 ... xn) (static y1 ... ym) m1 mk -> e in ... ] *)
+(* [let node (const x1 ... xn) (static y1 ... ym) m1 mk = e in ... ] *)
 (* is represented as *)
 (* [let f = fun (const x1...xn) -> fun (static y1...ym) -> fun m1...mk -> e in ...]*)
 let fun_one_desc is_atomic kind vkind p_list result startpos endpos =
@@ -243,9 +243,8 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token <string> INFIX4
 %token EOF
 
-%nonassoc RETURNS
-%nonassoc WHERE REC
-%right AND
+%nonassoc EMIT
+%nonassoc ASSERT
 %nonassoc prec_seq
 %right SEMI
 %nonassoc prec_der_with_reset
@@ -270,6 +269,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %left OR BARBAR
 %left AMPERSAND AMPERAMPER
 %left INFIX0 GREATER EQUAL
+%nonassoc RESET
 %right INFIX1
 %left INFIX2 PLUS SUBTRACTIVE MINUS PLUSPLUS
 %left STAR INFIX3
@@ -321,7 +321,7 @@ list_aux_no_sep(X):
 ;
 
 /* Localization */
-localized(X):
+%inline localized(X):
 | x = X { make x $startpos $endpos }
 ;
 
@@ -465,34 +465,44 @@ implementation:
   | LET v = const ide = ide EQUAL seq = seq_expression
       { Eletdecl { name = ide; const = v; e = seq } }
   /* several short-cuts are possible for function definitions */
+  | LET a = is_atomic c = const k = fun_kind_opt ide = ide
+        p_list_list = param_list_list r = result_or_where
+    { Eletdecl { name = ide; const = c;
+		 e = funexp a k p_list_list r $startpos $endpos } }
+  /* [let [atomic] const [node|fun|hybrid] (f x1...xn) = e */
   | LET a = is_atomic c = const LPAREN ide = ide p_list = param_list RPAREN
-    r = result
+    r = result_or_where
     { let vkind = if c then Kconst else Kany in
       Eletdecl { name = ide; const = c;
 		 e = funexp a (Kfun(vkind)) [vkind, p_list] r $startpos $endpos }
     }
-  | LET a = is_atomic c = const k = fun_kind_opt ide = ide
-        p_list_list = param_list_list r = result
-    { Eletdecl { name = ide; const = c;
-		 e = funexp a k p_list_list r $startpos $endpos } }
 ;
 
-%inline const:
+result_or_where:
+  | r = result { r }
+  | EQUAL seq = seq_expression WHERE i = is_rec eq = equation_and_list
+    { make (Exp(make (Elet(make { l_rec = i; l_kind = Kany; l_eq = eq }
+			  $startpos(eq) $endpos(eq), seq))
+		$startpos(seq) $endpos(eq)))
+      $startpos $endpos }
+;
+
+const:
   | CONST { true }
   | { false }
 ;
 
-%inline vkind:
+vkind:
   | CONST { Kconst }
   | STATIC { Kstatic }
 ;
 
-%inline vkind_opt:
+vkind_opt:
   | v = vkind { v }
   | { Kany }
 ;
 
-%inline fun_kind:
+fun_kind:
   | FUN    { Kfun(Kany) }
   | NODE   { Knode(Kdiscrete) }
   | HYBRID { Knode(Khybrid) }
@@ -509,48 +519,44 @@ implementation:
 ;
 
 
-%inline result:
-  | RETURNS p = param eq = equation_and_list
+result:
+  | RETURNS p = param eq = equation
     { make (Returns(p, eq)) $startpos $endpos }
   | EQUAL seq = seq_expression
     { make (Exp(seq)) $startpos $endpos }
-  | EQUAL seq = seq_expression WHERE i = is_rec eq = equation_and_list
-    { make (Exp(make (Elet(make { l_rec = i; l_kind = Kany; l_eq = eq }
-			  $startpos(eq) $endpos(eq), seq))
-		$startpos(seq) $endpos(eq)))
-      $startpos $endpos }
 ;
 
-%inline for_return:
+for_return:
   | fv = for_vardec
     { [fv] }
   | LPAREN l = optional(list_of(COMMA, for_vardec)) RPAREN
     { match l with None -> [] | Some(l) -> l }
 ;
 
-%inline for_vardec:
+for_vardec:
   | p = array_of(vardec)
     { make { for_array = fst p; for_vardec = snd p } $startpos $endpos }
 ;
 
-%inline equation_and_list:
+equation_and_list:
   | l = list_of(AND, equation)
     { match l with
       | [] -> no_eq $startpos $endpos | [eq] -> eq
       | l -> make (EQand(l)) $startpos $endpos }
 ;
 
-%inline equation_empty_and_list:
+equation_empty_and_list:
   | l_opt = optional(list_of(AND, equation))
     { match l_opt with | None -> make EQempty $startpos $endpos
 		       | Some([eq]) -> eq
 		       | Some(l) -> make (EQand(l)) $startpos $endpos }
 ;
 
-%inline equation:
+equation:
    eq = localized(equation_desc) { eq }
 ;
 
+/* a single equation; either ended by a terminal or an expression */
 equation_desc:
   | LOCAL v_list = vardec_comma_list DO eq = equation_empty_and_list DONE
     { EQlocal(v_list, eq) }
@@ -591,7 +597,8 @@ equation_desc:
       { EQinit(i, e) }
   | p = pattern EQUAL e = seq_expression
       { EQeq(p, e) }
-  | a = is_atomic k = fun_kind ide = ide v_p_list_list = param_list_list r = result
+  | a = is_atomic k = fun_kind ide = ide v_p_list_list = param_list_list 
+    r = result
     { EQeq(make (Evarpat ide) $startpos(ide) $endpos(ide),
 	   funexp a k v_p_list_list r $startpos $endpos) }
   | DER i = ide EQUAL e = seq_expression opt = optional(init_expression)
@@ -698,12 +705,12 @@ scondpat_desc :
 ;
 
 /* Block */
-%inline block(X):
+block(X):
   | lo = local_list DO x = X
       { make { b_vars = lo; b_body = x } $startpos $endpos }
 ;
 
-%inline emission(X):
+emission(X):
   | s = state
     { make { b_vars = []; b_body = no_eq $startpos $endpos }
       $startpos $endpos, s }
@@ -718,30 +725,30 @@ let_list:
       { o :: l }
 ;
 
-%inline one_let:
+one_let:
   | LET v = vkind_opt i = is_rec eq = equation_and_list
     { make { l_rec = i; l_kind = v; l_eq = eq } $startpos $endpos }
 ;
 
-%inline local_list:
+local_list:
   | /* empty */
       { [] }
   | LOCAL v_list = vardec_comma_list
       { v_list }
 ;
 
-%inline vardec_comma_list:
+vardec_comma_list:
   | l = list_of(COMMA, vardec)
     { l }
 ;
 
-%inline vardec_empty_comma_list:
+vardec_empty_comma_list:
   | l = optional(vardec_comma_list)
     { match l with None -> [] | Some(l) -> l }
 ;
 
 
-%inline param_list_list:
+param_list_list:
   | l = list_no_sep_of(param)
     { [Kany, l] }
   | l = list_no_sep_of(vkind_param_list)
@@ -758,17 +765,17 @@ let_list:
 ;
 */
 
-%inline vkind_param_list:
+vkind_param_list:
   | LPAREN v = vkind l = param_list RPAREN
     { v, l }
 ;
 
-%inline param_list:
+param_list:
   | l = list_no_sep_of(param)
     { l }
 ;
 
-%inline param:
+param:
   | LPAREN v = vardec_empty_comma_list RPAREN
     { v }
   | ide = ide
@@ -778,7 +785,7 @@ let_list:
 	$startpos $endpos ] }
 ;
 
-%inline vardec:
+vardec:
   | l = optional(LAST)
     c = optional(CLOCK) ide = ide t_opt = optional(colon_type_expression)
     i_opt = optional(init_expression)
@@ -907,13 +914,13 @@ seq_expression :
 ;
 
 
-%inline simple_expression_list:
+simple_expression_list:
   | l = list_no_sep_of(simple_expression)
     { l }
 ;
 
 
-%inline simple_expression:
+simple_expression:
   | desc = simple_expression_desc
       { make desc $startpos $endpos }
 ;
@@ -996,6 +1003,10 @@ expression_desc:
   | a = is_atomic k = fun_kind p_list_list = param_list_list
     MINUSGREATER e = expression
     { funexp_desc a k p_list_list (make (Exp(e)) $startpos(e) $endpos)
+         $startpos(p_list_list) $endpos }
+  | a = is_atomic k = fun_kind p_list_list = param_list_list
+    RETURNS p = param eq = equation
+    { funexp_desc a k p_list_list (make (Returns(p, eq)) $startpos(p) $endpos)
          $startpos(p_list_list) $endpos }
   | ATOMIC e = simple_expression
     { Eop(Eatomic, [e]) }
@@ -1082,7 +1093,6 @@ expression_desc:
       { Eop(Earray(Eflatten), [e]) }
   | e = simple_expression REVERSE
       { Eop(Earray(Ereverse), [e]) }
-
 ;
 
 %inline opt_end:
@@ -1092,7 +1102,7 @@ expression_desc:
 ;
 
 /* Loops for equations */
-%inline foreach_loop_exp:
+foreach_loop_exp:
   /* foreach (size) [i] (xi in ei,...) do e [default e] */
   | s_opt = optional_size_expression
     i_opt = optional(index)
@@ -1110,7 +1120,7 @@ expression_desc:
     { (s_opt, i_opt, li, Forreturns { returns = p; body = b }) }
 ;
 
-%inline forward_loop_exp:
+forward_loop_exp:
   /* forward (size) [i] (xi in ei,...) do e [default e] [while/unless/until e] done */
   | s_opt = optional_size_expression
     i_opt = optional(index)
@@ -1131,16 +1141,17 @@ expression_desc:
 ;
 
 /* Loops for equations */
-%inline foreach_loop_eq:
+foreach_loop_eq:
   | s_opt = optional_size_expression i_opt = optional(index)
     li = empty(input_list) f = block(equation_empty_and_list)
     { (s_opt, i_opt, li, { for_out = []; for_block = f }) }
   | s_opt = optional_size_expression i_opt = optional(index)
-    li = empty(input_list) RETURNS lo = output_list f = block(equation_empty_and_list)
+    li = empty(input_list) RETURNS 
+    lo = output_list f = block(equation_empty_and_list)
     { (s_opt, i_opt, li, { for_out = lo; for_block = f }) }
 ;
 
-%inline forward_loop_eq:
+forward_loop_eq:
   | s_opt = optional_size_expression i_opt = optional(index)
     li = empty(input_list)
     f = block(equation_empty_and_list)
@@ -1159,17 +1170,17 @@ expression_desc:
   | LPAREN e = expression RPAREN { Some(e) }
 ;
 
-%inline index :
+index:
   | LBRACKET i = ide RBRACKET { i }
 ;
 
 /* input in a for loop */
-%inline input_list:
+input_list:
   | LPAREN l = list_of(COMMA, localized(input_desc)) RPAREN { l }
   | l = list_of(COMMA, localized(input_desc)) { l }
 ;
 
-%inline input_desc:
+input_desc:
   | i = ide IN e = expression o = optional(by_expression) %prec prec_in_input
     { Einput { id = i; e = e; by = o } }
   | i = ide IN e1 = expression TO e2 = expression
@@ -1178,33 +1189,33 @@ expression_desc:
     { Eindex { id = i; e_left = e1; e_right = e2; dir = false } }
 ;
 
-%inline by_expression:
+by_expression:
   | BY e = simple_expression
     { e }
 ;
 
-%inline loop_exit_condition:
+loop_exit_condition:
   | k = loop_exit_condition_kind e = expression
     { { for_exit_kind = k; for_exit = e } }
 ;
 
-%inline loop_exit_condition_kind:
+loop_exit_condition_kind:
 | WHILE { Ewhile }
 | UNTIL { Euntil }
 | UNLESS { Eunless }
 ;
 
 /* outputs of a loop */
-%inline output_list:
+output_list:
   | LPAREN l = list_of(COMMA, localized(output_desc)) RPAREN { l }
 ;
 
-%inline out_ide:
+out_ide:
   | OUT ide = ide
     { ide }
 ;
 
-%inline output_desc:
+output_desc:
    | ide = ide o = out_ide
     { { for_name = ide; for_out_name = Some(o);
 	for_init = None; for_default = None } }
@@ -1220,19 +1231,19 @@ expression_desc:
 ;
 
 /* Periods */
-%inline period_expression:
+period_expression:
   | LPAREN per = expression RPAREN /* period */
       { [ make (Econst(Efloat(0.0))) $startpos $endpos; per ] }
   | LPAREN ph = simple_expression BAR per = expression RPAREN /* period */
       { [ ph; per ] }
 ;
 
-%inline is_inline:
+is_inline:
   | { false }
   | INLINE { true }
 ;
 
-%inline is_rec:
+is_rec:
   | REC { true }
   |     { false }
 ;
