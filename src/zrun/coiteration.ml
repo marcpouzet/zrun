@@ -382,10 +382,14 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
      if is_fun && for_resume 
      then error { kind = Eshould_be_combinatorial; loc = e_loc }
      else let* si_list = map (ifor_input is_fun genv env) for_input in
-       let* s_body, sr_list = ifor_exp is_fun genv env for_body in
+       let* s_body, sr_list = 
+         ifor_exp (is_fun && for_resume) genv env for_body in
        let* s_size, s_body =
          ifor_kind genv env for_size for_kind s_body in
        return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list))
+
+and iexp_opt is_fun genv env e_opt =
+  match e_opt with | None -> return Sempty | Some(e) -> iexp is_fun genv env e
 
 and ifor_kind genv env for_size for_kind s_body =
   match for_size with
@@ -407,9 +411,6 @@ and ialloc_foreach_loop size for_kind s_for_body =
   | Kforeach -> (* the initial state is a list of states *)
      Slist(Util.list_of size s_for_body)
 
-and iexp_opt is_fun genv env e_opt =
-  match e_opt with | None -> return Sempty | Some(e) -> iexp is_fun genv env e
-
 and ifor_input is_fun genv env { desc; loc } =
   match desc with
   | Einput { e; by } ->
@@ -428,9 +429,15 @@ and ifor_input is_fun genv env { desc; loc } =
      let* s2 = iexp is_fun genv env e_right in
      return (Slist [s1; s2])
 
-and ifor_out is_fun genv env
-  { desc = { for_name; for_init; for_default; for_out_name } } =
-  let* s_init = iexp_opt is_fun genv env for_init in
+and ifor_output is_fun is_resume genv env
+  { desc = { for_name; for_init; for_default; for_out_name }; loc } =
+  let* s_init =
+    match for_init with
+    | None -> return Sempty
+    | Some(e) -> 
+       (* if [is_resume = false] the state variable [last x] is allowed *)
+       if not is_resume then iexp is_fun genv env e
+       else error { kind = Eshould_be_combinatorial; loc } in
   let* s_default = iexp_opt is_fun genv env for_default in
   return (Slist [s_init; s_default])
 
@@ -440,7 +447,6 @@ and ifor_vardec is_fun genv env { desc = { for_vardec } } =
 and ifor_exp is_fun genv env r =
   match r with
   | Forexp { exp } ->
-     (* the default branch is supposed to be stateless *)
      let* s = iexp is_fun genv env exp in
      return (s, [])
   | Forreturns { returns; body } ->
@@ -510,10 +516,11 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
      let* se = iexp is_fun genv env e in
      return se
   | EQforloop({ for_size; for_kind; for_input;
-                for_body = { for_out; for_block } }) ->
+                for_body = { for_out; for_block }; for_resume }) ->
      let* s_input_list = map (ifor_input is_fun genv env) for_input in
-     let* so_list = map (ifor_out is_fun genv env) for_out in
-     let* s_body = iblock is_fun genv env for_block in
+     let* so_list = 
+       map (ifor_output (is_fun && for_resume) for_resume genv env) for_out in
+     let* s_body = iblock for_resume genv env for_block in
      let* s_size, s_body =
        ifor_kind genv env for_size for_kind s_body in
      return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
@@ -523,6 +530,7 @@ and iblock is_fun genv env { b_vars; b_body; b_loc  } =
   let* s_b_body = ieq is_fun genv env b_body in
   return (Slist (s_b_body :: s_b_vars))
 
+(* initial state of a variable declaration *)
 and ivardec is_fun genv env { var_init; var_default; var_loc; var_is_last } =
   let* s_init =
     match var_init with
