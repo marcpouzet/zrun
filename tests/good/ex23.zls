@@ -12,7 +12,7 @@ let node main0 () =
   let v = f t in
   assert (v = [| 4; 5 |])
   
-let node f () =
+let f () =
   forward(10) i in 0 to 9 returns (o init 0)
     do o = 0 -> pre o + i done
 
@@ -20,11 +20,11 @@ let node main1 () =
   let v = f () in
   v
     
-let node f x =
+let f x =
   forward(4) returns (o default 0)
     do o = 0 -> (pre o + 1) done
 
-let node main2 () =
+let main2 () =
   let v = f () in
   v
 
