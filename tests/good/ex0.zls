@@ -3,31 +3,51 @@ let main_2 () = (fun x f -> f(x))(3)(fun x -> x + 1)
 let f = fun x -> 
   node y returns o 
     let rec nat = 0 -> pre nat + x in
-    do o = nat done
+    o = nat
+
+let node h x = 0
+
+let node g5() = 
+  let f x = x + 1 in
+  f (42)
+
+let node hh () = 
+  let rec c = true -> pre (not c) in
+  (if c then (fun x -> x + 1) else (fun x -> x + 2)) 0
 
 let node g4() = run (f 42) 0
 
-(* let node g1() = let static m = f 42 in
-                run m 0
+(* let node g1() = 
+  let static m = f 42 in
+  run m 0
 
-let g2() = let static m = f 42 in
-           run m 0
+let g2() = 
+  let static m = f 42 in
+  run m 0
 
-let g3() = let m = f 42 in
-           run m 0 *)
+let g3() = 
+  let m = f 42 in
+  run m 0 *)
 
 let node main111() returns (o)
   o = forward resume (10) returns (v) do
         v = 0 fby (v + 1)
       done
 
-(*
-let main_() returns (o)
-  o = forward(1) returns (v init 42) do
-        v = 0 fby o
+let node main_() returns (o init 42)
+  o = forward(2) returns (v) do
+        v = 0 -> last o + 1
       done
 
-let node next(p)(x) = 
+let node main__() returns (o init 42)
+  o = last o + 1
+
+let node main___() returns (o)
+  local last_o do o = last_o + 1 and last_o = 42 fby o done
+
+let node test() = main__() = main___()
+
+let next(p)(x) = 
   forward(2) returns (o) do o = run p (x) done
 
 let main__ () =
@@ -174,4 +194,3 @@ let node main5() returns ()
       assert o
   done
  
-*)
