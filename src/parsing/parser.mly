@@ -597,7 +597,7 @@ equation_desc:
       { EQinit(i, e) }
   | p = pattern EQUAL e = seq_expression
       { EQeq(p, e) }
-  | a = is_atomic k = fun_kind ide = ide v_p_list_list = param_list_list 
+  | a = is_atomic k = fun_kind_opt ide = ide v_p_list_list = param_list_list 
     r = result
     { EQeq(make (Evarpat ide) $startpos(ide) $endpos(ide),
 	   funexp a k v_p_list_list r $startpos $endpos) }
