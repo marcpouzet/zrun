@@ -1216,16 +1216,25 @@ out_ide:
 ;
 
 output_desc:
-   | ide = ide o = out_ide
+  /* xi */
+  | ide = ide
+    { { for_name = ide; for_out_name = None;
+        for_init = None; for_default = None } }
+  /* xi out x */
+  | ide = ide o = out_ide 
     { { for_name = ide; for_out_name = Some(o);
 	for_init = None; for_default = None } }
+  /* xi init e [out x] */
   | ide = ide i = init_expression o_opt = optional(out_ide)
     { { for_name = ide; for_out_name = o_opt;
 	for_init = Some(i); for_default = None } }
+  /* xi default e [out x] */
   | ide = ide d = default_expression o_opt = optional(out_ide)
     { { for_name = ide; for_out_name = o_opt;
 	for_init = None; for_default = Some(d) } }
-  | ide = ide i = init_expression d = default_expression o_opt = optional(out_ide)
+  /* xi init e default e [out x] */
+  | ide = ide i = init_expression d = default_expression 
+  o_opt = optional(out_ide)
     { { for_name = ide; for_out_name = o_opt;
 	for_init = Some(i); for_default = Some(d) } }
 ;
