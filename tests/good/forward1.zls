@@ -2,7 +2,7 @@ let node make1(n)() =
   forward(n) i in 0 to n-1 returns ([|o|]) do o = i done
 
 let node sum(x) returns (o)
-  forward (xi in x) returns (o init 0) do
+  forward (xi in x) returns (o) do
     o = xi + (0 fby o)
   done
 
