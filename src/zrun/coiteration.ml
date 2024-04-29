@@ -1103,6 +1103,10 @@ and vexp genv env e s =
   let* v, _ = sexp genv env e s in
   return v
 
+and veq genv env eq s =
+  let* env, _ = seq genv env eq s in
+  return env
+
 (* computing the value of an expression from the initial state *)
 (* the expression is supposed to be stateless, that is, *)
 (* the new state must be unchanged *)
@@ -1110,6 +1114,7 @@ and vsexp genv env e =
   let* s = iexp true genv env e in
   vexp genv env e s
 
+  
 (* computing the value of a result combinatorial expression *)
 and vsresult genv env r =
   let* s = iresult true genv env r in
