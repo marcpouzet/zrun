@@ -243,6 +243,8 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token <string> INFIX4
 %token EOF
 
+/* %nonassoc LOCAL DO
+%nonassoc AND */
 %nonassoc EMIT
 %nonassoc ASSERT
 %nonassoc prec_seq
@@ -556,10 +558,22 @@ equation:
    eq = localized(equation_desc) { eq }
 ;
 
+/* a list of equations. If there is only one equation, "done" is optional */
+equation_empty_and_right_list:
+  | { make EQempty $startpos $endpos }
+  | eq = equation
+    { eq }
+  | eq1 = equation AND eq2 = equation
+  /* eq_list = list_of(AND, equation) DONE */
+    { make (EQand([eq1; eq2])) $startpos $endpos }
+; 
+
 /* a single equation; either ended by a terminal or an expression */
 equation_desc:
+  | LOCAL v_list = vardec_comma_list IN eq = equation
+    { EQlocal(v_list, eq) } 
   | LOCAL v_list = vardec_comma_list DO eq = equation_empty_and_list DONE
-    { EQlocal(v_list, eq) }
+    { EQlocal(v_list, eq) } 
   | DO eq = equation_empty_and_list DONE
     { eq.desc }
   | RESET eq = equation_and_list EVERY e = expression
@@ -612,7 +626,6 @@ equation_desc:
     { EQforloop (forward_loop false f) }
   | FORWARD RESUME f = forward_loop_eq DONE
     { EQforloop (forward_loop true f) }
-
 ;
 
 /* states of an automaton in an equation*/

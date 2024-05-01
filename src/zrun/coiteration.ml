@@ -1125,9 +1125,11 @@ and sfor_vardec genv env acc_env { desc = { for_vardec } } s v =
   svardec genv env acc_env for_vardec s v
 
 (* compute the initial value of accumulated variables *)
-(* [xi = { cur = bot; last = v; default = None }] when [xi init v][out x] *)
-(* [xi = { cur = bot; last = v; default = d }] when [xi init v default d][out x] *)
-(* [xi = { cur = bot; last = None; default = None }] when [xi out x] *)
+(* when { for_name = xi; for_init = v } returns *)
+(*                       [xi = { cur = bot; last = v; default = None }] *) 
+(* when { for_name = xi; for_init = v; for_default = d } returns *)
+(*                       [xi = { cur = bot; last = v; default = d }] *)
+(* otherwise [xi = { cur = bot; last = None; default = None }] *)
 and sfor_out genv env acc_env
   { desc = { for_name; for_init; for_default }; loc } s =
   match s with
