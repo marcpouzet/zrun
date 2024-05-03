@@ -1,0 +1,6 @@
+let node f n = 
+  forward(n)[i] returns (x init (0 -> 1))
+    do x = last x + i done
+
+let main () returns (o)
+  do o = f 10 and assert (o = 45) done
