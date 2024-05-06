@@ -281,6 +281,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %right PREFIX
 %right PRE TEST UP
 %left INIT DEFAULT
+%left TRANSPOSE
 %left DOT
 
 
@@ -1090,7 +1091,7 @@ expression_desc:
     { Eop(Earray(Eget_with_default), [e1; e2; e3]) }
   | e1 = expression PLUSPLUS e2 = expression
       { Eop(Earray(Econcat), [e1; e2]) }
-  | e = simple_expression TRANSPOSE
+  | e = expression TRANSPOSE
       { Eop(Earray(Etranspose), [e]) }
   | e = simple_expression FLATTEN
       { Eop(Earray(Eflatten), [e]) }
