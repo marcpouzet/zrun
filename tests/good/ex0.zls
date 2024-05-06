@@ -17,17 +17,13 @@ let node hh () =
 
 let node g4() = run (f 42) 0
 
-(* let node g1() = 
+let node g1() = 
   let static m = f 42 in
   run m 0
 
-let g2() = 
-  let static m = f 42 in
-  run m 0
-
-let g3() = 
+let node g3() = 
   let m = f 42 in
-  run m 0 *)
+  run m 0
 
 let node main111() returns (o)
   o = forward resume (10) returns (v) do
