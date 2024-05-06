@@ -12,6 +12,13 @@ let g(n)(m)(x) returns (cpt)
     done
   done
 
+let g(n)(m)(x) returns (cpt)
+  forward(n) (xi in x) returns (cpt) do
+    forward resume (m) (xij in xi) returns (cpt init 0) do
+      cpt = last cpt + xij
+    done
+  done
+
 let main1() returns o
   let v = [|[|1;2;3|];[|4;5;6|]|] in
   do o = f(2)(3)(v) done

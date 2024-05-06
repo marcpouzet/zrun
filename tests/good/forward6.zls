@@ -10,7 +10,7 @@ let main_1 () returns (o)
   let v1 = [|1;2;3|] in
   let v2 = [|1;2;3|] in
   do o = scalar_product_1(3)(v1, v2)
-  and assert (o = scalar_product_2(3)(v1, v2)) done
+  and assert (o = scalar_product_2(v1, v2)) done
 
 let sum_vectors_1(x, y) returns (z)
   forward (xi in x, yi in y) returns (zi out z) 
