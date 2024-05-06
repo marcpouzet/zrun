@@ -78,6 +78,8 @@ and 'a state =
   | Shorizon : { zin : bool; horizon : float } -> 'a state
   | Speriod :
       { zin : bool; phase : float; period : float; horizon : float } -> 'a state
+  (* environment of values *)
+  | Senv : 'a star ientry Ident.Env.t -> 'a state
 
 (* instance of a node *)
 and 'a instance =

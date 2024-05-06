@@ -274,16 +274,16 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
         let* s1 = iexp is_fun genv env e1 in
         let* s2 = iexp is_fun genv env e2 in
         return (Slist [s1; s2])
-     | Erun _, [{ e_loc } as e1; e2] ->
+     | Erun _, [{ e_loc = e_loc1} as e1; e2] ->
         (* node instanciation. [e1] must be a static expression *)
         if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
         else let* v = vsexp genv env e1 in
           let* v = Primitives.pvalue v |>
-                   Opt.to_result ~none: { kind = Etype; loc = e_loc} in
+                   Opt.to_result ~none: { kind = Etype; loc = e_loc1} in
           let* v =
             Primitives.get_node v |>
-            Opt.to_result ~none: { kind = Eshould_be_a_node; loc = e_loc} in
-          let* si = instance e_loc v in
+            Opt.to_result ~none: { kind = Eshould_be_a_node; loc = e_loc1} in
+          let* si = instance e_loc1 v in
           let* s2 = iexp is_fun genv env e2 in
           return (Slist [Sinstance(si); s2])
      | (Eatomic | Etest), [e] -> iexp is_fun genv env e
@@ -338,8 +338,8 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
      let* s_list = map (iexp is_fun genv env) e_list in
      return (Slist(s :: s_list))
   | Elet(leq, e) ->
-     let* s_eq = ileq is_fun genv env leq in
-     let* se = iexp is_fun genv env e in
+     let* l_env, s_eq = ileq is_fun genv env leq in
+     let* se = iexp is_fun genv (Env.append l_env env) e in
      return (Slist [s_eq; se])
   | Erecord_access({ arg }) ->
      iexp is_fun genv env arg
@@ -486,8 +486,8 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
      let* s_b_eq = iblock is_fun genv env b_eq in
      return s_b_eq
   | EQlet(leq, eq) ->
-     let* s_leq = ileq is_fun genv env leq in
-     let* s_eq = ieq is_fun genv env eq in
+     let* l_env, s_leq = ileq is_fun genv env leq in
+     let* s_eq = ieq is_fun genv (Env.append l_env env) eq in
      return (Slist [s_leq; s_eq])
   | EQreset(eq, e) ->
      let* s_eq = ieq is_fun genv env eq in
@@ -562,12 +562,29 @@ and ivardec is_fun is_resume genv env
   return (Slist [s_init; s_default])
 
 and iautomaton_handler is_fun genv env { s_let; s_body; s_trans } =
-  let* s_list = map (ileq is_fun genv env) s_let in
-  let* s_body = iblock is_fun genv env s_body in
+  let* l_env, s_list = ileq_list is_fun genv env s_let in
+  let* s_body = iblock is_fun genv (Env.append l_env env) s_body in
   let* st_list = map (iescape is_fun genv env) s_trans in
   return (Slist [Slist(s_list); s_body; Slist(st_list)])
 
-and ileq is_fun genv env { l_eq } = ieq is_fun genv env l_eq
+and ileq_list is_fun genv env leq_list =
+  mapfold 
+    (fun acc_env leq ->
+       let* l_env, s = ileq is_fun genv (Env.append acc_env env) leq in
+       return (Env.append l_env acc_env, s))
+    Env.empty leq_list
+  
+(* initial state of a local declaration [let eq in e] *)
+and ileq is_fun genv env ({ l_kind; l_eq } as leq) =
+  match l_kind with
+  | Kconst | Kstatic ->
+      (* if the declaration is constant/static, compute it during *)
+      (* the initialization *)
+      let* l_env = vleq genv env leq in
+      return (l_env, Senv(l_env))
+  | Kany ->
+      let* s = ieq is_fun genv env l_eq in
+      return (Env.empty, s)
 
 (* initial state of an automaton *)
 and initial_state_of_automaton 
@@ -587,7 +604,7 @@ and initial_state_of_automaton
 
 and iescape is_fun genv env { e_cond; e_let; e_body; e_next_state } =
   let* s_cond = iscondpat is_fun genv env e_cond in
-  let* s_list = map (ileq is_fun genv env) e_let in
+  let* l_env, s_list = ileq_list is_fun genv env e_let in
   let* s_body = iblock is_fun genv env e_body in
   let* s_state = istate is_fun genv env e_next_state in
   return (Slist [s_cond; Slist(s_list); s_body; s_state])
@@ -1099,13 +1116,10 @@ and sexp_opt genv env e_opt s =
   | Some(e) -> let* v, s = sexp genv env e s in return (Some(v), s)
 
 (* computing the value of an expression with a given state *)
+(* the expression [e] is expected to be combinational *)
 and vexp genv env e s =
   let* v, _ = sexp genv env e s in
   return v
-
-and veq genv env eq s =
-  let* env, _ = seq genv env eq s in
-  return env
 
 (* computing the value of an expression from the initial state *)
 (* the expression is supposed to be stateless, that is, *)
@@ -1114,7 +1128,15 @@ and vsexp genv env e =
   let* s = iexp true genv env e in
   vexp genv env e s
 
-  
+and vleq genv env { l_rec; l_eq; l_loc } =
+  (* computing the environment defined by a local definition *)
+  (* the expression [l_eq] is expected to be combinational *)
+  (* for the moment, we do not treat recursive definitions *)
+  if l_rec then error { kind = Eunexpected_failure; loc = l_loc }
+  else let* s = ieq true genv env l_eq in
+    let* env, _ = seq genv env l_eq s in
+    return env
+
 (* computing the value of a result combinatorial expression *)
 and vsresult genv env r =
   let* s = iresult true genv env r in
@@ -1268,18 +1290,23 @@ and sexp_list loc genv env e_list s_list =
 and sarg_list loc genv env e_list s_list =
   slist loc genv env sarg e_list s_list
 
-and sleq genv env { l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
-  if l_rec then
-    (* compute a bounded fix-point in [n] steps *)
-    let bot = bot_env eq_write in
-    let n = (Fix.size l_eq) + 1 in
-    let* env_eq, s_eq = Fix.eq genv env seq l_eq n s_eq bot in
-    (* a dynamic check of causality: all defined names in [eq] *)
-    (* must be non bottom provided that all free vars. are non bottom *)
-    let* _ = Fix.causal l_loc env env_eq (names eq_write) in
-    return (env_eq, s_eq)
-  else
-    seq genv env l_eq s_eq
+and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
+  match l_kind, s_eq with
+  | (Kconst | Kstatic), Senv(l_env) ->
+     return (l_env, s_eq)
+  | Kany, _ ->
+     if l_rec then
+       (* compute a bounded fix-point in [n] steps *)
+       let bot = bot_env eq_write in
+       let n = (Fix.size l_eq) + 1 in
+       let* env_eq, s_eq = Fix.eq genv env seq l_eq n s_eq bot in
+       (* a dynamic check of causality: all defined names in [eq] *)
+       (* must be non bottom provided that all free vars. are non bottom *)
+       let* _ = Fix.causal l_loc env env_eq (names eq_write) in
+       return (env_eq, s_eq)
+     else
+       seq genv env l_eq s_eq
+  | _ -> error { kind = Estate; loc = l_loc }
 
 and slets loc genv env leq_list s_list =
   mapfold2 { kind = Estate; loc }
