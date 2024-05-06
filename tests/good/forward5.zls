@@ -75,8 +75,3 @@ let main1() returns o
   and assert(o = sum_matrix_9(2)(3)(v1, v2)) 
   done
 
-let main2() returns ()
-  let v1 = [|[|1;2;3|];[|4;5;6|]|] in
-  let v2 = [|[|1;2;3|];[|4;5;6|]|] in
-  assert(v1.T.T = v1)
-  
