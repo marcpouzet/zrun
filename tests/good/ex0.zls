@@ -21,10 +21,6 @@ let node g1() =
   let static m = f 42 in
   run m 0
 
-let node g3() = 
-  let m = f 42 in
-  run m 0
-
 let node main111() returns (o)
   o = forward resume (10) returns (v) do
         v = 0 fby (v + 1)
