@@ -173,6 +173,14 @@ let mod_op v1 v2 =
   let* v2 = is_int v2 in
   return (Vint(v1 mod v2))
 
+let length v =
+  match v with
+  | Vmap { m_length } -> m_length | Vflat(a) -> Array.length a
+let length_op v =
+  match v with
+  | Varray(a) -> return (Vint(length a))
+  | _ -> none
+
 let rec compare_pvalue v1 v2 =
   match v1, v2 with
   | Vint i1, Vint i2 -> return (compare i1 i2)
@@ -188,12 +196,14 @@ let rec compare_pvalue v1 v2 =
        compare_list compare_pvalue p_list1 p_list2 else return v
   | Vpresent(v1), Vpresent(v2) -> compare_pvalue v1 v2
   | Vabsent, Vabsent -> return 0
-  | Vstuple(p_list1), Vstuple(p_list2) -> compare_list compare_pvalue p_list1 p_list2
+  | Vstuple(p_list1), Vstuple(p_list2) -> 
+     compare_list compare_pvalue p_list1 p_list2
   | Vstate0(id1), Vstate0(id2) -> return (Ident.compare id1 id2)
   | Vstate1(id1, p_list1), Vstate1(id2, p_list2) ->
      let v = Ident.compare id1 id2 in
      if v = 0 then compare_list compare_pvalue p_list1 p_list2 else return v
-  | Varray(v1), Varray(v2) -> compare_array compare_pvalue v1 v2
+  | Varray(v1), Varray(v2) -> 
+     if length v1 = length v2 then compare_array compare_pvalue v1 v2 else none
   | Vrecord _, Vrecord _ -> none
   | Vtuple _, Vtuple _ -> none
   | Vfun _, Vfun _ -> none
@@ -210,16 +220,27 @@ and compare_list compare p_list1 p_list2 =
 
 and compare_array compare a1 a2 =
   (* compare the elements of two arrays, from left to right *)
-  let rec compare_n i n a1 a2 =
-    if i <= n then
-      let* v = compare_pvalue (a1.(i)) (a2.(i)) in
-      if v = 0 then compare_n (i+1) n a1 a2 else return v
+  let compare_array_n n (get_a1, a1) (get_a2, a2) =
+    let rec compare_array_n i n =
+    if i < n then
+      let* p1 = get_a1 a1 i in
+      let* p2 = get_a2 a2 i in
+      let* v = compare_pvalue p1 p2 in
+      if v = 0 then compare_array_n (i+1) n else return v
     else return 0 in
+    compare_array_n 0 n in
+  let get_i_array a i = return (a.(i)) in
+  let get_i a i = Result.to_option (a i) in
+  let n = length a1 in
   match a1, a2 with
-  | Vflat(a1), Vflat(a2) ->
-     let n1 = Array.length a1 in
-     if n1 = Array.length a2 then compare_n 0 (n1-1) a1 a2 else none
-  | _ -> none
+  | Vflat(a1), Vflat(a2) -> 
+      compare_array_n n (get_i_array, a1) (get_i_array, a2)
+  | Vflat(a1), Vmap({ m_u }) -> 
+      compare_array_n n (get_i_array, a1) (get_i, m_u)
+  | Vmap({ m_u }), Vflat(a2) -> 
+      compare_array_n n (get_i, m_u) (get_i_array, a2)
+  | Vmap({ m_u = a1 }), Vmap({ m_u = a2 }) -> 
+    compare_array_n n (get_i, a1) (get_i, a2)
 
 let eq_op v1 v2 =
   let* v = compare_pvalue v1 v2 in
@@ -241,13 +262,6 @@ let gte_op v1 v2 =
   let* v = compare_pvalue v1 v2 in
   return (Vbool(v >= 0))
 
-let length v =
-  match v with
-  | Vmap { m_length } -> m_length | Vflat(a) -> Array.length a
-let length_op v =
-  match v with
-  | Varray(a) -> return (Vint(length a))
-  | _ -> none
        
 (* ifthenelse. this one is strict w.r.t all arguments *)
 let lustre_ifthenelse v1 v2 v3 =
