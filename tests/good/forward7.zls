@@ -12,4 +12,4 @@ let sum2(n)(x) returns (o)
  
 let main () returns (o1, o2)
   let x = [| 1; 2 |] in
-  do o1 = sum1(2)(x) and o2 = sum1(2)(x) and assert (o1 = o2) done
+  do o1 = sum1(2)(x) and o2 = sum2(2)(x) and assert (o1 = o2) done
