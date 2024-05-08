@@ -169,25 +169,22 @@ let for_matching_out missing env_list acc_env returns =
   | _ -> (* return a non strict tuple *)
      return (Value(Vtuple(v_list)))
 
-(* given a list of environments (one per iteration) [env_list] *)
-(* and an accumulated environment [acc_env] return the environment *)
-(* [env'] computed by a for loop *)
+(* given a list of environments [env_list = [env.(0);...;env.(n-1)]], that is *)
+(* one per loop iteration) and an accumulated environment [acc_env] *)
+(* return the environment [env'] computed by a for loop *)
 (* [env'(x) = acc_env(last x)] if x in Dom(acc_env) and *)
 (* [env'(x).(i) = env_list.(i).(x) otherwise *)
 let for_env_out missing env_list acc_env loc for_out =
   fold
     (fun acc { desc = { for_name; for_init; for_default; for_out_name }; loc } ->
-      match for_init, for_default, for_out_name with
-      | None, None, None ->
-         (* this case should not happen *)
-         error { kind = Eunexpected_failure; loc }
-      | (Some _, _, None) | (_, Some _, None) ->
+      match for_out_name with
+       | None ->
          (* accumulation. look for acc_env(last var_name) *)
          let* v =
            Find.find_last_opt for_name acc_env |>
              Opt.to_result ~none:{ kind = Eunbound_last_ident(for_name); loc } in
          return (Env.add for_name { cur = v; last = None; default = None } acc)
-      | _, _, Some(x) ->
+      | Some(x) ->
          let* v = Forloop.array_of missing loc
                     (for_name, for_init, for_default) acc_env env_list in
          return (Env.add x { cur = v; last = None; default = None } acc))
@@ -315,20 +312,20 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
   | Etuple(e_list) ->
      let* s_list = map (iexp is_fun genv env) e_list in
      return (Slist(s_list))
-  | Eapp({ e_desc = Eglobal { lname }; e_loc }, [e]) ->
+  | Eapp({ e_desc = Eglobal { lname }; e_loc = l_loc }, [e]) ->
      (* When [lname] is a global value, it can denote either a *)
      (* combinatorial function or a node; that is if [f] is a node *)
      (* [f e] is a shortcut for [run f e] *)
      let* v =
        find_gvalue_opt lname genv |>
-         Opt.to_result ~none: { kind = Eunbound_lident(lname); loc = e_loc} in
+         Opt.to_result ~none: { kind = Eunbound_lident(lname); loc = l_loc } in
      let* se = iexp is_fun genv env e in
      let* s =
        match v with
        | Vclosure ({ c_funexp = { f_kind = Knode _; f_args = [_] } } as c) ->
           (* [f e] with [f] a node is a short-cut for [run f e] *)
           if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
-          else let* si = instance e_loc c in
+          else let* si = instance l_loc c in
             return (Sinstance(si))
        | Vclosure _ | Vfun _ -> return Sempty
        | _ -> error { kind = Etype; loc = e_loc } in
@@ -437,7 +434,7 @@ and ifor_output is_fun is_resume genv env
     | Some(e) -> 
        (* if [is_resume = false] that is, the iteration restarts from *)
        (* the initial state then the state variable [last x] is allowed *)
-       if not is_resume then iexp is_fun genv env e
+       if not (is_fun && is_resume) then iexp is_fun genv env e
        else error { kind = Eshould_be_combinatorial; loc } in
   let* s_default = iexp_opt is_fun genv env for_default in
   return (Slist [s_init; s_default])
