@@ -1,9 +1,8 @@
-let sum(n)(m)(x) returns (o)
-  forward(n)(xi in x) returns (o) do
-    forward resume (m)(xij in xi) returns (o init 0)
-      do o = last o + xij done
+let sum(n)() returns (o)
+  forward(n) returns (o) do
+    forward resume (n) returns (o init 0)
+      do o = last o + 1 done
     done
  
 let main () returns (o)
-  let v1 = [|[|1;2;3|];[|4;5;6|]|] in
-  do o = sum(2)(3)(v1) done
+  do o = sum(2)() done

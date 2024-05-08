@@ -1,6 +1,3 @@
-let node make1(n)() = 
-  forward(n) (i in 0 to n-1) returns ([|o|]) do o = i done
-
 let node sum(x) returns (o)
   forward (xi in x) returns (o) do
     o = xi + (0 fby o)
@@ -9,6 +6,13 @@ let node sum(x) returns (o)
 let f () =
   forward(10) (i in 0 to 9) returns (o)
     do o = 0 -> pre o + i done
+
+let node make1(n)() = 
+  forward(n) (i in 0 to n-1) returns ([|o|]) do o = i done
+
+let node main() returns (s)
+  let o = [| 1; 2 |] in
+  do s = sum(o) done
 
 let node main1() returns ()
   assert (f() = sum(run (make1(10)) ()))

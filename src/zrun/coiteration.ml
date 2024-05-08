@@ -434,8 +434,8 @@ and ifor_output is_fun is_resume genv env
     | Some(e) -> 
        (* if [is_resume = false] that is, the iteration restarts from *)
        (* the initial state then the state variable [last x] is allowed *)
-       if not (is_fun && is_resume) then iexp is_fun genv env e
-       else error { kind = Eshould_be_combinatorial; loc } in
+       if is_fun && is_resume then error { kind = Eshould_be_combinatorial; loc } 
+       else iexp is_fun genv env e in
   let* s_default = iexp_opt is_fun genv env for_default in
   return (Slist [s_init; s_default])
 
