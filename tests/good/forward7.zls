@@ -1,5 +1,5 @@
 let sum1(n)(x) returns (o)
-  forward(n) (xi in x) returns (o init 100) do
+  forward(n) returns (o init 100) do
     forward (n) (xi in x) returns (o init last o)
       do o = last o + xi done
     done
@@ -10,6 +10,23 @@ let sum2(n)(x) returns (o)
       do o = last o + xi done
     done
  
-let main () returns (o1, o2)
-  let x = [| 1; 2 |] in
-  do o1 = sum1(2)(x) and o2 = sum2(2)(x) and assert (o1 = o2) done
+let main () returns (o1)
+  let x = [| 1; 1 |] in
+  do o1 = sum2(2)(x) done
+
+let main2 () returns (o1, o2)
+  let x = [| 1; 1 |] in
+  do o1 = sum1(2)(x)  and o2 = sum2(2)(x) (* and assert (o1 = o2) *) done
+
+let node f() returns (o)
+ forward(2) returns (o)
+  do forward resume (5) returns (o init (0))
+    do o = last o + 1 done
+  done 
+
+
+let node g() returns (o)
+ o = forward(4) returns (o)
+       do o = forward resume (5) returns (o init 0)
+                do o = last o + 1 done
+       done 
