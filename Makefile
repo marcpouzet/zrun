@@ -10,7 +10,9 @@ debug:
 	(cd src; dune build --debug-backtraces --debug-dependency-path -- zrun.bc)
 
 clean:
-	dune clean
+	dune clean;
+	(cd tests/good/; rm -f *.zlo);
+	(cd tests/bad/; rm -f *.zlo)
 
 wc:
 	(cd src; wc global/*.ml \
