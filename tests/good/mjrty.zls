@@ -19,10 +19,6 @@ let node vote(x) returns (m init 0)
   else
     do c = last c - 1 done
 
-(* un probleme avec les parametres statiques. Si on ecrit *)
-(* let count_votes(n)(x, a) ... rien ne dit que n est statique. Dans Zelus *)
-(* on fait l'hypothese que les n-1 arguments (currifies) sont statiques *)
-(* pas dans ZRun. Le faudrait-il ? *)
 let count_votes(n)(x, a) returns (n)
   n = forward(n)(ai in a) returns (s init 0) do
         s = if ai = x then last s + 1 else last s
