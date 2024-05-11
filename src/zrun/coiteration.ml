@@ -435,7 +435,10 @@ and ifor_output is_fun is_resume genv env
        (* if [is_resume = false] that is, the iteration restarts from *)
        (* the initial state then the state variable [last x] is allowed *)
        if is_fun && is_resume then error { kind = Eshould_be_combinatorial; loc } 
-       else iexp is_fun genv env e in
+       else 
+         let* s_e = iexp is_fun genv env e in
+         (* allocate a memory for storing [last x] *)
+         return (Slist [Sopt(None); s_e]) in
   let* s_default = iexp_opt is_fun genv env for_default in
   return (Slist [s_init; s_default])
 
@@ -1112,6 +1115,20 @@ and sexp_opt genv env e_opt s =
   | None -> return (None, s)
   | Some(e) -> let* v, s = sexp genv env e s in return (Some(v), s)
 
+and sexp_init_opt loc genv env e_opt s =
+  (* compute [last x] *)
+  match e_opt, s with
+  | None, _ -> return (None, s)
+  | Some(e), Slist [Sopt(v_opt); s] ->
+     let* ve, s = sexp genv env e s in 
+     let* v_opt, s_opt = match v_opt with
+       | None -> (* first instant *)
+          return (Some(ve), None)
+       | Some(v) -> (* return the stored value *)
+          return (Some(v), v_opt) in
+     return (v_opt, Slist [Sopt(s_opt); s])
+  | _ -> error { kind = Estate; loc }
+        
 (* computing the value of an expression with a given state *)
 (* the expression [e] is expected to be combinational *)
 and vexp genv env e s =
@@ -1153,7 +1170,7 @@ and sfor_out genv env acc_env
   { desc = { for_name; for_init; for_default }; loc } s =
   match s with
   | Slist [s_init; s_default] ->
-     let* last, s_init = sexp_opt genv env for_init s_init in
+     let* last, s_init = sexp_init_opt loc genv env for_init s_init in
      let* default, s_default = sexp_opt genv env for_default s_default in
      return
        (Env.add for_name { cur = Vbot; last; default } acc_env,
@@ -1640,9 +1657,34 @@ and sforloop_eq
             if for_resume then s_for_block_new else s_for_block in
           return (missing, env_list, acc_env, s_for_block)
        | _ -> error { kind = Estate; loc } in
+     (* store the next last value for [for_out] - only necessary *)
+     (* when [resume = true] *)
+     let* so_list = 
+       if for_resume then
+         map2 { kind = Estate; loc } (set_for_out acc_env) for_out so_list
+       else return so_list in
      let* env =
        for_env_out missing env_list acc_env loc for_out in
      return (env, s_for_block, so_list)
+
+(* store the next value for [last x] in the state of [for_out] *)
+(* this function assumes that the forloop is resumed *)
+(* the state is organised in [s_init; s_default] *)
+(* take the entry [last x] in the environment because it is an accumulation *)
+and set_for_out env_eq { desc = { for_name }; loc } s =
+  let* v =
+    find_last_opt for_name env_eq |>
+      Opt.to_result ~none:{ kind = Eundefined_ident(for_name); loc } in
+  match s with
+  | Slist [Sempty; _] -> return s
+  | Slist [Slist [Sopt _; s_init]; s_default] ->
+     (* store the current value of [var_name] into the state *)
+     return (Slist [Slist [Sopt(Some(v)); s_init]; s_default])
+  | Slist [_; s_default] ->
+     (* store the current value of [var_name] into the state *)
+     return (Slist [Sval(v); s_default])
+  | _ ->
+     error { kind = Estate; loc }
 
 (* Evaluation of the result of a function *)
 and sresult genv env { r_desc; r_loc } s =
@@ -1693,6 +1735,7 @@ and sblock_with_reset genv env b_eq s_eq r =
       return s_eq in
   sblock genv env b_eq s_eq
 
+(* [v] is the returned value for [var_name] *)
 and svardec genv env acc
   { var_name; var_init; var_default; var_loc; var_is_last } s v =
   match s with
@@ -1700,20 +1743,12 @@ and svardec genv env acc
      let* default, s_default = sexp_opt genv env var_default s_default in
      let* last, s_init =
        match var_init, s_init with
-       | None, se ->
-          if var_is_last then
-            match se with
-            | Sval(v) -> return (Some(v), se)
-            | _ -> error { kind = Estate; loc = var_loc }
-          else return (None, se)
-       | Some(e), Slist [Sopt(None); se] ->
-          (* first instant. *)
-          let* ve, se = sexp genv env e se in
-          return (Some(ve), Slist [Sopt(None); se])
-       | _, Slist [Sopt(Some(v)); _] ->
-          (* return the stored value *)
-          return (Some(v), s_init)
-       | _ -> error { kind = Estate; loc = var_loc } in
+       | None, Sval(v) ->
+         if var_is_last then
+         (* [x] is a state variable but it is not initialized *)
+         return (Some(v), s_init) (* this value is nil at the first instant *)
+         else error { kind = Estate; loc = var_loc }
+       | _ -> sexp_init_opt var_loc genv env var_init s_init in
      let entry = { cur = v; last = last; default = default } in
      return (Env.add var_name entry acc, Slist [s_init; s_default])
   | _ ->
