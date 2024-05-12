@@ -12,6 +12,7 @@ let main_1 () returns (o)
   do o = scalar_product_1(3)(v1, v2)
   and assert (o = scalar_product_2(v1, v2)) done
 
+(* test of transposition *)
 let sum_vectors_1(x, y) returns (z)
   forward (xi in x, yi in y) returns (zi out z) 
     do zi = xi + yi done

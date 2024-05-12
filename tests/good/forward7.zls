@@ -1,32 +1,38 @@
-let sum1(n)(x) returns (o)
-  forward(n) returns (o init 100) do
-    forward (n) (xi in x) returns (o init last o)
+let sum1 n w x returns (o)
+  forward(n) returns (o) do
+    forward resume (n) (xi in x) returns (o init w)
       do o = last o + xi done
     done
 
-let sum2(n)(x) returns (o)
+(* we test that the initialization for o is equivalent *)
+(* to have an initial delay inside the body of the loop *)
+let sum2 n w x returns (o)
   forward(n) (xi in x) returns (o) do
-    forward resume (n) (xi in x) returns (o init 100)
-      do o = last o + xi done
+    forward resume (n) (xi in x) returns (o)
+      do o = (w fby o) + xi done
     done
  
 let main () returns (o1)
-  let x = [| 1; 1 |] in
-  do o1 = sum2(2)(x) done
+  let x = [| 1; 1; 1; 1|] in
+  do o1 = sum1 4 100 x done
 
 let main2 () returns (o1, o2)
-  let x = [| 1; 1 |] in
-  do o1 = sum1(2)(x)  and o2 = sum2(2)(x) (* and assert (o1 = o2) *) done
+  let x = [| 1; 1; 1; 1 |] in
+  do o1 = sum1 4 100 x and o2 = sum2 4 100 x and assert (o1 = o2) done
 
-let node f() returns (o)
+(* two forms of loop - equation versus expression *)
+let f() returns (o)
  forward(2) returns (o)
-  do forward resume (5) returns (o init (0))
-    do o = last o + 1 done
-  done 
+   do forward resume (5) returns (o init (0))
+      do o = last o + 1 done
+   done 
 
 
-let node g() returns (o)
+let g() returns (o)
  o = forward(4) returns (o)
        do o = forward resume (5) returns (o init 0)
                 do o = last o + 1 done
        done 
+
+let main3 () returns (o1, o2)
+  do o1 = f() and o2 = g() and assert (o1 = o2) done

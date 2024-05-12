@@ -18,11 +18,11 @@ let make3(n) =
      local i init 0 do o = last i and i = last i + 1 done
 
 let node main() returns (s)
-  let o = [| 1; 2 |] in
+  let o = [| 1; 2; 3; 4 |] in
   do s = sum(o) done
 
 let node main1() returns ()
-  assert (f() = sum(run (make1(10)) ()))
+  assert (f() = sum(run (make1(10))()))
 
 let node main2() returns (s1, s2, s3)
   let o = [| 1; 2; 3; 4 |] in
