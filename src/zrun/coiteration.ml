@@ -55,9 +55,53 @@ open Primitives
 open Match
 open Debug
 
+(* [let+ x = e in e'] returns [bot] if [e] returns bot; *)
+(* nil if e returns nil; [e'] otherwise *)
+let (let+) v f =
+  match v with
+  | Vbot -> return Vbot
+  | Vnil -> return Vnil
+  | Value(v) -> f v
+
+let (and+) v1 v2 =
+  match v1, v2 with
+  | (Vbot, _) | (_, Vbot) -> Vbot
+  | (Vnil, _) | (_, Vnil) -> Vnil
+  | Value(v1), Value(v2) -> Value(v1, v2)
+
+(* [let*+ x = e in e'] composes [let*] and [let+] *)
+let (let*+) v f =
+  let* v = v in
+  let+ v = v in
+  f v
+
 (* evaluation functions *)
-let (let+) = Combinatorial.(let+)
-let (and+) = Combinatorial.(and+)
+(* merge two environments provided they do not overlap *)
+let merge loc env1 env2 =
+  let s = Env.to_seq env1 in
+  seqfold
+    (fun acc (x, entry) ->
+      if Env.mem x env2 then error { kind = Emerge_env; loc = loc }
+      else return (Env.add x entry acc))
+    env2 s
+
+(* check assertion *)
+let check_assertion loc ve ret =
+  (* when ve is not bot/nil it must be true *)
+  match ve with
+  | Vnil | Vbot -> return ret
+  | Value(v) ->
+     let* v = is_bool v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
+     (* stop when [no_assert = true] *)
+     if !no_assert || v then return ret
+     else error { kind = Eassert_failure; loc = loc }
+
+(* check that a value is an integer *)
+let is_int loc v =
+  let* v = Primitives.pvalue v |>
+             Opt.to_result ~none: { kind = Etype; loc } in
+  (* and an integer value *)
+  Primitives.is_int v |> Opt.to_result ~none: { kind = Etype; loc}
 
 (* [reset init step genv env body s r] resets [step genv env body] *)
 (* when [r] is true *)
@@ -190,6 +234,16 @@ let for_env_out missing env_list acc_env loc for_out =
          return (Env.add x { cur = v; last = None; default = None } acc))
     Env.empty for_out
 
+(* value of an immediate constant *)
+let immediate v =
+  match v with
+  | Eint(v) -> Vint(v)
+  | Ebool(b) -> Vbool(b)
+  | Evoid -> Vvoid
+  | Efloat(f) -> Vfloat(f)
+  | Echar(c) -> Vchar(c)
+  | Estring(s) -> Vstring(s)
+
 (* Present handler *)
 let ipresent_handler is_fun iscondpat ibody genv env { p_cond; p_body } =
   let* sc = iscondpat is_fun genv env p_cond in
@@ -246,7 +300,7 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
         (* synchronous register initialized with a static value *)
         if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
         else let* s = iexp is_fun genv env e  in
-          return (Slist [Sval(Value (Combinatorial.immediate v)); s])
+          return (Slist [Sval(Value (immediate v)); s])
      | Efby, [e1; e2] ->
         if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
         else let* s1 = iexp is_fun genv env e1 in
@@ -395,7 +449,7 @@ and ifor_kind genv env for_size for_kind s_body =
      (* [e] must be a static expression *)
      let* v = vsexp genv env e in
      (* and an integer value *)
-     let* v = Combinatorial.is_int e_loc v in
+     let* v = is_int e_loc v in
      let s_size = Sopt(Some(Value(Vint(v)))) in
      let s_body = ialloc_foreach_loop v for_kind s_body in
      return (s_size, s_body)
@@ -418,7 +472,7 @@ and ifor_input is_fun genv env { desc; loc } =
        | Some(e) ->
           (* [by] must be static and an integer *)
           let* v = vsexp genv env e in
-          let* v = Combinatorial.is_int e.e_loc v in
+          let* v = is_int e.e_loc v in
           return (Sval(Value(Vint(v)))) in
      return (Slist [se; se_opt])
   | Eindex { e_left; e_right } ->
@@ -660,7 +714,7 @@ and sexp genv env { e_desc; e_loc } s =
   | _, Sbot -> return (Vbot, s) (* Voir remarque PE-Dagand *)
   | _, Snil -> return (Vnil, s)
   | Econst(v), Sempty ->
-     return (Value (Combinatorial.immediate v), s)
+     return (Value (immediate v), s)
   | Econstr0 { lname }, Sempty ->
      return (Value (Vconstr0(lname)), s)
   | Elocal x, Sempty ->
@@ -830,7 +884,7 @@ and sexp genv env { e_desc; e_loc } s =
      let* v, s = sexp genv env arg s in
      let* v =
        let+ v = v in
-       let* v = Combinatorial.record_access { label; arg = v } |>
+       let* v = Records.record_access { label; arg = v } |>
                   Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
        return (Value(v)) in
      return (v, s)
@@ -862,7 +916,7 @@ and sexp genv env { e_desc; e_loc } s =
          get_record v |> Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
        let+ ext_label_arg_list = Primitives.slist ext_label_arg_list in
        let* r =
-         Combinatorial.record_with label_arg_list ext_label_arg_list |>
+         Records.record_with label_arg_list ext_label_arg_list |>
            Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
        return (Value(Vrecord(r))) in
      return (v, Slist(s :: s_list))
@@ -941,7 +995,7 @@ and sexp genv env { e_desc; e_loc } s =
      return (v_body, Slist [s_body; s_res])
   | Eassert(e_body), s ->
      let* v, s = sexp genv env e_body s in
-     let* r = Combinatorial.check_assertion e_loc v void in
+     let* r = check_assertion e_loc v void in
      return (r, s)
   | Eforloop ({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist (Sopt(Some(Value(Vint(size)))) as sv ::
@@ -1421,7 +1475,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQand(eq_list), Slist(s_list) ->
      let seq genv env acc eq s =
        let* env_eq, s = seq genv env eq s in
-       let* acc = Combinatorial.merge eq_loc env_eq acc in
+       let* acc = merge eq_loc env_eq acc in
        return (acc, s) in
      let* env_eq, s_list =
        mapfold2 { kind = Estate; loc = eq_loc }
@@ -1514,7 +1568,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQempty, s -> return (Env.empty, s)
   | EQassert(e), s ->
      let* ve, s = sexp genv env e s in
-     let* r = Combinatorial.check_assertion eq_loc ve Env.empty in
+     let* r = check_assertion eq_loc ve Env.empty in
      return (r, s)
   | EQforloop({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist ((Sopt(Some(Value(Vint(size)))) as sv) ::
@@ -1936,7 +1990,7 @@ and sscondpat
   | Econdand(sc1, sc2), Slist [s1; s2] ->
      let* (v1, env_sc1), s1 = sscondpat genv env sc1 s1 in
      let* (v2, env_sc2), s2 = sscondpat genv env sc2 s2 in
-     let* env_sc = Combinatorial.merge loc env_sc1 env_sc2 in
+     let* env_sc = merge loc env_sc1 env_sc2 in
      let s = Slist [s1; s2] in
      (match v1, v2 with
       | (Vbot, _) | (_, Vbot) -> return ((Vbot, Env.empty), s)
@@ -1951,7 +2005,7 @@ and sscondpat
   | Econdor(sc1, sc2), Slist [s1; s2] ->
      let* (v1, env_sc1), s1 = sscondpat genv env sc1 s1 in
      let* (v2, env_sc2), s2 = sscondpat genv env sc2 s2 in
-     let* env_sc = Combinatorial.merge loc env_sc1 env_sc2 in
+     let* env_sc = merge loc env_sc1 env_sc2 in
      (match v1, v2 with
       | (Vbot, _) | (_, Vbot) -> return ((Vbot, Env.empty), s)
       | (Vnil, _) | (_, Vnil) -> return ((Vnil, Env.empty), s)
