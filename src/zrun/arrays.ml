@@ -227,7 +227,7 @@ let flatten loc v =
   let* n_i, m_j = dim_dim loc v in
   return
     (Value(Varray (Vmap { m_length = n_i * m_j;
-                          m_u = fun i -> let q = i / n_i in
+                          m_u = fun i -> let q = i / m_j in
                                          let r = i mod m_j in
                                          get_get loc v q r })))
 
@@ -237,3 +237,5 @@ let reverse loc v =
   let+ v = v in
   let* n = dim loc v in
   return (Value(Varray(Vmap { m_length = n; m_u = fun i -> geti loc v (n-1-i) })))
+
+
