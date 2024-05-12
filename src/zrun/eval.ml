@@ -13,7 +13,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* the main *)
+(* the main functions *)
 open Misc
 open Location
 open Monad
