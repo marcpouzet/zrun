@@ -281,7 +281,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %right PREFIX
 %right PRE TEST UP
 %left INIT DEFAULT
-%left TRANSPOSE
+%left TRANSPOSE FLATTEN REVERSE
 %left DOT
 
 
@@ -966,7 +966,7 @@ simple_expression_desc:
   | e1 = simple_expression DOT LPAREN e2 = expression RPAREN
       { Eop(Earray(Eget), [e1; e2]) }
   | e = simple_expression DOT
-      LPAREN e1 = simple_expression DOTDOT e2 = simple_expression RPAREN
+      LPAREN e1 = expression DOTDOT e2 = expression RPAREN
       { Eop(Earray(Eslice), [e; e1; e2]) }
 
 ;
@@ -1093,9 +1093,9 @@ expression_desc:
       { Eop(Earray(Econcat), [e1; e2]) }
   | e = expression TRANSPOSE
       { Eop(Earray(Etranspose), [e]) }
-  | e = simple_expression FLATTEN
+  | e = expression FLATTEN
       { Eop(Earray(Eflatten), [e]) }
-  | e = simple_expression REVERSE
+  | e = expression REVERSE
       { Eop(Earray(Ereverse), [e]) }
 ;
 
@@ -1146,10 +1146,7 @@ forward_loop_exp:
 
 /* Loops for equations */
 foreach_loop_eq:
-  | s_opt = optional_size_expression i_opt = optional(index)
-    li = empty(input_list) f = block(equation_empty_and_list)
-    { (s_opt, i_opt, li, { for_out = []; for_block = f }) }
-  | s_opt = optional_size_expression i_opt = optional(index)
+  s_opt = optional_size_expression i_opt = optional(index)
     li = empty(input_list) RETURNS 
     lo = output_list f = block(equation_empty_and_list)
     { (s_opt, i_opt, li, { for_out = lo; for_block = f }) }
@@ -1157,15 +1154,10 @@ foreach_loop_eq:
 
 forward_loop_eq:
   | s_opt = optional_size_expression i_opt = optional(index)
-    li = empty(input_list)
-    f = block(equation_empty_and_list)
-    o_opt = optional(loop_exit_condition)
-    { (s_opt, i_opt, li, o_opt, { for_out = []; for_block = f }) }
-  | s_opt = optional_size_expression i_opt = optional(index)
     li = empty(input_list) RETURNS 
     lo = output_list 
     f = block(equation_empty_and_list)
-    o_opt = optional(loop_exit_condition) 
+    o_opt = optional(loop_exit_condition)
     { (s_opt, i_opt, li, o_opt, { for_out = lo; for_block = f }) }
 ;
 
