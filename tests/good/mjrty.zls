@@ -29,9 +29,7 @@ let count_votes (x, a) returns (n)
            s = if ai = x then last s + 1 else last s
       done
 
-let nb_votes = 10
-
-let node main(votes) returns (candidate, has_majority)
+let main(nb_votes, votes) returns (candidate, has_majority)
   do
     candidate = forward(vi in votes) returns (c) do c = vote(vi) done
   and
@@ -50,8 +48,9 @@ let node vote(x) returns (m)
       until (c = 0) continue NoCandidate
   end
   
+let nb_votes = 10
 
 let node main () returns (o)
   let votes = [|3;2;3;1;3;2;3;1;3;3|] in
-  do o = main(votes) done
+  do o = main(nb_votes, votes) done
 
