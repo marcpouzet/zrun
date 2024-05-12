@@ -106,7 +106,11 @@ let vec_vec <<n>> (u,v) = (a)
  *)
 
 let node vec_vec(u, v) returns (a)
-  forward ui in u, vi in v do a = last a +. ui *. vi done
+  forward ui in u, vi in v returns (a init 0.0)
+    do a = last a +. ui *. vi done
+
+let node main() returns (a)
+  a = vec_vec([|0.1;0.1;0.1;0.1|], [|0.1;0.1;0.1;0.1|])
 
 (*
 // Version "optimisée" et renversée: on sait vérifier les accès: juste quantif existentielle
