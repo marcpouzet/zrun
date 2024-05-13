@@ -577,7 +577,7 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
      let* s_input_list = map (ifor_input is_fun genv env) for_input in
      let* so_list = 
        map (ifor_output (is_fun && for_resume) for_resume genv env) for_out in
-     let* s_body = iblock for_resume genv env for_block in
+     let* s_body = iblock (is_fun && for_resume) genv env for_block in
      let* s_size, s_body =
        ifor_kind genv env for_size for_kind s_body in
      return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
@@ -1159,6 +1159,13 @@ and sforloop_exp
                  if for_resume then s_for_body_new else s_for_body in
                return (missing, env_list, acc_env, s_for_body)
             | _ -> error { kind = Estate; loc } in
+          (* store the next last value for [returns] - only necessary *)
+          (* when [resume = true] *)
+          let* sr_list = 
+            if for_resume then
+              map2 { kind = Estate; loc } 
+                (set_forexp_out acc_env) returns sr_list
+            else return sr_list in
           (* return the result of the for loop *)
           let* v = for_matching_out missing env_list acc_env returns in
           return (v, s_for_body, sr_list) in
@@ -1715,7 +1722,7 @@ and sforloop_eq
      (* when [resume = true] *)
      let* so_list = 
        if for_resume then
-         map2 { kind = Estate; loc } (set_for_out acc_env) for_out so_list
+         map2 { kind = Estate; loc } (set_foreq_out acc_env) for_out so_list
        else return so_list in
      let* env =
        for_env_out missing env_list acc_env loc for_out in
@@ -1725,7 +1732,7 @@ and sforloop_eq
 (* this function assumes that the forloop is resumed *)
 (* the state is organised in [s_init; s_default] *)
 (* take the entry [last x] in the environment because it is an accumulation *)
-and set_for_out env_eq { desc = { for_name }; loc } s =
+and set_foreq_out env_eq { desc = { for_name }; loc } s =
   let* v =
     find_last_opt for_name env_eq |>
       Opt.to_result ~none:{ kind = Eundefined_ident(for_name); loc } in
@@ -1739,6 +1746,10 @@ and set_for_out env_eq { desc = { for_name }; loc } s =
      return (Slist [Sval(v); s_default])
   | _ ->
      error { kind = Estate; loc }
+
+(* the same - for the second form of for loops *)
+and set_forexp_out env_eq { desc = { for_vardec } } s =
+  set_vardec env_eq for_vardec s
 
 (* Evaluation of the result of a function *)
 and sresult genv env { r_desc; r_loc } s =
