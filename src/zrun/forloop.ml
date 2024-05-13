@@ -80,7 +80,7 @@ let geti_env loc i_env i =
          return (Env.add x (entry vi) acc))
     Env.empty s_env
 
-(* [x_to_last_x local_env acc_env = acc_env'] where *)
+(* [x_to_last_x local_env acc_env] returns [acc_env'] where *)
 (* [Dom(acc_env) = Dom(acc_env')] and *)
 (* [acc_env'(x) = { cur = bot; last = v }] if [local_env(x) = v] *)
 let x_to_lastx local_env acc_env =
@@ -173,9 +173,11 @@ let foreach_i : (int -> 's -> ('r * 's, 'error) Result.t) -> 's list
 let foreach_with_accumulation_i f acc_env0 s_list =
   let rec for_rec i acc_env s_list =
     match s_list with
-    | [] -> return ([], acc_env, [])
+    | [] -> 
+       (* let acc_env = lastx_to_x acc_env in *) return ([], acc_env, [])
     | s :: s_list ->
        let* f_env, acc_env, s = f i acc_env s in
+       (* let acc_env = x_to_lastx acc_env in *)
        let* f_env_list, acc_env, s_list = for_rec (i+1) acc_env s_list in
        return (f_env :: f_env_list, acc_env, s :: s_list) in
   for_rec 0 acc_env0 s_list
@@ -196,10 +198,12 @@ let forward_i_without_exit_condition:
   fun n f acc_env0 s ->
   let rec for_rec i acc_env s =
     Debug.print_ienv "Debut iteration" acc_env;
-    if i = n then return ([], acc_env, s)
+    if i = n then 
+      (* let acc_env = lastx_to_x acc_env in *) return ([], acc_env, s)
     else
       let* f_env, acc_env, s = f i acc_env s in
       Debug.print_ienv "Env iteration" f_env;
+      (* let acc_env = x_to_lastx f_env acc_env in *)
       let* env_list, acc_env, s = for_rec (i+1) acc_env s in
       return (f_env :: env_list, acc_env, s) in
   for_rec 0 acc_env0 s
@@ -210,7 +214,8 @@ let forward_i_with_while_condition loc n write f cond acc_env0 s =
   let rec for_rec : int -> ('c star ientry Env.t as 'a) -> 'b state ->
                     ('a list * 'a * 'b state, 'e) Result.t =
     fun i acc_env s ->
-    if i = n then return ([], acc_env, s)
+    if i = n then 
+      (* let acc_env = lastx_to_x acc_env in *) return ([], acc_env, s)
     else
       let* v = cond i acc_env in
       match v with
@@ -223,6 +228,7 @@ let forward_i_with_while_condition loc n write f cond acc_env0 s =
              Opt.to_result ~none:{ kind = Etype; loc = loc } (is_bool v) in
            if b then
              let* f_env, acc_env, s = f i acc_env s in
+             (* let acc_env = x_to_lastx f_env acc_env in *)
              let* env_list, acc_env, s = for_rec (i+1) acc_env s in
              return (f_env :: env_list, acc_env, s)
            else return ([], acc_env, s) in
@@ -238,7 +244,8 @@ let forward_i_with_unless_condition loc n write f cond acc_env0 s =
   let rec for_rec : int -> ('c star ientry Env.t as 'a) -> 'b state ->
                     ('a list * 'a * 'b state, 'e) Result.t =
     fun i acc_env s ->
-    if i = n then return ([], acc_env, s)
+    if i = n then 
+      (* let acc_env = lastx_to_x acc_env in *) return ([], acc_env, s)
     else
       let* v = cond i acc_env in
       match v with
@@ -251,6 +258,7 @@ let forward_i_with_unless_condition loc n write f cond acc_env0 s =
              Opt.to_result ~none:{ kind = Etype; loc = loc } (is_bool v) in
            if Stdlib.not b then
              let* f_env, acc_env, s = f i acc_env s in
+             (* let acc_env = x_to_lastx f_env acc_env in *)
              let* env_list, acc_env, s = for_rec (i+1) acc_env s in
              return (f_env :: env_list, acc_env, s)
            else return ([], acc_env, s) in
@@ -260,9 +268,11 @@ let forward_i_with_until_condition loc n write f cond acc_env0 s =
   let rec for_rec : int -> ('c star ientry Env.t as 'a) -> 'b state ->
                     ('a list * 'a * 'b state, 'e) Result.t =
     fun i acc_env s ->
-    if i = n then return ([], acc_env, s)
+    if i = n then 
+      (* let acc_env = lastx_to_x acc_env in *) return ([], acc_env, s)
     else
       let* f_env, acc_env, s = f i acc_env s in
+      (* let acc_env = x_to_lastx f_env acc_env in *)
       let* v = cond i acc_env in
       match v with
       | Vbot ->
