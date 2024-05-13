@@ -25,6 +25,18 @@ open Find
 open Primitives
 open Match
 
+let (let+) v f =
+  match v with
+  | Vbot -> return Vbot
+  | Vnil -> return Vnil
+  | Value(v) -> f v
+
+let (and+) v1 v2 =
+  match v1, v2 with
+  | (Vbot, _) | (_, Vbot) -> Vbot
+  | (Vnil, _) | (_, Vnil) -> Vnil
+  | Value(v1), Value(v2) -> Value(v1, v2)
+
 (* index in a loop body *)
 type index =
   (* [xi in e by e'] means that in the i-th iteration, xi = e.(e' * i) *)
@@ -68,19 +80,26 @@ let geti_env loc i_env i =
          return (Env.add x (entry vi) acc))
     Env.empty s_env
 
-(* [x_to_last_x env acc_env = acc_env'] such that for every [x] *)
-(* in Dom(acc_env), replace entry [x\...] by [x\{ last = v }] *)
-(* if env(x) = { cur = v } *)
-let x_to_last_x local_env acc_env =
+(* [x_to_last_x local_env acc_env = acc_env'] where *)
+(* [Dom(acc_env) = Dom(acc_env')] and *)
+(* [acc_env'(x) = { cur = bot; last = v }] if [local_env(x) = v] *)
+let x_to_lastx local_env acc_env =
   Debug.print_ienv "x_to_last_x: local_env:" local_env;
   Debug.print_ienv "x_to_last_x (before): acc_env:" acc_env;
   let acc_env =
     Env.mapi
-    (fun x ({ default }) ->
+    (fun x entry ->
       let v = Find.find_value_opt x local_env in
-      { cur = Vbot; last = v; default })
+      { entry with cur = Vbot; last = v })
     acc_env in
   Debug.print_ienv "x_to_last_x (after): acc_env" acc_env; acc_env
+
+(* copy [last x] into [x] *)
+let lastx_to_x acc_env =
+  Env.mapi
+    (fun x ({ last } as entry) -> 
+       let v = match last with | None -> Vbot | Some(v) -> v in
+       { entry with last = None; cur = v }) acc_env
 
 (* given [x] and [env_list], returns array [v] st [v.(i) = env_list.(i).(x)] *)
 (* when [missing <> 0] complete with a default element *)
@@ -117,18 +136,6 @@ let array_of missing loc (var_name, var_init, var_default) acc_env env_list =
        return (Primitives.lift
                  (fun v -> Varray(Vflat(Array.of_list (v @ d_list)))) v_list)
 
-let (let+) v f =
-  match v with
-  | Vbot -> return Vbot
-  | Vnil -> return Vnil
-  | Value(v) -> f v
-
-let (and+) v1 v2 =
-  match v1, v2 with
-  | (Vbot, _) | (_, Vbot) -> Vbot
-  | (Vnil, _) | (_, Vnil) -> Vnil
-  | Value(v1), Value(v2) -> Value(v1, v2)
-
 (* check that [v] is indeed an array of length [for_size] *)
 let input loc v by =
   let+ v = v in
@@ -163,15 +170,15 @@ let foreach_i : (int -> 's -> ('r * 's, 'error) Result.t) -> 's list
 
 (* the same parallel loop except that [f] takes also an accumulator *)
 (* that is passed from iteration [i] to iteration [i+1] *)
-let foreach_with_accumulation_i f acc_0 s_list =
-  let rec for_rec i acc s_list =
+let foreach_with_accumulation_i f acc_env0 s_list =
+  let rec for_rec i acc_env s_list =
     match s_list with
-    | [] -> return ([], acc, [])
+    | [] -> return ([], acc_env, [])
     | s :: s_list ->
-       let* x, acc, s = f i acc s in
-       let* x_list, acc, s_list = for_rec (i+1) acc s_list in
-       return (x :: x_list, acc, s :: s_list) in
-  for_rec 0 acc_0 s_list
+       let* f_env, acc_env, s = f i acc_env s in
+       let* f_env_list, acc_env, s_list = for_rec (i+1) acc_env s_list in
+       return (f_env :: f_env_list, acc_env, s :: s_list) in
+  for_rec 0 acc_env0 s_list
 
 (* instantaneous for loop; take a single state and iterate on it *)
 let forward_i n default f s =
@@ -287,14 +294,16 @@ let foreach loc sbody env i_env s_list =
   return
     (Primitives.lift (fun v -> Varray(Vflat(Array.of_list v))) ve_list, s_list)
 
+
+(* One step of the evaluation of the body of a loop *)
 let step loc sbody env i_env i acc_env s =
   Debug.print_ienv "Forward: Env:" env;
   Debug.print_ienv "Forward: Env acc (before):" acc_env;
   let* env_0 = geti_env loc i_env i in
   let env = Env.append env_0 (Env.append acc_env env) in
   let* local_env, s = sbody env s in
-  (* every entry [x\v] becomes [x \ { cur = bot; last = v }] *)
-  let acc_env = x_to_last_x local_env acc_env in
+  (* every entry [x\v] from [acc_env] becomes [x \ { cur = bot; last = v }] *)
+  let acc_env = x_to_lastx local_env acc_env in
   Debug.print_ienv "Forward: Env acc (after):" acc_env;
   return (local_env, acc_env, s)
 
