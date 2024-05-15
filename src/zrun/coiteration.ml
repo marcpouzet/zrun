@@ -1748,8 +1748,20 @@ and set_foreq_out env_eq { desc = { for_name }; loc } s =
      error { kind = Estate; loc }
 
 (* the same - for the second form of for loops *)
-and set_forexp_out env_eq { desc = { for_vardec } } s =
-  set_vardec env_eq for_vardec s
+and set_forexp_out env_eq { desc = { for_vardec = { var_name } }; loc } s =
+   let* v =
+    find_last_opt var_name env_eq |>
+      Opt.to_result ~none:{ kind = Eundefined_ident(var_name); loc } in
+  match s with
+  | Slist [Sempty; _] -> return s
+  | Slist [Slist [Sopt _; s_init]; s_default] ->
+     (* store the current value of [var_name] into the state *)
+     return (Slist [Slist [Sopt(Some(v)); s_init]; s_default])
+  | Slist [_; s_default] ->
+     (* store the current value of [var_name] into the state *)
+     return (Slist [Sval(v); s_default])
+  | _ ->
+     error { kind = Estate; loc }
 
 (* Evaluation of the result of a function *)
 and sresult genv env { r_desc; r_loc } s =
