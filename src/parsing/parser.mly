@@ -611,11 +611,11 @@ equation_desc:
   | DER i = ide EQUAL e = seq_expression opt = optional(init_expression)
     RESET p = present_handlers(expression) %prec prec_der_with_reset
     { EQder(i, e, opt, p) }
-  | FOREACH f = foreach_loop_eq DONE
+  | FOREACH f = foreach_loop_eq
     { EQforloop (foreach_loop false f) }
-  | FORWARD f = forward_loop_eq DONE
+  | FORWARD f = forward_loop_eq
     { EQforloop (forward_loop false f) }
-  | FORWARD RESUME f = forward_loop_eq DONE
+  | FORWARD RESUME f = forward_loop_eq
     { EQforloop (forward_loop true f) }
 ;
 
@@ -1080,11 +1080,11 @@ expression_desc:
     { Eop(Ehorizon, [e]) }
   | ASSERT e = simple_expression
     { Eassert(e) }
-  | FOREACH f = foreach_loop_exp DONE
+  | FOREACH f = foreach_loop_exp
     { Eforloop (foreach_loop false f) }
-  | FORWARD f = forward_loop_exp DONE
+  | FORWARD f = forward_loop_exp
     { Eforloop (forward_loop false f) }
-  | FORWARD RESUME f = forward_loop_exp DONE
+  | FORWARD RESUME f = forward_loop_exp
     { Eforloop (forward_loop true f) }
   | e1 = simple_expression DOT LPAREN e2 = expression RPAREN
     DEFAULT e3 = expression
@@ -1113,6 +1113,7 @@ foreach_loop_exp:
     li = empty(input_list)
     DO e = expression
     d_opt = optional(default_expression)
+    DONE
     { (s_opt, i_opt, li, Forexp { exp = e; default = d_opt }) }
   | /* foreach (size) [i] (xi in ei,...) returns (...) do
        eq done */
@@ -1121,6 +1122,7 @@ foreach_loop_exp:
     li = empty(input_list)
     RETURNS p = for_return
     b = block(equation_empty_and_list)
+    DONE
     { (s_opt, i_opt, li, Forreturns { returns = p; body = b }) }
 ;
 
@@ -1131,7 +1133,8 @@ forward_loop_exp:
     li = empty(input_list)
     DO e = expression
     d_opt = optional(default_expression)
-    o_opt = optional(loop_exit_condition) 
+    o_opt = optional(loop_exit_condition)
+    DONE
     { (s_opt, i_opt, li, o_opt, Forexp { exp = e; default = d_opt }) }
   | /* forward (size) [i] (xi in ei,...) returns (...) do
        eq [while/unless/until e] done */
@@ -1141,6 +1144,7 @@ forward_loop_exp:
     RETURNS p = for_return
     b = block(equation_empty_and_list)
     o_opt = optional(loop_exit_condition)
+    DONE
     { (s_opt, i_opt, li, o_opt, Forreturns { returns = p; body = b }) }
 ;
 
@@ -1149,6 +1153,7 @@ foreach_loop_eq:
   s_opt = optional_size_expression i_opt = optional(index)
     li = empty(input_list) RETURNS 
     lo = output_list f = block(equation_empty_and_list)
+    DONE
     { (s_opt, i_opt, li, { for_out = lo; for_block = f }) }
 ;
 
@@ -1158,6 +1163,7 @@ forward_loop_eq:
     lo = output_list 
     f = block(equation_empty_and_list)
     o_opt = optional(loop_exit_condition)
+    DONE
     { (s_opt, i_opt, li, o_opt, { for_out = lo; for_block = f }) }
 ;
 
