@@ -45,6 +45,8 @@ type kind =
   (* the loop has [size] iterations but the index is of a different size *)
   | Eloop_no_iteration : kind
   (* the loop should iterate at least once; or give a default value *)
+  | Eloop_cannot_determine_size : kind
+  (* the size is not given and there is no input *)
   | Earray_cannot_be_filled : { name: Ident.t;
                                 size : int;
                                 missing : int } -> kind
@@ -134,6 +136,10 @@ let message loc kind =
         or ensure there is at least one iteration.@.@]"
        output_location loc
   (* the loop should iterate at least once; or give a default value *)
+  | Eloop_cannot_determine_size ->
+    eprintf
+       "@[%aZrun: the number of iterations of the loop cannot be determined.@.@]"
+       output_location loc
   | Earray_cannot_be_filled { name; size; missing } ->
      eprintf
      "@[%aZrun: the result should be an array of size %d but %d elements are\

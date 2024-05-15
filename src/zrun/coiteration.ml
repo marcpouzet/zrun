@@ -446,7 +446,7 @@ and ifor_kind genv env for_size for_kind s_body =
   match for_size with
   | None -> return (Sopt(None), s_body)
   | Some({ e_loc } as e) ->
-     (* [e] must be a static expression *)
+     (* [e] must be a static (hence stateless) expression *)
      let* v = vsexp genv env e in
      (* and an integer value *)
      let* v = is_int e_loc v in
@@ -574,13 +574,17 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
      return se
   | EQforloop({ for_size; for_kind; for_input;
                 for_body = { for_out; for_block }; for_resume }) ->
-     let* s_input_list = map (ifor_input is_fun genv env) for_input in
-     let* so_list = 
-       map (ifor_output (is_fun && for_resume) for_resume genv env) for_out in
-     let* s_body = iblock (is_fun && for_resume) genv env for_block in
-     let* s_size, s_body =
-       ifor_kind genv env for_size for_kind s_body in
-     return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
+     (* if the size is not given there should be at least one input *)
+     match for_size, for_input with
+       | None, [] -> error { kind = Eloop_cannot_determine_size; loc = eq_loc }
+       | _ ->
+         let* s_input_list = map (ifor_input is_fun genv env) for_input in
+         let* so_list = 
+           map (ifor_output (is_fun && for_resume) for_resume genv env) for_out in
+         let* s_body = iblock (is_fun && for_resume) genv env for_block in
+         let* s_size, s_body =
+           ifor_kind genv env for_size for_kind s_body in
+         return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
 
 and iblock is_fun genv env { b_vars; b_body } =
   let* s_b_vars = map (ivardec is_fun true genv env) b_vars in
@@ -1604,7 +1608,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQforloop ({ for_kind; for_index;
                  for_input = input :: input_list; for_body; for_resume }),
     Slist (Sopt(None) :: Slist(s_for_block :: so_list) :: si :: si_list) ->
-    (* the size is not known *)
+    (* the size is not known. *)
     let* size_i_env, si =
        sfor_input_no_size genv env Env.empty input si in
     let* r, s_size, s_for_body, so_list, si, si_list =
