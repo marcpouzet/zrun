@@ -20,4 +20,3 @@ let node main2() returns (o1, o2)
   let v = [|[|1;2;3|];[|4;5;6|]|] in
   do o1 = run (f(2)(3))(v) and o2 = run (g(2)(3))(v) 
   and assert (o1 = o2) done
-
