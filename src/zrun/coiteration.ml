@@ -1580,6 +1580,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQforloop({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist ((Sopt(Some(Value(Vint(size)))) as sv) ::
              Slist(s_for_block :: so_list) :: si_list) ->
+     (* the size is known *)
      (* computes a local environment for variables introduced *)
      (* in the index list *)
      let i_env =
@@ -1669,8 +1670,7 @@ and sforloop_eq
      (* iteration index. *)
      let* acc_env, so_list =
        mapfold2 { kind = Estate; loc }
-         (sfor_out genv env)
-         Env.empty for_out so_list in
+         (sfor_out genv env) Env.empty for_out so_list in
      (* 2/ runs the body *)
      let* missing, env_list, acc_env, s_for_block =
        match for_kind, s_for_block with
