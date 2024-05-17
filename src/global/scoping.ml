@@ -369,11 +369,12 @@ let rec equation env_pat env { desc; loc } =
        let pat = pattern_translate env_pat pat in
        let e = expression env e in
        Ast.EQeq(pat, e)
-    | EQder(x, e, e0_opt, p_h_list) ->
-       Ast.EQder(name loc env x, expression env e,
-                   Util.optional_map (expression env) e0_opt,
-                   List.map
-                     (present_handler scondpat expression env) p_h_list)
+    | EQder(x, e, e_opt, p_h_list) ->
+       Ast.EQder { id = name loc env x; e = expression env e;
+                   e_opt = Util.optional_map (expression env) e_opt;
+                   handlers = 
+                     List.map
+                       (present_handler scondpat expression env) p_h_list }
     | EQinit(x, e) -> EQinit(name loc env x, expression env e)
     | EQemit(x, e_opt) ->
        EQemit(name loc env x, Util.optional_map (expression env) e_opt)

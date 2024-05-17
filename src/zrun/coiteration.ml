@@ -512,13 +512,13 @@ and ifor_exp is_fun is_resume genv env r =
 and ieq is_fun genv env { eq_desc; eq_loc  } =
   match eq_desc with
   | EQeq(_, e) -> iexp is_fun genv env e
-  | EQder(x, e, e0_opt, p_h_list) ->
+  | EQder { e; e_opt; handlers } ->
      (* [x becomes an input; x' an output] *)
      (* they are stored as a state { der = x'; pos = x } *)
      let* se = iexp is_fun genv env e in
-     let* s0 = iexp_opt is_fun genv env e0_opt in
+     let* s0 = iexp_opt is_fun genv env e_opt in
      let* sp_h_list =
-       map (ipresent_handler is_fun iscondpat iexp genv env) p_h_list in
+       map (ipresent_handler is_fun iscondpat iexp genv env) handlers in
      return
        (Slist
           (Scstate { pos = zero_float; der = zero_float } ::
@@ -1407,21 +1407,21 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
          Opt.to_result ~none:{ kind = Epattern_matching_failure;
                                loc = eq_loc } in
      return (env_p, s)
-  | EQder(x, e, e0_opt, p_h_list),
+  | EQder { id; e; e_opt; handlers },
     Slist (Scstate({ pos } as sc) :: s :: Sopt(x0_opt) :: s0 :: s_list) ->
      let* ({ last; default } as entry) =
-       Env.find_opt x env |>
-         Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
+       Env.find_opt id env |>
+         Opt.to_result ~none:{ kind = Eunbound_ident(id); loc = eq_loc } in
      (* compute the derivative (w.r.t time) of [x] *)
      let* der, s = sexp genv env e s in
      (* computes the initial position *)
      let* cx0, x0_opt, s0 =
-       match e0_opt with
+       match e_opt with
        | None ->
           (* [x] should have a default value *)
           let* x0 =
             Fix.default_value last default |>
-              Opt.to_result ~none:{ kind = Eno_default(x); loc = eq_loc } in
+              Opt.to_result ~none:{ kind = Eno_default(id); loc = eq_loc } in
           return (x0, x0_opt, s0)
        | Some(e0) ->
           match x0_opt with
@@ -1431,7 +1431,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
           | Some(x0) -> return (x0, x0_opt, s0) in
      let* cx_opt, s_h_list =
        spresent_handler_list
-         eq_loc sscondpat Vbot Vnil sexp genv env p_h_list s_list in
+         eq_loc sscondpat Vbot Vnil sexp genv env handlers s_list in
      let cur =
        match cx_opt with
        | None ->
@@ -1440,7 +1440,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        | Some(cx) ->
           (* otherwise the value returned by the handler *)
           cx in
-     return (Env.singleton x { entry with cur },
+     return (Env.singleton id { entry with cur },
              Slist (Scstate({ sc with der }) :: Sopt(x0_opt) :: s0 :: s_list))
   | EQinit(x, e), Slist [Sopt(None); se] ->
      (* first step *)

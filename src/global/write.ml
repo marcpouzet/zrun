@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -47,17 +47,17 @@ let rec equation ({ eq_desc } as eq)=
     | EQeq(pat, e) ->
        EQeq(pat, expression e),
        { Defnames.empty with dv = fv_pat S.empty pat }
-    | EQder(x, e, e0_opt, handlers) ->
-       let e0_opt, di =
-         match e0_opt with
+    | EQder { id; e; e_opt; handlers } ->
+       let e_opt, di =
+         match e_opt with
          | None -> None, S.empty
-         | Some(e) -> Some(expression e), S.singleton x in
+         | Some(e) -> Some(expression e), S.singleton id in
        let handlers =
          List.map
            (fun ({ p_body } as p) -> { p with p_body = expression p_body })
            handlers in
-       EQder(x, e, e0_opt, handlers),
-       { Defnames.empty with der = S.singleton x; di }
+       EQder { id; e; e_opt; handlers },
+       { Defnames.empty with der = S.singleton id; di }
     | EQinit(x, e) ->
        EQinit(x, expression e),
        { Defnames.empty with di = S.singleton x }

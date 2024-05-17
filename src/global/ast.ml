@@ -87,15 +87,15 @@ and array_operator =
   | Eget_with_default : array_operator
   (* [e.(e) default e] *)
   | Eslice : array_operator
-  (* [e.(e..e)] *)
+  (* [e.(e .. e)] *)
   | Eupdate : array_operator
   (* [| e with e <- e |] *)
   | Etranspose : array_operator
-  (* [transpose e] *)
+  (* [e.T] *)
   | Eflatten : array_operator
-  (* [flatten e] *)
+  (* [e.F] *)
   | Ereverse : array_operator
-  (* [reverse e] *)
+  (* [e.R] *)
 
 and is_inline = bool
 
@@ -261,7 +261,8 @@ and eq =
 and eq_desc =
   | EQeq : pattern * exp -> eq_desc  (* [p = e] *)
   | EQder :
-      Ident.t * exp * exp option * (scondpat, exp, exp) present_handler list
+      { id: Ident.t; e: exp; e_opt: exp option;
+        handlers: (scondpat, exp, exp) present_handler list }
       -> eq_desc  (* [der x = e [init e0] [reset z1 -> e1 | ...]] *)
   | EQinit : Ident.t * exp -> eq_desc  (* [init x = e] *)
   | EQemit : Ident.t * exp option -> eq_desc  (* [emit x [= e]] *)

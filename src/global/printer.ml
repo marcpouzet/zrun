@@ -401,16 +401,16 @@ and equation ff ({ eq_desc = desc } as eq) =
   match desc with
   | EQeq(p, e) ->
      fprintf ff "@[<hov 2>%a =@ %a@]" pattern p expression e
-  | EQder(n, e, e0_opt, []) ->
+  | EQder { id; e; e_opt; handlers = [] } ->
       fprintf ff "@[<hov 2>der %a =@ %a%a@]"
-        name n expression e
+        name id expression e
         (Util.optional_unit
-           (fun ff e -> fprintf ff " init %a " expression e)) e0_opt
-  | EQder(n, e, e0_opt, handlers) ->
+           (fun ff e -> fprintf ff " init %a " expression e)) e_opt
+  | EQder { id; e; e_opt; handlers } ->
      fprintf ff "@[<hov 2>der %a =@ %a %a@ @[<hov 2>reset@ @[%a@]@]@]"
-       name n expression e
+       name id expression e
        (Util.optional_unit
-          (fun ff e -> fprintf ff "init %a " expression e)) e0_opt
+          (fun ff e -> fprintf ff "init %a " expression e)) e_opt
        (print_list_l (present_handler (scondpat expression) expression) """""")
        handlers
   | EQinit(n, e) ->
