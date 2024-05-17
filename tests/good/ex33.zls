@@ -1,2 +1,2 @@
-let node f() returns o
-  do o = 1 and init o = 0 done
+let node f() returns (o init 42)
+  do init o = 0 and o = last o + 1 done
