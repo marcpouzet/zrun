@@ -386,8 +386,12 @@ type implementation = implementation_desc localized
 
 and implementation_desc =
   | Eopen : name -> implementation_desc
-  | Eletdecl :
-      { name: name; const: bool; e: exp } -> implementation_desc
+  (* let [rec] f1 = e1 and ... and fn = en *)
+  (* | Eletdecl1 :
+      { is_rec: is_rec;
+        const: bool;
+        defs: (name * exp) list } -> implementation_desc *)
+  | Eletdecl : { const: bool; name: name; e: exp } -> implementation_desc
   | Etypedecl :
       { name: name; ty_params: name list; size_params: name list;
         ty_decl: type_decl } -> implementation_desc
