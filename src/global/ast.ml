@@ -194,7 +194,7 @@ and exp_desc =
   | Elast : Ident.t -> exp_desc
   | Eop : operator * exp list -> exp_desc
   | Etuple : exp list -> exp_desc
-  | Eapp : exp * exp list -> exp_desc
+  | Eapp : { is_inline: is_inline; f: exp; arg_list: exp list } -> exp_desc
   | Elet : leq * exp -> exp_desc
   | Erecord_access : exp record -> exp_desc
   | Erecord : exp record list -> exp_desc

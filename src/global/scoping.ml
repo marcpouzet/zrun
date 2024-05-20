@@ -720,10 +720,10 @@ and expression env { desc; loc } =
        let leq, new_env = letin env leq in
        let e = expression new_env e in
        Ast.Elet(leq, e)
-    | Eapp(f, arg_list) ->
+    | Eapp(is_inline, f, arg_list) ->
        let f = expression env f in
        let arg_list = List.map (expression env) arg_list in
-       Ast.Eapp(f, arg_list)
+       Ast.Eapp { is_inline; f; arg_list }
     | Erecord_access(e, lname) ->
        let e = expression env e in
        Ast.Erecord_access { arg = e; label = longname lname }
