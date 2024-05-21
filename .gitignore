@@ -2,6 +2,7 @@
 *.bc
 *.run
 *.ok
+*.zlo
 *.output
 .merlin
 _build/
