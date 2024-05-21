@@ -43,11 +43,15 @@ type pvalue =
   | Vtuple : pvalue star list -> pvalue
   | Vstate0 : Ident.t -> pvalue
   | Vstate1 : Ident.t * pvalue list -> pvalue
+  | Varray : pvalue array -> pvalue
   | Vfun : (pvalue -> pvalue option) -> pvalue
   (* imported stateless functions; they must verify that *)
   (* f(atomic v) not= bot *)
   | Vclosure : pvalue closure -> pvalue
-  | Varray : pvalue array -> pvalue
+  (* a representation for mutually recursive functions *)
+  (* [f where rec f1 = ... and fk = ...] *)
+  (* | Vfix : { name : Ident.t; defs : pvalue closure Ident.Env.t } -> pvalue *)
+      
 
 and 'a array =
   | Vflat : 'a Array.t -> 'a array
@@ -60,6 +64,19 @@ and 'a array =
 and 'a map =
   { m_length : int; m_u : int -> 'a result }
 
+(*
+(* fun<s1>...<sk> e *)
+  | Vsfun : { param: Ident.t list; sbody: Ast.exp; genv: pvalue Genv.genv } -> pvalue
+  (* [f1<s1>... = e1 and fk<s1>... = ek] *)
+  | Vsfun : { name: Ident.t; defs: s
+  and { param: Ident.t list; sbody: Ast.exp; genv: pvalue Genv.genv }
+
+let rec f1<n1,...,nk> x1 ... xm = e
+   fr<s1,...,sk> e1 ... em
+
+   fix f1 [f1\...;fr\] rho
+*)
+                                          
 and 'a closure =
   { c_funexp : Ast.funexp;
     c_genv: 'a Genv.genv;

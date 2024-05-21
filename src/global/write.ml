@@ -219,8 +219,8 @@ and expression ({ e_desc } as e) =
     | Elet({ l_eq } as leq, e) ->
        let l_eq, _ = equation l_eq in
        Elet({ leq with l_eq }, expression e)
-    | Eapp(f, arg_list) ->
-       Eapp(expression f, List.map expression arg_list)
+    | Eapp { is_inline; f; arg_list } ->
+       Eapp { is_inline; f = expression f; arg_list = List.map expression arg_list }
     | Erecord_access({ label; arg }) ->
        Erecord_access({ label; arg = expression arg })
     | Erecord(le_list) ->

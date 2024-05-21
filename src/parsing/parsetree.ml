@@ -177,7 +177,7 @@ and exp_desc =
   | Elast : name -> exp_desc
   | Eop : operator * exp list -> exp_desc
   | Etuple : exp list -> exp_desc
-  | Eapp : exp *  exp list -> exp_desc
+  | Eapp : is_inline * exp *  exp list -> exp_desc
   | Elet : leq * exp -> exp_desc
   | Erecord_access : exp * longname -> exp_desc
   | Erecord : (longname * exp) list -> exp_desc

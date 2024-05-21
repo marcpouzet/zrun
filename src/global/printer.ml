@@ -258,9 +258,10 @@ let rec expression ff e =
     | Elast x -> fprintf ff "last %a" name x
     | Econstr0 { lname } -> longname ff lname
     | Econst c -> immediate ff c
-    | Eapp(e, e_list) ->
-       fprintf ff "@[(%a %a)@]"
-         expression e (print_list_r expression "" "" "") e_list
+    | Eapp { is_inline; f; arg_list } ->
+       let s = if is_inline then "inline " else "" in
+       fprintf ff "@[%s%a %a@]"
+         s expression f (print_list_r expression "" "" "") arg_list
     | Econstr1 { lname; arg_list } ->
        fprintf ff "@[%a%a@]"
          longname lname (print_list_r expression "(" "," ")") arg_list

@@ -194,7 +194,7 @@ and exp_desc =
   | Elast : Ident.t -> exp_desc
   | Eop : operator * exp list -> exp_desc
   | Etuple : exp list -> exp_desc
-  | Eapp : exp * exp list -> exp_desc
+  | Eapp : { is_inline: is_inline; f: exp; arg_list: exp list } -> exp_desc
   | Elet : leq * exp -> exp_desc
   | Erecord_access : exp record -> exp_desc
   | Erecord : exp record list -> exp_desc
@@ -386,8 +386,12 @@ type implementation = implementation_desc localized
 
 and implementation_desc =
   | Eopen : name -> implementation_desc
-  | Eletdecl :
-      { name: name; const: bool; e: exp } -> implementation_desc
+  (* let [rec] f1 = e1 and ... and fn = en *)
+  (* | Eletdecl1 :
+      { is_rec: is_rec;
+        const: bool;
+        defs: (name * exp) list } -> implementation_desc *)
+  | Eletdecl : { const: bool; name: name; e: exp } -> implementation_desc
   | Etypedecl :
       { name: name; ty_params: name list; size_params: name list;
         ty_decl: type_decl } -> implementation_desc

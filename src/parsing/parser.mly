@@ -25,9 +25,10 @@ let make desc start_pos end_pos =
 let make_name op start_pos end_pos =
   make (Evar(Name(op))) start_pos end_pos
 
-let unop op e start_pos end_pos = Eapp(make_name op start_pos end_pos, [e])
+let unop op e start_pos end_pos =
+  Eapp(false, make_name op start_pos end_pos, [e])
 let binop op e1 e2 start_pos end_pos =
-  Eapp(make_name op start_pos end_pos, [e1; e2])
+  Eapp(false, make_name op start_pos end_pos, [e1; e2])
 
 let unary_minus op e start_pos end_pos =
   match op, e.desc with
@@ -45,7 +46,8 @@ let list_name n = Modname { qual = Misc.name_of_stdlib_module; id = n }
 let nil_desc = Evar(list_name Misc.nil_name)
 
 let cons_desc x l start_pos end_pos =
-  Eapp(make (Evar(list_name Misc.cons_name)) start_pos end_pos,
+  Eapp(false,
+       make (Evar(list_name Misc.cons_name)) start_pos end_pos,
        [make (Etuple [x; l]) start_pos end_pos])
 
 let rec cons_list_desc l start_pos end_pos =
@@ -59,14 +61,14 @@ and cons_list l start_pos end_pos =
 let no_eq start_pos end_pos = make (EQempty) start_pos end_pos
 
 (* constructors with arguments *)
-let app f l =
+let app i f l =
   match f.desc, l with
   | Econstr0(id), [{ desc = Etuple(arg_list) }] ->
      (* C(e1,...,en) *)
      Econstr1(id, arg_list)
   | Econstr0(id), [arg] ->
      Econstr1(id, [arg])
-  | _ -> Eapp(f, l)
+  | _ -> Eapp(i, f, l)
 
 let constr f e =
   match e.desc with
@@ -1002,8 +1004,8 @@ expression_desc:
       { Eop(Efby, [e1; e2]) }
   | i = is_inline RUN f = simple_expression e = simple_expression
       { Eop(Erun(i), [f; e]) }
-  | f = simple_expression arg_list = simple_expression_list
-      { app f arg_list }
+  | i = is_inline f = simple_expression arg_list = simple_expression_list
+      { app i f arg_list }
   | a = is_atomic k = fun_kind p_list_list = param_list_list
     MINUSGREATER e = expression
     { funexp_desc a k p_list_list (make (Exp(e)) $startpos(e) $endpos)
@@ -1249,7 +1251,7 @@ period_expression:
       { [ ph; per ] }
 ;
 
-is_inline:
+%inline is_inline:
   | { false }
   | INLINE { true }
 ;

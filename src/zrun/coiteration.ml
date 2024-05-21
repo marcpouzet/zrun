@@ -366,7 +366,7 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
   | Etuple(e_list) ->
      let* s_list = map (iexp is_fun genv env) e_list in
      return (Slist(s_list))
-  | Eapp({ e_desc = Eglobal { lname }; e_loc = l_loc }, [e]) ->
+  | Eapp { f = { e_desc = Eglobal { lname }; e_loc = l_loc }; arg_list = [e] } ->
      (* When [lname] is a global value, it can denote either a *)
      (* combinatorial function or a node; that is if [f] is a node *)
      (* [f e] is a shortcut for [run f e] *)
@@ -384,9 +384,9 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
        | Vclosure _ | Vfun _ -> return Sempty
        | _ -> error { kind = Etype; loc = e_loc } in
      return (Slist [s; se])
-  | Eapp(e, e_list) ->
-     let* s = iexp is_fun genv env e in
-     let* s_list = map (iexp is_fun genv env) e_list in
+  | Eapp { f; arg_list } ->
+     let* s = iexp is_fun genv env f in
+     let* s_list = map (iexp is_fun genv env) arg_list in
      return (Slist(s :: s_list))
   | Elet(leq, e) ->
      let* l_env, s_eq = ileq is_fun genv env leq in
@@ -926,15 +926,15 @@ and sexp genv env { e_desc; e_loc } s =
      return (v, Slist(s :: s_list))
   | Etypeconstraint(e, _), s ->
      sexp genv env e s
-  | Eapp(_, [e]), Slist [Sinstance si; s] ->
+  | Eapp { arg_list = [e] }, Slist [Sinstance si; s] ->
      (* Here, [f (e1,..., en)] is a short-cut for [run f (e1,...,en)] *)
      let* v, s = sarg genv env e s in
      let* v, si = run e_loc si v in
      return (v, Slist [Sinstance si; s])
-  | Eapp(e, e_list), Slist (s :: s_list) ->
+  | Eapp { f; arg_list }, Slist (s :: s_list) ->
      (* [f] must return a combinatorial function *)
-     let* fv, s = sexp genv env e s in
-     let* v_list, s_list = sarg_list e_loc genv env e_list s_list in
+     let* fv, s = sexp genv env f s in
+     let* v_list, s_list = sarg_list e_loc genv env arg_list s_list in
      (* the application of a combinatorial function is considered to be strict *)
      (* if one element is [bot] return [bot]; if [nil] return [nil] *)
      let* v =
