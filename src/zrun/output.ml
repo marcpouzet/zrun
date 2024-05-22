@@ -54,11 +54,11 @@ let rec pvalue ff v =
   | Vsizefun _ ->
      Format.fprintf ff "<sfun>"
   | Vsizefix { bound; name } ->
-     Format.fprintf ff "<sizefix %a>" Ident.fprint_t name
-       (* (Pp_tools.print_opt 
+     Format.fprintf ff "<sizefix <%a>%a>"
+       (Pp_tools.print_opt
           (fun ff i_list -> 
-             Pptools.print_list_l (fun ff i -> fprintf ff "%d" i)
-               "(" "," "") i_list) bound Ident.fprint_t name *)
+             Pp_tools.print_list_l (fun ff i -> Format.fprintf ff "%d" i)
+               "(" "," "" ff i_list)) bound Ident.fprint_t name
   | Vrecord(l) ->
      let one ff { Ast.arg; Ast.label } =
        Format.fprintf ff "@[<hov2>%a =@ %a@]"
