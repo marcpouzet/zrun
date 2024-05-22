@@ -26,6 +26,8 @@ type kind =
   | Eundefined_ident : Ident.t -> kind (* no definition is given *)
   | Eshould_be_a_node : kind (* the expression should return a node *)
   | Eshould_be_combinatorial : kind
+  (* the maximum number of fix-point iteration has been reached *)
+  | Efixpoint_limit : kind
   (* the expression should be combinatorial *)
   | Eand_non_linear : Ident.t  -> kind (* [x] appears twice *)
   | Eno_default : Ident.t -> kind (* no default value is given to [x] *)
@@ -87,7 +89,11 @@ let message loc kind =
   | Eshould_be_combinatorial ->
      eprintf "@[%aZrun: this expression should be combinatorial.@.@]"
        output_location loc 
-  | Eand_non_linear(name) ->
+  | Efixpoint_limit ->
+     eprintf "@[%aZrun: the maximum number of iteration for computing the\
+              fixpoint has been reached.@.@]"
+       output_location loc 
+ | Eand_non_linear(name) ->
      eprintf
        "@[%aZrun: the identifier %s is defined twice in a \
         two parallel branches.@.@]"

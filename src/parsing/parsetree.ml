@@ -4,6 +4,8 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
+(*  (c) 2020-2024 Inria Paris                                          *)
+(*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
 (*  the terms of the INRIA Non-Commercial License Agreement (see the   *)
@@ -14,6 +16,19 @@
 type 'a localized = { desc: 'a; loc: Location.t }
 
 type name = String.t
+
+type kind =
+  | Knode : tkind -> kind (* stateful *)
+  | Kfun : vkind -> kind (* combinatorial *)
+
+and vkind =
+  | Kconst (* constant; known at compilation time *)
+  | Kstatic (* constant; known at instantiation time *)
+  | Kany (* known dynamically *)
+
+and tkind =
+  | Kdiscrete (* only discrete-time state variables *)
+  | Khybrid (* discrete-time and continuous-time state variables *)
 
 type longname =
   | Name : name -> longname
@@ -29,19 +44,6 @@ and type_expression_desc =
   | Etypeconstr : longname * type_expression list -> type_expression_desc
   | Etypetuple : type_expression list -> type_expression_desc
   | Etypefun : kind * type_expression * type_expression -> type_expression_desc
-
-and kind =
-  | Knode : tkind -> kind (* stateful *)
-  | Kfun : vkind -> kind (* combinatorial *)
-
-and vkind =
-  | Kconst (* constant; known at compilation time *)
-  | Kstatic (* constant; known at instantiation time *)
-  | Kany (* known dynamically *)
-
-and tkind =
-  | Kdiscrete (* only discrete-time state variables *)
-  | Khybrid (* discrete-time and continuous-time state variables *)
 
 (* constants *)
 type immediate =
@@ -167,6 +169,15 @@ and ('scondpat, 'body) present_handler =
 
 type is_weak = bool
 
+type size = size_desc localized
+
+and size_desc =
+  | Sint : int -> size_desc
+  | Sfrac : size * int  -> size_desc
+  | Sident : name -> size_desc
+  | Splus: size * size -> size_desc
+  | Smult: size * size -> size_desc
+  
 type exp = exp_desc localized
 
 and exp_desc =
@@ -178,6 +189,7 @@ and exp_desc =
   | Eop : operator * exp list -> exp_desc
   | Etuple : exp list -> exp_desc
   | Eapp : is_inline * exp *  exp list -> exp_desc
+  | Esizeapp : exp * size list -> exp_desc
   | Elet : leq * exp -> exp_desc
   | Erecord_access : exp * longname -> exp_desc
   | Erecord : (longname * exp) list -> exp_desc
@@ -207,6 +219,8 @@ and eq = eq_desc localized
 and eq_desc =
   | EQeq : pattern * exp -> eq_desc
   (* [p = e] *)
+  | EQsizefun : name * name list * exp -> eq_desc
+  (* a size-parameterized expression [id <n1,...,nk> = e] *)
   | EQder :
       name * exp * exp option * (scondpat, exp) present_handler list -> eq_desc
   (* [der n = e [init e0] [reset p1 -> e1 | ... | pn -> en]] *)
@@ -214,7 +228,7 @@ and eq_desc =
   (* [init n = e0 *)
   | EQemit : name * exp option -> eq_desc
   (* [emit n [= e] *)
-  | EQif : exp * eq * eq -> eq_desc
+  | EQif : vkind * exp * eq * eq -> eq_desc
   (* [if e then [... and ...] else [... and ...]] *)
   | EQand : eq list -> eq_desc
   (* parallel composition [eq1 and eq2] *)
@@ -227,7 +241,7 @@ and eq_desc =
   | EQautomaton : (exp, eq) block automaton_handler list *
         exp state option -> eq_desc
   (* automaton ... *)
-  | EQmatch : exp * (exp, eq) match_handler list -> eq_desc
+  | EQmatch : vkind * exp * (exp, eq) match_handler list -> eq_desc
   | EQpresent :
       (scondpat, eq) present_handler list * eq default -> eq_desc
   | EQempty : eq_desc

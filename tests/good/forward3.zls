@@ -7,8 +7,8 @@ let f1 n m =
         do x = last x + j done done
 
 let f2 n m = 
-  forward(m)[i] returns (x)
-    do forward resume (n)[j] returns (x init 0)
+  forward(m)[i] returns (x init 0)
+    do forward (n)[j] returns (x init last x)
         do x = last x + j done done
 
 let main () returns (o, o', o1, o2)

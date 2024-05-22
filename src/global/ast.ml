@@ -178,6 +178,15 @@ type ('scondpat, 'exp, 'leq, 'body) escape =
 
 type is_weak = bool
 
+type size = size_desc localized
+
+and size_desc =
+  | Sint : int -> size_desc
+  | Sfrac : { num: size; denom: int } -> size_desc
+  | Sident : Ident.t -> size_desc
+  | Splus: size * size -> size_desc
+  | Smult: size * size -> size_desc
+  
 type exp =
   { e_desc: exp_desc; (* descriptor *)
     e_loc: Location.t; (* location *)
@@ -195,6 +204,7 @@ and exp_desc =
   | Eop : operator * exp list -> exp_desc
   | Etuple : exp list -> exp_desc
   | Eapp : { is_inline: is_inline; f: exp; arg_list: exp list } -> exp_desc
+  | Esizeapp : { f: exp; s_list: size list } -> exp_desc
   | Elet : leq * exp -> exp_desc
   | Erecord_access : exp record -> exp_desc
   | Erecord : exp record list -> exp_desc
@@ -260,13 +270,16 @@ and eq =
 
 and eq_desc =
   | EQeq : pattern * exp -> eq_desc  (* [p = e] *)
+  (* a size-parameterized expression [id <n1,...,nk> = e] *)
+  | EQsizefun : { id: Ident.t; id_list: Ident.t list; e : exp } -> eq_desc
   | EQder :
       { id: Ident.t; e: exp; e_opt: exp option;
         handlers: (scondpat, exp, exp) present_handler list }
       -> eq_desc  (* [der x = e [init e0] [reset z1 -> e1 | ...]] *)
   | EQinit : Ident.t * exp -> eq_desc  (* [init x = e] *)
   | EQemit : Ident.t * exp option -> eq_desc  (* [emit x [= e]] *)
-  | EQif : exp * eq * eq -> eq_desc (* [if e then eq1 else eq2] *)
+  (* [if e then eq1 else eq2] *)
+  | EQif : { vkind: vkind; e: exp; eq_true: eq; eq_false: eq } -> eq_desc 
   | EQand : eq list -> eq_desc (* [eq1 and...and eqn] *)
   | EQlocal : (exp, eq) block -> eq_desc (* local x [...] do eq done *)
   | EQlet : leq * eq -> eq_desc (* let eq in eq *)
@@ -279,7 +292,7 @@ and eq_desc =
       { handlers : (scondpat, exp, eq) present_handler list;
         default_opt : eq default } -> eq_desc
   | EQmatch :
-      { mutable is_total : bool; e : exp;
+      { mutable is_total : bool; vkind: vkind; e : exp;
         handlers : (exp, eq) match_handler list } -> eq_desc
   | EQempty : eq_desc
   | EQassert : exp -> eq_desc

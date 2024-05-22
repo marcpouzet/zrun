@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -142,7 +142,7 @@ let equal_env env1 env2 =
     (fun { cur = cur1} { cur = cur2 } -> equal_values cur1 cur2)
     env1 env2
 
-(* bounded fixpoint for a set of equations *)
+(* bounded fixpoint [n] for a set of mutually recursive equations *)
 let eq genv env sem eq n s_eq bot =
   let sem s_eq env_in =
     Debug.print_ienv "Before step" env_in;
@@ -153,3 +153,11 @@ let eq genv env sem eq n s_eq bot =
     return (env_out, s_eq) in
   let* m, env_out, s_eq = fixpoint n equal_env sem s_eq bot in
   return (env_out, s_eq)
+
+(* fixpoint for mutually recursive definitions of size parameterized functions *)
+(* [defs = [f1\Vsfun ...; fk\Vsfun ...]] *)
+let sizefixpoint defs env =
+  Ident.Env.fold 
+    (fun f entry acc -> 
+       Env.add f (Match.entry (Vsizefix { bound = None; name = f; defs })) acc)
+    defs env

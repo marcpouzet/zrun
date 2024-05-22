@@ -179,6 +179,7 @@ rule main = parse
   | "-C->" { CFUN }
   | "<-" { LESSMINUS }
   | "|"  { BAR }
+  | "/"  { DIV }
   | "-"  { MINUS }
   | "+"  { PLUS }
   | "++" { PLUSPLUS }
@@ -186,6 +187,9 @@ rule main = parse
   | "_"  { UNDERSCORE }
   | "?"  { TEST }
   | ">"  { GREATER }
+  | "<"  { LESSER }
+  | ">>"  { LLESSER }
+  | "<<"  { GGREATER }
   | (['A'-'Z']('_' ? ['A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 
       {CONSTRUCTOR id}
   | (['A'-'Z' 'a'-'z'](['_' 'A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 

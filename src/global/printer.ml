@@ -131,9 +131,9 @@ let vardec_list exp ff vardec_list =
 
 let vkind ff k =
   match k with
-  | Kconst -> fprintf ff "const"
-  | Kstatic -> fprintf ff "static"
-  | Kany -> fprintf ff "val"
+  | Kconst -> fprintf ff "const "
+  | Kstatic -> fprintf ff "static "
+  | Kany -> fprintf ff ""
 
 let print_writes ff { dv ; di; der } =
   if !verbose then begin
@@ -248,7 +248,24 @@ let automaton_handler_list
 	 automaton_handler_list s_h_list
 	 (print_opt (print_with_braces state " init" "")) e_opt
 
-  
+(* size expressions *)
+let size ff e =
+  let rec size prio ff { desc } =
+    match desc with
+    | Sint(i) -> fprintf ff "%d" i
+    | Sfrac { num; denom } -> 
+       if prio >= 2 then fprintf ff "(";
+       fprintf ff "(%a/%d)" (size 1) num denom;
+       if prio >= 2 then fprintf ff ")"
+    | Sident(n) -> name ff n
+    | Splus(s1, s2) -> 
+      (* if the surrending operator has a greater priority *)
+      if prio >= 1 then fprintf ff "(";
+      fprintf ff "@[%a + %a@]" (size 0) s1 (size 0) s2;
+      if prio >= 1 then fprintf ff ")"
+    | Smult(s1, s2) -> fprintf ff "@[%a * %a@]" (size 2) s1 (size 2) s2 in
+  size 0 ff e
+                         
 let rec expression ff e =
   let exp ff e =
     match e.e_desc with
@@ -262,6 +279,9 @@ let rec expression ff e =
        let s = if is_inline then "inline " else "" in
        fprintf ff "@[%s%a %a@]"
          s expression f (print_list_r expression "" "" "") arg_list
+    | Esizeapp { f; s_list } ->
+       fprintf ff "@[%a %a@]" expression f
+       (print_list_l size "<<" "," ">>") s_list 
     | Econstr1 { lname; arg_list } ->
        fprintf ff "@[%a%a@]"
          longname lname (print_list_r expression "(" "," ")") arg_list
@@ -402,6 +422,10 @@ and equation ff ({ eq_desc = desc } as eq) =
   match desc with
   | EQeq(p, e) ->
      fprintf ff "@[<hov 2>%a =@ %a@]" pattern p expression e
+  | EQsizefun { id; id_list; e } ->
+     fprintf ff "@[<hov 2>%a%a =@ %a@]" name id
+       (print_list_l name "<<" "," ">>") id_list
+       expression e
   | EQder { id; e; e_opt; handlers = [] } ->
       fprintf ff "@[<hov 2>der %a =@ %a%a@]"
         name id expression e
@@ -426,14 +450,14 @@ and equation ff ({ eq_desc = desc } as eq) =
      automaton_handler_list
        is_weak leqs block_of_equation block_of_equation expression
        ff handlers state_opt
-  | EQmatch { is_total; e; handlers } ->
-     fprintf ff "@[<hov0>%smatch %a with@ @[%a@]@]"
+  | EQmatch { vkind = v; is_total; e; handlers } ->
+     fprintf ff "@[<hov0>%s%amatch %a with@ @[%a@]@]"
        (if is_total then "total " else "")
-       expression e
+       vkind v expression e
        (print_list_l (match_handler equation) """""") handlers
-  | EQif(e, eq1, eq2) ->
-     fprintf ff "@[<hov0>if %a@ then %a@ else %a@]"
-       expression e equation eq1 equation eq2
+  | EQif { vkind = v; e; eq_true; eq_false } ->
+     fprintf ff "@[<hov0>%aif %a@ then %a@ else %a@]"
+       vkind v expression e equation eq_true equation eq_false
   | EQpresent { handlers; default_opt } ->
      fprintf ff "@[<hov0>present@ @[%a@]@%a]"
        (print_list_l

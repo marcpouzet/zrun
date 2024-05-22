@@ -228,7 +228,8 @@ let buildpat check_linear defnames p =
 let rec buildeq defnames { desc } =
   match desc with
   | EQeq(pat, _) -> buildpat false defnames pat
-  | EQder(x, _, _, _) | EQinit(x, _) | EQemit(x, _) -> S.add x defnames
+  | EQsizefun(x, _, _) | EQder(x, _, _, _) | EQinit(x, _) | EQemit(x, _) -> 
+     S.add x defnames
   | EQreset(eq, _) -> buildeq defnames eq
   | EQand(and_eq_list) ->
      List.fold_left buildeq defnames and_eq_list
@@ -237,10 +238,10 @@ let rec buildeq defnames { desc } =
      let defnames_eq = buildeq S.empty eq in
      S.union defnames (S.diff defnames_eq defnames_v_list)
   | EQlet(_, eq) -> buildeq defnames eq
-  | EQif(_, eq1, eq2) ->
+  | EQif(_, _, eq1, eq2) ->
      let defnames = buildeq defnames eq1 in
      buildeq defnames eq2
-  | EQmatch(_, h_list) ->
+  | EQmatch(_, _, h_list) ->
      List.fold_left build_match_handler defnames h_list
   | EQpresent(p_h_list, b_opt) ->
      let defnames = 
@@ -360,6 +361,16 @@ let match_handler body env { desc = { m_pat; m_body }; loc } =
   { Ast.m_pat = m_pat; Ast.m_body = m_body; Ast.m_loc = loc;
     Ast.m_reset = false; Ast.m_zero = false }
 
+(* size expressions *)
+let rec size env { desc; loc } =
+  let desc = match desc with
+  | Sint(i) -> Ast.Sint(i)
+  | Sfrac(s, q) -> Ast.Sfrac { num = size env s; denom = q }
+  | Sident(n) -> Ast.Sident(name loc env n)
+  | Splus(s1, s2) -> Ast.Splus(size env s1, size env s2)
+  | Smult(s1, s2) -> Ast.Smult(size env s1, size env s2) in
+  { desc; loc }
+
 (* [env_pat] is the environment for names that appear on the *)
 (* left of a definition. [env] is for names that appear on the right *)
 let rec equation env_pat env { desc; loc } =
@@ -369,6 +380,13 @@ let rec equation env_pat env { desc; loc } =
        let pat = pattern_translate env_pat pat in
        let e = expression env e in
        Ast.EQeq(pat, e)
+    | EQsizefun(x, x_list, e) ->
+       let x = name loc env x in
+       (* build the renaming *)
+       let x_list, env = 
+         Util.mapfold 
+           (fun acc n -> let m = fresh n in m, Env.add n m acc) env x_list in
+       Ast.EQsizefun { id = x; id_list = x_list; e = expression env e }
     | EQder(x, e, e_opt, p_h_list) ->
        Ast.EQder { id = name loc env x; e = expression env e;
                    e_opt = Util.optional_map (expression env) e_opt;
@@ -395,16 +413,18 @@ let rec equation env_pat env { desc; loc } =
        let l_eq, env = letin env l_eq in
        let in_eq = equation env_pat env in_eq in
        Ast.EQlet(l_eq, in_eq)
-    | EQif(e, eq1, eq2) ->
+    | EQif(v, e, eq_true, eq_false) ->
+       let v = vkind v in
        let e = expression env e in
-       let eq1 = equation env_pat env eq1 in
-       let eq2 = equation env_pat env eq2 in
-       Ast.EQif(e, eq1, eq2)
-    | EQmatch(e, m_h_list) ->
+       let eq_true = equation env_pat env eq_true in
+       let eq_false = equation env_pat env eq_false in
+       Ast.EQif { vkind = v; e; eq_true; eq_false }
+    | EQmatch(v, e, m_h_list) ->
+       let v = vkind v in
        let e = expression env e in
        let m_h_list =
          List.map (match_handler (equation env_pat) env) m_h_list in
-       Ast.EQmatch { is_total = false; e; handlers = m_h_list }
+       Ast.EQmatch { vkind = v; is_total = false; e; handlers = m_h_list }
     | EQautomaton(a_h_list, st_opt) ->
        let is_weak, is_strong =
          List.fold_left
@@ -724,6 +744,9 @@ and expression env { desc; loc } =
        let f = expression env f in
        let arg_list = List.map (expression env) arg_list in
        Ast.Eapp { is_inline; f; arg_list }
+    | Esizeapp(f, size_list) ->
+       Ast.Esizeapp 
+         { f = expression env f; s_list = List.map (size env) size_list }
     | Erecord_access(e, lname) ->
        let e = expression env e in
        Ast.Erecord_access { arg = e; label = longname lname }

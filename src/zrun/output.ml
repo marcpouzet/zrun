@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -51,6 +51,14 @@ let rec pvalue ff v =
      Format.fprintf ff "<fun>"
   | Vclosure _ ->
      Format.fprintf ff "<closure>"
+  | Vsizefun _ ->
+     Format.fprintf ff "<sfun>"
+  | Vsizefix { bound; name } ->
+     Format.fprintf ff "<sizefix %a>" Ident.fprint_t name
+       (* (Pp_tools.print_opt 
+          (fun ff i_list -> 
+             Pptools.print_list_l (fun ff i -> fprintf ff "%d" i)
+               "(" "," "") i_list) bound Ident.fprint_t name *)
   | Vrecord(l) ->
      let one ff { Ast.arg; Ast.label } =
        Format.fprintf ff "@[<hov2>%a =@ %a@]"

@@ -39,7 +39,6 @@ let rec fv_pat acc { pat_desc } =
   | Eorpat(p1, _) -> fv_pat acc p1
   | Etypeconstraintpat(p, _) -> fv_pat acc p
 
-
 (* computes [dv] and [di] *)
 let rec equation ({ eq_desc } as eq)=
   let eq_desc, def =
@@ -47,6 +46,8 @@ let rec equation ({ eq_desc } as eq)=
     | EQeq(pat, e) ->
        EQeq(pat, expression e),
        { Defnames.empty with dv = fv_pat S.empty pat }
+    | EQsizefun { id } ->
+       eq_desc, { Defnames.empty with dv = S.singleton id }
     | EQder { id; e; e_opt; handlers } ->
        let e_opt, di =
          match e_opt with
@@ -81,12 +82,12 @@ let rec equation ({ eq_desc } as eq)=
        let l_eq, _ = equation l_eq in
        let eq, def = equation eq in
        EQlet({ leq with l_eq }, eq), def
-    | EQif(e, eq1, eq2) ->
+    | EQif { vkind; e; eq_true; eq_false } ->
        let e = expression e in
-       let eq1, def1 = equation eq1 in
-       let eq2, def2 = equation eq2 in
-       let def = Defnames.union def1 def2 in
-       EQif(e, eq1, eq2), def
+       let eq_true, def_true = equation eq_true in
+       let eq_false, def_false = equation eq_false in
+       let def = Defnames.union def_true def_false in
+       EQif { vkind; e; eq_true; eq_false }, def
     | EQmatch({ e; handlers } as m) ->
        let match_handler acc ({ m_body } as m) =
          let m_body, def_body = equation m_body in
@@ -220,7 +221,9 @@ and expression ({ e_desc } as e) =
        let l_eq, _ = equation l_eq in
        Elet({ leq with l_eq }, expression e)
     | Eapp { is_inline; f; arg_list } ->
-       Eapp { is_inline; f = expression f; arg_list = List.map expression arg_list }
+       Eapp { is_inline; f = expression f; 
+              arg_list = List.map expression arg_list }
+    | Esizeapp { f; s_list } -> Esizeapp { f = expression f; s_list }
     | Erecord_access({ label; arg }) ->
        Erecord_access({ label; arg = expression arg })
     | Erecord(le_list) ->

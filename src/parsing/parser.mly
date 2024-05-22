@@ -161,6 +161,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token DOTDOT         /* ".." */
 %token DOWNTO         /* "downto" */
 %token DER            /* "der" */
+%token DIV            /* "/" */
 %token ELSE           /* "else" */
 %token EMIT           /* "emit" */
 %token END            /* "end" */
@@ -172,6 +173,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token FBY            /* "fby" */
 %token FUN            /* "fun" */
 %token GREATER        /* ">" */
+%token GGREATER       /* ">>" */
 %token HYBRID         /* "hybrid" */
 %token HORIZON        /* "horizon" */
 %token FOREACH        /* "foreach" */
@@ -182,6 +184,8 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token INLINE         /* "inline" */
 %token LAST           /* "last" */
 %token LBRACE         /* "{" */
+%token LESSER         /* "<" */
+%token LLESSER        /* "<<" */
 %token RBRACE         /* "}" */
 %token LBRACKET       /* "[" */
 %token RBRACKET       /* "]" */
@@ -272,19 +276,20 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %right MINUSGREATER VFUN SFUN DFUN CFUN AFUN 
 %left OR BARBAR
 %left AMPERSAND AMPERAMPER
-%left INFIX0 GREATER EQUAL
+%left INFIX0 LESSER GREATER EQUAL
 %nonassoc RESET
 %right INFIX1
 %left INFIX2 PLUS SUBTRACTIVE MINUS PLUSPLUS
+%left DIV
 %left STAR INFIX3
 %left INFIX4
 %left ON
 %right prec_uminus
 %right PREFIX
 %right PRE TEST UP
-%left INIT DEFAULT
 %left TRANSPOSE FLATTEN REVERSE
 %left DOT
+%left INIT DEFAULT
 
 
 %start implementation_file
@@ -579,16 +584,16 @@ equation_desc:
   | AUTOMATON opt_bar
     a = automaton_handlers(equation_empty_and_list) INIT e = state
     { EQautomaton(List.rev a, Some(e)) }
-  | MATCH e = seq_expression WITH opt_bar
+  | /* v = vkind_opt */ MATCH e = seq_expression WITH opt_bar
     m = match_handlers(equation) opt_end
-    { EQmatch(e, List.rev m) }
-  | IF e = seq_expression THEN eq1 = equation
+    { EQmatch(Kany, e, List.rev m) }
+  | /* v = vkind_opt */ IF e = seq_expression THEN eq1 = equation
     ELSE eq2 = equation opt_end
-    { EQif(e, eq1, eq2) }
-  | IF e = seq_expression THEN eq1 = equation opt_end
-      { EQif(e, eq1, no_eq $startpos $endpos) }
-  | IF e = seq_expression ELSE eq2 = equation opt_end
-      { EQif(e, no_eq $startpos $endpos, eq2) }
+    { EQif(Kany, e, eq1, eq2) }
+  | /* v = vkind_opt */ IF e = seq_expression THEN eq1 = equation opt_end
+      { EQif(Kany, e, eq1, no_eq $startpos $endpos) }
+  | /* v = vkind_opt */ IF e = seq_expression ELSE eq2 = equation opt_end
+      { EQif(Kany, e, no_eq $startpos $endpos, eq2) }
   | PRESENT opt_bar p = present_handlers(equation) opt_end
     { EQpresent(List.rev p, NoDefault) }
   | PRESENT opt_bar p = present_handlers(equation)
@@ -604,6 +609,14 @@ equation_desc:
       { EQinit(i, e) }
   | p = pattern EQUAL e = seq_expression
       { EQeq(p, e) }
+  | ide = ide LLESSER ide_list = list_of(COMMA, ide) GGREATER EQUAL 
+        e = seq_expression
+    { EQsizefun(ide, ide_list, e) }
+  | a = is_atomic k = fun_kind_opt ide = ide 
+       LLESSER ide_list = list_of(COMMA, ide) GGREATER 
+       v_p_list_list = param_list_list r = result
+    { EQsizefun(ide, ide_list, funexp a k v_p_list_list r 
+                                   $startpos(v_p_list_list) $endpos) }
   | a = is_atomic k = fun_kind_opt ide = ide v_p_list_list = param_list_list 
     r = result
     { EQeq(make (Evarpat ide) $startpos(ide) $endpos(ide),
@@ -920,15 +933,15 @@ seq_expression :
 ;
 
 
+/* Simple expressions - that is, well parenthesized expressions */
 simple_expression_list:
   | l = list_no_sep_of(simple_expression)
     { l }
 ;
 
-
 simple_expression:
-  | desc = simple_expression_desc
-      { make desc $startpos $endpos }
+  | l = localized(simple_expression_desc)
+    { l } 
 ;
 
 simple_expression_desc:
@@ -936,6 +949,8 @@ simple_expression_desc:
       { Econstr0(c) }
   | i = ext_ident
       { Evar i }
+  | e = simple_expression LLESSER s_e_list = size_expression_list GGREATER 
+    { Esizeapp(e, s_e_list) }
   | LBRACKET RBRACKET
       { nil_desc }
   | LBRACKET l = list_of(SEMI, expression) RBRACKET
@@ -970,7 +985,30 @@ simple_expression_desc:
   | e = simple_expression DOT
       LPAREN e1 = expression DOTDOT e2 = expression RPAREN
       { Eop(Earray(Eslice), [e; e1; e2]) }
+;
 
+/* size expression list */
+size_expression_list:
+  | s_list = list_of(COMMA, size_expression)
+    { s_list }
+;
+
+size_expression:
+  | s = localized(size_expression_desc)
+    { s }
+;
+
+size_expression_desc:
+  | i = ide
+    { Sident(i) }
+  | i = INT
+    { Sint(i) }
+  | num = size_expression DIV denom = INT
+    { Sfrac(num, denom) }
+  | e1 = size_expression PLUS e2 = size_expression
+    { Splus(e1, e2) }
+  | e1 = size_expression STAR e2 = size_expression
+    { Smult(e1, e2) }
 ;
 
 /* [| e with e1,...,en <- e' |] */
@@ -982,7 +1020,7 @@ update_array_comma_list:
     { e :: l }
 ;
 
-expression_comma_list :
+expression_comma_list:
   | ecl = expression_comma_list COMMA e = expression
       { e :: ecl }
   | e1 = expression COMMA e2 = expression
@@ -993,7 +1031,6 @@ expression:
   | x = localized(expression_desc)
     { x }
 ;
-
 
 expression_desc:
   | e = simple_expression_desc
@@ -1042,6 +1079,8 @@ expression_desc:
       { binop i e1 e2 ($startpos(i)) ($endpos(i)) }
   | e1 = expression i = INFIX0 e2 = expression
       { binop i e1 e2 ($startpos(i)) ($endpos(i)) }
+  | e1 = expression LESSER e2 = expression
+      { binop "<" e1 e2 $startpos $endpos }
   | e1 = expression GREATER e2 = expression
       { binop ">" e1 e2 $startpos $endpos }
   | e1 = expression EQUAL e2 = expression
@@ -1050,6 +1089,8 @@ expression_desc:
       { binop "or" e1 e2 ($startpos($2)) ($endpos($2)) }
   | e1 = expression STAR e2 = expression
       { binop "*" e1 e2 ($startpos($2)) ($endpos($2)) }
+  | e1 = expression DIV e2 = expression
+      { binop "/" e1 e2 ($startpos($2)) ($endpos($2)) }
   | e1 = expression AMPERSAND e2 = expression
       { binop "&" e1 e2 ($startpos($2)) ($endpos($2)) }
   | e1 = expression MINUS e2 = expression
@@ -1256,7 +1297,7 @@ period_expression:
   | INLINE { true }
 ;
 
-is_rec:
+%inline is_rec:
   | REC { true }
   |     { false }
 ;
@@ -1306,8 +1347,6 @@ ide:
       { i }
   | LPAREN i = infx RPAREN
       { i }
-  | LPAREN GREATER RPAREN
-    { ">" }
 ;
 
 ext_ident :
@@ -1323,7 +1362,10 @@ infx:
   | INFIX3          { $1 }    | INFIX4        { $1 }
   | STAR            { "*" }
   | PLUS            { "+" }
+  | DIV             { "/" }
   | MINUS           { "-" }
+  | GREATER         { ">" }
+  | LESSER          { "<" }
   | EQUAL           { "=" }
   | EQUALEQUAL      { "==" }
   | SUBTRACTIVE     { $1 }    | PREFIX        { $1 }

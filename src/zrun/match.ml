@@ -21,6 +21,7 @@ open Opt
 open Ident
 
 (* auxiliary functions for environments *)
+let entry v = { cur = Value(v); last = None; default = None }
 let lift f env =
   Env.map (fun v -> { cur = f v; last = None; default = None }) env
 let liftid env = lift (fun x -> x) env
