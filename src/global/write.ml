@@ -238,13 +238,13 @@ and expression ({ e_desc } as e) =
     | Etypeconstraint(e, ty) ->
        Etypeconstraint(expression e, ty)
     | Efun(fd) -> Efun(funexp fd)
-    | Ematch { is_total; e; handlers } ->
+    | Ematch({ e; handlers } as m) ->
        let e = expression e in
        let handlers =
          List.map
            (fun ({ m_body } as m) -> { m with m_body = expression m_body })
            handlers in
-       Ematch { is_total; e; handlers }
+       Ematch({ m with e; handlers })
     | Epresent({ handlers; default_opt }) ->
        let handlers =
          List.map

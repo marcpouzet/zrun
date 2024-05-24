@@ -757,11 +757,12 @@ and expression env { desc; loc } =
     | Etypeconstraint(e, texp) ->
        Ast.Etypeconstraint(expression env e, types texp)
     | Efun(fd) -> Ast.Efun(funexp env fd)
-    | Ematch(e, m_h_list) ->
+    | Ematch(v, e, m_h_list) ->
+       let v = vkind v in
        let e = expression env e in
        let m_h_list =
          List.map (match_handler expression env) m_h_list in
-       Ast.Ematch { is_total = false; e; handlers = m_h_list }
+       Ast.Ematch { is_total = false; vkind = v; e; handlers = m_h_list }
     | Epresent(p_h_list, eq_opt) ->
        let handlers =
          List.map (present_handler scondpat expression env) p_h_list in

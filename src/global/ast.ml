@@ -211,7 +211,7 @@ and exp_desc =
   | Erecord_with : exp * exp record list -> exp_desc
   | Etypeconstraint : exp * type_expression -> exp_desc
   | Efun : funexp -> exp_desc
-  | Ematch : { mutable is_total : bool; e : exp;
+  | Ematch : { mutable is_total : bool; vkind: vkind; e : exp;
                handlers : (exp, exp) match_handler list } -> exp_desc
   | Epresent :
       { handlers : (scondpat, exp, exp) present_handler list;

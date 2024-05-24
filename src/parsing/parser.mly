@@ -1105,8 +1105,9 @@ expression_desc:
       { unop p e ($startpos(p)) ($endpos(p)) }
   | LET v = vkind_opt i = is_rec eq = equation_and_list IN e = seq_expression
     { Elet(make { l_rec = i; l_kind = v; l_eq = eq } $startpos $endpos(eq), e) }
-  | MATCH e = seq_expression WITH opt_bar m = match_handlers(expression) opt_end
-      { Ematch(e, List.rev m) }
+  | v = vkind_opt MATCH e = seq_expression WITH
+      opt_bar m = match_handlers(expression) opt_end
+      { Ematch(v, e, List.rev m) }
   | PRESENT opt_bar pe = present_handlers(expression) opt_end %prec prec_present
     { Epresent(List.rev pe, NoDefault) }
   | PRESENT opt_bar pe = present_handlers(expression)
