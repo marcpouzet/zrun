@@ -2183,11 +2183,11 @@ and apply_closure loc genv env ({ f_kind; f_loc } as fe) f_args f_body v_list =
 
 (* apply a function of sizes to a list of sizes *)
 and sizeapply loc fv v_list =
-  (* decrement a size - lexical order *)
-  let lt s_list1 s_list2 =
-    (* returns true if s_list1 < s_list2. It coincides with the lexical order *)
+  (* strictly less than - lexical order *)
+  let lt v_list1 v_list2 =
+    (* returns true if v_list1 < v_list2. It coincides with the lexical order *)
     (* of OCaml *)
-    s_list1 < s_list2 in
+    v_list1 < v_list2 in
   let apply s_params s_body s_genv s_env =
     if List.length s_params <> List.length v_list
     then error { kind = Etype; loc }
@@ -2201,10 +2201,19 @@ and sizeapply loc fv v_list =
   | Vsizefun { s_params; s_body; s_genv; s_env } ->
      apply s_params s_body s_genv s_env
   | Vsizefix { bound; name; defs } ->
-     (* when it is recursive, we must decrement the bound. this is not done yet *)
      let { s_params; s_body; s_genv; s_env } = Env.find name defs in
+     (* when the function is recursive, the actual value of the argument *)
+     (* must be strictly less than the bound *)
+     let* _ =
+       match bound with
+       | None -> return ()
+       | Some(exp_v_list) ->
+         if lt v_list exp_v_list then return ()
+         else
+           error { kind = Esize_in_a_recursive_call(v_list, exp_v_list); loc } in
      apply s_params s_body s_genv 
-       (Env.add name (Match.entry (Vsizefix { bound; name; defs })) s_env)
+       (Env.add name
+          (Match.entry (Vsizefix { bound = Some(v_list); name; defs })) s_env)
   | _ -> error { kind = Etype; loc }
 
 (* check that a value is neither bot nor nil *)

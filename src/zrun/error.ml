@@ -46,6 +46,8 @@ type kind =
   | Eloop_index : { size : int; index : int } -> kind
   (* the loop has [size] iterations but the index is of a different size *)
   | Eloop_no_iteration : kind
+  (* the size must decrease at every recursive call *)
+  | Esize_in_a_recursive_call : int list * int list -> kind
   (* the loop should iterate at least once; or give a default value *)
   | Eloop_cannot_determine_size : kind
   (* the size is not given and there is no input *)
@@ -141,6 +143,14 @@ let message loc kind =
        "@[%aZrun: the loop has no iteration. Either give a default value\
         or ensure there is at least one iteration.@.@]"
        output_location loc
+  | Esize_in_a_recursive_call(actual_v_list, expected_v_list) ->
+    let print_v_list ff v_list =
+      Pp_tools.print_list_l
+        (fun ff i -> Format.fprintf ff "%d" i) "(" "," ")" ff v_list in
+    eprintf
+      "@[%aZrun: the value of the argument is \n%a\
+       whereas it should be strictly less than %a.@.@]"
+       output_location loc print_v_list actual_v_list print_v_list expected_v_list
   (* the loop should iterate at least once; or give a default value *)
   | Eloop_cannot_determine_size ->
     eprintf
