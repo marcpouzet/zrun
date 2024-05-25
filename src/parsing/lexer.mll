@@ -188,8 +188,8 @@ rule main = parse
   | "?"  { TEST }
   | ">"  { GREATER }
   | "<"  { LESSER }
-  | ">>"  { LLESSER }
-  | "<<"  { GGREATER }
+  | "<<"  { LLESSER }
+  | ">>"  { GGREATER }
   | (['A'-'Z']('_' ? ['A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 
       {CONSTRUCTOR id}
   | (['A'-'Z' 'a'-'z'](['_' 'A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 
