@@ -211,7 +211,7 @@ and exp_desc =
   | Erecord_with : exp * exp record list -> exp_desc
   | Etypeconstraint : exp * type_expression -> exp_desc
   | Efun : funexp -> exp_desc
-  | Ematch : { mutable is_total : bool; vkind: vkind; e : exp;
+  | Ematch : { mutable is_total : bool; e : exp;
                handlers : (exp, exp) match_handler list } -> exp_desc
   | Epresent :
       { handlers : (scondpat, exp, exp) present_handler list;
@@ -279,7 +279,7 @@ and eq_desc =
   | EQinit : Ident.t * exp -> eq_desc  (* [init x = e] *)
   | EQemit : Ident.t * exp option -> eq_desc  (* [emit x [= e]] *)
   (* [if e then eq1 else eq2] *)
-  | EQif : { vkind: vkind; e: exp; eq_true: eq; eq_false: eq } -> eq_desc 
+  | EQif : { e: exp; eq_true: eq; eq_false: eq } -> eq_desc 
   | EQand : eq list -> eq_desc (* [eq1 and...and eqn] *)
   | EQlocal : (exp, eq) block -> eq_desc (* local x [...] do eq done *)
   | EQlet : leq * eq -> eq_desc (* let eq in eq *)
@@ -291,9 +291,8 @@ and eq_desc =
   | EQpresent :
       { handlers : (scondpat, exp, eq) present_handler list;
         default_opt : eq default } -> eq_desc
-  | EQmatch :
-      { mutable is_total : bool; vkind: vkind; e : exp;
-        handlers : (exp, eq) match_handler list } -> eq_desc
+  | EQmatch : { mutable is_total : bool; e : exp;
+                handlers : (exp, eq) match_handler list } -> eq_desc
   | EQempty : eq_desc
   | EQassert : exp -> eq_desc
   | EQforloop : for_eq forloop -> eq_desc
