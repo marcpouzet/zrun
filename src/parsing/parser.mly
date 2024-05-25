@@ -584,16 +584,16 @@ equation_desc:
   | AUTOMATON opt_bar
     a = automaton_handlers(equation_empty_and_list) INIT e = state
     { EQautomaton(List.rev a, Some(e)) }
-  | /* v = vkind_opt */ MATCH e = seq_expression WITH opt_bar
+  | MATCH e = seq_expression WITH opt_bar
     m = match_handlers(equation) opt_end
-    { EQmatch(Kany, e, List.rev m) }
-  | /* v = vkind_opt */ IF e = seq_expression THEN eq1 = equation
+    { EQmatch(e, List.rev m) }
+  | IF e = seq_expression THEN eq1 = equation
     ELSE eq2 = equation opt_end
-    { EQif(Kany, e, eq1, eq2) }
-  | /* v = vkind_opt */ IF e = seq_expression THEN eq1 = equation opt_end
-      { EQif(Kany, e, eq1, no_eq $startpos $endpos) }
-  | /* v = vkind_opt */ IF e = seq_expression ELSE eq2 = equation opt_end
-      { EQif(Kany, e, no_eq $startpos $endpos, eq2) }
+    { EQif(e, eq1, eq2) }
+  | IF e = seq_expression THEN eq1 = equation opt_end
+      { EQif(e, eq1, no_eq $startpos $endpos) }
+  | IF e = seq_expression ELSE eq2 = equation opt_end
+      { EQif(e, no_eq $startpos $endpos, eq2) }
   | PRESENT opt_bar p = present_handlers(equation) opt_end
     { EQpresent(List.rev p, NoDefault) }
   | PRESENT opt_bar p = present_handlers(equation)
@@ -1105,9 +1105,9 @@ expression_desc:
       { unop p e ($startpos(p)) ($endpos(p)) }
   | LET v = vkind_opt i = is_rec eq = equation_and_list IN e = seq_expression
     { Elet(make { l_rec = i; l_kind = v; l_eq = eq } $startpos $endpos(eq), e) }
-  | v = vkind_opt MATCH e = seq_expression WITH
+  | MATCH e = seq_expression WITH
       opt_bar m = match_handlers(expression) opt_end
-      { Ematch(v, e, List.rev m) }
+      { Ematch(e, List.rev m) }
   | PRESENT opt_bar pe = present_handlers(expression) opt_end %prec prec_present
     { Epresent(List.rev pe, NoDefault) }
   | PRESENT opt_bar pe = present_handlers(expression)
