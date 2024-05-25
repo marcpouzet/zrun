@@ -1,0 +1,35 @@
+(* recursive functions *)
+let f1 = fun x returns o if true then o = 1 else o = 2
+let f2 () = f1 ()
+let f3 =
+  let rec xor_<<n>> = fun (x) returns (o)
+    match n with
+    | 0 -> do o = false done
+    | n -> do o = xor_<<n/2>>(x.(0 .. n/2-1)) || xor_<<n/2>>(x.(n/2 .. n-1)) done in
+  xor_
+
+let f4 () = f3 <<4>> 0
+
+let f5 = let f<<n>>() = n + 1 in f
+
+let f6 () = f5 <<4>>()
+  
+(* let rec fby_n<n> = fun (x, y) returns (o)
+  let v = const match n with
+          | 0 -> y | n -> fby_n<n-1>(x, y) in
+   x fby v
+
+let xor x y = if x then not y else y
+
+let adder(x, y, c) returns (s, c')
+ do s = xor (xor x y) y)
+ and c' = if x then y || c else y && c
+ done
+
+let rec add_n<n> = fun (x, y, c) returns (o, c')
+  const match n with
+  | 0 -> do o = [||] and c' = false
+  | n -> let s, c = adder(x.(0), y.(0), c) in
+         let o', c = add_n<n-1>(x.(1 .. n-1), y.(1 .. n-1), c) in
+         do o = [|s|] ++ o' and c' = c done
+*)
