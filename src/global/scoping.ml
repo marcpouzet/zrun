@@ -238,10 +238,10 @@ let rec buildeq defnames { desc } =
      let defnames_eq = buildeq S.empty eq in
      S.union defnames (S.diff defnames_eq defnames_v_list)
   | EQlet(_, eq) -> buildeq defnames eq
-  | EQif(_, _, eq1, eq2) ->
+  | EQif(_, eq1, eq2) ->
      let defnames = buildeq defnames eq1 in
      buildeq defnames eq2
-  | EQmatch(_, _, h_list) ->
+  | EQmatch(_, h_list) ->
      List.fold_left build_match_handler defnames h_list
   | EQpresent(p_h_list, b_opt) ->
      let defnames = 
@@ -381,21 +381,21 @@ let rec equation env_pat env { desc; loc } =
        let e = expression env e in
        Ast.EQeq(pat, e)
     | EQsizefun(x, x_list, e) ->
-       let x = name loc env x in
+       let x = name loc env_pat x in
        (* build the renaming *)
        let x_list, env = 
          Util.mapfold 
            (fun acc n -> let m = fresh n in m, Env.add n m acc) env x_list in
        Ast.EQsizefun { id = x; id_list = x_list; e = expression env e }
     | EQder(x, e, e_opt, p_h_list) ->
-       Ast.EQder { id = name loc env x; e = expression env e;
+       Ast.EQder { id = name loc env_pat x; e = expression env e;
                    e_opt = Util.optional_map (expression env) e_opt;
                    handlers = 
                      List.map
                        (present_handler scondpat expression env) p_h_list }
-    | EQinit(x, e) -> EQinit(name loc env x, expression env e)
+    | EQinit(x, e) -> EQinit(name loc env_pat x, expression env e)
     | EQemit(x, e_opt) ->
-       EQemit(name loc env x, Util.optional_map (expression env) e_opt)
+       EQemit(name loc env_pat x, Util.optional_map (expression env) e_opt)
     | EQreset(eq, e) ->
        let eq = equation env_pat env eq in
        let e = expression env e in
@@ -413,18 +413,16 @@ let rec equation env_pat env { desc; loc } =
        let l_eq, env = letin env l_eq in
        let in_eq = equation env_pat env in_eq in
        Ast.EQlet(l_eq, in_eq)
-    | EQif(v, e, eq_true, eq_false) ->
-       let v = vkind v in
+    | EQif(e, eq_true, eq_false) ->
        let e = expression env e in
        let eq_true = equation env_pat env eq_true in
        let eq_false = equation env_pat env eq_false in
-       Ast.EQif { vkind = v; e; eq_true; eq_false }
-    | EQmatch(v, e, m_h_list) ->
-       let v = vkind v in
+       Ast.EQif { e; eq_true; eq_false }
+    | EQmatch(e, m_h_list) ->
        let e = expression env e in
        let m_h_list =
          List.map (match_handler (equation env_pat) env) m_h_list in
-       Ast.EQmatch { vkind = v; is_total = false; e; handlers = m_h_list }
+       Ast.EQmatch { is_total = false; e; handlers = m_h_list }
     | EQautomaton(a_h_list, st_opt) ->
        let is_weak, is_strong =
          List.fold_left
@@ -757,12 +755,11 @@ and expression env { desc; loc } =
     | Etypeconstraint(e, texp) ->
        Ast.Etypeconstraint(expression env e, types texp)
     | Efun(fd) -> Ast.Efun(funexp env fd)
-    | Ematch(v, e, m_h_list) ->
-       let v = vkind v in
+    | Ematch(e, m_h_list) ->
        let e = expression env e in
        let m_h_list =
          List.map (match_handler expression env) m_h_list in
-       Ast.Ematch { is_total = false; vkind = v; e; handlers = m_h_list }
+       Ast.Ematch { is_total = false; e; handlers = m_h_list }
     | Epresent(p_h_list, eq_opt) ->
        let handlers =
          List.map (present_handler scondpat expression env) p_h_list in
