@@ -52,7 +52,7 @@ let rec pvalue ff v =
   | Vclosure _ ->
      Format.fprintf ff "<closure>"
   | Vsizefun _ ->
-     Format.fprintf ff "<sfun>"
+     Format.fprintf ff "<sizefun>"
   | Vsizefix { bound; name } ->
      Format.fprintf ff "<sizefix <%a>%a>"
        (Pp_tools.print_opt
