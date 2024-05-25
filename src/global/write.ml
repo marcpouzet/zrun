@@ -82,12 +82,12 @@ let rec equation ({ eq_desc } as eq)=
        let l_eq, _ = equation l_eq in
        let eq, def = equation eq in
        EQlet({ leq with l_eq }, eq), def
-    | EQif { vkind; e; eq_true; eq_false } ->
+    | EQif { e; eq_true; eq_false } ->
        let e = expression e in
        let eq_true, def_true = equation eq_true in
        let eq_false, def_false = equation eq_false in
        let def = Defnames.union def_true def_false in
-       EQif { vkind; e; eq_true; eq_false }, def
+       EQif { e; eq_true; eq_false }, def
     | EQmatch({ e; handlers } as m) ->
        let match_handler acc ({ m_body } as m) =
          let m_body, def_body = equation m_body in
