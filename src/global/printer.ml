@@ -450,14 +450,13 @@ and equation ff ({ eq_desc = desc } as eq) =
      automaton_handler_list
        is_weak leqs block_of_equation block_of_equation expression
        ff handlers state_opt
-  | EQmatch { vkind = v; is_total; e; handlers } ->
-     fprintf ff "@[<hov0>%s%amatch %a with@ @[%a@]@]"
+  | EQmatch { is_total; e; handlers } ->
+     fprintf ff "@[<hov0>%smatch %a with@ @[%a@]@]"
        (if is_total then "total " else "")
-       vkind v expression e
-       (print_list_l (match_handler equation) """""") handlers
-  | EQif { vkind = v; e; eq_true; eq_false } ->
-     fprintf ff "@[<hov0>%aif %a@ then %a@ else %a@]"
-       vkind v expression e equation eq_true equation eq_false
+       expression e (print_list_l (match_handler equation) """""") handlers
+  | EQif { e; eq_true; eq_false } ->
+     fprintf ff "@[<hov0>if %a@ then %a@ else %a@]"
+       expression e equation eq_true equation eq_false
   | EQpresent { handlers; default_opt } ->
      fprintf ff "@[<hov0>present@ @[%a@]@%a]"
        (print_list_l
