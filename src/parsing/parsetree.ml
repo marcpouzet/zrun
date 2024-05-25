@@ -196,7 +196,7 @@ and exp_desc =
   | Erecord_with : exp * (longname * exp) list -> exp_desc
   | Etypeconstraint : exp * type_expression -> exp_desc
   | Efun : funexp -> exp_desc
-  | Ematch : vkind * exp * (exp, exp) match_handler list -> exp_desc
+  | Ematch : exp * (exp, exp) match_handler list -> exp_desc
   | Epresent : (scondpat, exp) present_handler list * exp default -> exp_desc
   | Ereset : exp * exp -> exp_desc
   | Eassert : exp -> exp_desc
@@ -228,7 +228,7 @@ and eq_desc =
   (* [init n = e0 *)
   | EQemit : name * exp option -> eq_desc
   (* [emit n [= e] *)
-  | EQif : vkind * exp * eq * eq -> eq_desc
+  | EQif : exp * eq * eq -> eq_desc
   (* [if e then [... and ...] else [... and ...]] *)
   | EQand : eq list -> eq_desc
   (* parallel composition [eq1 and eq2] *)
@@ -241,7 +241,7 @@ and eq_desc =
   | EQautomaton : (exp, eq) block automaton_handler list *
         exp state option -> eq_desc
   (* automaton ... *)
-  | EQmatch : vkind * exp * (exp, eq) match_handler list -> eq_desc
+  | EQmatch : exp * (exp, eq) match_handler list -> eq_desc
   | EQpresent :
       (scondpat, eq) present_handler list * eq default -> eq_desc
   | EQempty : eq_desc
