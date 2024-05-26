@@ -2240,6 +2240,9 @@ let implementation genv { desc; loc } =
      (* debug info (a bit of imperative code here!) *)
      if !print_values then Output.letdecl Format.std_formatter name v;
      return (add name v genv)
+  (* | Eletdef { is_rec; const; defs } ->
+     if is_rec then
+     else *)
   | Etypedecl _ ->
      return genv
 
