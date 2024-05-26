@@ -1007,6 +1007,8 @@ size_expression_desc:
     { Sfrac(num, denom) }
   | e1 = size_expression PLUS e2 = size_expression
     { Splus(e1, e2) }
+  | e1 = size_expression MINUS e2 = size_expression
+    { Sminus(e1, e2) }
   | e1 = size_expression STAR e2 = size_expression
     { Smult(e1, e2) }
 ;

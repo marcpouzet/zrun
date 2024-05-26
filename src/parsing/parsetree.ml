@@ -176,6 +176,7 @@ and size_desc =
   | Sfrac : size * int  -> size_desc
   | Sident : name -> size_desc
   | Splus: size * size -> size_desc
+  | Sminus : size * size -> size_desc
   | Smult: size * size -> size_desc
   
 type exp = exp_desc localized
