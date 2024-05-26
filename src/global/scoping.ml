@@ -879,6 +879,9 @@ let implementation { desc; loc } =
       | Eletdecl { name; const; e } ->
          let e = expression Env.empty e in
          Ast.Eletdecl { name = name; const = const; e = e}
+      | Eletdef { is_rec; const; defs } ->
+         let defs = List.map (fun (n, e) -> (n, expression Env.empty e)) defs in
+         Ast.Eletdef { is_rec; const; defs }
       | Etypedecl { name; ty_params; size_params; ty_decl } ->
          let ty_decl = type_decl ty_decl in
          Ast.Etypedecl { name = name; ty_params; size_params; ty_decl } in

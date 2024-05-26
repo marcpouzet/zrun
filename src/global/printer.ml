@@ -600,6 +600,13 @@ let implementation ff impl =
   | Eletdecl { name; const; e } ->
      fprintf ff "@[<hov2>let %s%a =@ %a@]@."
        (if const then "const " else "") shortname name expression e
+  | Eletdef { is_rec; const; defs } ->
+     let def ff (name, e) =
+       fprintf ff "@[<hov2>%a =@ %a in@]" shortname name expression e in
+     fprintf ff "@[<hov>let %s%s%a@]"
+       (if const then "const " else "")
+       (if is_rec then "rec " else "")
+       (print_list_l def "" "and " "") defs
     
 let program ff imp_list = List.iter (implementation ff) imp_list
 

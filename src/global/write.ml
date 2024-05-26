@@ -316,8 +316,11 @@ and result ({ r_desc } as r) =
 let implementation ({ desc } as i) =
   let desc = match desc with
     | Eopen _ -> desc
-    | Eletdecl({ name; const; e } as entry) ->
-               Eletdecl { entry with e = expression e }
+    | Eletdecl({ e } as entry) ->
+       Eletdecl { entry with e = expression e }
+    | Eletdef({ defs } as entry) ->
+       let defs = List.map (fun (n, e) -> (n, expression e)) defs in
+       Eletdef { entry with defs }
     | Etypedecl _ -> desc in
   { i with desc = desc }
   
