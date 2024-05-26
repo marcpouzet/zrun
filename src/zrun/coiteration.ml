@@ -261,6 +261,10 @@ let rec size env { desc; loc } =
      let* v1 = size env s1 in
      let* v2 = size env s2 in
      return (v1 + v2)
+  | Sminus(s1, s2) ->
+     let* v1 = size env s1 in
+     let* v2 = size env s2 in
+     return (v1 - v2)
   | Smult(s1, s2) ->
      let* v1 = size env s1 in
      let* v2 = size env s2 in
@@ -276,7 +280,7 @@ let sizefun_defs genv env l_eq =
              { s_params = id_list; s_body = e; s_genv = genv; s_env = env } acc)
     | EQand(eq_list) ->
        fold sizefun_def acc eq_list
-    | _ -> error { kind = Etype; loc = eq_loc } in
+    | _ -> error { kind = Esizefun_def_recursive; loc = eq_loc } in
   sizefun_def Env.empty l_eq
 
 (* Present handler *)
@@ -546,10 +550,11 @@ and ifor_exp is_fun is_resume genv env r =
      let* s_b = iblock (is_fun && is_resume) genv env body in
      return (s_b, sr_list)
 
+(* initial state of an equation *)
 and ieq is_fun genv env { eq_desc; eq_loc  } =
   match eq_desc with
   | EQeq(_, e) -> iexp is_fun genv env e
-  | EQsizefun { id; id_list; e } -> return Sempty
+  | EQsizefun _ -> return Sempty
   | EQder { e; e_opt; handlers } ->
      (* [x becomes an input; x' an output] *)
      (* they are stored as a state { der = x'; pos = x } *)
@@ -671,16 +676,16 @@ and ileq_list is_fun genv env leq_list =
     Env.empty leq_list
   
 (* initial state of a local declaration [let eq in e] *)
-and ileq is_fun genv env ({ l_kind; l_eq } as leq) =
+and ileq is_fun genv env ({ l_kind; l_eq; l_rec } as leq) =
   match l_kind with
   | Kconst | Kstatic ->
-      (* if the declaration is constant/static, compute it during *)
-      (* the initialization *)
-      let* l_env = vleq genv env leq in
-      return (l_env, Senv(l_env))
+     (* if the declaration is constant/static, its value is computed during *)
+     (* the initialization phase *)
+     let* l_env = vleq genv env leq in
+     return (l_env, Senv(l_env))
   | Kany ->
-      let* s = ieq is_fun genv env l_eq in
-      return (Env.empty, s)
+     let* s = ieq is_fun genv env l_eq in
+     return (Env.empty, s)
 
 (* initial state of an automaton *)
 and initial_state_of_automaton 

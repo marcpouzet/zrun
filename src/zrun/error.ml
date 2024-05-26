@@ -34,7 +34,6 @@ type kind =
   | Einitial_state_with_parameter : Ident.t  -> kind
   (* the initial state has a parameter which is undefined *)
   | Epattern_matching_failure : kind
-  | Enot_implemented : kind (* not implemented *)
   | Enil : kind (* value is nil *)
   | Ebot : kind (* value is bottom *)
   | Eassert_failure : kind (* assertion is not true *)
@@ -48,6 +47,8 @@ type kind =
   | Eloop_no_iteration : kind
   (* the size must decrease at every recursive call *)
   | Esize_in_a_recursive_call : int list * int list -> kind
+  (* recursive values defined statically must only be size functions *)
+  | Esizefun_def_recursive : kind
   (* the loop should iterate at least once; or give a default value *)
   | Eloop_cannot_determine_size : kind
   (* the size is not given and there is no input *)
@@ -61,7 +62,8 @@ type kind =
   (* the loop iterates on [expected_dimensions] but the input or output array *)
   (* has dimention [actual_dimension] *)
   | Eunexpected_failure : kind (* an error that should not arrive *)
-                      
+  | Enot_implemented : kind (* not implemented *)
+                  
 type error = { kind : kind; loc : Location.t }
            
 let message loc kind =
@@ -144,13 +146,18 @@ let message loc kind =
         or ensure there is at least one iteration.@.@]"
        output_location loc
   | Esize_in_a_recursive_call(actual_v_list, expected_v_list) ->
-    let print_v_list ff v_list =
-      Pp_tools.print_list_l
-        (fun ff i -> Format.fprintf ff "%d" i) "(" "," ")" ff v_list in
-    eprintf
-      "@[%aZrun: the value of the argument is \n%a\
-       whereas it should be strictly less than %a.@.@]"
+     let print_v_list ff v_list =
+       Pp_tools.print_list_l
+         (fun ff i -> Format.fprintf ff "%d" i) "(" "," ")" ff v_list in
+     eprintf
+       "@[%aZrun: the actual value of the size parameter is %a \n\
+        whereas it should be strictly less than %a.@.@]"
        output_location loc print_v_list actual_v_list print_v_list expected_v_list
+  | Esizefun_def_recursive ->
+     eprintf
+       "@[%aZrun: static values defined recursively can only be\n\
+        functions parameterized by a size.@.@]"
+       output_location loc
   (* the loop should iterate at least once; or give a default value *)
   | Eloop_cannot_determine_size ->
     eprintf
