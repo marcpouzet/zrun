@@ -368,6 +368,7 @@ let rec size env { desc; loc } =
   | Sfrac(s, q) -> Ast.Sfrac { num = size env s; denom = q }
   | Sident(n) -> Ast.Sident(name loc env n)
   | Splus(s1, s2) -> Ast.Splus(size env s1, size env s2)
+  | Sminus(s1, s2) -> Ast.Sminus(size env s1, size env s2)
   | Smult(s1, s2) -> Ast.Smult(size env s1, size env s2) in
   { desc; loc }
 

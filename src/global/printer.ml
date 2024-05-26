@@ -263,9 +263,14 @@ let size ff e =
       if prio >= 1 then fprintf ff "(";
       fprintf ff "@[%a + %a@]" (size 0) s1 (size 0) s2;
       if prio >= 1 then fprintf ff ")"
+    | Sminus(s1, s2) -> 
+      (* if the surrending operator has a greater priority *)
+      if prio >= 1 then fprintf ff "(";
+      fprintf ff "@[%a - %a@]" (size 1) s1 (size 1) s2;
+      if prio >= 1 then fprintf ff ")"
     | Smult(s1, s2) -> fprintf ff "@[%a * %a@]" (size 2) s1 (size 2) s2 in
   size 0 ff e
-                         
+
 let rec expression ff e =
   let exp ff e =
     match e.e_desc with

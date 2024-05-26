@@ -185,6 +185,7 @@ and size_desc =
   | Sfrac : { num: size; denom: int } -> size_desc
   | Sident : Ident.t -> size_desc
   | Splus: size * size -> size_desc
+  | Sminus : size * size -> size_desc
   | Smult: size * size -> size_desc
   
 type exp =
