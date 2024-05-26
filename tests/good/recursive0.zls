@@ -2,13 +2,23 @@
 let f1 = fun x returns o if true then o = 1 else o = 2
 let f2 () = f1 ()
 let f3 =
-  let rec xor_<<n>> = fun (x) returns (o)
-    match n with
-    | 0 -> do o = false done
-    | n -> do o = xor_<<n/2>>(x.(0 .. n/2-1)) || xor_<<n/2>>(x.(n/2 .. n-1)) done in
+  let static rec xor_<<n>> = fun (x) returns (o)
+    if n = 0 then
+      do o = false done
+    else do o = xor_<<n/2>>(x.(0 .. n/2-1)) || xor_<<n/2>>(x.(n/2 .. n-1)) done in
   xor_
 
-let f4 () = f3 <<4>> 0
+let f3' =
+  let static rec sum_<<n>> = fun (x) returns (o)
+    if n = 1 then
+      do o = x.(0) done
+      else do o = (sum_<<n/2>>(x.(0 .. n/2-1))) +
+                  (sum_<<n/2>>(x.(n/2 .. n-1))) done in
+  sum_
+
+let f4 () = f3 <<4>> [|true; false; false; false |]
+
+let f44 () = f3' <<4>> [|1; 2; 3; 4 |]
 
 let f5 = let f<<n>>() = n + 1 in f
 
