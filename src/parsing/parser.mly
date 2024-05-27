@@ -472,6 +472,8 @@ implementation:
     td = localized(type_declaration_desc)
     { Etypedecl
 	{ name = id; ty_params = tp; size_params = sp; ty_decl = td } }
+  /* | LET v = vkind_opt i = is_rec let_eq = equation_and_list
+    { Eletdef(make { l_rec = i; l_kind = v; l_eq = let_eq } } */
   | LET v = const ide = ide EQUAL seq = seq_expression
       { Eletdecl { name = ide; const = v; e = seq } }
   /* several short-cuts are possible for function definitions */
