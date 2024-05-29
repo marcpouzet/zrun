@@ -2,6 +2,14 @@
 let rec f<<n>>(x) = g<<n-1>>(x+1)
     and g<<n>>(x) = g<<n-1>>(x)
   
+let ff () =
+    let rec f<<n>>(x) = g<<n-1>>(x+1)
+    and g<<n>>(x) = g<<n-1>>(x) in
+    f<<10>>(0)
+
+let m () = f
+let n () = g
+
 let main1 () = f<<10>>(1)
 
 
