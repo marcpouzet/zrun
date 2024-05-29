@@ -1,13 +1,15 @@
 (* recursive functions defined at top level *)
-let rec f<<n>>(x) = g<<n-1>>(x+1)
-    and g<<n>>(x) = g<<n-1>>(x)
+let rec f<<n>>(x) = 
+  match n with | 0 -> x | n -> g<<n-1>>(x+1)
+and g<<n>>(x) = g<<n-1>>(x)
   
 let ff () =
-    let rec f<<n>>(x) = g<<n-1>>(x+1)
+    let rec f<<n>>(x) = 
+      match n with | 0 -> x | n -> g<<n-1>>(x+1)
     and g<<n>>(x) = g<<n-1>>(x) in
     f<<10>>(0)
 
-let m () = f
+let m () = ff ()
 let n () = g
 
 let main1 () = f<<10>>(1)
