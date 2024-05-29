@@ -272,23 +272,28 @@ let size ff e =
   size 0 ff e
 
 let rec expression ff e =
-  let exp ff e =
-    match e.e_desc with
+  let exp ff { e_desc } =
+    match e_desc with
     | Elocal n -> name ff n
     | Eglobal { lname } -> longname ff lname
-    | Eop(op, e_list) -> operator ff op e_list
+    | Eop(op, e_list) -> 
+        fprintf ff "@[(";
+        operator ff op e_list;
+        fprintf ff ")@]"
     | Elast x -> fprintf ff "last %a" name x
     | Econstr0 { lname } -> longname ff lname
     | Econst c -> immediate ff c
     | Eapp { is_inline; f; arg_list } ->
+       fprintf ff "@[(";
        let s = if is_inline then "inline " else "" in
        fprintf ff "@[%s%a %a@]"
-         s expression f (print_list_r expression "" "" "") arg_list
-    | Esizeapp { f; s_list } ->
+         s expression f (print_list_r expression "" "" "") arg_list;
+       fprintf ff ")@]"
+    | Esizeapp { f; size_list } ->
        fprintf ff "@[%a %a@]" expression f
-       (print_list_l size "<<" "," ">>") s_list 
+       (print_list_l size "<<" "," ">>") size_list 
     | Econstr1 { lname; arg_list } ->
-       fprintf ff "@[%a%a@]"
+       fprintf ff "@[(%a%a)@]"
          longname lname (print_list_r expression "(" "," ")") arg_list
     | Etuple(e_list) ->
        fprintf ff "@[%a@]" (print_list_r expression "(" "," ")") e_list
@@ -304,7 +309,7 @@ let rec expression ff e =
 	    (print_record longname expression """ =""") "" ";" "")
          ln_e_list
     | Elet(l, e) ->
-       fprintf ff "@[<v0>%a%a@]" leq l expression e
+       fprintf ff "@[<v0>%a in @,%a@]" leq l expression e
     | Etypeconstraint(e, typ) ->
        fprintf ff "@[(%a: %a)@]" expression e ptype typ
     | Ematch { is_total; e; handlers } ->
@@ -320,7 +325,7 @@ let rec expression ff e =
     | Ereset(e_body, e) ->
        fprintf ff "@[<hov>reset@ %a@ every %a@]" expression e_body expression e
     | Efun(fe) ->
-       funexp ff fe
+       fprintf ff "@[(%a)@]" funexp fe
     | Eassert(e_body) ->
        fprintf ff "@[<hov 2>assert@ %a@]" expression e_body
     | Eforloop({ for_size; for_kind; for_index; for_input; for_body;
@@ -471,7 +476,7 @@ and equation ff ({ eq_desc = desc } as eq) =
      fprintf ff "@[<hov2>reset@ @[%a@]@ @[<hov 2>every@ %a@]@]"
        equation eq expression e
   | EQlet(l_eq, eq) ->
-     fprintf ff "@[<hov0>%a@ %a@]" leq l_eq equation eq
+     fprintf ff "@[<hov0>%a@,in@ %a@]" leq l_eq equation eq
   | EQlocal(b_eq) -> block_of_equation ff b_eq
   | EQand(and_eq_list) ->
      print_list_l equation "do " "and " " done" ff and_eq_list
@@ -559,13 +564,11 @@ and for_returns ff for_vardec_list =
 and block_of_equation ff b_eq =
   block expression equation ff b_eq
 
-(* "@[<v0>%alet %s%a in@ @]" *)
-
 and leq ff { l_rec; l_eq } =
   let s = if l_rec then " rec " else "" in
-  fprintf ff "@[<v0>@[<hov2>let%s@ %a@] in@ @]" s equation l_eq
+  fprintf ff "@[<v0>@[<hov2>let%s@ %a@]@ @]" s equation l_eq
 
-and leqs ff l =  print_if_not_empty (print_list_l leq "" "" "") ff l
+and leqs ff l =  print_if_not_empty (print_list_l leq "" "in" "in") ff l
 
 let constr_decl ff { desc = desc } =
   match desc with
@@ -597,16 +600,11 @@ let implementation ff impl =
        print_type_params ty_params
        name print_size_params size_params
        type_decl ty_decl
-  | Eletdecl { name; const; e } ->
-     fprintf ff "@[<hov2>let %s%a =@ %a@]@."
-       (if const then "const " else "") shortname name expression e
-  | Eletdef { is_rec; const; defs } ->
-     let def ff (name, e) =
-       fprintf ff "@[<hov2>%a =@ %a in@]" shortname name expression e in
-     fprintf ff "@[<hov>let %s%s%a@]"
-       (if const then "const " else "")
-       (if is_rec then "rec " else "")
-       (print_list_l def "" "and " "") defs
+  | Eletdecl { d_names; d_leq } ->
+     (* print the set of equations and the list of globally defined names *)
+     leq ff d_leq;
+     List.iter
+       (fun (n, id) -> fprintf ff "@[<v 0>let %s = %a@]@." n name id) d_names
     
 let program ff imp_list = List.iter (implementation ff) imp_list
 

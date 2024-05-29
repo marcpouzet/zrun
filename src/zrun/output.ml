@@ -53,12 +53,15 @@ let rec pvalue ff v =
      Format.fprintf ff "<closure>"
   | Vsizefun _ ->
      Format.fprintf ff "<sizefun>"
-  | Vsizefix { bound; name } ->
-     Format.fprintf ff "<sizefix <%a>%a>"
+  | Vsizefix { bound; name; defs } ->
+     let n_list = Ident.Env.to_list defs in
+     Format.fprintf ff "<sizefix <%a>%a with %a>"
        (Pp_tools.print_opt
           (fun ff i_list -> 
              Pp_tools.print_list_l (fun ff i -> Format.fprintf ff "%d" i)
                "(" "," "" ff i_list)) bound Ident.fprint_t name
+       (Pp_tools.print_list_r 
+          (fun ff (name, _) -> Ident.fprint_t ff name) "" "," "") n_list
   | Vrecord(l) ->
      let one ff { Ast.arg; Ast.label } =
        Format.fprintf ff "@[<hov2>%a =@ %a@]"
@@ -95,5 +98,7 @@ let value_flush ff v =
   Format.fprintf ff "%a@." value v
 let pvalue_flush ff l = 
   Format.fprintf ff "%a@." pvalue l
-let letdecl ff name v =
-  Format.fprintf ff "@[<hov 2>val %s =@ %a@]@." name pvalue v
+let letdecl ff n_v_list =
+  let onedecl ff (name, v) =
+    Format.fprintf ff "@[<hov 2>val %s =@ %a@]@." name pvalue v in
+  List.iter (onedecl ff) n_v_list

@@ -156,8 +156,7 @@ let eq genv env sem eq n s_eq bot =
 
 (* fixpoint for mutually recursive definitions of size parameterized functions *)
 (* [defs = [f1\Vsfun ...; fk\Vsfun ...]] *)
-let sizefixpoint defs env =
-  Ident.Env.fold 
-    (fun f entry acc -> 
-       Env.add f (Match.entry (Vsizefix { bound = None; name = f; defs })) acc)
-    defs env
+let sizefixpoint defs =
+  Ident.Env.mapi 
+    (fun f entry -> Match.entry (Vsizefix { bound = None; name = f; defs })) 
+    defs

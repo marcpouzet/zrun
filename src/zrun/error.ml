@@ -47,7 +47,8 @@ type kind =
   | Eloop_no_iteration : kind
   (* the size must decrease at every recursive call *)
   | Esize_in_a_recursive_call : int list * int list -> kind
-  (* recursive values defined statically must only be size functions *)
+  (* recursive definitions must be either sets of functions parameterized *)
+  (* by a size or do not contain such functions *)
   | Esizefun_def_recursive : kind
   (* the loop should iterate at least once; or give a default value *)
   | Eloop_cannot_determine_size : kind
@@ -151,12 +152,12 @@ let message loc kind =
          (fun ff i -> Format.fprintf ff "%d" i) "(" "," ")" ff v_list in
      eprintf
        "@[%aZrun: the actual value of the size parameter is %a \n\
-        whereas it should be strictly less than %a.@.@]"
+        whereas it should be strictly less than %a and non negative.@.@]"
        output_location loc print_v_list actual_v_list print_v_list expected_v_list
   | Esizefun_def_recursive ->
      eprintf
-       "@[%aZrun: static values defined recursively can only be\n\
-        functions parameterized by a size.@.@]"
+       "@[%aZrun: values defined recursively can only be\n\
+        functions parameterized by a size or streams.@.@]"
        output_location loc
   (* the loop should iterate at least once; or give a default value *)
   | Eloop_cannot_determine_size ->

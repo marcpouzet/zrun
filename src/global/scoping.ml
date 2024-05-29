@@ -745,7 +745,7 @@ and expression env { desc; loc } =
        Ast.Eapp { is_inline; f; arg_list }
     | Esizeapp(f, size_list) ->
        Ast.Esizeapp 
-         { f = expression env f; s_list = List.map (size env) size_list }
+         { f = expression env f; size_list = List.map (size env) size_list }
     | Erecord_access(e, lname) ->
        let e = expression env e in
        Ast.Erecord_access { arg = e; label = longname lname }
@@ -876,12 +876,10 @@ let implementation { desc; loc } =
   try
     let desc = match desc with
       | Eopen(n) -> Ast.Eopen(n)
-      | Eletdecl { name; const; e } ->
-         let e = expression Env.empty e in
-         Ast.Eletdecl { name = name; const = const; e = e}
-      | Eletdef { is_rec; const; defs } ->
-         let defs = List.map (fun (n, e) -> (n, expression Env.empty e)) defs in
-         Ast.Eletdef { is_rec; const; defs }
+      | Eletdecl(d_leq) ->
+         let d_leq, env = letin Env.empty d_leq in
+         let d_names = Env.to_list env in
+         Ast.Eletdecl { d_names = d_names; d_leq = d_leq }
       | Etypedecl { name; ty_params; size_params; ty_decl } ->
          let ty_decl = type_decl ty_decl in
          Ast.Etypedecl { name = name; ty_params; size_params; ty_decl } in

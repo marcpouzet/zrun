@@ -150,10 +150,10 @@ let rec equation ({ eq_desc } as eq)=
   { eq with eq_desc = eq_desc; eq_write = def }, def
 
 (* Sequence [let eq1 in let eq2 in ... let eqn in ...] *)
-and lets l =
-  List.map
-    (fun ({ l_eq } as leq) ->
-      let l_eq, _ = equation l_eq in { leq with l_eq }) l
+and lets l = List.map leq l
+
+and leq ({ l_eq } as l) =
+  let l_eq, _ = equation l_eq in { l with l_eq }
 
 (** [returns a new block whose body is an equation [eq];
  *- [def] the defined variables in [eq] that are not local;
@@ -217,13 +217,11 @@ and expression ({ e_desc } as e) =
     | Eop(op, e_list) ->
        Eop(op, List.map expression e_list)
     | Etuple(e_list) -> Etuple(List.map expression e_list)
-    | Elet({ l_eq } as leq, e) ->
-       let l_eq, _ = equation l_eq in
-       Elet({ leq with l_eq }, expression e)
+    | Elet(l_eq, e) -> Elet(leq l_eq, expression e)
     | Eapp { is_inline; f; arg_list } ->
        Eapp { is_inline; f = expression f; 
               arg_list = List.map expression arg_list }
-    | Esizeapp { f; s_list } -> Esizeapp { f = expression f; s_list }
+    | Esizeapp({ f } as app) -> Esizeapp({ app with f = expression f})
     | Erecord_access({ label; arg }) ->
        Erecord_access({ label; arg = expression arg })
     | Erecord(le_list) ->
@@ -316,11 +314,8 @@ and result ({ r_desc } as r) =
 let implementation ({ desc } as i) =
   let desc = match desc with
     | Eopen _ -> desc
-    | Eletdecl({ e } as entry) ->
-       Eletdecl { entry with e = expression e }
-    | Eletdef({ defs } as entry) ->
-       let defs = List.map (fun (n, e) -> (n, expression e)) defs in
-       Eletdef { entry with defs }
+    | Eletdecl({ d_leq } as d) ->
+       Eletdecl { d with d_leq = leq d_leq }
     | Etypedecl _ -> desc in
   { i with desc = desc }
   

@@ -249,8 +249,8 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token <string> INFIX4
 %token EOF
 
-/* %nonassoc LOCAL DO
-%nonassoc AND */
+%nonassoc prec_result
+%left WHERE AND
 %nonassoc EMIT
 %nonassoc ASSERT
 %nonassoc prec_seq
@@ -290,7 +290,8 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %left TRANSPOSE FLATTEN REVERSE
 %left DOT
 %left INIT DEFAULT
-
+/* %nonassoc WHERE
+%left AND */
 
 %start implementation_file
 %type <Parsetree.implementation list> implementation_file
@@ -472,24 +473,12 @@ implementation:
     td = localized(type_declaration_desc)
     { Etypedecl
 	{ name = id; ty_params = tp; size_params = sp; ty_decl = td } }
-  /* | LET v = vkind_opt i = is_rec let_eq = equation_and_list
-    { Eletdef(make { l_rec = i; l_kind = v; l_eq = let_eq } } */
-  | LET v = const ide = ide EQUAL seq = seq_expression
-      { Eletdecl { name = ide; const = v; e = seq } }
-  /* several short-cuts are possible for function definitions */
-  | LET a = is_atomic c = const k = fun_kind_opt ide = ide
-        p_list_list = param_list_list r = result_or_where
-    { Eletdecl { name = ide; const = c;
-		 e = funexp a k p_list_list r $startpos $endpos } }
-  /* [let [atomic] const [node|fun|hybrid] (f x1...xn) = e */
-  | LET a = is_atomic c = const LPAREN ide = ide p_list = param_list RPAREN
-    r = result_or_where
-    { let vkind = if c then Kconst else Kany in
-      Eletdecl { name = ide; const = c;
-		 e = funexp a (Kfun(vkind)) [vkind, p_list] r $startpos $endpos }
-    }
+  | LET v = vkind_opt i = is_rec let_eq = equation_and_list
+    { Eletdecl(make 
+                 { l_rec = i; l_kind = v; l_eq = let_eq } $startpos $endpos) }
 ;
 
+/*
 result_or_where:
   | r = result { r }
   | EQUAL seq = seq_expression WHERE i = is_rec eq = equation_and_list
@@ -498,11 +487,7 @@ result_or_where:
 		$startpos(seq) $endpos(eq)))
       $startpos $endpos }
 ;
-
-const:
-  | CONST { true }
-  | { false }
-;
+*/
 
 vkind:
   | CONST { Kconst }
@@ -534,8 +519,28 @@ fun_kind:
 result:
   | RETURNS p = param eq = equation
     { make (Returns(p, eq)) $startpos $endpos }
-  | EQUAL seq = seq_expression
-    { make (Exp(seq)) $startpos $endpos }
+  | EQUAL seq = seq_expression %prec prec_result
+    { make (Exp(seq)) $startpos(seq) $endpos(seq) }
+  | EQUAL seq = seq_expression WHERE 
+      i = is_rec eq = where_equation_and_list %prec prec_result
+    { make (Exp(make (Elet(make { l_rec = i; l_kind = Kany; l_eq = eq }
+			  $startpos(eq) $endpos(eq), seq))
+		$startpos(seq) $endpos(eq)))
+      $startpos $endpos }
+;
+
+%inline where_equation_and_list:
+  | l = where_equation_and_list_aux
+    { match List.rev l with
+      | [] -> no_eq $startpos $endpos | [eq] -> eq
+      | l -> make (EQand(l)) $startpos $endpos }
+;
+
+where_equation_and_list_aux:
+  | eq = equation
+     { [eq] }
+  | eq_list = where_equation_and_list_aux AND eq = equation
+    { eq :: eq_list }
 ;
 
 for_return:

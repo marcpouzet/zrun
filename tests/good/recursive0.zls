@@ -8,7 +8,7 @@ let f3 =
     else do o = xor_<<n/2>>(x.(0 .. n/2-1)) || xor_<<n/2>>(x.(n/2 .. n-1)) done in
   xor_
 
-let f3' =
+let f33 =
   let static rec sum_<<n>> = fun (x) returns (o)
     if n = 1 then
       do o = x.(0) done
@@ -18,7 +18,7 @@ let f3' =
 
 let f4 () = f3 <<4>> [|true; false; false; false |]
 
-let f44 () = f3' <<4>> [|1; 2; 3; 4 |]
+let f44 () = f33 <<4>> [|1; 2; 3; 4 |]
 
 let f5 = let f<<n>>() = n + 1 in f
 
