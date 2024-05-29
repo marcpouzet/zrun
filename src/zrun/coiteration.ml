@@ -1002,7 +1002,6 @@ and sexp genv env { e_desc; e_loc } s =
      return (v, Slist (s :: s_list))
   | Esizeapp { f; size_list }, s ->
      (* [size_list] is a list of size; it must be combinational *)
-     let l = Env.to_list env in
      let* fv, s = sexp genv env f s in
      let* v_list = map (size env) size_list in
      let* v = let+ fv = fv in sizeapply e_loc fv v_list in
@@ -2248,9 +2247,16 @@ and sizeapply loc fv v_list =
          else
            error 
              { kind = Esize_in_a_recursive_call(v_list, exp_v_list); loc } in
-     apply s_params s_body s_genv 
-       (Env.add name
-          (Match.entry (Vsizefix { bound = Some(v_list); name; defs })) s_env)
+     (* the body of [name] is evaluated in its closure environment *)
+     (* extended with all entries in [defs] *)
+     let s_env = 
+       Env.fold 
+         (fun f e acc -> 
+            Env.add f 
+              (Match.entry 
+                 (Vsizefix { bound = Some(v_list); name; defs })) acc)
+         defs s_env in
+     apply s_params s_body s_genv s_env
   | _ -> error { kind = Etype; loc }
 
 (* check that a value is neither bot nor nil *)
