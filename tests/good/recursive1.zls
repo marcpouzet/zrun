@@ -1,6 +1,7 @@
 (* recursive functions defined at top level *)
-let rec f<<n>>(x) = 
-  match n with | 0 -> x | n -> g<<n-1>>(x+1)
+let rec f<<n>>(x) returns o 
+  if n=0 then do o = x done
+  else do o = g<<n-1>>(x+1) done
 and g<<n>>(x) = g<<n-1>>(x)
   
 let ff () =
@@ -9,9 +10,8 @@ let ff () =
     and g<<n>>(x) = g<<n-1>>(x) in
     f<<10>>(0)
 
-let m () = ff ()
-let n () = g
 
-let main1 () = f<<10>>(1)
+let main1 () = f<<10>>(0)
+let main2 () = ff ()
 
 
