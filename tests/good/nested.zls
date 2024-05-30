@@ -1,6 +1,6 @@
 (* A nested set of blocks to observe the number of iteration *)
 (* to compute the fix-point *)
-(* Complexity in O(n^2) ? where n is the max nested number of blocks *)
+(* Complexity is exponential O(2^n) where n is the max nested number of blocks *)
 let node main() returns (x)
   local x1, x'1 do (* 3 + 1 iteration because 2 var. a defined*)
     local x2, x'2 do (* 5 + 1 iteration because 4 var. a defined*)
@@ -99,4 +99,20 @@ let node main4() returns (x)
 	done
       done
     done
-	    
+
+let f(g) = fun (x) returns (y)
+  local m do
+    y = m and m = g x
+  done
+
+(* this one is exponential *)
+let main5() returns (x)
+  x = f(f(f(f(f(f(f(f(f(f((fun x -> x))))))))))) 0
+
+let f(g) = fun x -> y where
+  rec y =
+    let rec m = g x and y = m in
+    y
+
+let main6() = f(f(f(f(f(fun x -> x))))) 0
+
