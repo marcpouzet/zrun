@@ -109,10 +109,14 @@ let f(g) = fun (x) returns (y)
 let main5() returns (x)
   x = f(f(f(f(f(f(f(f(f(f((fun x -> x))))))))))) 0
 
-let f(g) = fun x -> y where
+let f(g) = (fun x -> y) where
   rec y =
     let rec m = g x and y = m in
     y
 
 let main6() = f(f(f(f(f(fun x -> x))))) 0
+
+(* let f = fun x -> y where rec y = x + 1 *)
+
+
 
