@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -41,9 +41,9 @@ let doc_print_values = "\tPrint values"
 let doc_number_of_fixpoint_iterations =
   "\tPrint the number of steps for fixpoints"
 let doc_esterel =
-  "\t Sets the interpretation of if/then/else to that of Esterel"
+  "\t Sets the interpretation of if/then/else to be constructive"
 let doc_lustre =
-  "\t Sets the interpretation of if/then/else to that of Lustre"
+  "\t Sets the interpretation of if/then/else to be strict (that of Lustre)"
                    
 let errmsg = "Options are:"
 
