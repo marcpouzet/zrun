@@ -33,6 +33,17 @@ let rec xor_n<<n>> = fun (x) returns (o)
 let main5() returns ()
   assert (xor_n<<4>>([|true; false; false; false |]))
 
+let xor(n, m) = if n then not m else m
+
+let rec xor_n<<n>>(x) returns (o)
+  if n = 0 then
+    o = false
+  else if n = 1 then o = x.(0)
+  else o = xor(xor_n<<n/2>>(x.(0 .. n/2-1)), xor_n<<n/2>>(x.(n/2 .. n-1)))
+
+let main5() returns ()
+  assert (xor_n<<4>>([|true; false; false; false |]))
+
 let rec fby_n<<n>> = node (x) returns (o)
   local m
   do o = x fby m
@@ -42,19 +53,20 @@ let rec fby_n<<n>> = node (x) returns (o)
         do m = run (fby_n<<n-1>>)(x) done
   done
 
-let ff<<n>> = node (x) returns (o)
-  local m
-  do o = x fby m and m = 0 done
-
-let node main_() = run (ff<<10>>) (0)
-
-let fff = node (x) returns (o)
-  local m
-  do o = x fby m + 1 and m = o done
-
-let node main__() = run (fff) (0)
-
 let node main6() =
+  let rec x = 0 -> pre x + 1 in
+  run (fby_n<<10>>)(x)
+
+let rec node fby_n<<n>>(x) returns (o)
+  local m
+  do o = x fby m
+  and if n = 0 then
+        m = x
+      else
+        m = run (fby_n<<n-1>>)(x)
+  done
+
+let node main66() =
   let rec x = 0 -> pre x + 1 in
   run (fby_n<<10>>)(x)
 

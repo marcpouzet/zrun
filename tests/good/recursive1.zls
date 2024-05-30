@@ -1,7 +1,8 @@
 (* recursive functions defined at top level *)
 let rec f<<n>>(x) returns o 
-  if n=0 then do o = x done
-  else do o = g<<n-1>>(x+1) done
+  if n=0 then o = x
+  else o = g<<n-1>>(x+1)
+
 and g<<n>>(x) = g<<n-1>>(x)
   
 let ff () =

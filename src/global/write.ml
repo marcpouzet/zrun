@@ -46,8 +46,9 @@ let rec equation ({ eq_desc } as eq)=
     | EQeq(pat, e) ->
        EQeq(pat, expression e),
        { Defnames.empty with dv = fv_pat S.empty pat }
-    | EQsizefun { id } ->
-       eq_desc, { Defnames.empty with dv = S.singleton id }
+    | EQsizefun { id; id_list; e } ->
+       let e = expression e in
+       EQsizefun { id; id_list; e }, { Defnames.empty with dv = S.singleton id }
     | EQder { id; e; e_opt; handlers } ->
        let e_opt, di =
          match e_opt with

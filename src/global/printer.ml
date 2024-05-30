@@ -290,7 +290,7 @@ let rec expression ff e =
          s expression f (print_list_r expression "" "" "") arg_list;
        fprintf ff ")@]"
     | Esizeapp { f; size_list } ->
-       fprintf ff "@[%a %a@]" expression f
+       fprintf ff "@[(%a %a)@]" expression f
        (print_list_l size "<<" "," ">>") size_list 
     | Econstr1 { lname; arg_list } ->
        fprintf ff "@[(%a%a)@]"

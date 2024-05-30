@@ -384,7 +384,9 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
      | Erun _, [{ e_loc = e_loc1} as e1; e2] ->
         (* node instanciation. [e1] must be a static expression *)
         if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
-        else let* v = vsexp genv env e1 in
+        else 
+          (* [e1] is evaluated statically *)
+          let* v = vsexp genv env e1 in
           let* v = Primitives.pvalue v |>
                    Opt.to_result ~none: { kind = Etype; loc = e_loc1} in
           let* v =
@@ -1885,10 +1887,13 @@ and sresult genv env { r_desc; r_loc } s =
 and sblock genv env { b_vars; b_body = ({ eq_write } as eq); b_loc } s_b =
   match s_b with
   | Slist (s_eq :: s_list) ->
+     let l = Env.to_list env in
      let* env_v, s_list =
        mapfold3 { kind = Estate; loc = b_loc }
          (svardec genv env) Env.empty b_vars s_list (bot_list b_vars) in
+     let l = Env.to_list env_v in
      let bot = Fix.complete env env_v (names eq_write) in
+     let l = Env.to_list bot in
      let n = (Fix.size eq) + 1 in
      let* env_eq, s_eq = Fix.eq genv env seq eq n s_eq bot in
      (* a dynamic check of causality: all locally defined names *)
