@@ -290,8 +290,6 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %left TRANSPOSE FLATTEN REVERSE
 %left DOT
 %left INIT DEFAULT
-/* %nonassoc WHERE
-%left AND */
 
 %start implementation_file
 %type <Parsetree.implementation list> implementation_file
