@@ -14,91 +14,117 @@
 (*                                                                     *)
 (* *********************************************************************)
 
+open Format
 open Lident
 open Value
    
 let lident ff lid =
   match lid with
-  | Name(s) -> Format.fprintf ff "%s" s
-  | Modname { qual; id } -> Format.fprintf ff "%s.%s" qual id
+  | Name(s) -> fprintf ff "%s" s
+  | Modname { qual; id } -> fprintf ff "%s.%s" qual id
                           
 let rec print_list value ff l =
   match l with
   | [] -> assert false
   | [x] -> value ff x
-  | x :: l -> Format.printf "@[%a,@ %a@]" value x (print_list value) l
+  | x :: l -> printf "@[%a,@ %a@]" value x (print_list value) l
             
 let rec pvalue ff v =
   match v with
-  | Vint(i) -> Format.fprintf ff "%i" i
-  | Vbool(b) -> Format.fprintf ff "%s" (if b then "true" else "false")
-  | Vfloat(f) -> Format.fprintf ff "%f" f
-  | Vchar(c) -> Format.fprintf ff "%c" c
-  | Vstring(s) -> Format.fprintf ff "%s" s
-  | Vvoid -> Format.fprintf ff "()"
+  | Vint(i) -> fprintf ff "%i" i
+  | Vbool(b) -> fprintf ff "%s" (if b then "true" else "false")
+  | Vfloat(f) -> fprintf ff "%f" f
+  | Vchar(c) -> fprintf ff "%c" c
+  | Vstring(s) -> fprintf ff "%s" s
+  | Vvoid -> fprintf ff "()"
   | Vtuple(l) ->
-     Format.fprintf ff "@[<hov 1>(%a)@]" value_list l
+     fprintf ff "@[<hov 1>(%a)@]" value_list l
   | Vstuple(l) ->
-     Format.fprintf ff "@[<hov 1>(%a)@]" pvalue_list l
+     fprintf ff "@[<hov 1>(%a)@]" pvalue_list l
   | Vconstr0(lid) -> lident ff lid
   | Vconstr1(lid, l) ->
-     Format.fprintf ff "@[<hov1>%a(%a)@]" lident lid pvalue_list l 
+     fprintf ff "@[<hov1>%a(%a)@]" lident lid pvalue_list l 
   | Vstate0(id) -> Ident.fprint_t ff id
   | Vstate1(id, l) ->
-     Format.fprintf
+     fprintf
        ff "@[<hov 1>%a(%a)@]" Ident.fprint_t id pvalue_list l
   | Vfun _ ->
-     Format.fprintf ff "<fun>"
+     fprintf ff "<fun>"
   | Vclosure _ ->
-     Format.fprintf ff "<closure>"
+     fprintf ff "<closure>"
   | Vsizefun _ ->
-     Format.fprintf ff "<sizefun>"
+     fprintf ff "<sizefun>"
   | Vsizefix { bound; name; defs } ->
      let n_list = Ident.Env.to_list defs in
-     Format.fprintf ff "<sizefix <%a>%a with %a>"
+     fprintf ff "<sizefix <%a>%a with %a>"
        (Pp_tools.print_opt
           (fun ff i_list -> 
-             Pp_tools.print_list_l (fun ff i -> Format.fprintf ff "%d" i)
+             Pp_tools.print_list_l (fun ff i -> fprintf ff "%d" i)
                "(" "," "" ff i_list)) bound Ident.fprint_t name
        (Pp_tools.print_list_r 
           (fun ff (name, _) -> Ident.fprint_t ff name) "" "," "") n_list
   | Vrecord(l) ->
      let one ff { Ast.arg; Ast.label } =
-       Format.fprintf ff "@[<hov2>%a =@ %a@]"
+       fprintf ff "@[<hov2>%a =@ %a@]"
          pvalue arg Lident.fprint_t label in
      (Pp_tools.print_list_r one "{" ";" "}") ff l
   | Vabsent ->
-     Format.fprintf ff "abs"
+     fprintf ff "abs"
   | Vpresent(v) ->
-     Format.fprintf ff "!%a" pvalue v
+     fprintf ff "!%a" pvalue v
   | Varray(a) -> parray ff a
 
 and parray ff a =
   match a with
   | Vflat(v) ->
-     Format.fprintf ff "@[<hov1>[|%a|]@]"
+     fprintf ff "@[<hov1>[|%a|]@]"
        (fun ff v ->
-         Array.iter (fun x -> Format.fprintf ff "%a;@," pvalue x) v)
+         Array.iter (fun x -> fprintf ff "%a;@," pvalue x) v)
        v
   | Vmap(m) -> pmap ff m
 
-and pmap ff { m_length; m_u } = Format.fprintf ff "@[[%d] -> ...@]" m_length
+and pmap ff { m_length; m_u } = fprintf ff "@[[%d] -> ...@]" m_length
 
 and value ff v =
   match v with
-  | Vnil -> Format.fprintf ff "nil"
-  | Vbot -> Format.fprintf ff "bot"
+  | Vnil -> fprintf ff "nil"
+  | Vbot -> fprintf ff "bot"
   | Value(v) -> pvalue ff v                 
               
 and pvalue_list ff l = print_list pvalue ff l
                      
 and value_list ff l = print_list value ff l
                     
+
+(* print a state *)
+let rec pstate ff s =
+  match s with
+  | Sbot -> fprintf ff "bot"
+  | Snil -> fprintf ff "nil"
+  | Sempty -> fprintf ff "()"
+  | Sval(v) -> value ff v
+  | Sstatic(v) -> fprintf ff "@[(static %a)@]" pvalue v
+  | Slist(s_list) ->
+      (Pp_tools.print_list_l pstate "[" ";" "]") ff s_list
+  | Sopt(None) -> 
+     fprintf ff "none" | Sopt(Some(v)) -> fprintf ff "(some %a)" value v
+  | Sinstance { init } ->
+     fprintf ff "@[<hov2>(instance@ %a)@]" pstate init
+  | Scstate { pos; der } -> 
+     fprintf ff "@[{ pos = %a; der = %a }@]" value pos value der
+  | Szstate { zin; zout } ->
+     fprintf ff "@[{ zin = %b; zout = %a }@]" zin value zout
+  | Shorizon { zin; horizon } -> 
+     fprintf ff "@[{ zin = %b; zout = %f }@]" zin horizon
+  | Speriod { phase; period } -> 
+     fprintf ff "@[{ phase = %f; period = %f }@]" phase period
+  | Senv _ -> fprintf ff "@[(env)@]"
+
 let value_flush ff v =
-  Format.fprintf ff "%a@." value v
+  fprintf ff "%a@." value v
 let pvalue_flush ff l = 
-  Format.fprintf ff "%a@." pvalue l
+  fprintf ff "%a@." pvalue l
 let letdecl ff n_v_list =
   let onedecl ff (name, v) =
-    Format.fprintf ff "@[<hov 2>val %s =@ %a@]@." name pvalue v in
+    fprintf ff "@[<hov 2>val %s =@ %a@]@." name pvalue v in
   List.iter (onedecl ff) n_v_list
