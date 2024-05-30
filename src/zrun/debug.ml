@@ -38,6 +38,9 @@ let print_ienv comment env =
   if !debug then Format.eprintf "%a" (fprint_ienv comment) env;
   flush stderr; flush stdout
 
+let print_state comment s =
+  if !debug then Format.eprintf "%a" Output.pstate s  
+
 let print_program impl_list =
   if !verbose then
     Printer.program Format.err_formatter impl_list

@@ -120,6 +120,9 @@ let rec pstate ff s =
      fprintf ff "@[{ phase = %f; period = %f }@]" phase period
   | Senv _ -> fprintf ff "@[(env)@]"
 
+let pstate ff s =
+  fprintf ff "%a@." pstate s
+
 let value_flush ff v =
   fprintf ff "%a@." value v
 let pvalue_flush ff l = 
