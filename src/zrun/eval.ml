@@ -152,6 +152,7 @@ let eval_definitions_in_file modname filename =
              no_location (Output.value_flush ff) n_steps si void
         | Kfun _ ->
            let ff = Format.std_formatter in
+           Format.fprintf ff "@[Evaluate %d steps of %s@.@]" n_steps name;
            Coiteration.run_fun
              no_location (Output.value_flush ff) n_steps v [void] end
      | _ -> () in
