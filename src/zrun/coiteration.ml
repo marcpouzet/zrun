@@ -2324,8 +2324,9 @@ let catch e =
   | Ok(r) -> r
   | Error { kind; loc } ->  Error.message loc kind; raise Error
 
-(* The main function *)
 let program genv i_list = catch (fold implementation genv i_list)
+
+(* The main functions *)
 
 (* run a unit process for [n_steps] steps *)
 let run_n n_steps init step v_list =
@@ -2344,45 +2345,17 @@ let run_n n_steps init step v_list =
 
 let run_fun loc output n_steps fv v_list =
   let step s v_list =
+    Debug.print_state "State before:" s;
     let* v = apply loc fv v_list in
-    output v; return s in
+    output v;
+    Debug.print_state "State after:" s;
+    return s in
   run_n n_steps Sempty step v_list
 
 let run_node loc output n_steps { init; step } v  =
   let step s v =
+    Debug.print_state "State before:" s;
     let* v, s = runstep loc s step v in
-    output v; return s in
-  run_n n_steps init step v
-
-(* ---------------- The main functions ---------------- *)
-
-(* Computation of the initial state *)
-
-let program genv i_list = catch (fold implementation genv i_list)
-
-(* run a unit process for [n_steps] steps *)
-let run_n n_steps init step v_list =
-  let rec apply_rec s i =
-    if i = n_steps then s
-    else
-      let r = step s v_list in
-      match r with
-      | Error { kind; loc } ->
-         Error.message loc kind;
-         Format.eprintf "@[Zrun: %d iterations out of %d.@.@]" i n_steps;
-         raise Error
-      | Ok(s) ->
-         apply_rec s (i+1) in
-  let _ = apply_rec init 0 in ()
-
-let run_fun loc output n_steps fv v_list =
-  let step s v_list =
-    let* v = apply loc fv v_list in
-    output v; return s in
-  run_n n_steps Sempty step v_list
-
-let run_node loc output n_steps { init; step } v  =
-  let step s v =
-    let* v, s = runstep loc s step v in
+    Debug.print_state "State after:" s;
     output v; return s in
   run_n n_steps init step v
