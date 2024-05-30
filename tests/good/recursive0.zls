@@ -1,33 +1,48 @@
 (* recursive functions *)
 let f1 = fun x returns o if true then o = 1 else o = 2
-let f2 () = f1 ()
+let main1 () = f1 ()
+
 let f3 =
-  let static rec xor_<<n>> = fun (x) returns (o)
+  let rec xor_<<n>> = fun (x) returns (o)
     if n = 0 then
       do o = false done
-    else do o = xor_<<n/2>>(x.(0 .. n/2-1)) || xor_<<n/2>>(x.(n/2 .. n-1)) done in
+    else do o = xor_<<n/2>>(x.(0 .. n/2-1)) || xor_<<n/2>>(x.(n/2 .. n-1)) 
+         done in
   xor_
 
+let main2 () = f3 <<4>> [|true; false; false; false |]
+
 let f33 =
-  let static rec sum_<<n>> = fun (x) returns (o)
+  let rec sum_<<n>> = fun (x) returns (o)
     if n = 1 then
       do o = x.(0) done
       else do o = (sum_<<n/2>>(x.(0 .. n/2-1))) +
                   (sum_<<n/2>>(x.(n/2 .. n-1))) done in
   sum_
 
-let f4 () = f3 <<4>> [|true; false; false; false |]
+let main3 () = f33 <<4>> [|1; 2; 3; 4 |]
 
-let f44 () = f33 <<4>> [|1; 2; 3; 4 |]
+let main4 () = let f<<n>>() = n + 1 in f<<4>>
 
-let f5 = let f<<n>>() = n + 1 in f
+let rec xor_n<<n>> = fun (x) returns (o)
+  if n = 0 then
+    do o = false done
+  else do o = xor_n<<n/2>>(x.(0 .. n/2-1)) || xor_n<<n/2>>(x.(n/2 .. n-1)) 
+       done
 
-let f6 () = f5 <<4>>()
-  
-(* let rec fby_n<n> = fun (x, y) returns (o)
-  let v = const match n with
-          | 0 -> y | n -> fby_n<n-1>(x, y) in
-   x fby v
+let main5() = 
+  xor_n<4>([|true; false; false; false |], [|true; false; false; false |])
+
+let rec fby_n<<n>> = node (x) returns (o)
+  do o = x fby m
+  and if n = 0 then
+        do m = x done
+      else
+        do m = run (fby_n<<n-1>>)(x) done
+
+let node main6() =
+  let rec x = 0 -> pre x + 1 in
+  run (fby_n<<10>>)(x)
 
 let xor x y = if x then not y else y
 
@@ -36,10 +51,11 @@ let adder(x, y, c) returns (s, c')
  and c' = if x then y || c else y && c
  done
 
-let rec add_n<n> = fun (x, y, c) returns (o, c')
-  const match n with
-  | 0 -> do o = [||] and c' = false
-  | n -> let s, c = adder(x.(0), y.(0), c) in
-         let o', c = add_n<n-1>(x.(1 .. n-1), y.(1 .. n-1), c) in
+let rec add_n<<n>> = fun (x, y, c) returns (o, c')
+  if n = 0 then do o = [||] and c' = false done
+  else let s, c = adder(x.(0), y.(0), c) in
+       let o', c = add_n<<n-1>>(x.(1 .. n-1), y.(1 .. n-1), c) in
          do o = [|s|] ++ o' and c' = c done
-*)
+
+let main7() =
+  add_n<<4>>([|true; false; false; false |], [|true; false; false; false |])

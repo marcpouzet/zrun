@@ -48,7 +48,7 @@ type pvalue =
   (* f(atomic v) not= bot *)
   | Vfun : (pvalue -> pvalue option) -> pvalue
   | Vclosure : pvalue closure -> pvalue
-  (* a size parameterized function *)
+  (* function parameterized by sizes *)
   | Vsizefun : pvalue sizefun -> pvalue
   (* a representation for mutually recursive functions over sizes *)
   (* f where rec [f1<s,...> = e1 and ... fk<s,...> = ek] *)
@@ -88,6 +88,7 @@ and 'a state =
   | Snil : 'a state
   | Sempty : 'a state
   | Sval : 'a star -> 'a state
+  | Sstatic : 'a -> 'a state
   | Slist : 'a state list -> 'a state
   | Sopt : 'a star option -> 'a state
   | Sinstance : 'a instance -> 'a state
@@ -95,7 +96,8 @@ and 'a state =
   | Szstate : { zin : bool; zout : 'a star } -> 'a state
   | Shorizon : { zin : bool; horizon : float } -> 'a state
   | Speriod :
-      { zin : bool; phase : float; period : float; horizon : float } -> 'a state
+      { zin : bool; phase : float; period : float; horizon : float } -> 
+      'a state
   (* environment of values *)
   | Senv : 'a star ientry Ident.Env.t -> 'a state
 

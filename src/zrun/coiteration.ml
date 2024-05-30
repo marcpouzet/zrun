@@ -590,9 +590,21 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
      iexp_opt is_fun genv env e_opt
   | EQif { e; eq_true; eq_false } ->
      let* se = iexp is_fun genv env e in
-     let* seq_true = ieq is_fun genv env eq_true in
-     let* seq_false = ieq is_fun genv env eq_false in
-     return (Slist [se; seq_true; seq_false])
+     (* try to evaluate [se] statically *)
+     let* v = try_vexp genv env e se in
+     let* s = match v with 
+       | None -> 
+          let* seq_true = ieq is_fun genv env eq_true in
+          let* seq_false = ieq is_fun genv env eq_false in
+          return (Slist [se; seq_true; seq_false])
+       | Some(b) ->
+          let* v = is_bool b |> 
+                   Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
+          if v then let* seq_true = ieq is_fun genv env eq_true in
+            return (Slist [Sstatic(Vbool(true)); seq_true; Sempty])
+          else let* seq_false = ieq is_fun genv env eq_false in
+          return (Slist [Sstatic(Vbool(false)); Sempty; seq_false]) in
+     return s
   | EQand(eq_list) ->
      let* seq_list = map (ieq is_fun genv env) eq_list in
      return (Slist seq_list)
@@ -775,8 +787,9 @@ and instance loc ({ c_funexp = { f_args; f_body }; c_genv; c_env } as c) =
 (* Its type is [state -> (value * state) option] *)
 and sexp genv env { e_desc; e_loc } s =
   match e_desc, s with
-  | _, Sbot -> return (Vbot, s) (* Voir remarque PE-Dagand *)
+  | _, Sbot -> return (Vbot, s)
   | _, Snil -> return (Vnil, s)
+  | _, Sstatic(v) -> return (Value(v), s)
   | Econst(v), Sempty ->
      return (Value (immediate v), s)
   | Econstr0 { lname }, Sempty ->
@@ -1262,6 +1275,16 @@ and sexp_init_opt loc genv env e_opt s =
 and vexp genv env e s =
   let* v, _ = sexp genv env e s in
   return v
+
+(* try to evaluate e. Return None if some variables are unbounded; Some(v) *)
+(* if the execution succeed; propagate the error otherwise *)
+and try_vexp genv env e s =
+  let v = vexp genv env e s in
+  match v with 
+  | Error({ kind = Eunbound_ident _ | Eunbound_last_ident _ }) -> return None
+  | Error(k) -> error k
+  | Ok(v) -> 
+     match v with | Vbot | Vnil -> return None | Value(v) -> return (Some(v))
 
 (* computing the value of an expression from the initial state *)
 (* the expression is supposed to be stateless, that is, *)
