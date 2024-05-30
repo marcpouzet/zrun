@@ -26,19 +26,33 @@ let main4 () = let f<<n>>() = n + 1 in f<<4>>
 
 let rec xor_n<<n>> = fun (x) returns (o)
   if n = 0 then
-    do o = false done
-  else do o = xor_n<<n/2>>(x.(0 .. n/2-1)) || xor_n<<n/2>>(x.(n/2 .. n-1)) 
-       done
+    o = false
+  else if n = 1 then o = x.(0)
+  else o = xor_n<<n/2>>(x.(0 .. n/2-1)) || xor_n<<n/2>>(x.(n/2 .. n-1))
 
-let main5() = 
-  xor_n<4>([|true; false; false; false |], [|true; false; false; false |])
+let main5() returns ()
+  assert (xor_n<<4>>([|true; false; false; false |]))
 
 let rec fby_n<<n>> = node (x) returns (o)
+  local m
   do o = x fby m
   and if n = 0 then
         do m = x done
       else
         do m = run (fby_n<<n-1>>)(x) done
+  done
+
+let ff<<n>> = node (x) returns (o)
+  local m
+  do o = x fby m and m = 0 done
+
+let node main_() = run (ff<<10>>) (0)
+
+let fff = node (x) returns (o)
+  local m
+  do o = x fby m + 1 and m = o done
+
+let node main__() = run (fff) (0)
 
 let node main6() =
   let rec x = 0 -> pre x + 1 in
@@ -47,15 +61,25 @@ let node main6() =
 let xor x y = if x then not y else y
 
 let adder(x, y, c) returns (s, c')
- do s = xor (xor x y) y)
+ do s = xor (xor x y) c
  and c' = if x then y || c else y && c
  done
+
+let main7() =
+  let x = [| true; false; true;  false; true;  false; true;  false |] in
+  let y = [| true; true;  false; false; true;  true;  false; false |] in
+  let c = [| true; true;  true;  true;  false; false; false; false |] in
+  forward (xi in x, yi in y, ci in c) returns ([|zi|], [|c'i|])
+    do zi, c'i = adder(xi, yi, ci) done
 
 let rec add_n<<n>> = fun (x, y, c) returns (o, c')
   if n = 0 then do o = [||] and c' = false done
   else let s, c = adder(x.(0), y.(0), c) in
-       let o', c = add_n<<n-1>>(x.(1 .. n-1), y.(1 .. n-1), c) in
-         do o = [|s|] ++ o' and c' = c done
+       if n = 1 then
+        do o = [|s|] and c' = c done
+       else let o', c = add_n<<n-1>>(x.(1 .. n-1), y.(1 .. n-1), c) in
+        do o = [|s|] ++ o' and c' = c done
 
-let main7() =
-  add_n<<4>>([|true; false; false; false |], [|true; false; false; false |])
+let main8() =
+  add_n<<4>>([|true; false; false; false |], 
+            [|true; false; false; false |], false)
