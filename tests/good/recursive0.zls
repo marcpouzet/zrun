@@ -68,7 +68,7 @@ let rec node fby_n2<<n>>(x) returns (o)
 
 let node main7() =
   let rec x = 0 -> pre x + 1 in
-  run (fby_n2<<3>>)(x)
+  run (fby_n2<<6>>)(x)
 
 let node main8() returns ()
   let rec x = 0 -> pre x + 1 in
