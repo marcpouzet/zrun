@@ -136,6 +136,9 @@ let fixpoint n stop f s bot =
 (* lazy fixpoint combinator *)
 (*  let fix2 f s =
       let rec o = lazy(let o, _ = f s o in Lazy.force o) in o, let _, s = f s o in s;;
+
+ let fix2 f s =
+  let rec o = lazy (let* v, _ = f s o in return (Lazy.force v)) in o
 *)
 
 (* Invariant: values in the environment are restricted by construction *)
