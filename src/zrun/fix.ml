@@ -132,7 +132,11 @@ let fixpoint n stop f s bot =
       if stop v v' then return (n, v', s') else fixpoint (n-1) v' in      
   (* computes the next state *)
   fixpoint n bot
-  
+
+(* lazy fixpoint combinator *)
+(*  let fix2 f s = let rec o = lazy(let o, _ = f s o in Lazy.force o) in o, let _, s = f s o in s;;
+*)
+
 (* Invariant: values in the environment are restricted by construction *)
 (* to be either bot, nil or a primitive (atomic) value, i.e., a value *)
 (* which is fully defined *)
