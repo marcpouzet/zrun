@@ -275,6 +275,7 @@ let lazy_ifthenelse v1 v2 v3 =
   let+ v1 = v1 in
   ifthenelse_op v1 v2 v3
 
+(* the constructive semantics for the boolean operators [or] and [and] *)
 let esterel_or_op v1 v2 =
   match v1, v2 with
   | (Value(Vbool(true)), (Vbot | Vnil)) | ((Vbot|Vnil), Value(Vbool(true)))
@@ -300,14 +301,16 @@ let esterel_and_op v1 v2 =
   | _ -> none
 
 (* this one is a bit experimental; it can be used to implement *)
-(* the constructive semantics of Esterel. *)
-(* an alternative semantics to the constructive semantics of Esterel *)
-(* it is closer to the "logical semantics of Esterel" than the *)
-(* the "constructive semantics" through it is not entirely clear. *)
-(* note that this is very different than the treatment of activation *)
-(* conditions (e.g., if c then eq1 else eq2 which correspond to a *)
-(* condition on a clock. In that case, when c = bot, then the resulting *)
-(* environment is also bot *)
+(* the constructive semantics of Esterel but does not coincide exactly *)
+(* with Esterel. It relies on the fact that we consider that a decidable *)
+(* equality exists on instantaneous value. This is true for the Esterel *)
+(* language --- all imported operations are supposed to terminate --- whereas *)
+(* it is wrong in the general case. *)
+(* It is an alternative semantics to the constructive semantics of Esterel *)
+(* that accept more programs, in particular [x = if x then true else true] *)
+(* is causal with this whereas it is not in the original semantics of Esterel *)
+(* note that an activation condition [if c then eq1 else eq2] which *)
+(* corresponds to a condition on a clock returns bot as soon as [c = bot] *)
 let esterel_ifthenelse v1 v2 v3 =
   match v1 with
   | Value(v1) -> ifthenelse_op v1 v2 v3
