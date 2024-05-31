@@ -107,7 +107,7 @@ let f(g) = fun (x) returns (y)
 
 (* this one is exponential *)
 let main5() returns (x)
-  x = f(f(f(f(f(f(f(f(f(fun x -> x))))))))) 0
+  x = f(f(f(f(fun x -> x)))) 0
 
 let f(g) = (fun x -> y) where
   rec y =
@@ -119,7 +119,10 @@ let g h x = y where
     let rec m = h x and y = m in
     y
 
+(*
 let main7() = g(g(g(g(g(g(g(g(g(fun x -> x))))))))) 0
+*)
+let main7() = g(g(g(fun x -> x))) 0
 
 (* let f = fun x -> y where rec y = x + 1 *)
 
