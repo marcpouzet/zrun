@@ -24,14 +24,14 @@ let main3 () = f33 <<4>> [|1; 2; 3; 4 |]
 
 let main4 () = let f<<n>>() = n + 1 in f<<4>>
 
-let rec xor_n<<n>> = fun (x) returns (o)
+let rec or_n<<n>> = fun (x) returns (o)
   if n = 0 then
     o = false
   else if n = 1 then o = x.(0)
-  else o = xor_n<<n/2>>(x.(0 .. n/2-1)) || xor_n<<n/2>>(x.(n/2 .. n-1))
+  else o = or_n<<n/2>>(x.(0 .. n/2-1)) || or_n<<n/2>>(x.(n/2 .. n-1))
 
 let main5() returns ()
-  assert (xor_n<<4>>([|true; false; false; false |]))
+  assert (or_n<<4>>([|true; false; false; false |]))
 
 let rec or_n<<n>>(x) returns (o)
   local m
