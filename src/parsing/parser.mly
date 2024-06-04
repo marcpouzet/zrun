@@ -1101,7 +1101,7 @@ expression_desc:
       { unop p e ($startpos(p)) ($endpos(p)) }
   | LET v = vkind_opt i = is_rec eq = equation_and_list IN e = seq_expression
     { Elet(make { l_rec = i; l_kind = v; l_eq = eq } $startpos $endpos(eq), e) }
-  | LOCAL v_list = vardec_comma_list DO eq = equation IN e = seq_expression
+  | LOCAL v_list = vardec_comma_list DO eq = equation_and_list IN e = seq_expression
     { Elocal(v_list, eq, e) }  
   | MATCH e = seq_expression WITH
       opt_bar m = match_handlers(expression) opt_end

@@ -309,7 +309,7 @@ let rec expression ff e =
 	    (print_record longname expression """ =""") "" ";" "")
          ln_e_list
     | Elet(l, e) ->
-       fprintf ff "@[<v0>%a in @,%a@]" leq l expression e
+       fprintf ff "@[<v0>%ain @,%a@]" leq l expression e
     | Elocal(b_eq, e) ->
         fprintf ff "@[<v0>%a in @,%a@]"
           block_of_equation b_eq expression e
