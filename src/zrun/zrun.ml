@@ -68,7 +68,7 @@ let main () =
       main
       errmsg
   with
-  | _ -> exit 2
+  | Misc.Error -> exit 2
                  
 let _ = main ()
 let _ = exit 0

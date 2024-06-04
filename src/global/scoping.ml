@@ -713,7 +713,7 @@ and expression env { desc; loc } =
     | Evar(Name(n)) ->
        begin try
            let m = Env.find n env in
-           Ast.Elocal(m)
+           Ast.Evar(m)
          with
          | Not_found ->
             Ast.Eglobal({ lname = Name(n) })
@@ -739,6 +739,13 @@ and expression env { desc; loc } =
        let leq, new_env = letin env leq in
        let e = expression new_env e in
        Ast.Elet(leq, e)
+    | Elocal(v_list, eq, e) ->
+       let v_list, env_v_list = vardec_list env v_list in
+       let env_pat = env_v_list in
+       let env = Env.append env_v_list env in
+       let eq = equation env_pat env eq in
+       let e = expression env e in
+       Ast.Elocal(make_block loc v_list eq, e)
     | Eapp(is_inline, f, arg_list) ->
        let f = expression env f in
        let arg_list = List.map (expression env) arg_list in

@@ -159,7 +159,7 @@ let block exp body ff { b_vars; b_body; b_write } =
   match b_vars with
   | [] -> body ff b_body
   | _ ->
-     fprintf ff "@[<hov 0>local@ %a in@ %a%a@]"
+     fprintf ff "@[<hov 0>local@ %a do@ %a%a@]"
        (vardec_list exp) b_vars
        print_writes b_write       
        body b_body
@@ -274,7 +274,7 @@ let size ff e =
 let rec expression ff e =
   let exp ff { e_desc } =
     match e_desc with
-    | Elocal n -> name ff n
+    | Evar n -> name ff n
     | Eglobal { lname } -> longname ff lname
     | Eop(op, e_list) -> 
         fprintf ff "@[(";
@@ -310,6 +310,9 @@ let rec expression ff e =
          ln_e_list
     | Elet(l, e) ->
        fprintf ff "@[<v0>%a in @,%a@]" leq l expression e
+    | Elocal(b_eq, e) ->
+        fprintf ff "@[<v0>%a in @,%a@]"
+          block_of_equation b_eq expression e
     | Etypeconstraint(e, typ) ->
        fprintf ff "@[(%a: %a)@]" expression e ptype typ
     | Ematch { is_total; e; handlers } ->

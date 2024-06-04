@@ -345,7 +345,7 @@ let spresent_handler_list loc sscondpat bot nil sbody genv env p_h_list s_list =
 let rec iexp is_fun genv env { e_desc; e_loc  } =
 (* and [sexp genv env e = f] *)
   match e_desc with
-  | Econst _ | Econstr0 _ | Elocal _ | Eglobal _ | Elast _ ->
+  | Econst _ | Econstr0 _ | Evar _ | Eglobal _ | Elast _ ->
      return Sempty
   | Econstr1 { arg_list } ->
      let* s_list = map (iexp is_fun genv env) arg_list in
@@ -452,6 +452,10 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
      let* l_env, s_eq = ileq is_fun genv env leq in
      let* se = iexp is_fun genv (Env.append l_env env) e in
      return (Slist [s_eq; se])
+  | Elocal(b_eq, e) ->
+     let* s_b_eq = iblock is_fun genv env b_eq in
+     let* se = iexp is_fun genv env e in
+     return (Slist [s_b_eq; se])
   | Erecord_access({ arg }) ->
      iexp is_fun genv env arg
   | Erecord(r_list) ->
@@ -796,7 +800,7 @@ and sexp genv env { e_desc; e_loc } s =
      return (Value (immediate v), s)
   | Econstr0 { lname }, Sempty ->
      return (Value (Vconstr0(lname)), s)
-  | Elocal x, Sempty ->
+  | Evar x, Sempty ->
      let* v =
        find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = e_loc } in
@@ -1024,6 +1028,10 @@ and sexp genv env { e_desc; e_loc } s =
   | Elet(l_eq, e), Slist [s_eq; s] ->
      let* env_eq, s_eq = sleq genv env l_eq s_eq in
      let env = Env.append env_eq env in
+     let* v, s = sexp genv env e s in
+     return (v, Slist [s_eq; s])
+  | Elocal(b_eq, e), Slist [s_b_eq; s] ->
+     let* env, _, s_eq = sblock genv env b_eq s_b_eq in
      let* v, s = sexp genv env e s in
      return (v, Slist [s_eq; s])
   | Efun(fe), s ->

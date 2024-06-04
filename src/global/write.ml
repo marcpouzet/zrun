@@ -212,13 +212,16 @@ and scondpat ({ desc } as scpat) =
 and expression ({ e_desc } as e) =
   let desc =
     match e_desc with
-    | Elocal _ | Eglobal _ | Econst _ | Econstr0 _ | Elast _ -> e_desc
+    | Evar _ | Eglobal _ | Econst _ | Econstr0 _ | Elast _ -> e_desc
     | Econstr1 { lname; arg_list } ->
        Econstr1 {lname; arg_list = List.map expression arg_list }
     | Eop(op, e_list) ->
        Eop(op, List.map expression e_list)
     | Etuple(e_list) -> Etuple(List.map expression e_list)
     | Elet(l_eq, e) -> Elet(leq l_eq, expression e)
+    | Elocal(b_eq, e) -> 
+       let b_eq, _, _ = block b_eq in
+       Elocal(b_eq, expression e)
     | Eapp { is_inline; f; arg_list } ->
        Eapp { is_inline; f = expression f; 
               arg_list = List.map expression arg_list }

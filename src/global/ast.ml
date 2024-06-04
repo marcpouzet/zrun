@@ -198,7 +198,7 @@ and exp_desc =
   | Econstr0 : { mutable lname: Lident.t } -> exp_desc
   | Econstr1 :
       { mutable lname: Lident.t; arg_list: exp list } -> exp_desc
-  | Elocal : Ident.t -> exp_desc
+  | Evar : Ident.t -> exp_desc
   | Eglobal :
       { mutable lname : Lident.t } -> exp_desc
   | Elast : Ident.t -> exp_desc
@@ -207,6 +207,7 @@ and exp_desc =
   | Eapp : { is_inline: is_inline; f: exp; arg_list: exp list } -> exp_desc
   | Esizeapp : { f: exp; size_list: size list } -> exp_desc
   | Elet : leq * exp -> exp_desc
+  | Elocal : (exp, eq) block * exp -> exp_desc
   | Erecord_access : exp record -> exp_desc
   | Erecord : exp record list -> exp_desc
   | Erecord_with : exp * exp record list -> exp_desc

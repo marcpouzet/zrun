@@ -192,6 +192,7 @@ and exp_desc =
   | Eapp : is_inline * exp *  exp list -> exp_desc
   | Esizeapp : exp * size list -> exp_desc
   | Elet : leq * exp -> exp_desc
+  | Elocal : exp vardec list * eq * exp -> exp_desc
   | Erecord_access : exp * longname -> exp_desc
   | Erecord : (longname * exp) list -> exp_desc
   | Erecord_with : exp * (longname * exp) list -> exp_desc

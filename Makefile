@@ -3,6 +3,9 @@ all: build tests
 build:
 	(cd src; dune build -- zrun.exe)
 
+buildv:
+	(cd src; dune build --verbose -- zrun.exe)
+
 tests:
 	(cd tests; dune test)
 

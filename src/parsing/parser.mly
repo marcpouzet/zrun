@@ -476,17 +476,6 @@ implementation:
                  { l_rec = i; l_kind = v; l_eq = let_eq } $startpos $endpos) }
 ;
 
-/*
-result_or_where:
-  | r = result { r }
-  | EQUAL seq = seq_expression WHERE i = is_rec eq = equation_and_list
-    { make (Exp(make (Elet(make { l_rec = i; l_kind = Kany; l_eq = eq }
-			  $startpos(eq) $endpos(eq), seq))
-		$startpos(seq) $endpos(eq)))
-      $startpos $endpos }
-;
-*/
-
 vkind:
   | CONST { Kconst }
   | STATIC { Kstatic }
@@ -1054,15 +1043,6 @@ expression_desc:
     MINUSGREATER e = expression
     { funexp_desc a k p_list_list (make (Exp(e)) $startpos(e) $endpos)
       $startpos(p_list_list) $endpos }
-  /*| a = is_atomic k = fun_kind p_list_list = param_list_list
-    MINUSGREATER e = expression WHERE 
-      i = is_rec eq = where_equation_and_list %prec prec_result
-    { funexp_desc a k p_list_list
-		  (make (Exp(make (Elet(make { l_rec = i; l_kind = Kany; l_eq = eq }
-					$startpos(eq) $endpos(eq), e))
-			     $startpos(e) $endpos(eq)))
-		   $startpos(e) $endpos(eq))
-      $startpos(p_list_list) $endpos(eq) }*/
   | a = is_atomic k = fun_kind p_list_list = param_list_list
     RETURNS p = param eq = equation
     { funexp_desc a k p_list_list (make (Returns(p, eq)) $startpos(p) $endpos)
@@ -1121,6 +1101,8 @@ expression_desc:
       { unop p e ($startpos(p)) ($endpos(p)) }
   | LET v = vkind_opt i = is_rec eq = equation_and_list IN e = seq_expression
     { Elet(make { l_rec = i; l_kind = v; l_eq = eq } $startpos $endpos(eq), e) }
+  | LOCAL v_list = vardec_comma_list DO eq = equation IN e = seq_expression
+    { Elocal(v_list, eq, e) }  
   | MATCH e = seq_expression WITH
       opt_bar m = match_handlers(expression) opt_end
       { Ematch(e, List.rev m) }
