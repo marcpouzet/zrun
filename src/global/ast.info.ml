@@ -215,6 +215,8 @@ and ('info, 'size, 'body) forloop =
     for_resume : bool; (* resume or restart *)
   }
 
+type info = Info : { info: 'a; print : 'a -> string } -> info
+
 (* result expression of a loop *)
 and 'info for_exp =
   (* [for[each|ward] ... do e done] *)
@@ -321,7 +323,6 @@ and 'info for_out_desc =
     for_init : 'info exp option;
     for_default : 'info exp option;
   }
-
 
 and ('info, 'body) escape =
   { e_cond: 'info scondpat;
