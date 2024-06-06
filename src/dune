@@ -45,11 +45,21 @@
   )   
   (libraries zrun.ast_lib))
 
+; rewriting steps
+(library
+  (name rewrite_lib)
+  (public_name zrun.rewrite_lib)
+  (wrapped false)
+  (modules
+    reduce ; static reduction
+  )
+  (libraries zrun.ast_lib))
+
 (executable
  (name zrun)
   (modes (byte exe))
   (modules zrun)
-  (libraries zrun.ast_lib zrun.zrun_lib)
+  (libraries zrun.ast_lib zrun.zrun_lib zrun.rewrite_lib)
   (promote (until-clean) (into ..)))
 
 (install

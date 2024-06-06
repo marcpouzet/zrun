@@ -3,7 +3,7 @@
 (*                                                                     *)
 (*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
-(*  (c) 2020 Inria Paris (see the AUTHORS file)                        *)
+(*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -14,153 +14,50 @@
 
 (** reduce expressions that are tagged to be static; leave other unchanged *)
 
-open Zmisc
-open Zident
+open Misc
+open Ident
 open Lident
-open Global
-open Zelus
-open Zaux
-open Static
-open Deftypes
-open Ztypes
+open Ast
 
-       
-type value_desc =
-    { mutable value_typ: typ_scheme; (* its type scheme *)
-      mutable value_static: bool; (* is-it a static value? *)
-      mutable value_caus: tc_scheme option; (* its causality scheme *)
-      mutable value_init: ti_scheme option; (* its init. scheme *)
-      mutable value_code: value_code; (* source code *)
-    }
-
-(** The type of values *)
-and value_exp =
-  | Vconst of immediate (* constant *)
-  | Vconstr0 of Lident.qualident (* constructor *)
-  | Vconstr1 of Lident.qualident * value_code list (* constructor *)
-  | Vtuple of value_code list (* tuple *)
-  | Vrecord of (Lident.qualident * value_code) list (* record *)
-  | Vperiod of value_code period (* period *)
-  | Vfun of funexp * value_code Env.t
-        (* a closure: the function body; the environment of values *)
-  | Vabstract of Lident.qualident (* no implementation is given *)
-
-and value_code =
-  { value_exp: value_exp; (* the value descriptor *)
-    value_name: Lident.qualident option;
-                          (* when the value is defined globally *) }
-
-(* the list of functions introduced during the reduction *)
-type fun_defs = { fundefs : (name * funexp) list }
-
-let empty = { fundefs =[] }
-	      
-(* Generate fresh symbol names for global values introduced during *)
-(* the reduction *)
-let num = ref 0
-let gfresh () = num := !num + 1; "__" ^ (string_of_int !num)
+type 'a env = { r_env: Ident.t Ident.Env.t; (* renaming *)
+                v_env: 'a Ident.Env.t; (* values *)
+              }
 
 (** Build a renaming from an environment *)
 let build env =
   let buildrec n entry (env, renaming) =
-    let m = Zident.fresh (Zident.source n) in
+    let m = Ident.fresh (Ident.source n) in
     Env.add m entry env,
     Env.add n m renaming in
   Env.fold buildrec env (Env.empty, Env.empty)
-
-(** rename a variable *)
-let rename x renaming =
-  try Env.find x renaming
-  with Not_found -> Zmisc.internal_error "Reduce: unbound name" Printer.name x
-
-(** Remove entries in [venv] that are defined in [renaming] *)
-let remove rename venv =
-  Env.filter (fun x _ -> not (Env.mem x rename)) venv
     
-(** type expressions *)
-let rec type_expression venv renaming ({ desc = desc } as ty_e) =
-  match desc with
-  | Etypevar _ -> ty_e
-  | Etypeconstr(g, ty_list) ->
-      let ty_list = List.map (type_expression venv renaming) ty_list in
-      { ty_e with desc = Etypeconstr(g, ty_list) }
-  | Etypetuple(ty_list) ->
-      let ty_list = List.map (type_expression venv renaming) ty_list in
-      { ty_e with desc = Etypetuple(ty_list) }
-  | Etypevec(ty_vec, s) ->
-      let ty_vec = type_expression venv renaming ty_vec in
-      { ty_e with desc = Etypevec(ty_vec, size venv renaming s) }
-  | Etypefun(k, opt_name, ty_arg, ty_res) ->
-     let ty_arg = type_expression venv renaming ty_arg in
-     let opt_name, renaming =
-       match opt_name with
-       | None -> opt_name, renaming
-       | Some(n) ->
-	  let m = Zident.fresh (Zident.source n) in
-	  Some(m), Env.add n m renaming in
-     let ty_res = type_expression venv renaming ty_res in
-     { ty_e with desc = Etypefun(k, opt_name, ty_arg, ty_res) }
+let rename n env = Env.find n env
 
-and size venv renaming ({ desc = desc } as s) =
-  let operator op i1 i2 =
-    match op with
-    | Splus -> i1 + i2
-    | Sminus -> i1 - i2 in
-
-  match desc with
-  | Sconst _ | Sglobal _ -> s
-  | Sname(n) ->
-      let desc =
-        try
-          let { value_exp = v } = Env.find n venv in
-          match v with
-          | Vconst(Eint(i)) -> Sconst(i)
-          | _ -> desc
-        with
-          Not_found -> Sname(rename n renaming) in
-      { s with desc = desc }
-  | Sop(op, s1, s2) ->
-      let s1 = size venv renaming s1 in
-      let s2 = size venv renaming s2 in
-      let desc =
-        match s1.desc, s2.desc with
-        | Sconst(i1), Sconst(i2) -> Sconst(operator op i1 i2)
-        | _ -> Sop(op, s1, s2) in
-      { s with desc = desc }
-
-(** Rename an operator *)
-let operator venv renaming op =
-  match op with
-  | Eunarypre | Efby | Eminusgreater | Eifthenelse
-  | Eup | Etest | Edisc | Ehorizon | Einitial | Eaccess
-  | Eupdate | Econcat | Eatomic -> op
-  | Eslice(s1, s2) -> Eslice(size venv renaming s1, size venv renaming s2)
-  		       
 (** Renaming of patterns *)
-let rec pattern venv renaming ({ p_desc = desc } as p) =
-  match desc with
-  | Ewildpat | Econstpat _ | Econstr0pat _ -> p
-  | Evarpat(n) ->  { p with p_desc = Evarpat(rename n renaming) }
-  | Etuplepat(p_list) ->
-      { p with p_desc = Etuplepat(List.map (pattern venv renaming) p_list) }
-  | Econstr1pat(c, p_list) ->
-      { p with p_desc =
-                 Econstr1pat(c, List.map (pattern venv renaming) p_list) }
-  | Erecordpat(n_p_list) ->
-      let n_p_list =
-        List.map (fun (ln, p) -> (ln, pattern venv renaming p)) n_p_list in
-      { p with p_desc = Erecordpat(n_p_list) }
-  | Ealiaspat(p1, n) ->
-      let n = rename n renaming in
-      { p with p_desc = Ealiaspat(pattern venv renaming p1, n) }
-  | Eorpat(p1, p2) ->
-      { p with p_desc =
-                 Eorpat(pattern venv renaming p1, pattern venv renaming p2) }
-  | Etypeconstraintpat(p1, ty) ->
-      { p with p_desc = Etypeconstraintpat(pattern venv renaming p1,
-					    type_expression venv renaming ty) }
+let pattern f p = 
+  let rec pattern ({ pat_desc } as p) =
+    let pat_desc = match pat_desc with
+      | Ewildpat | Econstpat _ | Econstr0pat _ -> pat_desc
+      | Evarpat(n) ->  Evarpat(f n)
+      | Etuplepat(p_list) -> Etuplepat(List.map pattern p_list)
+      | Econstr1pat(c, p_list) ->
+         Econstr1pat(c, List.map pattern p_list)
+      | Erecordpat(n_p_list) ->
+         let n_p_list =
+           List.map 
+             (fun { label; arg } -> { label; arg = pattern p}) n_p_list in
+         Erecordpat(n_p_list)
+      | Ealiaspat(p1, n) ->
+         Ealiaspat(pattern p1, f n)
+      | Eorpat(p1, p2) ->
+         Eorpat(pattern p1, pattern p2)
+      | Etypeconstraintpat(p1, ty) ->
+         Etypeconstraintpat(pattern p1, ty) in
+    { p with pat_desc } in
+  pattern p
 
-(** Simplify an expression. *)
+(** Simplify an expression. This is mainly symbolic execution. Either the *)
+(* result is a close value or a value in which some leaves are variables *)
 (* [expression venv renaming fun_defs e = e', fun_defs'] *)
 (* - venv an environment of values;
  *- renaming is a renaming of variables;
@@ -168,51 +65,49 @@ let rec pattern venv renaming ({ p_desc = desc } as p) =
  *- fun_defs and fun_defs' are list of the functions introduced 
  *- during the simplification 
 *)
-let rec expression venv renaming fun_defs ({ e_desc = desc } as e) =
-  match desc with
-  | Econst _ | Econstr0 _ | Eglobal _ -> e, fun_defs
-  | Elocal(x) ->
-      (* fist search in the environment of values *)
-      (* other wise, rename [x] into [x'] *)
-      begin try exp_of_value fun_defs (Env.find x venv)
-        with Not_found ->
-          { e with e_desc = Elocal(rename x renaming) }, fun_defs
-      end
-  | Elast(x) -> { e with e_desc = Elast(rename x renaming) }, fun_defs
-  | Eperiod { p_phase = p1; p_period = p2 } ->
-     let p1, fun_defs = Zmisc.optional_with_map (expression venv renaming) fun_defs p1 in
-     let p2, fun_defs = expression venv renaming fun_defs p2 in
-     { e with e_desc = Eperiod { p_phase = p1; p_period = p2 } }, fun_defs
+let rec expression env ({ e_desc } as e) =
+  match e_desc with
+  | Econst(v) -> 
+     Value(immediate v)
+  | Econstr0 { lname } ->
+     Value(Vconstr0(lname))
+  | Eglobal { lname } ->
+     let v = find_gvalue_opt lname genv |>
+         Opt.to_result ~none:{ kind = Eunbound_lident(lname); loc = e_loc } in
+     Value(v)
+  | Evar(x) -> 
+     find_value_opt x env |> Opt.to_result ~none: e
+  | Elast _ | Eperiod _ -> e
   | Etuple(e_list) ->
-      let e_list, fun_defs =
-        Zmisc.map_fold (expression venv renaming) fun_defs e_list in
-     { e with e_desc = Etuple(e_list) }, fun_defs
-  | Econstr1(c, e_list) ->
-      let e_list, fun_defs =
-        Zmisc.map_fold (expression venv renaming) fun_defs e_list in
-     { e with e_desc = Econstr1(c, e_list) }, fun_defs
+      let e_list = List.map (expression env) e_list in
+      { e with e_desc = Etuple(e_list) }
+  | Econstr1 { lname; arg_list } ->
+      let arg_list = List.map (expression env) arg_list in
+     { e with e_desc = Econstr1 { lname; arg_list } }
   | Erecord(l_e_list) -> 
-      let l_e_list, fun_defs =
-        Zmisc.map_fold
-	  (fun fun_defs (ln, e) ->
-            let e, fun_defs = expression venv renaming fun_defs e in
-            (ln, e), fun_defs) fun_defs l_e_list in
-      { e with e_desc = Erecord(l_e_list) }, fun_defs
-  | Erecord_access(e_record, ln) ->
-      let e_record, fun_defs =
-        expression venv renaming fun_defs e_record in
-      { e_record with e_desc = Erecord_access(e_record, ln) }, fun_defs
+      let l_e_list =
+        List.map
+	  (fun { label; arg } -> 
+            let arg = expression env arg in { label; arg })
+          l_e_list in
+      { e with e_desc = Erecord(l_e_list) }
+  | Erecord_access { label; arg } ->
+      let arg = expression env arg in
+      { e with e_desc = Erecord_access { label; arg } }
   | Erecord_with(e_record, l_e_list) -> 
-     let e_record, fun_defs =
-       expression venv renaming fun_defs e_record in
-     let l_e_list, fun_defs =
-        Zmisc.map_fold
-	  (fun fun_defs (ln, e) ->
-            let e, fun_defs = expression venv renaming fun_defs e in
-            (ln, e), fun_defs) fun_defs l_e_list in
-      { e with e_desc = Erecord_with(e_record, l_e_list) }, fun_defs
-  | Eapp({ app_inline = inline } as app, e_fun, e_list) ->
-      (* [e_fun] is necessarily static. It needs to be a compile-time *)
+     let e_record = expression env e_record in
+     let l_e_list =
+       List.map
+	  (fun { label; arg } ->
+            let arg = expression env e in { label; arg }) l_e_list in
+      { e with e_desc = Erecord_with(e_record, l_e_list) }
+  | Eapp ({ is_inline; f; arg_list } as a) ->
+      let arg_list = List.map (expression env) arg_list in
+      let f = expression env f in
+      if is_inline then
+        (* [f] must be a transparent value that is a closure *)
+      else
+        (* [e_fun] is necessarily static. It needs to be a compile-time *)
       (* non opaque value only when [inline] is true *)
       (* [e_list] decomposes into (a possibly empty) sequence of 
        *- static arguments [s_list] and non static ones [ne_list] *)
