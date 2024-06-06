@@ -41,6 +41,5 @@ let print_ienv comment env =
 let print_state comment s =
   if !debug then Format.eprintf "%a" Output.pstate s  
 
-let print_program impl_list =
-  if !verbose then
-    Printer.program Format.err_formatter impl_list
+let print_program p =
+  if !verbose then Printer.program Format.err_formatter p

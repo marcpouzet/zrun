@@ -92,7 +92,7 @@ module Env =
 (* make a block *)
 let make_block loc s_vars s_eq =
   { Ast.b_vars = s_vars; Ast.b_body = s_eq;
-    Ast.b_loc = loc; Ast.b_write = Defnames.empty }
+    Ast.b_loc = loc; Ast.b_write = Defnames.empty; Ast.b_env = Ident.Env.empty }
 
 let name loc env n =
   try
@@ -338,7 +338,7 @@ let rec pattern_translate env { desc; loc } =
          (List.map (fun (lname, p) -> { Ast.label = longname lname;
                                         Ast.arg = pattern_translate env p })
 	    l_p_list) in
-  { Ast.pat_desc = desc; Ast.pat_loc = loc }
+  { Ast.pat_desc = desc; Ast.pat_loc = loc; Ast.pat_env = Ident.Env.empty }
   
 and pattern_translate_list env p_list = List.map (pattern_translate env) p_list
 
@@ -352,14 +352,15 @@ let present_handler scondpat body env { desc = { p_cond; p_body }; loc } =
   let scpat, env_scpat = scondpat env p_cond in
   let env = Env.append env_scpat env in
   let p_body = body env p_body in
-  { Ast.p_cond = scpat; Ast.p_body = p_body; Ast.p_loc = loc }
+  { Ast.p_cond = scpat; Ast.p_body = p_body; Ast.p_loc = loc; 
+    Ast.p_zero = false; Ast.p_env = Ident.Env.empty }
 
 let match_handler body env { desc = { m_pat; m_body }; loc } = 
   let m_pat, env_m_pat = pattern env m_pat in
   let env = Env.append env_m_pat env in
   let m_body = body env m_body in
   { Ast.m_pat = m_pat; Ast.m_body = m_body; Ast.m_loc = loc;
-    Ast.m_reset = false; Ast.m_zero = false }
+    Ast.m_reset = false; Ast.m_zero = false; Ast.m_env = Ident.Env.empty }
 
 (* size expressions *)
 let rec size env { desc; loc } =
@@ -462,7 +463,7 @@ let rec equation env_pat env { desc; loc } =
   in
   (* set the names defined in the equation *)
   { Ast.eq_desc = eq_desc; Ast.eq_write = Defnames.empty;
-    Ast.eq_loc = loc }
+    Ast.eq_loc = loc; Ast.eq_env = Ident.Env.empty }
 
 and trans_for_input env acc i_list =
   let input acc { desc; loc } =
@@ -547,7 +548,7 @@ and letin env { desc = { l_kind; l_rec; l_eq }; loc } =
   let new_env = Env.append env_pat env in
   let l_eq = equation env_pat (if l_rec then new_env else env) l_eq in
   let l_kind = vkind l_kind in
-  { l_kind; l_rec; l_eq; l_loc = loc }, new_env
+  { l_kind; l_rec; l_eq; l_loc = loc; l_env = Ident.Env.empty }, new_env
   
 and vardec env
 { desc = { var_name; var_init; var_default;
@@ -599,7 +600,7 @@ and block body env_pat env { desc = { b_vars; b_body }; loc } =
   let env = Env.append env_b_vars env in
   let b = body env_pat env b_body in
   env, { Ast.b_vars = b_vars; Ast.b_body = b; Ast.b_loc = loc;
-         Ast.b_write = Defnames.empty }
+         Ast.b_write = Defnames.empty; Ast.b_env = Ident.Env.empty }
   
 and state env_for_states env { desc; loc } =
   let desc = match desc with
@@ -659,7 +660,7 @@ and escape env_for_states env_pat env
   let e_next_state = state env_for_states env e_next_state in
   { Ast.e_reset; Ast.e_cond = e_cond; Ast.e_let = e_let;
     Ast.e_body = e_body; Ast.e_next_state = e_next_state;
-    Ast.e_loc = loc }
+    Ast.e_loc = loc; Ast.e_env = Ident.Env.empty }
   
 and scondpat env scpat =
   (* first build the set of names *)
@@ -784,7 +785,7 @@ and expression env { desc; loc } =
     | Eforloop(f) ->
        Ast.Eforloop(forloop_exp env f)
   in
-  { Ast.e_desc = desc; Ast.e_loc = loc }
+  { Ast.e_desc = desc; Ast.e_loc = loc; Ast.e_info = Misc.noinfo }
   
 and forloop_exp env 
     { for_size; for_kind; for_index; for_input; for_body; for_resume } =
@@ -839,7 +840,8 @@ and funexp env { desc = { f_vkind; f_kind; f_atomic; f_args; f_body }; loc } =
   let f_body = result env f_body in
   { Ast.f_vkind = vkind f_vkind;
     Ast.f_kind = kind f_kind; Ast.f_atomic = f_atomic;
-    Ast.f_args = f_args; Ast.f_body = f_body; Ast.f_loc = loc }
+    Ast.f_args = f_args; Ast.f_body = f_body; Ast.f_loc = loc;
+    Ast.f_env = Ident.Env.empty }
   
 and arg env v_list =
   let v_list, env_v_list = vardec_list env v_list in
@@ -879,6 +881,20 @@ let type_decls n_params_typdecl_list =
   List.map (fun (n, pars, typdecl) -> (n, pars, type_decl typdecl))
     n_params_typdecl_list
 
+let interface interf =
+  try
+    let desc = match interf.desc with
+      | Einter_open(n) -> Ast.Einter_open(n)
+      | Einter_typedecl { name; ty_params; size_params; ty_decl } ->
+         let ty_decl = type_decl ty_decl in
+         Ast.Einter_typedecl { name; ty_params; size_params; ty_decl }
+      | Einter_constdecl { name; const; ty; info } ->
+         let ty = types ty in
+         Ast.Einter_constdecl { name; const = const; ty; info } in
+      { Ast.desc = desc; Ast.loc = interf.loc }
+  with
+    | Error.Err(loc, err) -> Error.message loc err
+
 let implementation { desc; loc } =
   try
     let desc = match desc with
@@ -894,21 +910,11 @@ let implementation { desc; loc } =
   with
     Error.Err(loc, kind) -> Error.message loc kind
                           
-let program i_list = List.map implementation i_list
+(* translate a program. Invariant: all defined names in [i_list] have unique *)
+(* index names (pairwise distinct) and all less than [p_index] *)
+let program i_list = 
+  let i_list = List.map implementation i_list in
+  { Ast.p_impl_list = i_list; Ast.p_index = Ident.get () }
 
-let interface interf =
-  try
-    let desc = match interf.desc with
-      | Einter_open(n) -> Ast.Einter_open(n)
-      | Einter_typedecl { name; ty_params; size_params; ty_decl } ->
-         let ty_decl = type_decl ty_decl in
-         Ast.Einter_typedecl { name; ty_params; size_params; ty_decl }
-      | Einter_constdecl { name; const; ty; info } ->
-         let ty = types ty in
-         Ast.Einter_constdecl { name; const = const; ty; info } in
-      { Ast.desc = desc; Ast.loc = interf.loc }
-  with
-    | Error.Err(loc, err) -> Error.message loc err
-
-let implementation_list = program
 let interface_list inter_list = Util.iter interface inter_list
+let implementation_list = program

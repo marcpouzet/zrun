@@ -34,7 +34,7 @@ let names_env env = Env.fold (fun n _ acc -> S.add n acc) env S.empty
 let names eq_write = Defnames.names S.empty eq_write
 
 (* match a value [v] against a pattern [p] *)
-let pmatch (v : pvalue) (p : pattern) : pvalue Env.t Opt.t =
+let pmatch (v : pvalue) (p : _ pattern) : pvalue Env.t Opt.t =
   let rec pmatch acc v { pat_desc } =
     match v, pat_desc with
     | _, Etypeconstraintpat(p, _) -> pmatch acc v p
@@ -82,7 +82,7 @@ let pmatch (v : pvalue) (p : pattern) : pvalue Env.t Opt.t =
 (* [v] is an star value; [p] is a pattern but pattern matching *)
 (* should not fail. In the case of a failure, this is considered as *)
 (* a typing error *)
-let pmatcheq (v : pvalue) (p : pattern) : pvalue Env.t Opt.t =
+let pmatcheq (v : pvalue) (p : _ pattern) : pvalue Env.t Opt.t =
   let rec pmatcheq acc v { pat_desc } =
     match v, pat_desc with
     | Vstuple(v_list), Etuplepat(l_list) ->
@@ -113,7 +113,7 @@ let pmatcheq (v : pvalue) (p : pattern) : pvalue Env.t Opt.t =
   pmatcheq Env.empty v p
 
 (* Pattern matching of a signal *)
-let matchsig (vstate: pvalue) (p: pattern) : (pvalue * pvalue Env.t) Opt.t =
+let matchsig (vstate: pvalue) (p: _ pattern) : (pvalue * pvalue Env.t) Opt.t =
   match vstate with
   | Vabsent -> return (Vbool(false), Env.empty)
   | Vpresent(v) ->
@@ -172,7 +172,7 @@ let pbot p = distribute Vbot Env.empty p
 let pnil p = distribute Vnil Env.empty p
 
 (* Pattern matching for equations *)
-let matcheq (v: 'a star) (p: pattern) : 'a star ientry Env.t Opt.t =
+let matcheq (v: 'a star) (p: _ pattern) : 'a star ientry Env.t Opt.t =
   let rec matchrec acc v ({ pat_desc; pat_loc } as p) =
     match v with
     | Vbot -> return (Env.append (liftid (pbot p)) acc)
@@ -188,7 +188,7 @@ let matcheq (v: 'a star) (p: pattern) : 'a star ientry Env.t Opt.t =
     Opt.fold2 matchrec acc v_list l_list in
   matchrec Env.empty v p
 
-let matchsig (v: 'a star) ({ pat_loc } as p : pattern) :
+let matchsig (v: 'a star) ({ pat_loc } as p : _ pattern) :
       ('a star * 'a star ientry Env.t) Opt.t =
   match v with
   | Vbot ->

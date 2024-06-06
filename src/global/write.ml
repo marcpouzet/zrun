@@ -323,5 +323,5 @@ let implementation ({ desc } as i) =
     | Etypedecl _ -> desc in
   { i with desc = desc }
   
-let program i_list = List.map implementation i_list
-let implementation_list = program
+let program ({ p_impl_list } as p) = 
+  { p with p_impl_list = List.map implementation p_impl_list }

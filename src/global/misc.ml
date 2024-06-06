@@ -88,3 +88,7 @@ let set_esterel = ref false
 
 (* sets the interpretation of the if/then/else to Lustre *)
 let set_lustre = ref false
+
+(* no information associated to expressions *)
+type noinfo = unit
+let noinfo: noinfo = ()

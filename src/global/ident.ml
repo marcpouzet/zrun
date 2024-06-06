@@ -14,8 +14,10 @@
 (*                                                                     *)
 (* *********************************************************************)
 
+type num = int
+
 type t =
-      { num : int;        (* a unique index *)
+      { num : num;        (* a unique index *)
         source : string;  (* the original name in the source *)
       }
       
@@ -25,6 +27,8 @@ let source id = id.source
 
 let num = ref 0
 let fresh s = num := !num + 1; { num = !num; source = s }
+let set n = num := n
+let get () = !num
 
 let fprint_t ff id = Format.fprintf ff "%s" (name id)
 

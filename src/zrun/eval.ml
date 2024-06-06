@@ -109,17 +109,17 @@ let eval_definitions_in_file modname filename =
   Debug.print_message "Parsing done";
 
   (* Scoping *)
-  let impl_list = do_step "Scoping done" Scoping.program impl_list in
+  let p = do_step "Scoping done" Scoping.program impl_list in
   
   (* Write defined variables for equations *)
-  let impl_list = do_step "Write done" Write.program impl_list in
+  let p = do_step "Write done" Write.program p in
 
   (* Evaluation of definitions in [filename] *)
   let genv = Genv.initialize modname [] in
   (* Add Stdlib *)
   let genv = Genv.add_module genv Primitives.stdlib_env in
   
-  let genv = Coiteration.program genv impl_list in
+  let genv = Coiteration.program genv p in
   Debug.print_message "Evaluation of definitions done";
 
   (* Write the values into a file *)

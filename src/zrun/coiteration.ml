@@ -2332,7 +2332,7 @@ let catch e =
   | Ok(r) -> r
   | Error { kind; loc } ->  Error.message loc kind; raise Error
 
-let program genv i_list = catch (fold implementation genv i_list)
+let program genv { p_impl_list } = catch (fold implementation genv p_impl_list)
 
 (* The main functions *)
 
