@@ -595,22 +595,6 @@ let type_decl ff { desc = desc } =
 let open_module ff n =
   fprintf ff "@[open %a@]@." shortname n
 
-let implementation ff impl =
-  match impl.desc with
-  | Eopen(n) -> open_module ff n
-  | Etypedecl { name; ty_params; size_params; ty_decl } ->
-     fprintf ff "@[<v 2>type %a%s%a %a@]@."
-       print_type_params ty_params
-       name print_size_params size_params
-       type_decl ty_decl
-  | Eletdecl { d_names; d_leq } ->
-     (* print the set of equations and the list of globally defined names *)
-     leq ff d_leq;
-     List.iter
-       (fun (n, id) -> fprintf ff "@[<v 0>let %s = %a@]@." n name id) d_names
-    
-let program ff imp_list = List.iter (implementation ff) imp_list
-
 let interface ff { desc } =
   match desc with
   | Einter_open(n) -> open_module ff n
@@ -627,3 +611,22 @@ let interface ff { desc } =
 
 let interface_list ff int_list =
   List.iter (interface ff) int_list
+
+let implementation ff { desc } =
+  match desc with
+  | Eopen(n) -> open_module ff n
+  | Etypedecl { name; ty_params; size_params; ty_decl } ->
+     fprintf ff "@[<v 2>type %a%s%a %a@]@."
+       print_type_params ty_params
+       name print_size_params size_params
+       type_decl ty_decl
+  | Eletdecl { d_names; d_leq } ->
+     (* print the set of equations and the list of globally defined names *)
+     leq ff d_leq;
+     List.iter
+       (fun (n, id) -> fprintf ff "@[<v 0>let %s = %a@]@." n name id) d_names
+    
+let program ff { p_impl_list; p_index } = 
+  fprintf ff "Index number = %d@." p_index;
+  List.iter (implementation ff) p_impl_list
+
