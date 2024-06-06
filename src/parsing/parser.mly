@@ -17,6 +17,9 @@ open Lexing
 open Location
 open Parsetree
 
+(* https://github.com/ocaml/ocaml/issues/12302 *)
+module Zrun_frontend = struct end
+
 let localise start_pos end_pos = Loc(start_pos.pos_cnum, end_pos.pos_cnum)
 
 let make desc start_pos end_pos =

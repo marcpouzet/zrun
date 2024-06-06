@@ -1,0 +1,6 @@
+(rule
+ (copy %{project_root}/config.ml config.ml))
+
+(library
+  (name zrun_common)
+  (public_name zrun.common))

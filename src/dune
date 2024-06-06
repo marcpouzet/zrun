@@ -1,56 +1,10 @@
-(include_subdirs unqualified)
-
-(rule
- (copy %{project_root}/config.ml config.ml))
-
-(subdir parsing
-  (ocamllex lexer))
-
-(subdir parsing
-  (menhir (modules parser) (infer true) (flags --explain --table)
-  ))
-
-; all the modules necessary to generate an ast
-(library
-  (name ast_lib)
-  (public_name zrun.ast_lib)
-  (wrapped false)
-  (modules
-    config misc
-    lexer parser parsetree
-    ident lident defnames location util ast write scoping pp_tools printer)
-  (libraries menhirLib))
-
-; all the necessary modules to make zrun except the entry module
-(library
-  (name zrun_lib)
-  (public_name zrun.zrun_lib)
-  (wrapped false)
-  (modules
-    error ; error messages
-    value ; the type of values
-    debug ; all the information for debuging
-    genv  ; the type of a gloval environment
-    primitives ; the value of primitives
-    find ; find the current value and the last value of a variable
-    match ; the evaluation of pattern matching
-    arrays ; representing an array value
-    records ; reprenting a record
-    fix ; a bounded fix-point
-    monad ; useful monad to deal with errors
-    coiteration ; the main execution loop
-    output ; reprentation of the internal state
-    forloop ; evaluation functions for for loops
-    eval ; evaluation of an expression.
-  )   
-  (libraries zrun.ast_lib))
-
 (executable
  (name zrun)
   (modes (byte exe))
   (modules zrun)
-  (libraries zrun.ast_lib zrun.zrun_lib)
-  (promote (until-clean) (into ..)))
+  (libraries zrun.frontend zrun.interpreter)
+  (promote (until-clean) (into ..))
+  (flags (:standard -open Zrun_common -open Zrun_frontend -open Zrun_interpreter)))
 
 (install
  (package zrun)
