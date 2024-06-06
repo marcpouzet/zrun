@@ -19,9 +19,10 @@ open Ident
 open Lident
 open Ast
 
-type 'a env = { r_env: Ident.t Ident.Env.t; (* renaming *)
-                v_env: 'a Ident.Env.t; (* values *)
-              }
+type 'a env = 
+  { r_env: Ident.t Ident.Env.t; (* renaming *)
+    v_env: 'a Ident.Env.t; (* values *)
+  }
 
 (** Build a renaming from an environment *)
 let build env =
@@ -104,8 +105,13 @@ let rec expression env ({ e_desc } as e) =
   | Eapp ({ is_inline; f; arg_list } as a) ->
       let arg_list = List.map (expression env) arg_list in
       let f = expression env f in
-      if is_inline then
+      if is_inline || Misc.inline_all then
         (* [f] must be a transparent value that is a closure *)
+        match f with
+        | Value(Vclosure { c_funexp; c_genv; c_env }) ->
+      
+      
+      
       else
         (* [e_fun] is necessarily static. It needs to be a compile-time *)
       (* non opaque value only when [inline] is true *)
