@@ -12,7 +12,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(** reduce expressions that are tagged to be static; leave other unchanged *)
+(** reduce static expressions and inline function called that are tagged to be static; leave other unchanged *)
 
 open Misc
 open Ident
@@ -122,26 +122,15 @@ let rec expression genv env ({ e_desc } as e) =
      let e_ty = expression genv env e_ty in
      { e with e_desc = Etypeconstraint(e_ty, ty) }
   | Elet(l, e_let) ->
-     let l, renaming = leq genv env l in
+     let l, env = leq genv env l in
      let e_let = expression genv env e_let in
      { e with e_desc = Elet(l, e_let) }
-  | Eblock(b, e_block) ->
-      let b, (renaming, fun_defs) = block venv (renaming, fun_defs) b in
-      let e_block, fun_defs = expression venv renaming fun_defs e_block in
-      { e with e_desc = Eblock(b, e_block) }, fun_defs
+  | Elocal(eq_b, e) ->
+     let v, env = block genv env e in
+     let e = expression genv env e in
+     { e with e_desc = Elocal(eq_b, e) }
   | Epresent _ | Ematch _ -> assert false
-
-(* evaluate a static expression [e] at compile-time if possible *)
-(* and turn it into an expression. Otherwise, returns [e] *)
-(* preserve the type of [e].  *)
-and static venv fun_defs e =
-  try
-    let v = Static.expression venv e in
-    let { e_desc = desc }, fun_defs = exp_of_value fun_defs v in
-    { e with e_desc = desc }, fun_defs
-  with
-    Static.Error _ -> e, fun_defs
-                      
+        
 (** Simplify a local declaration *)
 and local venv (renaming, fun_defs) ({ l_eq = eq_list; l_env = env } as l) =
   let env, renaming0 = build env in
