@@ -22,10 +22,6 @@ open Monad
 open Opt
 open Result
 
-type ('a, 'b) value =
-  | Value : 'a -> ('a, 'b) value
-  | Term : 'b -> ('a, 'b) value
-                   
 (** Build a renaming from an environment *)
 let build env =
   let buildrec n entry (env, renaming) =
@@ -36,28 +32,61 @@ let build env =
     
 let rename n env = Env.find n env
 
+exception Fallback
+
+type 'a global_it_funs =
+  { var_ident : 'acc global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+  }
+    
+type 'a it_funs = {
+    pattern : 'acc it_funs -> 'a -> noinfo pattern -> noinfo pattern * 'a;
+    global_funs: 'a global_it_funs;
+  }
+
+let var_ident funs acc x -> Env.find x acc, acc
+
+let global_funs_default =
+  { var_ident }
+
+let it_funs_default =
+  { pattern; global_funs = global_funs_default }
+
 (** Renaming of patterns *)
-let pattern f p = 
-  let rec pattern ({ pat_desc } as p) =
-    let pat_desc = match pat_desc with
-      | Ewildpat | Econstpat _ | Econstr0pat _ -> pat_desc
-      | Evarpat(n) ->  Evarpat(f n)
-      | Etuplepat(p_list) -> Etuplepat(List.map pattern p_list)
-      | Econstr1pat(c, p_list) ->
-         Econstr1pat(c, List.map pattern p_list)
-      | Erecordpat(n_p_list) ->
-         let n_p_list =
-           List.map 
-             (fun { label; arg } -> { label; arg = pattern p}) n_p_list in
-         Erecordpat(n_p_list)
-      | Ealiaspat(p1, n) ->
-         Ealiaspat(pattern p1, f n)
-      | Eorpat(p1, p2) ->
-         Eorpat(pattern p1, pattern p2)
-      | Etypeconstraintpat(p1, ty) ->
-         Etypeconstraintpat(pattern p1, ty) in
-    { p with pat_desc } in
-  pattern p
+let pattern_it funs acc p =
+  try funs.pattern funs acc p
+  with Fallback -> pattern funs acc p
+
+and pattern funs acc ({ pat_desc } as p) =
+  let pat_desc, acc = match pat_desc with
+    | Ewildpat | Econstpat _ | Econstr0pat _ -> pat_desc, acc
+    | Evarpat(v) ->
+       let v, acc =  funs.global_funs acc v in
+       Evarpat(v, acc)
+    | Etuplepat(p_list) ->
+       let p_list, acc = Utils.mapfold (pattern_it funs) acc p_list in
+       Etuplepat(p_list), acc
+    | Econstr1pat(c, p_list) ->
+       let p_list, acc = Utils.mapfold (pattern_it funs) acc p_list in
+       Econstr1pat(c, p_list), acc
+    | Erecordpat(n_p_list) ->
+       let n_p_list =
+         Utils.mapfold 
+           (fun acc { label; arg } ->
+             let p, acc = pattern_it funs p in
+             { label; arg = pattern p}, acc) n_p_list in
+       Erecordpat(n_p_list), acc
+    | Ealiaspat(p1, n) ->
+       let p1, acc = pattern_it funs p1 in
+       let n = funs.global_funs acc n in
+       Ealiaspat(p1, n), acc
+    | Eorpat(p1, p2) ->
+       let p1, acc = pattern_it funs acc p1 in
+       let p2, acc = pattern_it funs acc p2 in
+       Eorpat(p1, p2), acc
+    | Etypeconstraintpat(p1, ty) ->
+       let p1, acc = pattern_it funs acc p1 in
+       Etypeconstraintpat(p1, ty), acc in
+  { p with pat_desc }, acc
 
 (** Simplify an expression. This is mainly symbolic execution. Either the *)
 (** result is a value or a term *)
@@ -567,12 +596,13 @@ let implementation_list ff impl_list =
    [type_it]. You should always put a custom version or the default version
    provided in this file. Trespassers will loop infinitely! /!\ *)
 
+(*
 open Misc
 open Errors
 open Global_mapfold
 open Heptagon
 
-type 'a hept_it_funs = {
+type 'a it_funs = {
   app            : 'a hept_it_funs -> 'a -> app -> app * 'a;
   block          : 'a hept_it_funs -> 'a -> block -> block * 'a;
   edesc          : 'a hept_it_funs -> 'a -> desc -> desc * 'a;
@@ -887,3 +917,4 @@ let defaults_stop = {
   program = stop;
   program_desc = stop;
   global_funs = Global_mapfold.defaults_stop }
+ *)
