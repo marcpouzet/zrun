@@ -42,7 +42,7 @@
     output ; reprentation of the internal state
     forloop ; evaluation functions for for loops
     eval ; evaluation of an expression.
-  )   
+  )   	 
   (libraries zrun.ast_lib))
 
 ; rewriting steps
@@ -53,18 +53,17 @@
   (modules
     reduce ; static reduction
   )
-  (libraries zrun.ast_lib))
+  (libraries zrun.ast_lib zrun.zrun_lib)
+)
 
 (executable
  (name zrun)
   (modes (byte exe))
   (modules zrun)
-  (libraries zrun.ast_lib zrun.zrun_lib zrun.rewrite_lib)
+  (libraries zrun.ast_lib zrun.zrun_lib)
   (promote (until-clean) (into ..)))
-
+  
 (install
  (package zrun)
  (section bin)
  (files (zrun.exe as zrun)))
-
-
