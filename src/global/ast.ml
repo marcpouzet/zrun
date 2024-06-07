@@ -366,7 +366,6 @@ and ('info, 'body) automaton_handler =
     mutable s_reset: bool; (* is the state always entered by reset? *)
   }
 
-
 and 'a default =
   | Init : 'a -> 'a default | Else : 'a -> 'a default | NoDefault
 
