@@ -65,80 +65,61 @@ let rec pattern f acc ({ pat_desc } as p) =
        Etypeconstraintpat(p1, ty), acc in
   { p with pat_desc }, acc
 
-(** Simplify an expression. This is mainly symbolic execution. Either the *)
-(** result is a value or a term *)
-(* [expression genv env e = v] *)
-(* - genv is a global environment; *)
-(* - env is an environment *)
-let rec expression genv env ({ e_desc } as e) =
+(** Expressions **)
+let rec expression acc ({ e_desc } as e) =
   match e_desc with
-  | Econst _ | Econstr0 _ | Eglobal _ -> e
-  | Evar(x) -> { e with e_desc = Evar(rename env x) }
-  | Elast(x) -> { e with e_desc = Elast(rename env x) }
+  | Econst _ | Econstr0 _ | Eglobal _ -> e, acc
+  | Evar(x) ->
+     let x, acc = rename x acc in
+     { e with e_desc = Evar(x) }, acc
+  | Elast(x) ->
+     let x, acc = rename x acc in
+     { e with e_desc = Elast(x) }, acc
   | Etuple(e_list) ->
-     { e with e_desc = List.map (expression genv env) e_list }
+     let e_list, acc = Utils.mapfold expression acc e_list in
+     { e with e_desc = e_list }, acc
   | Econstr1 { lname; arg_list } ->
-     let arg_list = List.map (expression genv env) arg_list in
-     { e with e_desc = Econstr1 { lname; arg_list } }
+     let arg_list, acc = Utils.mapfold expression acc arg_list in
+     { e with e_desc = Econstr1 { lname; arg_list } }, acc
   | Erecord(l_e_list) -> 
-      let l_e_list =
-        List.map (fun { label; arg } ->
-            let arg = expression genv env arg in { label; arg }) l_e_list in
-      { e with e_desc = Erecord(l_e_list) }
+      let l_e_list, acc =
+        Utils.mapfold (fun { label; arg } ->
+            let arg, acc = expression acc arg in { label; arg }, acc)
+          acc l_e_list in
+      { e with e_desc = Erecord(l_e_list) }, acc
   | Erecord_access { label; arg } ->
-      let arg = expression genv env arg in
-      { e with e_desc = Erecord_access { label; arg } }
+      let arg, acc = expression acc arg in
+      { e with e_desc = Erecord_access { label; arg } }, acc
   | Erecord_with(e_record, l_e_list) -> 
-     let e_record = expression genv env e_record in
+     let e_record, acc = expression acc e_record in
      let l_e_list =
-       List.map
+       Utils.mapfold
 	  (fun { label; arg } ->
-            let arg = expression genv env e in { label; arg }) l_e_list in
-      { e with e_desc = Erecord_with(e_record, l_e_list) }
-  | Eapp ({ is_inline; f; arg_list } as a) ->
-      if is_inline then
-        (* [f] must be a transparent value and a closure *)
-        let env = value_env env in
-        try
-          let f = vexp genv venv f in
-          match f with
-          | Value(Closure { c_funexp = { f_args; f_body }; c_genv; c_env }) ->
-             (* local x1,...,xm do
-                  p1 = e1 and ... pn = en and eq in
-                x1,...,xm *)
-             let arg_list = List.map (expression genv env) arg_list in
-             let f_args, env = build_renaming env f_args in
-             let eq_list =
-               List.map
-                 (fun (p_arg, arg) -> Aux.equation p_arg arg) f_args arg_list in
-             let r = result genv env f_body in
-             let vdec_list, eq, vdec_result = result f_body in
-             Aux.local vdec_list (eq :: eq_list) vdec_result
-          | _ -> raise Error
-        with
-          Unbound -> raise Error
-      else
-        let f = expression genv env f in
-        let arg_list = List.map (expression genv env) arg_list in
-        { e_desc = Eapp { a with f; arg_list } }
+            let arg, acc = expression acc e in { label; arg }, acc)
+          acc l_e_list in
+      { e with e_desc = Erecord_with(e_record, l_e_list) }, acc
+  | Eapp ({ f; arg_list } as a) ->
+     let f, acc = expression acc f in
+     let arg_list, acc = Utils.mapfold expression acc arg_list in
+     { e with e_desc = Eapp { a with f; arg_list } }
   | Eop(op, e_list) ->
-     let e_list = List.map (expression genv env) e_list in
-     { e with e_desc = Eop(op, e_list) }
+     let e_list, acc = Utils.mapfold expression acc e_list in
+     { e with e_desc = Eop(op, e_list) }, acc
   | Etypeconstraint(e_ty, ty) ->
-     let e_ty = expression genv env e_ty in
-     { e with e_desc = Etypeconstraint(e_ty, ty) }
+     let e_ty, acc = expression acc e_ty in
+     { e with e_desc = Etypeconstraint(e_ty, ty) }, acc
   | Elet(l, e_let) ->
-     let l, env = leq genv env l in
-     let e_let = expression genv env e_let in
+     let l, acc = leq acc l in
+     let e_let, acc = expression acc e_let in
      { e with e_desc = Elet(l, e_let) }
   | Elocal(eq_b, e) ->
-     let v, env = block genv env e in
-     let e = expression genv env e in
-     { e with e_desc = Elocal(eq_b, e) }
+     let eq_b, acc = block acc eq_b in
+     let e, acc = expression acc e in
+     { e with e_desc = Elocal(eq_b, e) }, acc
   | Epresent _ | Ematch _ -> assert false
         
 (** Simplify a local declaration *)
-and local venv (renaming, fun_defs) ({ l_eq = eq_list; l_env = env } as l) =
+and leq acc { l_eq = eq_list; l_write } =
   let env, renaming0 = build env in
   let venv = remove renaming0 venv in
   let renaming = Env.append renaming0 renaming in
