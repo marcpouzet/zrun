@@ -30,7 +30,7 @@ let build env =
     Env.add n m renaming in
   Env.fold buildrec env (Env.empty, Env.empty)
     
-let rename n env = Env.find n env
+let rename env n = Env.find n env, env
 
 (** Renaming of patterns *)
 let rec pattern f acc ({ pat_desc } as p) =
@@ -38,22 +38,22 @@ let rec pattern f acc ({ pat_desc } as p) =
     | Ewildpat | Econstpat _ | Econstr0pat _ -> pat_desc, acc
     | Evarpat(v) ->
        let v, acc = f acc v in
-       Evarpat(v, acc)
+       Evarpat(v), acc
     | Etuplepat(p_list) ->
-       let p_list, acc = Utils.mapfold (pattern f) acc p_list in
+       let p_list, acc = Util.mapfold (pattern f) acc p_list in
        Etuplepat(p_list), acc
     | Econstr1pat(c, p_list) ->
-       let p_list, acc = Utils.mapfold (pattern f) acc p_list in
+       let p_list, acc = Util.mapfold (pattern f) acc p_list in
        Econstr1pat(c, p_list), acc
     | Erecordpat(n_p_list) ->
-       let n_p_list =
-         Utils.mapfold 
+       let n_p_list, acc =
+         Util.mapfold 
            (fun acc { label; arg } ->
-             let p, acc = pattern f p in
-             { label; arg = pattern p}, acc) n_p_list in
+             let arg, acc = pattern f acc p in
+             { label; arg}, acc) acc n_p_list in
        Erecordpat(n_p_list), acc
     | Ealiaspat(p1, n) ->
-       let p1, acc = pattern f p1 in
+       let p1, acc = pattern f acc p1 in
        let n, acc = f acc n in
        Ealiaspat(p1, n), acc
     | Eorpat(p1, p2) ->
@@ -70,40 +70,40 @@ let rec expression acc ({ e_desc } as e) =
   match e_desc with
   | Econst _ | Econstr0 _ | Eglobal _ -> e, acc
   | Evar(x) ->
-     let x, acc = rename x acc in
+     let x, acc = rename acc x in
      { e with e_desc = Evar(x) }, acc
   | Elast(x) ->
-     let x, acc = rename x acc in
+     let x, acc = rename acc x in
      { e with e_desc = Elast(x) }, acc
   | Etuple(e_list) ->
-     let e_list, acc = Utils.mapfold expression acc e_list in
-     { e with e_desc = e_list }, acc
+     let e_list, acc = Util.mapfold expression acc e_list in
+     { e with e_desc = Etuple(e_list) }, acc
   | Econstr1 { lname; arg_list } ->
-     let arg_list, acc = Utils.mapfold expression acc arg_list in
+     let arg_list, acc = Util.mapfold expression acc arg_list in
      { e with e_desc = Econstr1 { lname; arg_list } }, acc
   | Erecord(l_e_list) -> 
       let l_e_list, acc =
-        Utils.mapfold (fun { label; arg } ->
-            let arg, acc = expression acc arg in { label; arg }, acc)
-          acc l_e_list in
+        Util.mapfold (fun acc { label; arg } ->
+            let arg, acc = expression acc arg in 
+            { label; arg }, acc) acc l_e_list in
       { e with e_desc = Erecord(l_e_list) }, acc
   | Erecord_access { label; arg } ->
       let arg, acc = expression acc arg in
       { e with e_desc = Erecord_access { label; arg } }, acc
   | Erecord_with(e_record, l_e_list) -> 
      let e_record, acc = expression acc e_record in
-     let l_e_list =
-       Utils.mapfold
-	  (fun { label; arg } ->
+     let l_e_list, acc =
+       Util.mapfold
+	  (fun acc { label; arg } ->
             let arg, acc = expression acc e in { label; arg }, acc)
           acc l_e_list in
       { e with e_desc = Erecord_with(e_record, l_e_list) }, acc
   | Eapp ({ f; arg_list } as a) ->
      let f, acc = expression acc f in
-     let arg_list, acc = Utils.mapfold expression acc arg_list in
-     { e with e_desc = Eapp { a with f; arg_list } }
+     let arg_list, acc = Util.mapfold expression acc arg_list in
+     { e with e_desc = Eapp { a with f; arg_list } }, acc
   | Eop(op, e_list) ->
-     let e_list, acc = Utils.mapfold expression acc e_list in
+     let e_list, acc = Util.mapfold expression acc e_list in
      { e with e_desc = Eop(op, e_list) }, acc
   | Etypeconstraint(e_ty, ty) ->
      let e_ty, acc = expression acc e_ty in
@@ -111,14 +111,34 @@ let rec expression acc ({ e_desc } as e) =
   | Elet(l, e_let) ->
      let l, acc = leq acc l in
      let e_let, acc = expression acc e_let in
-     { e with e_desc = Elet(l, e_let) }
+     { e with e_desc = Elet(l, e_let) }, acc
   | Elocal(eq_b, e) ->
      let eq_b, acc = block acc eq_b in
      let e, acc = expression acc e in
      { e with e_desc = Elocal(eq_b, e) }, acc
-  | Epresent _ | Ematch _ -> assert false
-        
-(** Simplify a local declaration *)
+  | Epresent({ handlers; default_opt } as h) ->
+     let body acc ({ p_cond; p_body; p_env } as p_b) =
+       let p_env, acc = build acc p_env in
+       let p_cond, acc = scondpat acc p_cond in
+       let p_body, acc = expression acc p_body in
+       { p_b with p_cond; p_body }, acc in
+     let handlers, acc =
+       Util.mapfold body acc handlers in
+     let default_opt, acc = default_opt expression acc default_opt in
+     { e_desc = Epresent { h with handlers; default_opt } }, acc 
+  | Ematch({ e; handlers } as m) ->
+     let body acc ({ m_pat; m_body; m_env } as m_h) =
+       let m_env, acc = build acc m_env in
+       let m_pat, acc = pattern acc m_pat in
+       let m_body, acc = expression acc m_body in
+       { m_h with m_pat; m_body; m_env }, acc in
+     let e, acc = expression acc e in
+     let handlers, acc =
+       Util.mapfold body acc handlers in
+     { eq_desc = Ematch { m with e; handlers } }, acc
+  | _ -> assert false
+  
+        (** Simplify a local declaration *)
 and leq acc ({ l_eq } as l) =
   let l_eq, acc = equation acc l_eq in
   { l with l_eq }, acc
@@ -135,7 +155,7 @@ and equation acc ({ eq_desc } as eq) =
   | EQeq(p, e) ->
      let p, acc = pattern acc p in
      let e, acc = expression acc e in
-     EQeq(p, e), acc
+     { eq with eq_desc = EQeq(p, e) }, acc
   | EQinit(x, e) ->
      let e, acc = expression acc e in
      let x, acc = rename acc x in
@@ -143,7 +163,7 @@ and equation acc ({ eq_desc } as eq) =
   | EQemit(x, e_opt) ->
      let x, acc = rename acc x in
      let e_opt, acc =
-       Utils.optional_map expression acc e_opt in
+       Util.optional_with_map expression acc e_opt in
      { eq_desc = EQemit(x, e_opt) }, acc
   | EQder { id; e; e_opt; handlers } ->
      let body acc ({ p_cond; p_body; p_env } as p_b) =
@@ -153,29 +173,29 @@ and equation acc ({ eq_desc } as eq) =
        { p_b with p_cond; p_body }, acc in
      let id, acc = rename acc id in
      let e, acc = expression acc e in
-     let e_opt, acc = Utils.optional_map expression acc e_opt in
-     let handlers, acc = Utils.mapfold body acc handlers in
+     let e_opt, acc = Util.optional_with_map expression acc e_opt in
+     let handlers, acc = Util.mapfold body acc handlers in
      { eq_desc = EQder { id; e; e_opt; handlers } }, acc
   | EQif { e; eq_true; eq_false } ->
      let e, acc = expression acc e in
      let eq_true, acc = equation acc eq_true in
      let eq_false, acc = equation acc eq_false in
-     { eq with eq_desc = EQif(e, eq_true, eq_false) }, acc
+     { eq with eq_desc = EQif { e; eq_true; eq_false } }, acc
   | EQmatch({ e; handlers } as m) ->
      let body acc ({ m_pat; m_body; m_env } as m_h) =
        let m_env, acc = build acc m_env in
        let m_pat, acc = pattern acc m_pat in
        let m_body, acc = equation acc m_body in
        { m_h with m_pat; m_body; m_env }, acc in
-     let e, acc = expression e acc in
+     let e, acc = expression acc e in
      let handlers, acc =
-       Utils.mapfold body acc handlers in
+       Util.mapfold body acc handlers in
      { eq_desc = EQmatch { m with e; handlers } }, acc
   | EQlocal(eq_b) ->
      let eq_b, acc = block acc eq_b in
      { eq_desc = EQblock(eq_b) }, acc
   | EQand(eq_list) ->
-     let eq_list, acc = Utils.mapfold equation acc eq_list in
+     let eq_list, acc = Util.mapfold equation acc eq_list in
      { eq_desc = EQand(eq_list) }, acc
   | EQpresent({ handlers; default_opt } as h) ->
      let body acc ({ p_cond; p_body; p_env } as p_b) =
@@ -184,19 +204,43 @@ and equation acc ({ eq_desc } as eq) =
        let p_body, acc = equation acc p_body in
        { p_b with p_cond; p_body }, acc in
      let handlers, acc =
-       Utils.mapfold body acc handlers in
-     let default_opt, acc = default acc default_opt in
+       Util.mapfold body acc handlers in
+     let default_opt, acc = default_opt acc default_opt in
      { eq_desc = EQpresent { h with handlers; default_opt } }, acc
-  | EQautomaton({ handlers } as a) ->
+  | EQautomaton({ handlers; state_opt } as a) ->
      let handler acc ({ s_state; s_let; s_body; s_trans } as h) =
-       
+       let s_state, acc = statepat acc s_state in
+       let s_let, acc = slet acc s_let in
+       let s_body, acc = block acc s_body in
+       let s_trans, acc = Util.mapfold escape acc s_trans in
+       { h with s_state; s_let; s_body; s_trans } in
+     let state_opt, acc = state acc state_opt in
+     let handlers, acc = Util.mapfold handler acc handlers in
+     { eq with eq_desc = EQautomaton({ a with handlers; state_opt }) }, acc
   | EQempty -> eq, acc
   | EQassert(e) ->
      let e, acc = expression acc e in
-     { eq_desc = EQassert(e) }, acc
+     { eq with eq_desc = EQassert(e) }, acc
   | EQforloop({ for_size; for_kind; for_index; for_input; for_body } as f) ->
+     let for_kind_t acc for_kind =
+       match for_kind with
+       | Kforeach -> Kforeach, acc
+       | Kforward(for_exit_opt) ->
+           let for_exit_opt, acc = 
+             Util.optional_with_map for_exit acc for_exit_opt in
+           Kforward(for_exit_opt), acc in
+     let body 
+         acc ({ for_size; for_kind; for_index; for_input; for_body } as f) =
+       let for_size, acc = Util.optional_with_map acc for_size in
+       let for_kind, acc = for_kind_t acc for_kind in
+       let for_index, acc = build acc for_index{for_size : 'size option;
+    for_kind : 'info for_kind;
+    for_index : Ident.t option;
+    for_input : 'info for_input_desc localized list;
+    for_body : 'body;
+    for_resume : bool; 
+  | _ -> assert false
      
-
 and scondpat acc ({ desc = desc } as scpat) =
   match desc with
   | Econdand(scpat1, scpat2) ->

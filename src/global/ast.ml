@@ -240,6 +240,7 @@ and ('info, 'size, 'body) forloop =
     for_input : 'info for_input_desc localized list;
     for_body : 'body;
     for_resume : bool; (* resume or restart *)
+    for_env : 'info Ident.Env.t;
   }
 
 (* result expression of a loop *)

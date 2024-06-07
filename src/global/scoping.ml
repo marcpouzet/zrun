@@ -538,7 +538,8 @@ and forloop_eq env_pat env { for_size; for_kind; for_index; for_input; for_resum
       Ast.for_index = for_index;
       Ast.for_input = for_input;
       Ast.for_body = { for_out; for_block };
-      Ast.for_resume = for_resume }
+      Ast.for_resume = for_resume;
+      Ast.for_env = Ident.Env.empty }
 
 (** Translating a sequence of local declarations *)
 and leqs env l = Util.mapfold letin env l
@@ -813,8 +814,10 @@ and forloop_exp env
     | Kforward(e_opt) ->
        Ast.Kforward(Util.optional_map (exit_expression env_body) e_opt) in
   { Ast.for_size = for_size; Ast.for_kind = for_kind;
-    Ast.for_index = for_index; Ast.for_input = for_input; Ast.for_body = for_body;
-    Ast.for_resume = for_resume }
+    Ast.for_index = for_index; Ast.for_input = for_input; 
+    Ast.for_body = for_body;
+    Ast.for_resume = for_resume;
+    Ast.for_env = Ident.Env.empty }
 
 and exit_expression env { for_exit_kind; for_exit } =
   let k = match for_exit_kind with 

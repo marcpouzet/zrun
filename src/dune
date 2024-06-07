@@ -41,20 +41,21 @@
     coiteration ; the main execution loop
     output ; reprentation of the internal state
     forloop ; evaluation functions for for loops
-    eval ; evaluation of an expression.
+    eval ; evaluation of an expression
+    reduce ; static reduction  
   )   	 
   (libraries zrun.ast_lib))
 
 ; rewriting steps
-(library
-  (name rewrite_lib)
-  (public_name zrun.rewrite_lib)
-  (wrapped false)
-  (modules
-    reduce ; static reduction
-  )
-  (libraries zrun.ast_lib zrun.zrun_lib)
-)
+;(library
+;  (name rewrite_lib)
+;  (public_name zrun.rewrite_lib)
+;  (wrapped false)
+;  (modules
+;    reduce ; static reduction
+;  )
+;  (libraries zrun.ast_lib zrun.zrun_lib)
+;)
 
 (executable
  (name zrun)
