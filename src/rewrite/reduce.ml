@@ -18,12 +18,14 @@ open Misc
 open Ident
 open Lident
 open Ast
+open Monad
+open Opt
+open Result
 
-type 'a env = 
-  { r_env: Ident.t Ident.Env.t; (* renaming *)
-    v_env: 'a Ident.Env.t; (* values *)
-  }
-
+type ('a, 'b) value =
+  | Value : 'a -> ('a, 'b) value
+  | Term : 'b -> ('a, 'b) value
+                   
 (** Build a renaming from an environment *)
 let build env =
   let buildrec n entry (env, renaming) =
@@ -58,132 +60,71 @@ let pattern f p =
   pattern p
 
 (** Simplify an expression. This is mainly symbolic execution. Either the *)
-(* result is a close value or a value in which some leaves are variables *)
-(* [expression venv renaming fun_defs e = e', fun_defs'] *)
-(* - venv an environment of values;
- *- renaming is a renaming of variables;
- *- e and e' are expressions;
- *- fun_defs and fun_defs' are list of the functions introduced 
- *- during the simplification 
-*)
-let rec expression env ({ e_desc } as e) =
+(** result is a value or a term *)
+(* [expression genv env e = v] *)
+(* - genv is a global environment; *)
+(* - env is an environment *)
+let rec expression genv env ({ e_desc } as e) =
   match e_desc with
-  | Econst(v) -> 
-     Value(immediate v)
-  | Econstr0 { lname } ->
-     Value(Vconstr0(lname))
-  | Eglobal { lname } ->
-     let v = find_gvalue_opt lname genv |>
-         Opt.to_result ~none:{ kind = Eunbound_lident(lname); loc = e_loc } in
-     Value(v)
-  | Evar(x) -> 
-     find_value_opt x env |> Opt.to_result ~none: e
-  | Elast _ | Eperiod _ -> e
+  | Econst _ | Econstr0 _ | Eglobal _ -> e
+  | Evar(x) -> { e with e_desc = Evar(rename env x) }
+  | Elast(x) -> { e with e_desc = Elast(rename env x) }
   | Etuple(e_list) ->
-      let e_list = List.map (expression env) e_list in
-      { e with e_desc = Etuple(e_list) }
+     { e with e_desc = List.map (expression genv env) e_list }
   | Econstr1 { lname; arg_list } ->
-      let arg_list = List.map (expression env) arg_list in
+     let arg_list = List.map (expression genv env) arg_list in
      { e with e_desc = Econstr1 { lname; arg_list } }
   | Erecord(l_e_list) -> 
       let l_e_list =
-        List.map
-	  (fun { label; arg } -> 
-            let arg = expression env arg in { label; arg })
-          l_e_list in
+        List.map (fun { label; arg } ->
+            let arg = expression genv env arg in { label; arg }) l_e_list in
       { e with e_desc = Erecord(l_e_list) }
   | Erecord_access { label; arg } ->
-      let arg = expression env arg in
+      let arg = expression genv env arg in
       { e with e_desc = Erecord_access { label; arg } }
   | Erecord_with(e_record, l_e_list) -> 
-     let e_record = expression env e_record in
+     let e_record = expression genv env e_record in
      let l_e_list =
        List.map
 	  (fun { label; arg } ->
-            let arg = expression env e in { label; arg }) l_e_list in
+            let arg = expression genv env e in { label; arg }) l_e_list in
       { e with e_desc = Erecord_with(e_record, l_e_list) }
   | Eapp ({ is_inline; f; arg_list } as a) ->
-      let arg_list = List.map (expression env) arg_list in
-      let f = expression env f in
-      if is_inline || Misc.inline_all then
-        (* [f] must be a transparent value that is a closure *)
-        match f with
-        | Value(Vclosure { c_funexp; c_genv; c_env }) ->
-      
-      
-      
-      else
-        (* [e_fun] is necessarily static. It needs to be a compile-time *)
-      (* non opaque value only when [inline] is true *)
-      (* [e_list] decomposes into (a possibly empty) sequence of 
-       *- static arguments [s_list] and non static ones [ne_list] *)
-      let e, fun_defs =
-        let s_list, ne_list, ty_res =
-          Ztypes.split_arguments e_fun.e_typ e_list in
-        let ne_list, fun_defs =
-          Zmisc.map_fold (expression venv renaming) fun_defs ne_list in
+      if is_inline then
+        (* [f] must be a transparent value and a closure *)
+        let env = value_env env in
         try
-          let v_fun = Static.expression venv e_fun in
-          let { value_exp = v; value_name = opt_name } as v_fun =
-            Static.app v_fun (List.map (Static.expression venv) s_list) in
-          match ne_list with
-          | [] ->
-	      let e, fun_defs = exp_of_value fun_defs v_fun in
-              { e with e_typ = ty_res }, fun_defs
-          | _ ->
-	      (* two solutions are possible. Either we introduce a fresh *)
-              (* function [f] for the result of [v_fun s1...sn] *)
-              (* and return [f ne1...nek]. [f] could then be shared in case *)
-              (* several instance of [v_fun s1...sn] exist *)
-	      (* Or we directly inline the body of [f]. We take this solution *)
-	      (* for the moment *)
-              match opt_name, v with
-              | None,
-                Vfun({ f_args = p_list; f_body = e; f_env = f_env },
-                     venv_closure) ->
-	          (* [p_list] should now be a list of non static parameters *)
-                  let f_env, renaming0 = build f_env in
-                  let venv = remove renaming0 venv in
-                  let renaming = Env.append renaming0 renaming in
-                  let p_list = List.map (pattern venv renaming) p_list in
-                  let e, fun_defs =
-                    expression venv_closure renaming fun_defs e in
-	          (* return [let p1 = ne1 in ... in pk = nek in e] *)
-	          Zaux.make_let f_env
-                    (List.map2
-                     (fun p ne -> Zaux.eqmake (EQeq(p, ne))) p_list ne_list) e,
-                    fun_defs
-	      | _ -> (* returns an application *)
-                  let e_fun, fundefs = exp_of_value fun_defs v_fun in
-	          let e_fun = { e_fun with e_typ = ty_res } in
-	          { e with e_desc = Eapp(app, e_fun, ne_list) }, fun_defs
+          let f = vexp genv venv f in
+          match f with
+          | Value(Closure { c_funexp = { f_args; f_body }; c_genv; c_env }) ->
+             (* local x1,...,xm do
+                  p1 = e1 and ... pn = en and eq in
+                x1,...,xm *)
+             let arg_list = List.map (expression genv env) arg_list in
+             let f_args, env = build_renaming env f_args in
+             let eq_list =
+               List.map
+                 (fun (p_arg, arg) -> Aux.equation p_arg arg) f_args arg_list in
+             let r = result genv env f_body in
+             let vdec_list, eq, vdec_result = result f_body in
+             Aux.local vdec_list (eq :: eq_list) vdec_result
+          | _ -> raise Error
         with
-          Static.Error _ ->
-            let e_fun, fun_defs = expression venv renaming fun_defs e_fun in
-            let s_list, fun_defs =
-              Zmisc.map_fold (expression venv renaming) fun_defs s_list in
-            { e with e_desc = Eapp(app, e_fun, s_list @ ne_list) }, fun_defs in
-      e, fun_defs
+          Unbound -> raise Error
+      else
+        let f = expression genv env f in
+        let arg_list = List.map (expression genv env) arg_list in
+        { e_desc = Eapp { a with f; arg_list } }
   | Eop(op, e_list) ->
-      let e_list, fun_defs =
-        Zmisc.map_fold (expression venv renaming) fun_defs e_list in
-     { e with e_desc = Eop(op, e_list) }, fun_defs
+     let e_list = List.map (expression genv env) e_list in
+     { e with e_desc = Eop(op, e_list) }
   | Etypeconstraint(e_ty, ty) ->
-      let e_ty, fun_defs =
-        expression venv renaming fun_defs e_ty in
-      let ty = type_expression venv renaming ty in
-      { e with e_desc = Etypeconstraint(e_ty, ty) }, fun_defs
-  | Eseq(e1, e2) ->
-      let e1, fun_defs =
-        expression venv renaming fun_defs e1 in
-      let e2, fun_defs =
-        expression venv renaming fun_defs e2 in
-     { e with e_desc = Eseq(e1, e2) }, fun_defs
+     let e_ty = expression genv env e_ty in
+     { e with e_desc = Etypeconstraint(e_ty, ty) }
   | Elet(l, e_let) ->
-     let l, (renaming, fun_defs) = local venv (renaming, fun_defs) l in
-     let e_let, fun_defs =
-       expression venv renaming fun_defs e_let in
-     { e with e_desc = Elet(l, e_let) }, fun_defs
+     let l, renaming = leq genv env l in
+     let e_let = expression genv env e_let in
+     { e with e_desc = Elet(l, e_let) }
   | Eblock(b, e_block) ->
       let b, (renaming, fun_defs) = block venv (renaming, fun_defs) b in
       let e_block, fun_defs = expression venv renaming fun_defs e_block in
