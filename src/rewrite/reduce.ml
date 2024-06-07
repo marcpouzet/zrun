@@ -12,7 +12,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(** reduce static expressions and inline function called that are tagged to be static; leave other unchanged *)
+(** reduce static expressions *)
 
 open Misc
 open Ident
@@ -32,59 +32,36 @@ let build env =
     
 let rename n env = Env.find n env
 
-exception Fallback
-
-type 'a global_it_funs =
-  { var_ident : 'acc global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
-  }
-    
-type 'a it_funs = {
-    pattern : 'acc it_funs -> 'a -> noinfo pattern -> noinfo pattern * 'a;
-    global_funs: 'a global_it_funs;
-  }
-
-let var_ident funs acc x -> Env.find x acc, acc
-
-let global_funs_default =
-  { var_ident }
-
-let it_funs_default =
-  { pattern; global_funs = global_funs_default }
-
 (** Renaming of patterns *)
-let pattern_it funs acc p =
-  try funs.pattern funs acc p
-  with Fallback -> pattern funs acc p
-
-and pattern funs acc ({ pat_desc } as p) =
+let rec pattern f acc ({ pat_desc } as p) =
   let pat_desc, acc = match pat_desc with
     | Ewildpat | Econstpat _ | Econstr0pat _ -> pat_desc, acc
     | Evarpat(v) ->
-       let v, acc =  funs.global_funs acc v in
+       let v, acc = f acc v in
        Evarpat(v, acc)
     | Etuplepat(p_list) ->
-       let p_list, acc = Utils.mapfold (pattern_it funs) acc p_list in
+       let p_list, acc = Utils.mapfold (pattern f) acc p_list in
        Etuplepat(p_list), acc
     | Econstr1pat(c, p_list) ->
-       let p_list, acc = Utils.mapfold (pattern_it funs) acc p_list in
+       let p_list, acc = Utils.mapfold (pattern f) acc p_list in
        Econstr1pat(c, p_list), acc
     | Erecordpat(n_p_list) ->
        let n_p_list =
          Utils.mapfold 
            (fun acc { label; arg } ->
-             let p, acc = pattern_it funs p in
+             let p, acc = pattern f p in
              { label; arg = pattern p}, acc) n_p_list in
        Erecordpat(n_p_list), acc
     | Ealiaspat(p1, n) ->
-       let p1, acc = pattern_it funs p1 in
-       let n = funs.global_funs acc n in
+       let p1, acc = pattern f p1 in
+       let n, acc = f acc n in
        Ealiaspat(p1, n), acc
     | Eorpat(p1, p2) ->
-       let p1, acc = pattern_it funs acc p1 in
-       let p2, acc = pattern_it funs acc p2 in
+       let p1, acc = pattern f acc p1 in
+       let p2, acc = pattern f acc p2 in
        Eorpat(p1, p2), acc
     | Etypeconstraintpat(p1, ty) ->
-       let p1, acc = pattern_it funs acc p1 in
+       let p1, acc = pattern f acc p1 in
        Etypeconstraintpat(p1, ty), acc in
   { p with pat_desc }, acc
 
