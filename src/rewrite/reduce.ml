@@ -123,6 +123,12 @@ and leq acc ({ l_eq } as l) =
   let l_eq, acc = equation acc l_eq in
   { l with l_eq }, acc
 
+and default_opt f acc d =
+  match d with
+  | Init(e) -> let e, acc = f acc e in Init(e), acc
+  | Else(e) -> let e, acc = f acc e in Else(e), acc
+  | NoDefault -> NoDefault, acc
+
 (** Equations **)
 and equation acc ({ eq_desc } as eq) = 
   match eq_desc with
@@ -132,175 +138,86 @@ and equation acc ({ eq_desc } as eq) =
      EQeq(p, e), acc
   | EQinit(x, e) ->
      let e, acc = expression acc e in
-     let x, acc = rename x acc in
+     let x, acc = rename acc x in
      { eq with eq_desc = EQinit(x, e) }, acc
+  | EQemit(x, e_opt) ->
+     let x, acc = rename acc x in
+     let e_opt, acc =
+       Utils.optional_map expression acc e_opt in
+     { eq_desc = EQemit(x, e_opt) }, acc
   | EQder { id; e; e_opt; handlers } ->
+     let body acc ({ p_cond; p_body; p_env } as p_b) =
+       let p_env, acc = build acc p_env in
+       let p_cond, acc = scondpat acc p_cond in
+       let p_body, acc = expression acc p_body in
+       { p_b with p_cond; p_body }, acc in
+     let id, acc = rename acc id in
+     let e, acc = expression acc e in
+     let e_opt, acc = Utils.optional_map expression acc e_opt in
+     let handlers, acc = Utils.mapfold body acc handlers in
+     { eq_desc = EQder { id; e; e_opt; handlers } }, acc
   | EQif { e; eq_true; eq_false } ->
-  | EQmatch({ e; handlers } as m)
-  let body venv fun_defs ({ m_pat = p; m_body = b; m_env = env } as m_h) =
-          let env, renaming0 = build env in
-          let venv = remove renaming0 venv in
-          let renaming = Env.append renaming0 renaming in
-          let b, (_, fun_defs) = block venv (renaming, fun_defs) b in
-	  { m_h with m_pat = pattern venv renaming p;
-	      m_body = b; m_env = env }, fun_defs in
-        let e, fun_defs = expression venv renaming fun_defs e in
-        let m_b_list, fun_defs =
-          Zmisc.map_fold (body venv) fun_defs m_b_list in
-        EQmatch(total, e, m_b_list), fun_defs
-    | EQblock(b) ->
-        let b, (_, fun_defs) = block venv (renaming, fun_defs) b in
-        EQblock(b), fun_defs
+     let e, acc = expression acc e in
+     let eq_true, acc = equation acc eq_true in
+     let eq_false, acc = equation acc eq_false in
+     { eq with eq_desc = EQif(e, eq_true, eq_false) }, acc
+  | EQmatch({ e; handlers } as m) ->
+     let body acc ({ m_pat; m_body; m_env } as m_h) =
+       let m_env, acc = build acc m_env in
+       let m_pat, acc = pattern acc m_pat in
+       let m_body, acc = equation acc m_body in
+       { m_h with m_pat; m_body; m_env }, acc in
+     let e, acc = expression e acc in
+     let handlers, acc =
+       Utils.mapfold body acc handlers in
+     { eq_desc = EQmatch { m with e; handlers } }, acc
+  | EQlocal(eq_b) ->
+     let eq_b, acc = block acc eq_b in
+     { eq_desc = EQblock(eq_b) }, acc
   | EQand(eq_list) ->
-  | EQlocal(eq_block) ->
+     let eq_list, acc = Utils.mapfold equation acc eq_list in
+     { eq_desc = EQand(eq_list) }, acc
+  | EQpresent({ handlers; default_opt } as h) ->
+     let body acc ({ p_cond; p_body; p_env } as p_b) =
+       let p_env, acc = build acc p_env in
+       let p_cond, acc = scondpat acc p_cond in
+       let p_body, acc = equation acc p_body in
+       { p_b with p_cond; p_body }, acc in
+     let handlers, acc =
+       Utils.mapfold body acc handlers in
+     let default_opt, acc = default acc default_opt in
+     { eq_desc = EQpresent { h with handlers; default_opt } }, acc
+  | EQautomaton({ handlers } as a) ->
+     let handler acc ({ s_state; s_let; s_body; s_trans } as h) =
+       
+  | EQempty -> eq, acc
+  | EQassert(e) ->
+     let e, acc = expression acc e in
+     { eq_desc = EQassert(e) }, acc
+  | EQforloop({ for_size; for_kind; for_index; for_input; for_body } as f) ->
      
-    | EQmatch(total, e, m_b_list) ->
-          | EQreset(eq_list, e) ->
-        let e, fun_defs = expression venv renaming fun_defs e in
-        let eq_list, fun_defs =
-          Zmisc.map_fold (equation venv renaming) fun_defs eq_list in
-        EQreset(eq_list, e), fun_defs
-    | EQand(and_eq_list) ->
-        let and_eq_list, fun_defs =
-          Zmisc.map_fold (equation venv renaming) fun_defs and_eq_list in
-        EQand(and_eq_list), fun_defs
-    | EQbefore(before_eq_list) ->
-        let before_eq_list, fun_defs =
-          Zmisc.map_fold (equation venv renaming) fun_defs before_eq_list in
-        EQbefore(before_eq_list), fun_defs
-    | EQpresent(p_h_list, b_opt) ->
-        let body fun_defs ({ p_cond = scpat; p_body = b; p_env = env } as p_b) =
-          let env, renaming0 = build env in
-          let venv = remove renaming0 venv in
-          let renaming = Env.append renaming0 renaming in
-          let scpat, fun_defs = scondpat venv renaming fun_defs scpat in
-          let b, (renaming, fun_defs) = block venv (renaming, fun_defs) b in
-          { p_b with p_cond = scpat; p_body = b; p_env = env }, fun_defs in
-        let p_h_list, fun_defs = Zmisc.map_fold body fun_defs p_h_list in
-        let b_opt, (_, fun_defs) =
-          Zmisc.optional_with_map (block venv) (renaming, fun_defs) b_opt in
-        EQpresent(p_h_list, b_opt), fun_defs
-    | EQemit(x, e_opt) ->
-        let e_opt, fun_defs =
-          Zmisc.optional_with_map (expression venv renaming) fun_defs e_opt in
-        EQemit(rename x renaming, e_opt), fun_defs
-  | EQautomaton(is_weak, s_h_list, se_opt) ->
-     let build_state_names renaming { s_state = { desc = desc } } =
-       match desc with
-       | Estate0pat(n) | Estate1pat(n, _) ->
-	   let m = Zident.fresh (Zident.source n) in
-           Env.add n m renaming in
-     let statepat renaming ({ desc = desc } as spat) =
-	 match desc with
-	 | Estate0pat(x) -> { spat with desc = Estate0pat(rename x renaming) }
-	 | Estate1pat(x, x_list) ->
-	    let x = rename x renaming in
-	    let x_list = List.map (fun x -> rename x renaming) x_list in
-	    { spat with desc = Estate1pat(x, x_list) } in
-     let state_exp venv renaming fun_defs ({ desc = desc } as se) =
-       match desc with
-       | Estate0(x) -> { se with desc = Estate0(rename x renaming) }, fun_defs
-       | Estate1(x, e_list) ->
-	  let e_list, fun_defs =
-	    Zmisc.map_fold (expression venv renaming) fun_defs e_list in
-	  { se with desc = Estate1(rename x renaming, e_list) }, fun_defs in
-     let escape venv renaming fun_defs
-         ({ e_cond = scpat; e_block = b_opt;
-	    e_next_state = se; e_env = env } as esc) =
-       let env, renaming0 = build env in
-       let venv = remove renaming0 venv in
-       let renaming = Env.append renaming0 renaming in
-       let renaming, fun_defs, b_opt =
-	 match b_opt with
-         | None -> renaming, fun_defs, None
-         | Some(b) ->
-	     let b, (renaming, fun_defs) = block venv (renaming, fun_defs) b
-             in renaming, fun_defs, Some(b) in
-       let scpat, fun_defs = scondpat venv renaming fun_defs scpat in
-       let se, fun_defs = state_exp venv renaming fun_defs se in
-       { esc with e_cond = scpat; e_block = b_opt; e_next_state = se;
-                  e_env = env },
-       fun_defs in
-     let body venv renaming fun_defs
-         ({ s_state = spat; s_body = b; s_trans = esc_list;
-            s_env = env } as h) =
-       let env, renaming0 = build env in
-       let venv = remove renaming0 venv in
-       let renaming = Env.append renaming0 renaming in
-       let spat = statepat renaming spat in
-       let b, (renaming, fun_defs) = block venv (renaming, fun_defs) b in
-       let esc_list, fun_defs =
-	 Zmisc.map_fold (escape venv renaming) fun_defs esc_list in
-       { h with s_state = spat; s_body = b; s_trans = esc_list; s_env = env },
-       fun_defs in
-     let renaming =
-       List.fold_left build_state_names renaming s_h_list in
-     let s_h_list, fun_defs =
-       Zmisc.map_fold (body venv renaming) fun_defs s_h_list in
-     let se_opt, fun_defs =
-       Zmisc.optional_with_map (state_exp venv renaming) fun_defs se_opt in
-     EQautomaton(is_weak, s_h_list, se_opt), fun_defs
-  | EQforall({ for_index = i_list; for_init = init_list;
-               for_body = b_eq_list;
-	       for_in_env = in_env; for_out_env = out_env } as f_body ) ->
-      let in_env, renaming0 = build in_env in
-      let venv = remove renaming0 venv in
-      let out_env, renaming1 = build out_env in
-      let venv = remove renaming1 venv in
-      let renaming = Env.append renaming0 (Env.append renaming1 renaming) in
-      let index fun_defs ({ desc = desc } as ind) =
-        let desc, fun_defs =
-          match desc with
-          | Einput(x, e) ->
-	      let e, fun_defs = expression venv renaming fun_defs e in
-              Einput(rename x renaming, e), fun_defs
-          | Eoutput(x, xout) ->
-              Eoutput(rename x renaming, rename xout renaming), fun_defs
-          | Eindex(x, e1, e2) ->
-	      let e1, fun_defs = static venv fun_defs e1 in
-              let e2, fun_defs = static venv fun_defs e2 in
-              Eindex(rename x renaming, e1, e2), fun_defs in
-        { ind with desc = desc }, fun_defs in
-     let init fun_defs ({ desc = desc } as ini) =
-       let desc, fun_defs =
-         match desc with
-         | Einit_last(x, e) ->
-	     let e, fun_defs = expression venv renaming fun_defs e in
-             Einit_last(rename x renaming, e), fun_defs in
-       { ini with desc = desc }, fun_defs in
-     let i_list, fun_defs =
-       Zmisc.map_fold index fun_defs i_list in
-     let init_list, fun_defs =
-       Zmisc.map_fold init fun_defs init_list in
-     let b_eq_list, (_, fun_defs) = block venv (renaming, fun_defs) b_eq_list in
-      EQforall { f_body with
-                 for_index = i_list;
-	         for_init = init_list;
-	         for_body = b_eq_list;
-		 for_in_env = in_env;
-                 for_out_env = out_env }, fun_defs in
-  { eq with eq_desc = desc; eq_write = Deftypes.empty }, fun_defs
 
-and scondpat venv renaming fun_defs ({ desc = desc } as scpat) =
+and scondpat acc ({ desc = desc } as scpat) =
   match desc with
   | Econdand(scpat1, scpat2) ->
-     let scpat1, fun_defs = scondpat venv renaming fun_defs scpat1 in
-     let scpat2, fun_defs = scondpat venv renaming fun_defs scpat2 in
-     { scpat with desc = Econdand(scpat1, scpat2) }, fun_defs
+     let scpat1, acc = scondpat acc scpat1 in
+     let scpat2, acc = scondpat acc scpat2 in
+     { scpat with desc = Econdand(scpat1, scpat2) }, acc
   | Econdor(scpat1, scpat2) ->
-     let scpat1, fun_defs = scondpat venv renaming fun_defs scpat1 in
-     let scpat2, fun_defs = scondpat venv renaming fun_defs scpat2 in
-     { scpat with desc = Econdor(scpat1, scpat2) }, fun_defs
+     let scpat1, acc = scondpat acc scpat1 in
+     let scpat2, acc = scondpat acc scpat2 in
+     { scpat with desc = Econdor(scpat1, scpat2) }, acc
   | Econdexp(e) ->
-     let e, fun_defs = expression venv renaming fun_defs e in
-     { scpat with desc = Econdexp(e) }, fun_defs
+     let e, acc = expression acc fun_defs e in
+     { scpat with desc = Econdexp(e) }, acc
   | Econdpat(e, p) ->
-     let e, fun_defs = expression venv renaming fun_defs e in
-     { scpat with desc = Econdpat(e, pattern venv renaming p) }, fun_defs
+     let e, acc = expression acc fun_defs e in
+     let p, acc = pattern acc p in
+     { scpat with desc = Econdpat(e, p) }, acc
   | Econdon(scpat, e) ->
-     let scpat, fun_defs = scondpat venv renaming fun_defs scpat in
-     let e, fun_defs = expression venv renaming fun_defs e in
-     { scpat with desc = Econdon(scpat, e) }, fun_defs
+     let scpat, acc = scondpat acc scpat in
+     let e, acc = expression acc e in
+     { scpat with desc = Econdon(scpat, e) }, acc
 
 and vardec renaming ({ vardec_name = n } as v) =
     { v with vardec_name = rename n renaming }
