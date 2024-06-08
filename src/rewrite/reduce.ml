@@ -96,6 +96,34 @@ let default_t f acc d =
   | Else(e) -> let e, acc = f acc e in Else(e), acc
   | NoDefault -> NoDefault, acc
 
+let for_exit_t expression acc ({ for_exit } as fe) =
+  let for_exit, acc = expression acc for_exit in
+  { fe with for_exit }, acc
+
+let for_kind_t expression acc for_kind =
+  match for_kind with
+  | Kforeach -> Kforeach, acc
+  | Kforward(for_exit_opt) ->
+     let for_exit_opt, acc = 
+       Util.optional_with_map (for_exit_t expression) acc for_exit_opt in
+     Kforward(for_exit_opt), acc
+    
+let for_size_t expression acc e = expression acc e
+
+let for_input_t expression acc ({ desc } as fi) =
+  let desc, acc = match desc with
+    | Einput {id; e; by } ->
+       let id, acc = rename acc id in
+       let e, acc = expression acc e in
+       let by, acc = Util.optional_with_map expression acc by in
+       Einput { id; e; by }, acc
+    | Eindex ({ id; e_left; e_right } as ind) ->
+       let id, acc = rename acc id in
+       let e_left, acc = expression acc e_left in
+       let e_right, acc = expression acc e_right in
+       Eindex { ind with id; e_left; e_right }, acc in
+  { fi with desc }, acc
+     
 (** Expressions **)
 let rec expression acc ({ e_desc } as e) =
   match e_desc with
@@ -167,12 +195,12 @@ let rec expression acc ({ e_desc } as e) =
      let handlers, acc =
        Util.mapfold body acc handlers in
      { e with e_desc = Ematch { m with e; handlers } }, acc
+  | Eassert e -> let e, acc = expression acc e in
+                              { e with e_desc = Eassert(e) }, acc
   | Esizeapp _ 
     | Efun _
-    | Ereset _ -> assert false
-    | Eassert e -> let e, acc = expression acc e in
-                              { e with e_desc = Eassert(e) }, acc
-  | Eforloop _ -> assert false
+    | Ereset _
+    | Eforloop _ -> assert false
   
 (** Equations **)
 and equation acc ({ eq_desc } as eq) = 
@@ -280,30 +308,6 @@ and equation acc ({ eq_desc } as eq) =
      { eq with eq_desc = EQassert(e) }, acc
   | EQforloop
      ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
-     let for_exit_t acc ({ for_exit } as fe) =
-       let for_exit, acc = expression acc for_exit in
-       { fe with for_exit }, acc in
-     let for_kind_t acc for_kind =
-       match for_kind with
-       | Kforeach -> Kforeach, acc
-       | Kforward(for_exit_opt) ->
-           let for_exit_opt, acc = 
-             Util.optional_with_map for_exit_t acc for_exit_opt in
-           Kforward(for_exit_opt), acc in
-     let for_size_t acc e = expression acc e in
-     let for_input_t acc ({ desc } as fi) =
-      let desc, acc = match desc with
-        | Einput {id; e; by } ->
-           let id, acc = rename acc id in
-           let e, acc = expression acc e in
-           let by, acc = Util.optional_with_map expression acc by in
-           Einput { id; e; by }, acc
-        | Eindex ({ id; e_left; e_right } as ind) ->
-           let id, acc = rename acc id in
-           let e_left, acc = expression acc e_left in
-           let e_right, acc = expression acc e_right in
-           Eindex { ind with id; e_left; e_right }, acc in
-      { fi with desc }, acc in
      let for_eq_t acc { for_out; for_block } =
        let for_out_t acc
              ({ desc = { for_name; for_out_name; for_init; for_default } } as f) =
@@ -319,10 +323,11 @@ and equation acc ({ eq_desc } as eq) =
        let for_block, acc = block acc for_block in
        { for_out; for_block }, acc in
      let for_env, acc = build acc for_env in
-     let for_size, acc = Util.optional_with_map for_size_t acc for_size in
-     let for_kind, acc = for_kind_t acc for_kind in
+     let for_size, acc =
+       Util.optional_with_map (for_size_t expression) acc for_size in
+     let for_kind, acc = for_kind_t expression acc for_kind in
      let for_input, acc =
-       Util.mapfold for_input_t acc for_input in
+       Util.mapfold (for_input_t expression) acc for_input in
      let for_body, acc = for_eq_t acc for_body in
      { eq with eq_desc =
                  EQforloop
