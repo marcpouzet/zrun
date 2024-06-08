@@ -138,7 +138,7 @@ let rec expression acc ({ e_desc } as e) =
      { eq_desc = Ematch { m with e; handlers } }, acc
   | _ -> assert false
   
-        (** Simplify a local declaration *)
+(** Simplify a local declaration *)
 and leq acc ({ l_eq } as l) =
   let l_eq, acc = equation acc l_eq in
   { l with l_eq }, acc
@@ -266,28 +266,39 @@ and scondpat acc ({ desc = desc } as scpat) =
 and vardec renaming ({ vardec_name = n } as v) =
     { v with vardec_name = rename n renaming }
   
-and block venv (renaming, fun_defs)
-    ({ b_vars = n_list; b_locals = l_list; b_body = eq_list;
-       b_env = n_env } as b) =
-  let n_env, renaming0 = build n_env in
-  let venv = remove renaming0 venv in
-  let renaming = Env.append renaming0 renaming in
-  let n_list = List.map (vardec renaming) n_list in
-  let l_list, (renaming, fun_defs) =
-    Zmisc.map_fold (local venv) (renaming, fun_defs) l_list in
-  let eq_list, fun_defs =
-    Zmisc. map_fold (equation venv renaming) fun_defs eq_list in
-  { b with b_vars = n_list; b_locals = l_list; 
-           b_body = eq_list; b_write = Deftypes.empty; b_env = n_env },
-  (renaming, fun_defs)
+and block acc ({ b_vars; b_body; b_env } as b) =
+  let b_env, acc = build acc n_env in
+  let n_list, acc = 
+    Util.mapfold vardec acc b_vars in
+  let b_body, acc = equation acc b_body in
+  { b with b_vars; b_body; b_env }, acc
 
-(** Convert a value into an expression. *)
-(* [exp_of_value fun_defs v = acc', e] where
- * - fun_defs is a set of global function declarations;
- * - v is a value;
- * - e is the corresponding expression for v *)
-and exp_of_value fun_defs { value_exp = v; value_name = opt_name } =
-  let desc, fun_defs =
+(** Convert a value into an expression. **)
+let exp_of_value v =
+  match v with
+  | Vint(v) -> Econst(Eint(v))
+  | Vbool(v) -> Econst(Ebool(v))
+  | Vfloat(v) -> Econst(Efloat(v))
+  | Vchar(v) -> Econst(Echar(v))
+  | Vstring(v) -> Econst(Estring(v))
+  | Vvoid -> Econst(Evoid)
+  | Vconstr0 lname -> Econstr0 { lname }
+  | Vconstr1(lname, v_list) -> 
+     Econstr1 { lname; arg_list = exp_of_value v_list }
+  | Vrecord(r_list) ->
+  | Vpresent(v) ->
+  | Vabsent(v) ->
+  | Vstuple(v_list) ->
+  | Vtuple(v_list) ->
+  | Vstate0(id) ->
+  | Vstate1(id, v_list) ->
+  | Varray(a) ->
+  | Vfun(f) ->
+  | Vclosure { c_funexp; c_genv; c_env } ->
+  | Vsizefun { s_params; s_body; s_genv; s_env } ->
+  | Vsizefix : { bound; name; defs } ->
+                     } -> pvalue
+let desc, fun_defs =
     match v with
     | Vconst(i) -> Econst(i), fun_defs
     | Vconstr0(qualident) ->
