@@ -338,7 +338,7 @@ let rec pattern_translate env { desc; loc } =
          (List.map (fun (lname, p) -> { Ast.label = longname lname;
                                         Ast.arg = pattern_translate env p })
 	    l_p_list) in
-  { Ast.pat_desc = desc; Ast.pat_loc = loc; Ast.pat_env = Ident.Env.empty }
+  { Ast.pat_desc = desc; Ast.pat_loc = loc; Ast.pat_info = Misc.no_info }
   
 and pattern_translate_list env p_list = List.map (pattern_translate env) p_list
 
@@ -786,7 +786,7 @@ and expression env { desc; loc } =
     | Eforloop(f) ->
        Ast.Eforloop(forloop_exp env f)
   in
-  { Ast.e_desc = desc; Ast.e_loc = loc; Ast.e_info = Misc.noinfo }
+  { Ast.e_desc = desc; Ast.e_loc = loc; Ast.e_info = Misc.no_info }
   
 and forloop_exp env 
     { for_size; for_kind; for_index; for_input; for_body; for_resume } =
