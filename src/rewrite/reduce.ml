@@ -22,10 +22,19 @@ open Monad
 open Opt
 open Result
 
+type error =
+  | NotStatic
+  | NotStaticExp of no_info exp
+  | NotStaticEq of no_info eq
+
+exception Reduce of error
+
 type 'a env =
   { e_renaming: Ident.t Ident.Env.t; (* associate a name to a name *)
     e_values: 'a Ident.Env.t;  (* associate a value of type 'a to a name *)
   }
+
+let empty = { e_renaming = Ident.Env.empty; e_values = Ident.Env.empty }
 
 (** Build a renaming from an environment *)
 let build ({ e_renaming } as acc) env =
@@ -35,8 +44,15 @@ let build ({ e_renaming } as acc) env =
     Env.add n m renaming in
   let env, e_renaming = Env.fold buildrec env (Env.empty, e_renaming) in
   env, { acc with e_renaming }
-    
+
+(* attention: il faut enlever des entrees de la substitution des
+   valeurs *)
+
 let rename ({ e_renaming } as acc) n = Env.find n e_renaming, acc
+
+let write_t acc { Defnames.dv; Defnames.di; Defnames.der } = assert false
+
+let type_expression acc ty = ty, acc
 
 (** Renaming of patterns *)
 let rec pattern f acc ({ pat_desc } as p) =
@@ -68,6 +84,7 @@ let rec pattern f acc ({ pat_desc } as p) =
        Eorpat(p1, p2), acc
     | Etypeconstraintpat(p1, ty) ->
        let p1, acc = pattern f acc p1 in
+       let ty, acc = type_expression acc ty in
        Etypeconstraintpat(p1, ty), acc in
   { p with pat_desc }, acc
 
@@ -152,12 +169,6 @@ let rec expression acc ({ e_desc } as e) =
      { e with e_desc = Ematch { m with e; handlers } }, acc
   | _ -> assert false
   
-(** Simplify a local declaration *)
-and leq acc ({ l_eq } as l) =
-  let l_eq, acc = equation acc l_eq in
-  { l with l_eq }, acc
-
-
 (** Equations **)
 and equation acc ({ eq_desc } as eq) = 
   match eq_desc with
@@ -262,25 +273,56 @@ and equation acc ({ eq_desc } as eq) =
   | EQassert(e) ->
      let e, acc = expression acc e in
      { eq with eq_desc = EQassert(e) }, acc
-  | EQforloop({ for_size; for_kind; for_index; for_input; for_body } as f) ->
+  | EQforloop
+     ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
+     let for_exit_t acc ({ for_exit } as fe) =
+       let for_exit, acc = expression acc for_exit in
+       { fe with for_exit }, acc in
      let for_kind_t acc for_kind =
        match for_kind with
        | Kforeach -> Kforeach, acc
        | Kforward(for_exit_opt) ->
            let for_exit_opt, acc = 
-             Util.optional_with_map for_exit acc for_exit_opt in
+             Util.optional_with_map for_exit_t acc for_exit_opt in
            Kforward(for_exit_opt), acc in
-     let body 
-         acc ({ for_size; for_kind; for_index; for_input; for_body } as f) =
-       let for_size, acc = Util.optional_with_map for_size_t acc for_size in
-       let for_kind, acc = for_kind_t acc for_kind in
-       let for_index, acc = build acc for_index in
-       let for_input, acc = for_input_t acc for_input in
-       let for_body, acc = for_eq_t acc for_body in
-       { f with for_size; for_kind; for_index; for_input; for_body } in
+     let for_size_t acc e = expression acc e in
+     let for_input_t acc ({ desc } as fi) =
+      let desc, acc = match desc with
+        | Einput {id; e; by } ->
+           let id, acc = rename acc id in
+           let e, acc = expression acc e in
+           let by, acc = Util.optional_with_map expression acc by in
+           Einput { id; e; by }, acc
+        | Eindex ({ id; e_left; e_right } as ind) ->
+           let id, acc = rename acc id in
+           let e_left, acc = expression acc e_left in
+           let e_right, acc = expression acc e_right in
+           Eindex { ind with id; e_left; e_right }, acc in
+      { fi with desc }, acc in
+     let for_eq_t acc { for_out; for_block } =
+       let for_out_t acc
+             ({ desc = { for_name; for_out_name; for_init; for_default } } as f) =
+         let for_name, acc = rename acc for_name in
+         let for_out_name, acc = Util.optional_with_map rename acc for_out_name in
+         let for_init, acc = Util.optional_with_map expression acc for_init in
+         let for_default, acc =
+           Util.optional_with_map expression acc for_default in
+         { f with desc = { for_name; for_out_name; for_init; for_default } },
+         acc in
+       let for_out, acc =
+         Util.mapfold for_out_t acc for_out in
+       let for_block, acc = block acc for_block in
+       { for_out; for_block }, acc in
+     let for_env, acc = build acc for_env in
+     let for_size, acc = Util.optional_with_map for_size_t acc for_size in
+     let for_kind, acc = for_kind_t acc for_kind in
+     let for_input, acc =
+       Util.mapfold for_input_t acc for_input in
+     let for_body, acc = for_eq_t acc for_body in
      { eq with eq_desc =
-                 EQforloop { f with for_size; for_kind; for_index;
-                                    for_input; for_body } }
+                 EQforloop
+                   { f with for_size; for_kind; for_index; for_input;
+                            for_body; for_env } }, acc
   | _ -> assert false
 
 and slet acc leq_list = Util.mapfold leq acc leq_list
@@ -313,19 +355,20 @@ and scondpat acc ({ desc = desc } as scpat) =
      { scpat with desc = Econdon(scpat, e) }, acc
 
 and vardec acc ({ var_name; var_default; var_init; var_typeconstraint } as v) =
-  let var_name = rename acc var_name in
+  let var_name, acc = rename acc var_name in
   let var_default, acc =
-    Util.optional_with_map acc var_default in
-  let var_init, acc = Util.optional_with_map acc var_init in
-  let var_typeconstraint = type_expression acc var_typeconstraint in
+    Util.optional_with_map expression acc var_default in
+  let var_init, acc = Util.optional_with_map expression acc var_init in
+  let var_typeconstraint, acc = type_expression acc var_typeconstraint in
   { v with var_name; var_default; var_init; var_typeconstraint }, acc
-  
+
+                 
 and block acc ({ b_vars; b_body; b_env; b_write } as b) =
   let b_env, acc = build acc b_env in
   let b_vars, acc = 
     Util.mapfold vardec acc b_vars in
   let b_body, acc = equation acc b_body in
-  let b_write, acc = write acc b_write in
+  let b_write, acc = write_t acc b_write in
   { b with b_vars; b_body; b_env; b_write }, acc
 
 (** Convert a value into an expression. **)
@@ -348,105 +391,62 @@ let rec exp_of_value v =
        Erecord r_list
     | Vstuple(v_list) ->
        Etuple (List.map exp_of_value v_list)
-    | Vpresent _ | Vabsent _ 
+    | Vtuple _ | Vpresent _ | Vabsent  
     | Vstate0 _ | Vstate1 _ 
-    | Varray _ | Vfun _ | 
+    | Varray _ | Vfun _  
     | Vclosure _ | Vsizefun _ | Vsizefix _ -> assert false in
-  
+  { e_desc; e_loc = Location.no_location; e_info = no_info }
 
-				     
 (* Reduction under a function body. *)
-and lambda venv fun_defs
-    ({ f_args = p_list; f_body = e; f_env = env } as funexp) =
-  let env, renaming = build env in
-  let venv = remove renaming venv in
-  let p_list = List.map (pattern venv renaming) p_list in
-  let e, fun_defs = expression venv renaming fun_defs e in
-  { funexp with f_args = p_list; f_body = e; f_env = env }, fun_defs
+and lambda acc ({ f_args; f_body; f_env } as funexp) =
+  let arg acc v_list = Util.mapfold vardec acc v_list in
+  let env, acc = build acc f_env in
+  let f_args, acc = Util.mapfold arg acc f_args in
+  let f_body, acc = result acc f_body in
+  { funexp with f_args; f_body; f_env }, acc
+
+and result acc ({ r_desc } as r) =
+  let r_desc, acc = match r_desc with
+    | Exp(e) -> let e, acc = expression acc e in Exp(e), acc
+    | Returns(b_eq) -> let b_eq, acc = block acc b_eq in Returns(b_eq), acc in
+  { r with r_desc }, acc
 
 (* The main function. Reduce every definition *)
-let implementation_list ff impl_list =
-  let set_value_code name v =
-    let ({ info = info } as entry) =
-      try Modules.find_value (Lident.Name(name))
-      with Not_found ->
-	let qualname = Modules.qualify name in
-	let info = Global.value_desc false Deftypes.no_typ_scheme qualname in
-	Modules.add_value name info; { qualid = qualname; info = info } in
-    Global.set_value_code entry v in
+let implementation acc ({ desc } as impl) =
+  let desc, acc = match desc with
+    | Eopen _ -> desc, acc
+    | Eletdecl { d_names; d_leq } ->
+       let d_leq, acc = leq acc d_leq in
+       Eletdecl { d_names; d_leq }, acc
+    | Etypedecl _ -> desc, acc in
+  { impl with desc }, acc
 
-  (* convert a function declaration into an implementation phrase *)
-  (* add every entry in the global symbol table once it has been typed *)
-  let make (name, funexp) impl_defs =
-    set_value_code name (value_code (Vfun(funexp, Env.empty)));
-    Zaux.make (Efundecl(name, funexp)) :: impl_defs in
+let set_index_t n = Ident.set n
+let get_index_t () = Ident.get ()
 
-  (* [fun_defs] is the list of extra functions that have been introduced *)
-  let implementation impl_defs impl = 
-    match impl.desc with
-    | Econstdecl(f, is_static, e) ->
-       (* is [is_static = true], f is a compile-time constant *)
-       let e, { fundefs = fun_defs } =
-         if is_static then
-           try
-             let v = Static.expression Env.empty e in
-             (* add [f \ v] in the global symbol table *)
-             let v = Global.value_name (Modules.qualify f) v in
-             set_value_code f v;
-             exp_of_value empty v
-           with
-             Static.Error _ -> expression Env.empty Env.empty empty e
-         else expression Env.empty Env.empty empty e in
-       { impl with desc = Econstdecl(f, is_static, e) } ::
-	 List.fold_right make fun_defs impl_defs
-    | Efundecl(f, funexp) ->
-       let ({ info = { value_typ = tys } } as entry) =
-	 try Modules.find_value (Lident.Name(f))
-	 with Not_found -> assert false in
-       let no_parameter = Ztypes.noparameters tys in
-       (* strong reduction (under the lambda) when [no_parameter] *)
-       if !Zmisc.no_reduce then
-	 (* no reduction is done; use it carefully as the compilation steps *)
-	 (* done after like static scheduling may fail. *)
-	 (* This flag is very temporary *)
-	 let v = Global.value_code (Global.Vfun(funexp, Env.empty)) in
-	 let v = Global.value_name (Modules.qualify f) v in
-	 set_value_code f v;
-	 impl :: impl_defs
-       else
-	 let funexp, impl_defs =
-	   if no_parameter then
-	     let funexp, { fundefs = fun_defs } = lambda Env.empty empty funexp in
-	     funexp, { impl with desc = Efundecl(f, funexp) } ::
-		       List.fold_right make fun_defs impl_defs
-           else
-             (* funexp is removed from the list of defs. to be compiled *)
-	     funexp, impl_defs in
-	 let v = Global.value_code (Global.Vfun(funexp, Env.empty)) in
-	 let v = Global.value_name (Modules.qualify f) v in
-	 set_value_code f v;
-	 impl_defs
-    | _ -> impl :: impl_defs in
+let program { p_impl_list; p_index } =
   try
-    let impl_list = List.fold_left implementation [] impl_list in
-    List.rev impl_list
+    set_index_t p_index;
+    let p_impl_list, acc = Util.mapfold implementation empty p_impl_list in
+    let p_index = get_index_t () in
+    { p_impl_list; p_index }
   with
-  | Static.Error(error) ->
+  | Reduce(error) ->
       match error with
-      | TypeError ->
+      | NotStatic ->
           Format.eprintf
             "@[Internal error (static reduction):@,\
              the expression to be reduced is not static.@.@]";
-          raise Zmisc.Error
+          raise Error
       | NotStaticExp(e) ->
           Format.eprintf
             "@[%aInternal error (static reduction):@,\
              static evaluation failed because the expression is not static.@.@]"
             Printer.expression e;
-          raise Zmisc.Error
+          raise Error
       | NotStaticEq(eq) ->
           Format.eprintf
             "@[%aInternal error (static reduction):@,\
              static evaluation failed because the equation is not static.@.@]"
             Printer.equation eq;
-          raise Zmisc.Error
+          raise Error
