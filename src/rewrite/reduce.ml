@@ -22,15 +22,21 @@ open Monad
 open Opt
 open Result
 
+type 'a env =
+  { e_renaming: Ident.t Ident.Env.t; (* associate a name to a name *)
+    e_values: 'a Ident.Env.t;  (* associate a value of type 'a to a name *)
+  }
+
 (** Build a renaming from an environment *)
-let build env =
+let build ({ e_renaming } as acc) env =
   let buildrec n entry (env, renaming) =
     let m = Ident.fresh (Ident.source n) in
     Env.add m entry env,
     Env.add n m renaming in
-  Env.fold buildrec env (Env.empty, Env.empty)
+  let env, e_renaming = Env.fold buildrec env (Env.empty, e_renaming) in
+  env, { acc with e_renaming }
     
-let rename env n = Env.find n env, env
+let rename ({ e_renaming } as acc) n = Env.find n e_renaming, acc
 
 (** Renaming of patterns *)
 let rec pattern f acc ({ pat_desc } as p) =
@@ -64,6 +70,14 @@ let rec pattern f acc ({ pat_desc } as p) =
        let p1, acc = pattern f acc p1 in
        Etypeconstraintpat(p1, ty), acc in
   { p with pat_desc }, acc
+
+let pattern acc p = pattern rename acc p
+
+let default_t f acc d =
+  match d with
+  | Init(e) -> let e, acc = f acc e in Init(e), acc
+  | Else(e) -> let e, acc = f acc e in Else(e), acc
+  | NoDefault -> NoDefault, acc
 
 (** Expressions **)
 let rec expression acc ({ e_desc } as e) =
@@ -116,7 +130,7 @@ let rec expression acc ({ e_desc } as e) =
      let eq_b, acc = block acc eq_b in
      let e, acc = expression acc e in
      { e with e_desc = Elocal(eq_b, e) }, acc
-  | Epresent({ handlers; default_opt } as h) ->
+  | Epresent({ handlers; default_opt }) ->
      let body acc ({ p_cond; p_body; p_env } as p_b) =
        let p_env, acc = build acc p_env in
        let p_cond, acc = scondpat acc p_cond in
@@ -124,8 +138,8 @@ let rec expression acc ({ e_desc } as e) =
        { p_b with p_cond; p_body }, acc in
      let handlers, acc =
        Util.mapfold body acc handlers in
-     let default_opt, acc = default_opt expression acc default_opt in
-     { e_desc = Epresent { h with handlers; default_opt } }, acc 
+     let default_opt, acc = default_t expression acc default_opt in
+     { e with e_desc = Epresent { handlers; default_opt } }, acc 
   | Ematch({ e; handlers } as m) ->
      let body acc ({ m_pat; m_body; m_env } as m_h) =
        let m_env, acc = build acc m_env in
@@ -135,7 +149,7 @@ let rec expression acc ({ e_desc } as e) =
      let e, acc = expression acc e in
      let handlers, acc =
        Util.mapfold body acc handlers in
-     { eq_desc = Ematch { m with e; handlers } }, acc
+     { e with e_desc = Ematch { m with e; handlers } }, acc
   | _ -> assert false
   
 (** Simplify a local declaration *)
@@ -143,11 +157,6 @@ and leq acc ({ l_eq } as l) =
   let l_eq, acc = equation acc l_eq in
   { l with l_eq }, acc
 
-and default_opt f acc d =
-  match d with
-  | Init(e) -> let e, acc = f acc e in Init(e), acc
-  | Else(e) -> let e, acc = f acc e in Else(e), acc
-  | NoDefault -> NoDefault, acc
 
 (** Equations **)
 and equation acc ({ eq_desc } as eq) = 
@@ -164,7 +173,7 @@ and equation acc ({ eq_desc } as eq) =
      let x, acc = rename acc x in
      let e_opt, acc =
        Util.optional_with_map expression acc e_opt in
-     { eq_desc = EQemit(x, e_opt) }, acc
+     { eq with eq_desc = EQemit(x, e_opt) }, acc
   | EQder { id; e; e_opt; handlers } ->
      let body acc ({ p_cond; p_body; p_env } as p_b) =
        let p_env, acc = build acc p_env in
@@ -175,7 +184,7 @@ and equation acc ({ eq_desc } as eq) =
      let e, acc = expression acc e in
      let e_opt, acc = Util.optional_with_map expression acc e_opt in
      let handlers, acc = Util.mapfold body acc handlers in
-     { eq_desc = EQder { id; e; e_opt; handlers } }, acc
+     { eq with eq_desc = EQder { id; e; e_opt; handlers } }, acc
   | EQif { e; eq_true; eq_false } ->
      let e, acc = expression acc e in
      let eq_true, acc = equation acc eq_true in
@@ -190,14 +199,14 @@ and equation acc ({ eq_desc } as eq) =
      let e, acc = expression acc e in
      let handlers, acc =
        Util.mapfold body acc handlers in
-     { eq_desc = EQmatch { m with e; handlers } }, acc
+     { eq with eq_desc = EQmatch { m with e; handlers } }, acc
   | EQlocal(eq_b) ->
      let eq_b, acc = block acc eq_b in
-     { eq_desc = EQblock(eq_b) }, acc
+     { eq with eq_desc = EQlocal(eq_b) }, acc
   | EQand(eq_list) ->
      let eq_list, acc = Util.mapfold equation acc eq_list in
-     { eq_desc = EQand(eq_list) }, acc
-  | EQpresent({ handlers; default_opt } as h) ->
+     { eq with eq_desc = EQand(eq_list) }, acc
+  | EQpresent({ handlers; default_opt }) ->
      let body acc ({ p_cond; p_body; p_env } as p_b) =
        let p_env, acc = build acc p_env in
        let p_cond, acc = scondpat acc p_cond in
@@ -205,8 +214,8 @@ and equation acc ({ eq_desc } as eq) =
        { p_b with p_cond; p_body }, acc in
      let handlers, acc =
        Util.mapfold body acc handlers in
-     let default_opt, acc = default_opt acc default_opt in
-     { eq_desc = EQpresent { h with handlers; default_opt } }, acc
+     let default_opt, acc = default_t equation acc default_opt in
+     { eq with eq_desc = EQpresent { handlers; default_opt } }, acc
   | EQautomaton({ handlers; state_opt } as a) ->
      let handler acc ({ s_state; s_let; s_body; s_trans } as h) =
        let s_state, acc = statepat acc s_state in
@@ -231,14 +240,15 @@ and equation acc ({ eq_desc } as eq) =
            Kforward(for_exit_opt), acc in
      let body 
          acc ({ for_size; for_kind; for_index; for_input; for_body } as f) =
-       let for_size, acc = Util.optional_with_map acc for_size in
+       let for_size, acc = Util.optional_with_map for_size_t acc for_size in
        let for_kind, acc = for_kind_t acc for_kind in
-       let for_index, acc = build acc for_index{for_size : 'size option;
-    for_kind : 'info for_kind;
-    for_index : Ident.t option;
-    for_input : 'info for_input_desc localized list;
-    for_body : 'body;
-    for_resume : bool; 
+       let for_index, acc = build acc for_index in
+       let for_input, acc = for_input_t acc for_input in
+       let for_body, acc = for_eq_t acc for_body in
+       { f with for_size; for_kind; for_index; for_input; for_body } in
+     { eq with eq_desc =
+                 EQforloop { f with for_size; for_kind; for_index;
+                                    for_input; for_body } }
   | _ -> assert false
      
 and scondpat acc ({ desc = desc } as scpat) =
@@ -252,10 +262,10 @@ and scondpat acc ({ desc = desc } as scpat) =
      let scpat2, acc = scondpat acc scpat2 in
      { scpat with desc = Econdor(scpat1, scpat2) }, acc
   | Econdexp(e) ->
-     let e, acc = expression acc fun_defs e in
+     let e, acc = expression acc e in
      { scpat with desc = Econdexp(e) }, acc
   | Econdpat(e, p) ->
-     let e, acc = expression acc fun_defs e in
+     let e, acc = expression acc e in
      let p, acc = pattern acc p in
      { scpat with desc = Econdpat(e, p) }, acc
   | Econdon(scpat, e) ->
@@ -263,81 +273,48 @@ and scondpat acc ({ desc = desc } as scpat) =
      let e, acc = expression acc e in
      { scpat with desc = Econdon(scpat, e) }, acc
 
-and vardec renaming ({ vardec_name = n } as v) =
-    { v with vardec_name = rename n renaming }
+and vardec acc ({ var_name; var_default; var_init; var_typeconstraint } as v) =
+  let var_name = rename acc var_name in
+  let var_default, acc =
+    Util.optional_with_map acc var_default in
+  let var_init, acc = Util.optional_with_map acc var_init in
+  let var_typeconstraint = type_expression acc var_typeconstraint in
+  { v with var_name; var_default; var_init; var_typeconstraint }, acc
   
-and block acc ({ b_vars; b_body; b_env } as b) =
-  let b_env, acc = build acc n_env in
-  let n_list, acc = 
+and block acc ({ b_vars; b_body; b_env; b_write } as b) =
+  let b_env, acc = build acc b_env in
+  let b_vars, acc = 
     Util.mapfold vardec acc b_vars in
   let b_body, acc = equation acc b_body in
-  { b with b_vars; b_body; b_env }, acc
+  let b_write, acc = write acc b_write in
+  { b with b_vars; b_body; b_env; b_write }, acc
 
 (** Convert a value into an expression. **)
-let exp_of_value v =
-  match v with
-  | Vint(v) -> Econst(Eint(v))
-  | Vbool(v) -> Econst(Ebool(v))
-  | Vfloat(v) -> Econst(Efloat(v))
-  | Vchar(v) -> Econst(Echar(v))
-  | Vstring(v) -> Econst(Estring(v))
-  | Vvoid -> Econst(Evoid)
-  | Vconstr0 lname -> Econstr0 { lname }
-  | Vconstr1(lname, v_list) -> 
-     Econstr1 { lname; arg_list = exp_of_value v_list }
-  | Vrecord(r_list) ->
-  | Vpresent(v) ->
-  | Vabsent(v) ->
-  | Vstuple(v_list) ->
-  | Vtuple(v_list) ->
-  | Vstate0(id) ->
-  | Vstate1(id, v_list) ->
-  | Varray(a) ->
-  | Vfun(f) ->
-  | Vclosure { c_funexp; c_genv; c_env } ->
-  | Vsizefun { s_params; s_body; s_genv; s_env } ->
-  | Vsizefix : { bound; name; defs } ->
-                     } -> pvalue
-let desc, fun_defs =
-    match v with
-    | Vconst(i) -> Econst(i), fun_defs
-    | Vconstr0(qualident) ->
-       Econstr0(Lident.Modname(qualident)), fun_defs
-    | Vtuple(v_list) ->
-       let v_list, fun_defs =
-	 Zmisc.map_fold exp_of_value fun_defs v_list in
-       Etuple(v_list), fun_defs
-    | Vconstr1(qualident, v_list) ->
-       let v_list, fun_defs =
-	 Zmisc.map_fold exp_of_value fun_defs v_list in
-       Econstr1(Lident.Modname(qualident), v_list), fun_defs
-    | Vrecord(l_v_list) ->
-       let l_e_list, fun_defs =
-	 Zmisc.map_fold
-	   (fun fun_defs (qid, v) ->
-	    let v, fun_defs = exp_of_value fun_defs v in
-	    (Lident.Modname(qid), v), fun_defs)
-	   fun_defs l_v_list in
-       Erecord(l_e_list), fun_defs
-    | Vperiod { p_phase = p1; p_period = p2 } ->
-       let p1, fun_defs =
-         Zmisc.optional_with_map exp_of_value fun_defs p1 in
-       let p2, fun_defs = exp_of_value fun_defs p2 in
-       Eperiod { p_phase = p1; p_period = p2 }, fun_defs
-    | Vabstract(qualident) ->
-       Zaux.global (Lident.Modname(qualident)), fun_defs
-    | Vfun(funexp, venv) ->
-       (* if the function already exist, return its name *)
-       match opt_name with
-       | Some(qualident) ->
-	  Zaux.global (Lident.Modname(qualident)), fun_defs
-       | None ->
-	  let funexp, fun_defs = lambda venv fun_defs funexp in
-	  (* introduce a new function *)
-	  let name = gfresh () in
-	  Zaux.global (Lident.Name(name)),
-	  { fundefs = (name, funexp) :: fun_defs.fundefs } in
-    Zaux.emake desc Deftypes.no_typ, fun_defs
+let rec exp_of_value v =
+  let open Value in
+  let e_desc = match v with
+    | Vint(v) -> Econst(Eint(v))
+    | Vbool(v) -> Econst(Ebool(v))
+    | Vfloat(v) -> Econst(Efloat(v))
+    | Vchar(v) -> Econst(Echar(v))
+    | Vstring(v) -> Econst(Estring(v))
+    | Vvoid -> Econst(Evoid)
+    | Vconstr0 lname -> Econstr0 { lname }
+    | Vconstr1(lname, v_list) -> 
+       Econstr1 { lname; arg_list = List.map exp_of_value v_list }
+    | Vrecord(r_list) ->
+       let r_list =
+         List.map (fun { label; arg } -> { label; arg = exp_of_value arg })
+           r_list in
+       Erecord r_list
+    | Vstuple(v_list) ->
+       Etuple (List.map exp_of_value v_list)
+    | Vpresent _ | Vabsent _ 
+    | Vstate0 _ | Vstate1 _ 
+    | Varray _ | Vfun _ | 
+    | Vclosure _ | Vsizefun _ | Vsizefix _ -> assert false in
+  
+
 				     
 (* Reduction under a function body. *)
 and lambda venv fun_defs

@@ -118,7 +118,7 @@ type 'a record = { mutable label: Lident.t; arg: 'a }
 type 'info pattern =
   { mutable pat_desc: 'info pattern_desc; (* descriptor *)
     pat_loc: Location.t; (* its location in the source file *)
-    pat_env: 'info Ident.Env.t; (* environment *)
+    pat_info: 'info; (* info *)
   }
 
 and 'info pattern_desc = 
