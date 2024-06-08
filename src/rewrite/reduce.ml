@@ -167,7 +167,12 @@ let rec expression acc ({ e_desc } as e) =
      let handlers, acc =
        Util.mapfold body acc handlers in
      { e with e_desc = Ematch { m with e; handlers } }, acc
-  | _ -> assert false
+  | Esizeapp _ 
+    | Efun _
+    | Ereset _ -> assert false
+    | Eassert e -> let e, acc = expression acc e in
+                              { e with e_desc = Eassert(e) }, acc
+  | Eforloop _ -> assert false
   
 (** Equations **)
 and equation acc ({ eq_desc } as eq) = 
