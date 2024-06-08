@@ -333,7 +333,7 @@ and equation acc ({ eq_desc } as eq) =
                  EQforloop
                    { f with for_size; for_kind; for_index; for_input;
                             for_body; for_env } }, acc
-  | _ -> assert false
+  | EQreset _ | EQlet _ | EQsizefun _ -> assert false
 
 and slet acc leq_list = Util.mapfold leq acc leq_list
 
