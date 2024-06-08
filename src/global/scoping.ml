@@ -388,7 +388,9 @@ let rec equation env_pat env { desc; loc } =
        let x_list, env = 
          Util.mapfold 
            (fun acc n -> let m = fresh n in m, Env.add n m acc) env x_list in
-       Ast.EQsizefun { id = x; id_list = x_list; e = expression env e }
+       Ast.EQsizefun
+         { sf_id = x; sf_id_list = x_list; sf_e = expression env e;
+           sf_loc = loc; sf_env = Ident.Env.empty }
     | EQder(x, e, e_opt, p_h_list) ->
        Ast.EQder { id = name loc env_pat x; e = expression env e;
                    e_opt = Util.optional_map (expression env) e_opt;
@@ -807,7 +809,7 @@ and forloop_exp env
        let returns, env_v_list = for_vardec_list env returns in
        let env = Env.append env_v_list env in
        let env_body, body = block equation env_v_list env body in
-       env_body, Ast.Forreturns { returns; body } in
+       env_body, Ast.Forreturns { returns; body; r_env = Ident.Env.empty } in
   let for_kind =
     match for_kind with
     | Kforeach -> Ast.Kforeach
