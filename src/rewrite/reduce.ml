@@ -217,13 +217,45 @@ and equation acc ({ eq_desc } as eq) =
      let default_opt, acc = default_t equation acc default_opt in
      { eq with eq_desc = EQpresent { handlers; default_opt } }, acc
   | EQautomaton({ handlers; state_opt } as a) ->
+     let statepat acc ({ desc } as spat) =
+       let desc, acc = match desc with
+         | Estate0pat(id) ->
+            let id, acc = rename acc id in
+            Estate0pat(id), acc
+         | Estate1pat(id, id_list) ->
+            let id, ac = rename acc id in
+            let id_list, acc = Util.mapfold rename acc id_list in
+            Estate1pat(id, id_list), acc in
+       { spat with desc }, acc in
+     let rec state acc ({ desc } as st) =
+       let desc, acc  = match desc with
+         | Estate0(id) ->
+            let id, acc = rename acc id in
+            Estate0(id), acc
+         | Estate1(id, e_list) ->
+            let id, acc = rename acc id in
+            let e_list, acc = Util.mapfold expression acc e_list in
+            Estate1(id, e_list), acc
+         | Estateif(e, st1, st2) ->
+            let e, acc = expression acc e in
+            let st1, acc = state acc st1 in
+            let st2, acc = state acc st2 in
+            Estateif(e, st1, st2), acc in
+       { st with desc }, acc in
+     let escape acc ({ e_cond; e_let; e_body; e_next_state; e_env } as esc) =
+       let e_env, acc = build acc e_env in
+       let e_cond, acc = scondpat acc e_cond in
+       let e_let, acc = slet acc e_let in
+       let e_body, acc = block acc e_body in
+       let e_next_state, acc = state acc e_next_state in
+       { esc with e_cond; e_let; e_body; e_next_state; e_env }, acc in
      let handler acc ({ s_state; s_let; s_body; s_trans } as h) =
        let s_state, acc = statepat acc s_state in
        let s_let, acc = slet acc s_let in
        let s_body, acc = block acc s_body in
        let s_trans, acc = Util.mapfold escape acc s_trans in
-       { h with s_state; s_let; s_body; s_trans } in
-     let state_opt, acc = state acc state_opt in
+       { h with s_state; s_let; s_body; s_trans }, acc in
+     let state_opt, acc = Util.optional_with_map state acc state_opt in
      let handlers, acc = Util.mapfold handler acc handlers in
      { eq with eq_desc = EQautomaton({ a with handlers; state_opt }) }, acc
   | EQempty -> eq, acc
@@ -250,7 +282,14 @@ and equation acc ({ eq_desc } as eq) =
                  EQforloop { f with for_size; for_kind; for_index;
                                     for_input; for_body } }
   | _ -> assert false
-     
+
+and slet acc leq_list = Util.mapfold leq acc leq_list
+
+and leq acc ({ l_eq; l_env } as l) =
+  let l_env, acc = build acc l_env in
+  let l_eq, acc = equation acc l_eq in
+  { l with l_eq; l_env }, acc
+
 and scondpat acc ({ desc = desc } as scpat) =
   match desc with
   | Econdand(scpat1, scpat2) ->
