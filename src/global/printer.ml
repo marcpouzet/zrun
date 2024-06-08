@@ -435,10 +435,10 @@ and equation ff ({ eq_desc = desc } as eq) =
   match desc with
   | EQeq(p, e) ->
      fprintf ff "@[<hov 2>%a =@ %a@]" pattern p expression e
-  | EQsizefun { id; id_list; e } ->
-     fprintf ff "@[<hov 2>%a%a =@ %a@]" name id
-       (print_list_l name "<<" "," ">>") id_list
-       expression e
+  | EQsizefun { sf_id; sf_id_list; sf_e } ->
+     fprintf ff "@[<hov 2>%a%a =@ %a@]" name sf_id
+       (print_list_l name "<<" "," ">>") sf_id_list
+       expression sf_e
   | EQder { id; e; e_opt; handlers = [] } ->
       fprintf ff "@[<hov 2>der %a =@ %a%a@]"
         name id expression e

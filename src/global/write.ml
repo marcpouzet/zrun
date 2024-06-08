@@ -46,9 +46,10 @@ let rec equation ({ eq_desc } as eq)=
     | EQeq(pat, e) ->
        EQeq(pat, expression e),
        { Defnames.empty with dv = fv_pat S.empty pat }
-    | EQsizefun { id; id_list; e } ->
-       let e = expression e in
-       EQsizefun { id; id_list; e }, { Defnames.empty with dv = S.singleton id }
+    | EQsizefun ({ sf_id; sf_id_list; sf_e } as sf) ->
+       let sf_e = expression sf_e in
+       EQsizefun { sf with sf_id; sf_id_list; sf_e },
+       { Defnames.empty with dv = S.singleton sf_id }
     | EQder { id; e; e_opt; handlers } ->
        let e_opt, di =
          match e_opt with
@@ -274,10 +275,10 @@ and expression ({ e_desc } as e) =
          | Forexp { exp; default } ->
             Forexp { exp = expression exp;
                      default = Util.optional_map expression default }
-         | Forreturns({ returns; body }) ->
+         | Forreturns({ returns; body } as r) ->
             let returns, _ = Util.mapfold for_vardec S.empty returns in
             let body, _, _ = block body in
-            Forreturns({ returns; body }) in
+            Forreturns({ r with returns; body }) in
        Eforloop({ f with for_size; for_kind; for_input; for_body }) in
   { e with e_desc = desc }
 

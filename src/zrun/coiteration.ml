@@ -275,11 +275,11 @@ let rec size env { desc; loc } =
 let sizefun_defs_or_values genv env l_eq =
   let rec split (acc, one_value) { eq_desc; eq_loc } =
     match eq_desc with
-    | EQsizefun { id; id_list; e } ->
+    | EQsizefun { sf_id; sf_id_list; sf_e } ->
        if one_value then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
-       else return (Env.add id { s_params = id_list; 
-                              s_body = e; s_genv = genv; s_env = env } acc,
+       else return (Env.add sf_id { s_params = sf_id_list; 
+                              s_body = sf_e; s_genv = genv; s_env = env } acc,
                  one_value)
     | EQand(eq_list) ->
        fold split (acc, one_value) eq_list
@@ -1516,9 +1516,10 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
          Opt.to_result ~none:{ kind = Epattern_matching_failure;
                                loc = eq_loc } in
      return (env_p, s)
-  | EQsizefun { id; id_list; e }, s ->
-     let v = { s_params = id_list; s_body = e; s_genv = genv; s_env = env } in
-     return (Env.singleton id (Match.entry (Vsizefun v)), s)
+  | EQsizefun { sf_id; sf_id_list; sf_e }, s ->
+     let v =
+       { s_params = sf_id_list; s_body = sf_e; s_genv = genv; s_env = env } in
+     return (Env.singleton sf_id (Match.entry (Vsizefun v)), s)
   | EQder { id; e; e_opt; handlers },
     Slist (Scstate({ pos } as sc) :: s :: Sopt(x0_opt) :: s0 :: s_list) ->
      let* ({ last; default } as entry) =

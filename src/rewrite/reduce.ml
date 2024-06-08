@@ -1,7 +1,7 @@
 (***********************************************************************)
 (*                                                                     *)
 (*                                                                     *)
-(*          Zelus, a synchronous language for hybrid systems           *)
+(*          Zélus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
 (*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
@@ -53,6 +53,29 @@ let rename ({ e_renaming } as acc) n = Env.find n e_renaming, acc
 let write_t acc { Defnames.dv; Defnames.di; Defnames.der } = assert false
 
 let type_expression acc ty = ty, acc
+
+(* size expressions *)
+let rec size acc ({ desc } as s) =
+  let desc, acc = match desc with
+  | Sint _ -> desc, acc
+  | Sfrac { num; denom } ->
+     let num, acc = size acc num in Sfrac { num; denom }, acc
+  | Sident(n) ->
+     let n, acc = rename acc n in
+     Sident(n), acc
+  | Splus(s1, s2) ->
+     let s1, acc = size acc s1 in
+     let s2, acc = size acc s2 in
+     Splus(s1, s2), acc
+  | Sminus(s1, s2) ->
+     let s1, acc = size acc s1 in
+     let s2, acc = size acc s2 in
+     Sminus(s1, s2), acc
+  | Smult(s1, s2) ->
+     let s1, acc = size acc s1 in
+     let s2, acc = size acc s2 in
+     Smult(s1, s2), acc in
+  { s with desc }, acc
 
 (** Renaming of patterns *)
 let rec pattern f acc ({ pat_desc } as p) =
@@ -168,7 +191,7 @@ let rec expression acc ({ e_desc } as e) =
      let e_ty, acc = expression acc e_ty in
      { e with e_desc = Etypeconstraint(e_ty, ty) }, acc
   | Elet(l, e_let) ->
-     let l, acc = leq acc l in
+     let l, acc = leq_t acc l in
      let e_let, acc = expression acc e_let in
      { e with e_desc = Elet(l, e_let) }, acc
   | Elocal(eq_b, e) ->
@@ -197,11 +220,44 @@ let rec expression acc ({ e_desc } as e) =
      { e with e_desc = Ematch { m with e; handlers } }, acc
   | Eassert e -> let e, acc = expression acc e in
                               { e with e_desc = Eassert(e) }, acc
-  | Esizeapp _ 
-    | Efun _
-    | Ereset _
-    | Eforloop _ -> assert false
-  
+  | Ereset(e_body, e_c) ->
+     let e_body, acc = expression acc e_body in
+     let e_c, acc = expression acc e_c in
+     { e with e_desc = Ereset(e_body, e_c) }, acc
+  | Esizeapp { f; size_list } ->
+     let e, acc = expression acc f in
+     let size_list, acc = Util.mapfold size acc size_list in
+     { e with e_desc = Esizeapp { f; size_list } }, acc
+  | Efun { f_vkind; f_kind; f_atomic; f_args; f_body; f_env } ->
+     assert false
+  | Eforloop
+     ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
+     let for_vardec_t acc ({ desc = { for_array; for_vardec } } as f) =
+       let for_vardec, acc = vardec acc for_vardec in
+       { f with desc = { for_array; for_vardec } }, acc in
+     let for_exp_t acc for_exp =
+       match for_exp with
+       | Forexp { exp; default } ->
+          let exp, acc = expression acc exp in
+          let default, acc = Util.optional_with_map expression acc default in
+          Forexp { exp; default }, acc
+       | Forreturns { returns; body; r_env } ->
+          let r_env, acc = build acc r_env in
+          let returns, acc = Util.mapfold for_vardec_t acc returns in
+          let body, acc = block acc body in
+          Forreturns { returns; body; r_env }, acc in
+     let for_env, acc = build acc for_env in
+     let for_size, acc =
+       Util.optional_with_map (for_size_t expression) acc for_size in
+     let for_kind, acc = for_kind_t expression acc for_kind in
+     let for_input, acc =
+       Util.mapfold (for_input_t expression) acc for_input in
+     let for_body, acc = for_exp_t acc for_body in
+     { e with e_desc =
+                Eforloop
+                  { f with for_size; for_kind; for_index; for_input;
+                           for_body; for_env } }, acc
+     
 (** Equations **)
 and equation acc ({ eq_desc } as eq) = 
   match eq_desc with
@@ -333,11 +389,25 @@ and equation acc ({ eq_desc } as eq) =
                  EQforloop
                    { f with for_size; for_kind; for_index; for_input;
                             for_body; for_env } }, acc
-  | EQreset _ | EQlet _ | EQsizefun _ -> assert false
+  | EQreset(eq, e_c) ->
+     let eq, acc = equation acc eq in
+     let e_c, acc = expression acc e_c in
+     { eq with eq_desc = EQreset(eq, e_c) }, acc
+  | EQlet(leq, eq) ->
+     let leq, acc = leq_t acc leq in
+     let eq, acc = equation acc eq in
+     { eq with eq_desc = EQlet(leq, eq) }, acc
+  | EQsizefun ({ sf_id; sf_id_list; sf_e; sf_env } as sf) ->
+     let sf_env, acc = build acc sf_env in
+     let sf_id, acc = rename acc sf_id in
+     let sf_id_list, acc = Util.mapfold rename acc sf_id_list in
+     let sf_e, acc = expression acc sf_e in
+     { eq with eq_desc = EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
+     acc
 
-and slet acc leq_list = Util.mapfold leq acc leq_list
+and slet acc leq_list = Util.mapfold leq_t acc leq_list
 
-and leq acc ({ l_eq; l_env } as l) =
+and leq_t acc ({ l_eq; l_env } as l) =
   let l_env, acc = build acc l_env in
   let l_eq, acc = equation acc l_eq in
   { l with l_eq; l_env }, acc
@@ -426,7 +496,7 @@ let implementation acc ({ desc } as impl) =
   let desc, acc = match desc with
     | Eopen _ -> desc, acc
     | Eletdecl { d_names; d_leq } ->
-       let d_leq, acc = leq acc d_leq in
+       let d_leq, acc = leq_t acc d_leq in
        Eletdecl { d_names; d_leq }, acc
     | Etypedecl _ -> desc, acc in
   { impl with desc }, acc
