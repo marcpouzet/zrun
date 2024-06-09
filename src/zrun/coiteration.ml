@@ -2306,6 +2306,13 @@ let no_bot_no_nil loc env =
        let* v = no_bot_no_nil cur in
        return (Env.add f v acc)) Env.empty seq_env
 
+(* evaluate an equation *)
+(* check that no value is bot nor nil *)
+let vleq genv env ({ l_loc } as leq) =
+  let* env = vleq genv env leq in
+  let* env = no_bot_no_nil l_loc env in
+  return env
+
 let implementation genv { desc; loc } =
   match desc with
   | Eopen(name) ->
@@ -2314,8 +2321,6 @@ let implementation genv { desc; loc } =
   | Eletdecl { d_names; d_leq } -> 
      (* evaluate the set of equations *)
      let* env = vleq genv Env.empty d_leq in
-     (* check that no value is bot nor nil *)
-     let* env = no_bot_no_nil loc env in
      let f_pvalue_list =
        List.map (fun (n, id) -> (n, Env.find id env)) d_names in
      (* debug info (a bit of imperative code here!) *)

@@ -1,7 +1,7 @@
 (***********************************************************************)
 (*                                                                     *)
 (*                                                                     *)
-(*          Zélus, a synchronous language for hybrid systems           *)
+(*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
 (*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
@@ -12,7 +12,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(** reduce static expressions *)
+(** reduce size expressions *)
 
 open Misc
 open Ident
@@ -54,7 +54,7 @@ let write_t acc { Defnames.dv; Defnames.di; Defnames.der } = assert false
 
 let type_expression acc ty = ty, acc
 
-(* size expressions *)
+(* size expressions - evaluation *)
 let rec size acc ({ desc } as s) =
   let desc, acc = match desc with
   | Sint _ -> desc, acc

@@ -42,7 +42,9 @@
     output ; reprentation of the internal state
     forloop ; evaluation functions for for loops
     eval ; evaluation of an expression
-    reduce ; static reduction  
+    rsize ; static evaluation of sizes
+    reduce ; static reduction
+    inline ; inlining
   )   	 
   (libraries zrun.ast_lib))
 

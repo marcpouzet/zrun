@@ -23,6 +23,7 @@ open Opt
 open Result
 
 type error =
+  | Eval of Error.error (* error during evaluation *)
   | NotStatic
   | NotStaticExp of no_info exp
   | NotStaticEq of no_info eq
@@ -32,9 +33,13 @@ exception Reduce of error
 type 'a env =
   { e_renaming: Ident.t Ident.Env.t; (* associate a name to a name *)
     e_values: 'a Ident.Env.t;  (* associate a value of type 'a to a name *)
+    e_globals: 'a Genv.genv;   (* global environment *)
   }
 
-let empty = { e_renaming = Ident.Env.empty; e_values = Ident.Env.empty }
+let empty =
+  { e_renaming = Ident.Env.empty;
+    e_values = Ident.Env.empty;
+    e_globals = Genv.modules }
 
 (** Build a renaming from an environment *)
 let build ({ e_renaming } as acc) env =
@@ -407,10 +412,20 @@ and equation acc ({ eq_desc } as eq) =
 
 and slet acc leq_list = Util.mapfold leq_t acc leq_list
 
-and leq_t acc ({ l_eq; l_env } as l) =
+and leq_t acc ({ l_kind; l_eq; l_env } as leq) =
   let l_env, acc = build acc l_env in
   let l_eq, acc = equation acc l_eq in
-  { l with l_eq; l_env }, acc
+  let acc = match l_kind with
+    | Kconst | Kstatic ->
+       (* static evaluation *)
+       let l_env =
+         let l_env =
+           Coiteration.vleq acc.e_globals (Match.liftv acc.e_values) leq in
+         match l_env with
+         | Ok(l_env) -> l_env | Error(e) -> raise (Reduce (Eval e)) in
+       { acc with e_values = Env.append l_env acc.e_values }
+    | Kany -> acc in
+  { leq with l_eq; l_env }, acc
 
 and scondpat acc ({ desc = desc } as scpat) =
   match desc with
@@ -512,21 +527,22 @@ let program { p_impl_list; p_index } =
     { p_impl_list; p_index }
   with
   | Reduce(error) ->
-      match error with
-      | NotStatic ->
-          Format.eprintf
-            "@[Internal error (static reduction):@,\
-             the expression to be reduced is not static.@.@]";
-          raise Error
-      | NotStaticExp(e) ->
-          Format.eprintf
-            "@[%aInternal error (static reduction):@,\
-             static evaluation failed because the expression is not static.@.@]"
-            Printer.expression e;
-          raise Error
-      | NotStaticEq(eq) ->
-          Format.eprintf
-            "@[%aInternal error (static reduction):@,\
-             static evaluation failed because the equation is not static.@.@]"
-            Printer.equation eq;
-          raise Error
+     match error with
+     | Eval { kind; loc } -> Error.message loc kind; raise Error
+     | NotStatic ->
+        Format.eprintf
+          "@[Internal error (static reduction):@,\
+           the expression to be reduced is not static.@.@]";
+        raise Error
+     | NotStaticExp(e) ->
+        Format.eprintf
+          "@[%aInternal error (static reduction):@,\
+           static evaluation failed because the expression is not static.@.@]"
+          Printer.expression e;
+        raise Error
+     | NotStaticEq(eq) ->
+        Format.eprintf
+          "@[%aInternal error (static reduction):@,\
+           static evaluation failed because the equation is not static.@.@]"
+          Printer.equation eq;
+        raise Error
