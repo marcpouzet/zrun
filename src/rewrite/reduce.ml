@@ -31,15 +31,17 @@ type error =
 exception Reduce of error
 
 type 'a env =
-  { e_renaming: Ident.t Ident.Env.t; (* associate a name to a name *)
-    e_values: 'a Ident.Env.t;  (* associate a value of type 'a to a name *)
+  { e_renaming: Ident.t Ident.Env.t; (* environment for renaming *)
+    e_values: 'a Ident.Env.t;  (* environment of values *)
     e_globals: 'a Genv.genv;   (* global environment *)
-  }
+    e_sizes: int Ident.Env.t; (* environment of sizes *)}
 
 let empty =
   { e_renaming = Ident.Env.empty;
     e_values = Ident.Env.empty;
-    e_globals = Genv.modules }
+    e_globals = Genv.modules;
+    e_sizes = Ident.Env.empty;
+  }
 
 (** Build a renaming from an environment *)
 let build ({ e_renaming } as acc) env =
@@ -81,6 +83,27 @@ let rec size acc ({ desc } as s) =
      let s2, acc = size acc s2 in
      Smult(s1, s2), acc in
   { s with desc }, acc
+
+(* size expressions *)
+let rec size_e acc { desc } =
+  match desc with
+  | Sint(v) -> v
+  | Sfrac { num; denom } ->
+     let v = size_e acc num in v / denom
+  | Sident(n) ->
+     Env.find n acc.e_sizes
+  | Splus(s1, s2) ->
+     let v1 = size_e acc s1 in
+     let v2 = size_e acc s2 in
+     v1 + v2
+  | Sminus(s1, s2) ->
+     let v1 = size_e acc s1 in
+     let v2 = size_e acc s2 in
+     v1 - v2
+  | Smult(s1, s2) ->
+     let v1 = size_e acc s1 in
+     let v2 = size_e acc s2 in
+     v1 * v2
 
 (** Renaming of patterns *)
 let rec pattern f acc ({ pat_desc } as p) =
@@ -229,12 +252,8 @@ let rec expression acc ({ e_desc } as e) =
      let e_body, acc = expression acc e_body in
      let e_c, acc = expression acc e_c in
      { e with e_desc = Ereset(e_body, e_c) }, acc
-  | Esizeapp { f; size_list } ->
-     let e, acc = expression acc f in
-     let size_list, acc = Util.mapfold size acc size_list in
-     { e with e_desc = Esizeapp { f; size_list } }, acc
-  | Efun { f_vkind; f_kind; f_atomic; f_args; f_body; f_env } ->
-     assert false
+  | Esizeapp { f; size_list } -> assert false
+  | Efun _ -> e, acc
   | Eforloop
      ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
      let for_vardec_t acc ({ desc = { for_array; for_vardec } } as f) =
@@ -262,7 +281,23 @@ let rec expression acc ({ e_desc } as e) =
                 Eforloop
                   { f with for_size; for_kind; for_index; for_input;
                            for_body; for_env } }, acc
-     
+
+(*
+and sizeapp acc f size_list =
+  let v = expression_e acc f in
+  let size_list = List.map (size_e acc) size_list in
+  match v with
+  | Vsizefun { s_params; s_body; s_genv; s_env } ->
+  | Vsizefix { bound; name; defs } ->
+  | _ ->
+                                                     *)
+
+(** Eval an expression *)
+and expression_e acc e =
+  let v = Coiteration.vexp acc.e_globals (Match.liftv acc.e_values) e in
+  match v with
+  | Ok(v) -> v | Error(error) -> raise (Reduce (Eval error))
+
 (** Equations **)
 and equation acc ({ eq_desc } as eq) = 
   match eq_desc with
@@ -412,17 +447,20 @@ and equation acc ({ eq_desc } as eq) =
 
 and slet acc leq_list = Util.mapfold leq_t acc leq_list
 
+(* eval a definition *)
+and leq_e acc leq =
+  let l_env =
+    Coiteration.vleq acc.e_globals (Match.liftv acc.e_values) leq in
+  match l_env with
+  | Ok(l_env) -> l_env | Error(error) -> raise (Reduce (Eval error))
+
 and leq_t acc ({ l_kind; l_eq; l_env } as leq) =
   let l_env, acc = build acc l_env in
   let l_eq, acc = equation acc l_eq in
   let acc = match l_kind with
     | Kconst | Kstatic ->
        (* static evaluation *)
-       let l_env =
-         let l_env =
-           Coiteration.vleq acc.e_globals (Match.liftv acc.e_values) leq in
-         match l_env with
-         | Ok(l_env) -> l_env | Error(e) -> raise (Reduce (Eval e)) in
+       let l_env = leq_e acc leq in
        { acc with e_values = Env.append l_env acc.e_values }
     | Kany -> acc in
   { leq with l_eq; l_env }, acc

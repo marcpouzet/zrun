@@ -75,6 +75,20 @@ let (let*+) v f =
   let+ v = v in
   f v
 
+(* check that a value is neither bot nor nil *)
+let no_bot_no_nil loc v =
+  match v with
+  | Vbot -> error { kind = Ebot; loc = loc }
+  | Vnil -> error { kind = Enil; loc = loc }
+  | Value(v) -> return v
+    
+let no_bot_no_nil_env loc env =
+  let seq_env = Env.to_seq env in
+  seqfold 
+    (fun acc (f, { cur }) -> 
+      let* v = no_bot_no_nil loc cur in
+      return (Env.add f v acc)) Env.empty seq_env
+
 (* evaluation functions *)
 (* merge two environments provided they do not overlap *)
 let merge loc env1 env2 =
@@ -386,7 +400,7 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
         if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
         else 
           (* [e1] is evaluated statically *)
-          let* v = vsexp genv env e1 in
+          let* v = vexp genv env e1 in
           let* v = Primitives.pvalue v |>
                    Opt.to_result ~none: { kind = Etype; loc = e_loc1} in
           let* v =
@@ -407,8 +421,8 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
      | Eperiod, [e1; e2] ->
        (* [e1] and [e2] must be static *)
        if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
-        else let* v1 = vsexp genv env e1 in
-          let* v2 = vsexp genv env e2 in
+        else let* v1 = vexp genv env e1 in
+          let* v2 = vexp genv env e2 in
           let* v1 = is_vfloat v1 |>
                     Opt.to_result ~none: { kind = Etype; loc = e_loc} in
           let* v2 = is_vfloat v2 |>
@@ -511,7 +525,7 @@ and ifor_kind genv env for_size for_kind s_body =
   | None -> return (Sopt(None), s_body)
   | Some({ e_loc } as e) ->
      (* [e] must be a static (hence stateless) expression *)
-     let* v = vsexp genv env e in
+     let* v = vexp genv env e in
      (* and an integer value *)
      let* v = is_int e_loc v in
      let s_size = Sopt(Some(Value(Vint(v)))) in
@@ -535,7 +549,7 @@ and ifor_input is_fun genv env { desc; loc } =
        | None -> return Sempty
        | Some(e) ->
           (* [by] must be static and an integer *)
-          let* v = vsexp genv env e in
+          let* v = vexp genv env e in
           let* v = is_int e.e_loc v in
           return (Sval(Value(Vint(v)))) in
      return (Slist [se; se_opt])
@@ -597,7 +611,7 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
   | EQif { e; eq_true; eq_false } ->
      let* se = iexp is_fun genv env e in
      (* try to evaluate [se] statically *)
-     let* v = try_vexp genv env e se in
+     let* v = try_vsexp genv env e se in
      let* s = match v with 
        | None -> 
           let* seq_true = ieq is_fun genv env eq_true in
@@ -905,7 +919,7 @@ and sexp genv env { e_desc; e_loc } s =
              return (v, Slist [s1; s2])
           | Eget, [e; i], Slist [s1; s2] ->
              let* v, s1 = sexp genv env e s1 in
-             let* i = vexp genv env i s2 in
+             let* i = vsexp genv env i s2 in
              let* v = Arrays.get e_loc v i in
              return (v, Slist [s1; s2])
           | Eget_with_default, [e; ei; default], Slist [se; si; s_default] ->
@@ -916,8 +930,8 @@ and sexp genv env { e_desc; e_loc } s =
              return (v, s)
           | Eslice, [e; i1; i2], Slist [s; s1; s2] ->
              let* v, s = sexp genv env e s in
-             let* i1 = vexp genv env i1 s1 in
-             let* i2 = vexp genv env i2 s2 in
+             let* i1 = vsexp genv env i1 s1 in
+             let* i2 = vsexp genv env i2 s2 in
              let* v = Arrays.slice e_loc v i1 i2 in
              return (v, Slist [s; s1; s2])
           | Eupdate, (e :: arg :: i_list), Slist (s :: s_arg :: s_list) ->
@@ -1182,7 +1196,7 @@ and sforloop_exp
                     else
                       (* the default value is [nil] *)
                       return Vnil
-                 | Some(e) -> vsexp genv env e in
+                 | Some(e) -> vexp genv env e in
                (* the final state is discarded *)
                let* ve, s_for_body_new =
                  Forloop.forward loc (fun env s -> sexp genv env e s)
@@ -1228,7 +1242,7 @@ and sforloop_exp
                let sbody env s =
                  let* _, local_env, s = sblock genv env body s in
                  return (local_env, s) in
-               let cond env = vsexp genv env for_exit in
+               let cond env = vexp genv env for_exit in
                let* env_list, acc_env, s_for_body_new =
                   match for_exit_kind with
                     | Ewhile ->
@@ -1282,14 +1296,14 @@ and sexp_init_opt loc genv env e_opt s =
         
 (* computing the value of an expression with a given state *)
 (* the expression [e] is expected to be combinational *)
-and vexp genv env e s =
+and vsexp genv env e s =
   let* v, _ = sexp genv env e s in
   return v
 
 (* try to evaluate e. Return None if some variables are unbounded; Some(v) *)
 (* if the execution succeed; propagate the error otherwise *)
-and try_vexp genv env e s =
-  let v = vexp genv env e s in
+and try_vsexp genv env e s =
+  let v = vsexp genv env e s in
   match v with 
   | Error({ kind = Eunbound_ident _ | Eunbound_last_ident _ }) -> return None
   | Error(k) -> error k
@@ -1299,9 +1313,9 @@ and try_vexp genv env e s =
 (* computing the value of an expression from the initial state *)
 (* the expression is supposed to be stateless, that is, *)
 (* the new state must be unchanged *)
-and vsexp genv env e =
+and vexp genv env e =
   let* s = iexp true genv env e in
-  vexp genv env e s
+  vsexp genv env e s
 
 (* computing the environment defined by a local definition *)
 (* the expression [l_eq] is expected to be combinational *)
@@ -1316,7 +1330,7 @@ and vleq genv env ({ l_rec; l_eq } as leq) =
     return env
 
 (* computing the value of a result combinatorial expression *)
-and vsresult genv env r =
+and vresult genv env r =
   let* s = iresult true genv env r in
   let* v, _ = sresult genv env r s in
   return v
@@ -1814,7 +1828,7 @@ and sforloop_eq
           let sbody env s =
             let* _, local_env, s = sblock genv env for_block s in
             return (local_env, s) in
-          let cond env = vsexp genv env for_exit in
+          let cond env = vexp genv env for_exit in
           let* env_list, acc_env, s_for_block_new =
             match for_exit_kind with
              | Ewhile ->
@@ -2231,8 +2245,8 @@ and apply_closure loc genv env ({ f_kind; f_loc } as fe) f_args f_body v_list =
           error { kind = Eshould_be_combinatorial; loc }
        | Kfun _ ->
           match v_list with
-          | [] -> vsresult genv env f_body
-          | _ -> let* fv = vsresult genv env f_body in
+          | [] -> vresult genv env f_body
+          | _ -> let* fv = vresult genv env f_body in
                  let+ fv = fv in
                  apply loc fv v_list in
      return r
@@ -2265,7 +2279,7 @@ and sizeapply loc fv v_list =
         List.fold_left2 
           (fun acc id v -> Env.add id (Match.entry (Vint v)) acc) 
           s_env s_params v_list in
-      vsexp s_genv env s_body in
+      vexp s_genv env s_body in
   match fv with
   | Vsizefun { s_params; s_body; s_genv; s_env } ->
      apply s_params s_body s_genv s_env
@@ -2293,25 +2307,18 @@ and sizeapply loc fv v_list =
      apply s_params s_body s_genv s_env
   | _ -> error { kind = Etype; loc }
 
-(* check that a value is neither bot nor nil *)
-let no_bot_no_nil loc env =
-  let no_bot_no_nil v =
-    match v with
-    | Vbot -> error { kind = Ebot; loc = loc }
-    | Vnil -> error { kind = Enil; loc = loc }
-    | Value(v) -> return v in
-  let seq_env = Env.to_seq env in
-  seqfold 
-    (fun acc (f, { cur }) -> 
-       let* v = no_bot_no_nil cur in
-       return (Env.add f v acc)) Env.empty seq_env
 
 (* evaluate an equation *)
 (* check that no value is bot nor nil *)
 let vleq genv env ({ l_loc } as leq) =
   let* env = vleq genv env leq in
-  let* env = no_bot_no_nil l_loc env in
+  let* env = no_bot_no_nil_env l_loc env in
   return env
+
+(* evaluate an expression *)
+let vexp genv env ({ e_loc } as e) =
+  let* v = vexp genv env e in
+  no_bot_no_nil e_loc v
 
 let implementation genv { desc; loc } =
   match desc with
