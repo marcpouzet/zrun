@@ -30,6 +30,9 @@ type error =
 
 exception Reduce of error
 
+(* Invariant: defined names in the four environment are pairwise distinct *)
+(* this is ensured if this is the case in the source *)
+(* this compiler pass ensures it too *)
 type 'a env =
   { e_renaming: Ident.t Ident.Env.t; (* environment for renaming *)
     e_values: 'a Ident.Env.t;  (* environment of values *)
@@ -51,9 +54,6 @@ let build ({ e_renaming } as acc) env =
     Env.add n m renaming in
   let env, e_renaming = Env.fold buildrec env (Env.empty, e_renaming) in
   env, { acc with e_renaming }
-
-(* attention: il faut enlever des entrees de la substitution des
-   valeurs *)
 
 let rename ({ e_renaming } as acc) n = Env.find n e_renaming, acc
 
