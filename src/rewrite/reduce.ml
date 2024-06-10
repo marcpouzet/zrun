@@ -1,7 +1,7 @@
 (***********************************************************************)
 (*                                                                     *)
 (*                                                                     *)
-(*          Zélus, a synchronous language for hybrid systems           *)
+(*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
 (*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
@@ -62,36 +62,16 @@ let write_t acc { Defnames.dv; Defnames.di; Defnames.der } = assert false
 let type_expression acc ty = ty, acc
 
 (* size expressions *)
-let rec size acc ({ desc } as s) =
-  let desc, acc = match desc with
-  | Sint _ -> desc, acc
-  | Sfrac { num; denom } ->
-     let num, acc = size acc num in Sfrac { num; denom }, acc
-  | Sident(n) ->
-     let n, acc = rename acc n in
-     Sident(n), acc
-  | Splus(s1, s2) ->
-     let s1, acc = size acc s1 in
-     let s2, acc = size acc s2 in
-     Splus(s1, s2), acc
-  | Sminus(s1, s2) ->
-     let s1, acc = size acc s1 in
-     let s2, acc = size acc s2 in
-     Sminus(s1, s2), acc
-  | Smult(s1, s2) ->
-     let s1, acc = size acc s1 in
-     let s2, acc = size acc s2 in
-     Smult(s1, s2), acc in
-  { s with desc }, acc
-
-(* size expressions *)
 let rec size_e acc { desc } =
   match desc with
   | Sint(v) -> v
   | Sfrac { num; denom } ->
      let v = size_e acc num in v / denom
   | Sident(n) ->
-     Env.find n acc.e_sizes
+     let v = 
+       try Env.find n acc.e_sizes 
+       with Not_found -> raise (Reduce(NotStatic)) in
+     v
   | Splus(s1, s2) ->
      let v1 = size_e acc s1 in
      let v2 = size_e acc s2 in
@@ -176,7 +156,7 @@ let for_input_t expression acc ({ desc } as fi) =
   { fi with desc }, acc
      
 (** Expressions **)
-let rec expression acc ({ e_desc } as e) =
+let rec expression acc ({ e_desc; e_loc } as e) =
   match e_desc with
   | Econst _ | Econstr0 _ | Eglobal _ -> e, acc
   | Evar(x) ->
@@ -252,8 +232,21 @@ let rec expression acc ({ e_desc } as e) =
      let e_body, acc = expression acc e_body in
      let e_c, acc = expression acc e_c in
      { e with e_desc = Ereset(e_body, e_c) }, acc
-  | Esizeapp { f; size_list } -> assert false
-  | Efun _ -> e, acc
+  | Esizeapp { f; size_list } -> 
+     (* after this step, there should be no static expressions left *)
+     let v = expression_e acc f in
+     let size_list = List.map (size_e acc) size_list in
+     let v = Coiteration.sizeapply e_loc v size_list in
+     let v = 
+       match v with
+       | Ok(v) -> v | Error(error) -> raise (Reduce (Eval error)) in
+     exp_of_value v, acc
+  | Efun ({ f_args; f_body; f_env } as funexp) ->
+     let f_env, acc = build acc f_env in
+     let arg acc v_list = Util.mapfold vardec acc v_list in
+     let f_args, acc = Util.mapfold arg acc f_args in
+     let f_body, acc = result acc f_body in
+     { e with e_desc = Efun { funexp with f_args; f_body; f_env } }, acc
   | Eforloop
      ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
      let for_vardec_t acc ({ desc = { for_array; for_vardec } } as f) =
@@ -281,16 +274,6 @@ let rec expression acc ({ e_desc } as e) =
                 Eforloop
                   { f with for_size; for_kind; for_index; for_input;
                            for_body; for_env } }, acc
-
-(*
-and sizeapp acc f size_list =
-  let v = expression_e acc f in
-  let size_list = List.map (size_e acc) size_list in
-  match v with
-  | Vsizefun { s_params; s_body; s_genv; s_env } ->
-  | Vsizefix { bound; name; defs } ->
-  | _ ->
-                                                     *)
 
 (** Eval an expression *)
 and expression_e acc e =
@@ -504,8 +487,15 @@ and block acc ({ b_vars; b_body; b_env; b_write } as b) =
   let b_write, acc = write_t acc b_write in
   { b with b_vars; b_body; b_env; b_write }, acc
 
+and result acc ({ r_desc } as r) =
+  let r_desc, acc = match r_desc with
+    | Exp(e) -> let e, acc = expression acc e in Exp(e), acc
+    | Returns(b_eq) -> let b_eq, acc = block acc b_eq in Returns(b_eq), acc in
+  { r with r_desc }, acc
+
+
 (** Convert a value into an expression. **)
-let rec exp_of_value v =
+and exp_of_value v =
   let open Value in
   let e_desc = match v with
     | Vint(v) -> Econst(Eint(v))
@@ -529,20 +519,6 @@ let rec exp_of_value v =
     | Varray _ | Vfun _  
     | Vclosure _ | Vsizefun _ | Vsizefix _ -> assert false in
   { e_desc; e_loc = Location.no_location; e_info = no_info }
-
-(* Reduction under a function body. *)
-and lambda acc ({ f_args; f_body; f_env } as funexp) =
-  let arg acc v_list = Util.mapfold vardec acc v_list in
-  let env, acc = build acc f_env in
-  let f_args, acc = Util.mapfold arg acc f_args in
-  let f_body, acc = result acc f_body in
-  { funexp with f_args; f_body; f_env }, acc
-
-and result acc ({ r_desc } as r) =
-  let r_desc, acc = match r_desc with
-    | Exp(e) -> let e, acc = expression acc e in Exp(e), acc
-    | Returns(b_eq) -> let b_eq, acc = block acc b_eq in Returns(b_eq), acc in
-  { r with r_desc }, acc
 
 (* The main function. Reduce every definition *)
 let implementation acc ({ desc } as impl) =
