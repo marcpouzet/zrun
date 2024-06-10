@@ -91,10 +91,10 @@ let rec equation ({ eq_desc } as eq)=
     | EQlocal(b_eq) ->
        let b_eq, def_eq, _ = block b_eq in
        EQlocal(b_eq), def_eq
-    | EQlet({ l_eq } as leq, eq) ->
-       let l_eq, _ = equation l_eq in
+    | EQlet(l, eq) ->
+       let l = leq l in
        let eq, def = equation eq in
-       EQlet({ leq with l_eq }, eq), def
+       EQlet(l, eq), def
     | EQif { e; eq_true; eq_false } ->
        let e = expression e in
        let eq_true, def_true = equation eq_true in
