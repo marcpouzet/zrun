@@ -105,11 +105,11 @@ let eval_definitions_in_file modname filename =
   Location.initialize source_name;
 
   (* Parsing *)
-  let impl_list = parse_implementation_file source_name in
+  let p = parse_implementation_file source_name in
   Debug.print_message "Parsing done";
 
   (* Scoping *)
-  let p = do_step "Scoping done" Scoping.program impl_list in
+  let p = do_step "Scoping done" Scoping.program p in
   
   (* Write defined variables for equations *)
   let p = do_step "Write done" Write.program p in
@@ -122,8 +122,9 @@ let eval_definitions_in_file modname filename =
   let genv = Coiteration.program genv p in
   Debug.print_message "Evaluation of definitions done";
 
+  let _ = do_step "Reduce done" Reduce.program p in
+
   (* Write the values into a file *)
-  (* Genv.write genv otc; *)
   apply_with_close_out (Genv.write genv) otc;
 
   genv
