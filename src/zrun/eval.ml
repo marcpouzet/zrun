@@ -123,7 +123,8 @@ let eval_definitions_in_file modname filename =
   Debug.print_message "Evaluation of definitions done";
 
   let _ = 
-    if !set_reduce then do_step "Reduce done" Reduce.program p else p in
+    if !set_reduce 
+    then do_step "Reduce done" (Reduce.program genv) p else p in
 
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv) otc;
