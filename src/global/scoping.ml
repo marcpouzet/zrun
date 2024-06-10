@@ -650,8 +650,8 @@ and automaton_handler is_weak env_for_states env_pat env
     List.map (escape env_for_states env_pat env)
       (if is_weak then s_until else s_unless) in
   { Ast.s_state = s_state; Ast.s_let = s_let; Ast.s_body = s_body;
-    Ast.s_trans = s_trans; Ast.s_loc = loc;
-    Ast.s_reset = false }
+    Ast.s_trans = s_trans; Ast.s_loc = loc; Ast.s_reset = false; 
+    Ast.s_env = Ident.Env.empty }
   
 and escape env_for_states env_pat env
 { desc = { e_reset; e_cond; e_let; e_body; e_next_state }; loc } = 
