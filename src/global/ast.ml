@@ -365,6 +365,7 @@ and ('info, 'body) automaton_handler =
     s_trans: ('info, 'info scondpat, 'info exp, 'info leq, 'body) escape list;
     s_loc: Location.t;
     mutable s_reset: bool; (* is the state always entered by reset? *)
+    s_env: 'info Ident.Env.t; (* env. for parameter names in [s_state] *) 
   }
 
 and 'a default =
