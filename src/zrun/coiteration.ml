@@ -2320,6 +2320,11 @@ let vexp genv env ({ e_loc } as e) =
   let* v = vexp genv env e in
   no_bot_no_nil e_loc v
 
+(* evaluate a size application *)
+let sizeapply loc fv v_list =
+  let* v = sizeapply loc fv v_list in
+  no_bot_no_nil loc v
+
 let implementation genv { desc; loc } =
   match desc with
   | Eopen(name) ->
