@@ -21,6 +21,14 @@ open Ident
 open Ast
 open Defnames
 
+(* build an environment *)
+let build id env = Env.add id Misc.no_info env
+
+let build_from_defnames { dv; di; der } = 
+  S.fold build dv (S.fold build di (S.fold build der Env.empty))
+
+let build_from_names n_set = S.fold build n_set Env.empty
+
 let rec fv_pat acc { pat_desc } =
   match pat_desc with
   | Ewildpat | Econstr0pat _ | Econstpat _ -> acc
@@ -47,8 +55,11 @@ let rec equation ({ eq_desc } as eq)=
        EQeq(pat, expression e),
        { Defnames.empty with dv = fv_pat S.empty pat }
     | EQsizefun ({ sf_id; sf_id_list; sf_e } as sf) ->
+       let dv = 
+         List.fold_left (fun acc id -> S.add id acc) S.empty sf_id_list in
        let sf_e = expression sf_e in
-       EQsizefun { sf with sf_id; sf_id_list; sf_e },
+       let sf_env = build_from_names dv in
+       EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env },
        { Defnames.empty with dv = S.singleton sf_id }
     | EQder { id; e; e_opt; handlers } ->
        let e_opt, di =
@@ -93,7 +104,8 @@ let rec equation ({ eq_desc } as eq)=
     | EQmatch({ e; handlers } as m) ->
        let match_handler acc ({ m_body } as m) =
          let m_body, def_body = equation m_body in
-         { m with m_body = m_body }, Defnames.union acc def_body in
+         let m_env = build_from_defnames def_body in
+         { m with m_body = m_body; m_env }, Defnames.union acc def_body in
        let e = expression e in
        let handlers, def =
          Util.mapfold match_handler Defnames.empty handlers in
@@ -107,7 +119,8 @@ let rec equation ({ eq_desc } as eq)=
     | EQpresent({ handlers; default_opt }) ->
        let present_handler acc ({ p_body } as p) =
          let p_body, def_body = equation p_body in
-         { p with p_body = p_body }, Defnames.union acc def_body in
+         let p_env = build_from_defnames def_body in
+         { p with p_body = p_body; p_env }, Defnames.union acc def_body in
        let handlers, def =
          Util.mapfold present_handler Defnames.empty handlers in
        let default_opt, def_opt =
@@ -118,7 +131,7 @@ let rec equation ({ eq_desc } as eq)=
        EQpresent({ handlers; default_opt }), Defnames.union def def_opt
     | EQempty -> EQempty, Defnames.empty
     | EQassert(e) -> EQassert(expression e), Defnames.empty
-    | EQforloop({ for_size; for_kind;
+    | EQforloop({ for_size; for_kind; for_index;
                   for_input; for_body = { for_out; for_block } } as f) ->
        let for_size = Util.optional_map expression for_size in
        let for_kind =
@@ -126,10 +139,10 @@ let rec equation ({ eq_desc } as eq)=
          | Kforeach -> for_kind
          | Kforward(e_opt) ->
             Kforward(Util.optional_map exit_expression e_opt) in
-       let for_input =
-         for_input_w for_input in
-       let for_input =
-         for_input_w for_input in
+       let dv_index = 
+         Util.optional (fun acc x -> S.add x acc) S.empty for_index in
+       let for_input, dv_input =
+         for_input_w dv_index for_input in
        (* From outside, when the output is [xi out x] *)
        (* the defined variable in the loop body is [x], not [xi] *)
        let for_out_one h_out
@@ -145,7 +158,9 @@ let rec equation ({ eq_desc } as eq)=
        let for_out, h_out = Util.mapfold for_out_one Env.empty for_out in
        let for_block, defnames, dv_for_block = block for_block in
        let defnames = Defnames.subst defnames h_out in
-       EQforloop({ f with for_size; for_kind; for_input;
+       let dv = Env.fold (fun n _ acc -> S.add n acc) h_out dv_input in
+       let for_env = build_from_names dv in
+       EQforloop({ f with for_size; for_kind; for_input; for_env;
                           for_body = { for_out; for_block }}),
        defnames in
   (* set the names defined in the equation *)
@@ -155,7 +170,9 @@ let rec equation ({ eq_desc } as eq)=
 and lets l = List.map leq l
 
 and leq ({ l_eq } as l) =
-  let l_eq, _ = equation l_eq in { l with l_eq }
+  let l_eq, def = equation l_eq in 
+  let l_env = build_from_defnames def in
+  { l with l_eq; l_env }
 
 (** [returns a new block whose body is an equation [eq];
  *- [def] the defined variables in [eq] that are not local;
@@ -164,7 +181,8 @@ and block ({ b_vars; b_body } as b) =
   let b_vars, dv_b = Util.mapfold vardec S.empty b_vars in
   let b_body, def_body = equation b_body in
   let def = Defnames.diff def_body dv_b in
-  { b with b_vars; b_body; b_write = def }, def, dv_b
+  let b_env = build_from_names dv_b in
+  { b with b_vars; b_body; b_write = def; b_env }, def, dv_b
 
 and vardec acc ({ var_name; var_default; var_init } as v) =
   { v with var_default = Util.optional_map expression var_default;
@@ -179,36 +197,50 @@ and state ({ desc } as se) =
   | Estateif(e, se1, se2) ->
      { se with desc = Estateif(expression e, state se1, state se2) }
 
-and automaton_handler acc ({ s_let; s_body; s_trans } as h) =
+and automaton_handler acc ({ s_state; s_let; s_body; s_trans } as h) =
+  let dv_state = fv_statepat s_state in
   let s_let = lets s_let in
   let s_body, def_eq, dv_b = block s_body in
   let s_trans, def_escape = Util.mapfold escape Defnames.empty s_trans in
-  { h with s_let; s_body; s_trans },
+  let s_env = build_from_names dv_state in
+  { h with s_let; s_body; s_trans; s_env },
   Defnames.union (Defnames.union def_eq (Defnames.diff def_escape dv_b)) acc
 
 and escape acc ({ e_cond; e_let; e_body; e_next_state } as esc) =
-  let e_cond = scondpat e_cond in
+  let e_cond, dv_cond = scondpat S.empty e_cond in
   let e_let = lets e_let in
   let e_body, def_eq, _ = block e_body in
   let e_next_state = state e_next_state in
+  let e_env = build_from_names dv_cond in
   { esc with e_cond = e_cond; e_let; e_body = e_body;
-             e_next_state = e_next_state },
+             e_next_state = e_next_state; e_env },
   Defnames.union def_eq acc
 
-and scondpat ({ desc } as scpat) =
-  let desc = match desc with
+and scondpat acc ({ desc } as scpat) =
+  let desc, acc = match desc with
     | Econdand(scpat1, scpat2) ->
-       Econdand(scondpat scpat1, scondpat scpat2)
+       let scpat1, acc = scondpat acc scpat1 in
+       let scpat2, acc = scondpat acc scpat2 in
+       Econdand(scpat1, scpat2), acc
     | Econdor(scpat1, scpat2) ->
-       Econdor(scondpat scpat1, scondpat scpat2)
+       let scpat1, acc = scondpat acc scpat1 in
+       let scpat2, acc = scondpat acc scpat2 in
+       Econdor(scpat1, scpat2), acc
     | Econdexp(e) ->
-       Econdexp(expression e)
+       Econdexp(expression e), acc
     | Econdpat(e, p) ->
-       Econdpat(expression e, p)
+       let acc = fv_pat acc p in
+       Econdpat(expression e, p), acc
     | Econdon(scpat, e) ->
-       Econdon(scondpat scpat, expression e) in
-  { scpat with desc = desc }
+       let scpat, acc = scondpat acc scpat in
+       Econdon(scpat, expression e), acc in
+  { scpat with desc = desc }, acc
 
+and fv_statepat { desc } =
+  match desc with
+  | Estate0pat(id) -> S.singleton id
+  | Estate1pat(id, id_list) -> 
+     List.fold_left (fun acc id -> S.add id acc) (S.singleton id) id_list
 
 and expression ({ e_desc } as e) =
   let desc =
@@ -262,23 +294,27 @@ and expression ({ e_desc } as e) =
     | Ereset(e_body, e_res) ->
        Ereset(expression e_body, expression e_res)
     | Eassert(e_body) -> Eassert(expression e_body)
-    | Eforloop({ for_size; for_kind; for_input; for_body } as f) ->
+    | Eforloop({ for_size; for_index; for_kind; for_input; for_body } as f) ->
        let for_size = Util.optional_map expression for_size in
        let for_kind =
          match for_kind with
          | Kforeach -> for_kind
          | Kforward(e_opt) ->
             Kforward(Util.optional_map exit_expression e_opt) in
-       let for_input = for_input_w for_input in
+       let dv_index = 
+         Util.optional (fun acc x -> S.add x acc) S.empty for_index in
+       let for_input, dv_input =
+         for_input_w dv_index for_input in
        let for_body =
          match for_body with
          | Forexp { exp; default } ->
             Forexp { exp = expression exp;
                      default = Util.optional_map expression default }
-         | Forreturns({ returns; body } as r) ->
-            let returns, _ = Util.mapfold for_vardec S.empty returns in
+         | Forreturns { returns; body } ->
+            let returns, dv = Util.mapfold for_vardec S.empty returns in
+            let r_env = build_from_names dv in
             let body, _, _ = block body in
-            Forreturns({ r with returns; body }) in
+            Forreturns({ returns; body; r_env }) in
        Eforloop({ f with for_size; for_kind; for_input; for_body }) in
   { e with e_desc = desc }
 
@@ -286,16 +322,17 @@ and for_vardec acc ({ desc = ({ for_vardec } as v) } as fv) =
   let for_vardec, acc = vardec acc for_vardec in
   { fv with desc = { v with for_vardec } }, acc
 
-and for_input_w for_input =
-  let input ({ desc } as i) =
-    let desc = match desc with
+and for_input_w acc for_input_list =
+  let input acc ({ desc } as i) =
+    let desc, acc = match desc with
       | Einput { id; e; by } ->
-         Einput { id; e = expression e; by = Util.optional_map expression by }
+         let by = Util.optional_map expression by in
+         Einput { id; e = expression e; by }, S.add id acc
       | Eindex { id; e_left; e_right; dir } ->
          Eindex { id; e_left = expression e_left;
-                  e_right = expression e_right; dir } in
-    { i with desc } in
-  List.map input for_input
+                  e_right = expression e_right; dir }, S.add id acc in
+    { i with desc }, acc in
+  Util.mapfold input acc for_input_list
 
 and exit_expression ({ for_exit } as e) =
   { e with for_exit = expression for_exit }
@@ -303,9 +340,10 @@ and exit_expression ({ for_exit } as e) =
 and arg acc v_list = Util.mapfold vardec acc v_list
 
 and funexp ({ f_args; f_body } as fd) =
-  let f_args, _ = Util.mapfold arg S.empty f_args in
+  let f_args, dv_args = Util.mapfold arg S.empty f_args in
   let f_body = result f_body in
-  { fd with f_args = f_args; f_body = f_body }
+  let f_env = build_from_names dv_args in
+  { fd with f_args = f_args; f_body = f_body; f_env }
 
 and result ({ r_desc } as r) =
   let r_desc =
