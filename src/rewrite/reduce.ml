@@ -281,6 +281,13 @@ and expression_e acc e =
   match v with
   | Ok(v) -> v | Error(error) -> raise (Reduce (Eval error))
 
+(** Try to evaluate and expression; expect the result to be boolean *)
+and try_expression_bool acc e =
+  let v = 
+    Coiteration.try_vexp_into_bool acc.e_globals (Match.liftv acc.e_values) e in
+  match v with
+  | Ok(v) -> Some(v) | _ -> None
+
 (** Equations **)
 and equation acc ({ eq_desc } as eq) = 
   match eq_desc with
@@ -309,10 +316,16 @@ and equation acc ({ eq_desc } as eq) =
      let handlers, acc = Util.mapfold body acc handlers in
      { eq with eq_desc = EQder { id; e; e_opt; handlers } }, acc
   | EQif { e; eq_true; eq_false } ->
-     let e, acc = expression acc e in
-     let eq_true, acc = equation acc eq_true in
-     let eq_false, acc = equation acc eq_false in
-     { eq with eq_desc = EQif { e; eq_true; eq_false } }, acc
+     (* two cases; either [e] is a compile-time boolean value or not *)
+     let v = try_expression_bool acc e in
+     let eq, acc = match v with 
+       | None -> let e, ac = expression acc e in
+                 let eq_true, acc = equation acc eq_true in
+                 let eq_false, acc = equation acc eq_false in
+                 { eq with eq_desc = EQif { e; eq_true; eq_false } }, acc
+       | Some(b) ->
+          if b then equation acc eq_true else equation acc eq_false in
+     eq, acc
   | EQmatch({ e; handlers } as m) ->
      let body acc ({ m_pat; m_body; m_env } as m_h) =
        let m_env, acc = build acc m_env in

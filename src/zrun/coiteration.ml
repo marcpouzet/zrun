@@ -2325,6 +2325,11 @@ let sizeapply loc fv v_list =
   let* v = sizeapply loc fv v_list in
   no_bot_no_nil loc v
 
+(* try to evaluate a boolean expression *)
+and try_vexp_into_bool genv env ({ e_loc } as e) =
+  let* v = vexp genv env e in
+  is_bool v |> Opt.to_result ~none:{ kind = Etype; loc = e_loc }     
+
 let implementation genv { desc; loc } =
   match desc with
   | Eopen(name) ->
