@@ -151,28 +151,34 @@ let print_writes ff { dv ; di; der } =
   	    "@[<v 0>(* der = {@[%a@]} *)@ @]" (print_list_r name "" "," "") der
   end
 
+let print_env_names ff env =
+  if !verbose && not (Ident.Env.is_empty env) then 
+    Ident.Env.fprint_t (fun ff _ -> ()) ff env
+
 let print_eq_info ff { eq_write } =
   print_writes ff eq_write
 
 (* print a block *)
-let block exp body ff { b_vars; b_body; b_write } =
+let block exp body ff { b_vars; b_body; b_write; b_env } =
   match b_vars with
-  | [] -> body ff b_body
+  | [] -> fprintf ff "@[<hov 0>%a@ %a@]" body b_body print_env_names b_env
   | _ ->
-     fprintf ff "@[<hov 0>local@ %a do@ %a%a@]"
+     fprintf ff "@[<hov 0>local@ %a@ %ado@ %a%a@]"
        (vardec_list exp) b_vars
+       print_env_names b_env
        print_writes b_write       
        body b_body
 
-let match_handler body ff { m_pat; m_body; m_reset; m_zero } =
-  fprintf ff "@[<hov 4>| %a -> %s%s@,%a@]"
+let match_handler body ff { m_pat; m_body; m_reset; m_zero; m_env } =
+  fprintf ff "@[<hov 4>| %a -> %s%s@,%a@ %a@]"
     pattern m_pat (if m_reset then "(* reset *)" else "")
                 (if m_zero then "(* zero *)" else "")
     body m_body
+    print_env_names m_env
 
-let present_handler scondpat body ff { p_cond; p_body } =
-  fprintf ff "@[<hov4>| (%a) ->@ @[<v 0>%a@]@]"
-    scondpat p_cond body p_body
+let present_handler scondpat body ff { p_cond; p_body; p_env } =
+  fprintf ff "@[<hov4>| (%a) ->@ @[<v 0>%a@ %a@]@]"
+    scondpat p_cond body p_body print_env_names p_env
 
 let with_default body ff default_opt =
   match default_opt with
@@ -198,12 +204,12 @@ let is_empty_block { b_vars; b_body = { eq_desc } } =
   
 let automaton_handler_list
       is_weak leqs body body_in_escape expression ff s_h_list e_opt =
-  let statepat ff spat = match spat.desc with
+  let statepat ff { desc } = match desc with
     | Estate0pat(n) -> name ff n
     | Estate1pat(n, n_list) ->
        fprintf ff "%a%a" name n (print_list_r name "("","")") n_list in
   
-  let rec state ff se = match se.desc with
+  let rec state ff { desc } = match desc with
     | Estate0(n) -> name ff n
     | Estate1(n, e_list) ->
        fprintf ff "%a%a" name n (print_list_r expression "("","")") e_list
@@ -212,21 +218,24 @@ let automaton_handler_list
          expression e state se1 state se2 in
 
   let automaton_handler is_weak body body_in_escape expression ff
-        { s_state; s_let; s_body; s_trans } =
+        { s_state; s_let; s_body; s_trans; s_env } =
     
     let escape ff { e_cond; e_let; e_reset; e_body;
-		    e_next_state } =
+		    e_next_state; e_env } =
       leqs ff e_let;
       if is_empty_block e_body
       then
-        fprintf ff "@[<v4>| %a %s@ %a@]"
+        fprintf ff "@[<v4>| %a %s@ %a@ %a@]"
           (scondpat expression) e_cond
           (if e_reset then "then" else "continue") state e_next_state
+          print_env_names e_env
       else
-         fprintf ff "@[<v4>| %a %s@ %a in %a@]"
+         fprintf ff "@[<v4>| %a %s@ %a @ %a in %a@]"
            (scondpat expression) e_cond
            (if e_reset then "then" else "continue")
-           body_in_escape e_body state e_next_state in
+           body_in_escape e_body 
+           print_env_names e_env
+           state e_next_state in
     
     let escape_list ff t_list =
       if t_list = [] then fprintf ff "done"
@@ -358,7 +367,7 @@ and result_block ff { b_vars; b_body; b_write } =
     print_writes b_write
     equation b_body
   
-and funexp ff { f_vkind; f_kind; f_args; f_body } =
+and funexp ff { f_vkind; f_kind; f_args; f_body; f_env } =
   let kind =
     match f_kind with
     | Kfun _ -> "fun"
@@ -366,8 +375,8 @@ and funexp ff { f_vkind; f_kind; f_args; f_body } =
        (match k with | Kdiscrete -> "node" | Khybrid -> "hybrid") in
   let vkind =
     match f_vkind with | Kconst -> "const" | Kstatic -> "static" | Kany -> "" in
-  fprintf ff "@[<hov 2>%s %s %a ->@ %a@]"
-    kind vkind arg_list f_args result f_body
+  fprintf ff "@[<hov 2>%s %s %a ->@ %a@ %a@]"
+    kind vkind arg_list f_args result f_body print_env_names f_env
 
 and arg_list ff a_list =
   print_list_r arg "" "" "" ff a_list
@@ -435,10 +444,11 @@ and equation ff ({ eq_desc = desc } as eq) =
   match desc with
   | EQeq(p, e) ->
      fprintf ff "@[<hov 2>%a =@ %a@]" pattern p expression e
-  | EQsizefun { sf_id; sf_id_list; sf_e } ->
-     fprintf ff "@[<hov 2>%a%a =@ %a@]" name sf_id
+  | EQsizefun { sf_id; sf_id_list; sf_e; sf_env } ->
+     fprintf ff "@[<hov 2>%a%a =@ %a@ %a@]" name sf_id
        (print_list_l name "<<" "," ">>") sf_id_list
        expression sf_e
+       print_env_names sf_env
   | EQder { id; e; e_opt; handlers = [] } ->
       fprintf ff "@[<hov 2>der %a =@ %a%a@]"
         name id expression e
@@ -567,9 +577,10 @@ and for_returns ff for_vardec_list =
 and block_of_equation ff b_eq =
   block expression equation ff b_eq
 
-and leq ff { l_rec; l_eq } =
+and leq ff { l_rec; l_eq; l_env } =
   let s = if l_rec then " rec " else "" in
-  fprintf ff "@[<v0>@[<hov2>let%s@ %a@]@ @]" s equation l_eq
+  fprintf ff "@[<v0>@[<hov2>let%s@ %a@ %a@]@ @]" 
+    s equation l_eq print_env_names l_env
 
 and leqs ff l =  print_if_not_empty (print_list_l leq "" "in" "in") ff l
 
