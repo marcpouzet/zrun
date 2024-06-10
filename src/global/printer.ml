@@ -131,8 +131,8 @@ let vardec_list exp ff vardec_list =
 
 let vkind ff k =
   match k with
-  | Kconst -> fprintf ff "const "
-  | Kstatic -> fprintf ff "static "
+  | Kconst -> fprintf ff " const"
+  | Kstatic -> fprintf ff " static"
   | Kany -> fprintf ff ""
 
 let print_writes ff { dv ; di; der } =
@@ -577,10 +577,10 @@ and for_returns ff for_vardec_list =
 and block_of_equation ff b_eq =
   block expression equation ff b_eq
 
-and leq ff { l_rec; l_eq; l_env } =
+and leq ff { l_rec; l_kind; l_eq; l_env } =
   let s = if l_rec then " rec " else "" in
-  fprintf ff "@[<v0>@[<hov2>let%s@ %a@ %a@]@ @]" 
-    s equation l_eq print_env_names l_env
+  fprintf ff "@[<v0>@[<hov2>let%a%s@ %a@ %a@]@ @]" 
+    vkind l_kind s equation l_eq print_env_names l_env
 
 and leqs ff l =  print_if_not_empty (print_list_l leq "" "in" "in") ff l
 
