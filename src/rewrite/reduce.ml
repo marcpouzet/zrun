@@ -25,7 +25,7 @@ open Defnames
 
 type error =
   | Eval of Error.error (* error during evaluation *)
-  | NotStatic
+  | NotStatic of Location.t
   | NotStaticExp of no_info exp
   | NotStaticEq of no_info eq
 
@@ -69,28 +69,30 @@ let write_t acc { dv; di; der } =
 let type_expression acc ty = ty, acc
 
 (* size expressions *)
-let rec size_e acc { desc } =
-  match desc with
-  | Sint(v) -> v
-  | Sfrac { num; denom } ->
-     let v = size_e acc num in v / denom
-  | Sident(n) ->
-     let v = 
-       try Env.find n acc.e_sizes 
-       with Not_found -> raise (Reduce(NotStatic)) in
-     v
-  | Splus(s1, s2) ->
-     let v1 = size_e acc s1 in
-     let v2 = size_e acc s2 in
-     v1 + v2
-  | Sminus(s1, s2) ->
-     let v1 = size_e acc s1 in
-     let v2 = size_e acc s2 in
-     v1 - v2
-  | Smult(s1, s2) ->
-     let v1 = size_e acc s1 in
-     let v2 = size_e acc s2 in
-     v1 * v2
+let size_e e_loc acc si =
+  let rec size_e { desc } =
+    match desc with
+    | Sint(v) -> v
+    | Sfrac { num; denom } ->
+       let v = size_e num in v / denom
+    | Sident(n) ->
+       let v = 
+         try Env.find n acc.e_sizes 
+         with Not_found -> raise (Reduce(NotStatic e_loc)) in
+       v
+    | Splus(s1, s2) ->
+       let v1 = size_e s1 in
+       let v2 = size_e s2 in
+       v1 + v2
+    | Sminus(s1, s2) ->
+       let v1 = size_e s1 in
+       let v2 = size_e s2 in
+       v1 - v2
+    | Smult(s1, s2) ->
+       let v1 = size_e s1 in
+       let v2 = size_e s2 in
+       v1 * v2 in
+  size_e si
 
 (** Renaming of patterns *)
 let rec pattern f acc ({ pat_desc } as p) =
@@ -242,7 +244,7 @@ let rec expression acc ({ e_desc; e_loc } as e) =
   | Esizeapp { f; size_list } -> 
      (* after this step, there should be no static expressions left *)
      let v = expression_e acc f in
-     let size_list = List.map (size_e acc) size_list in
+     let size_list = List.map (size_e e_loc acc) size_list in
      let v = Coiteration.sizeapply e_loc v size_list in
      let v = 
        match v with
@@ -290,8 +292,10 @@ and expression_e acc e =
 
 (** Try to evaluate and expression; expect the result to be boolean *)
 and try_expression_bool acc e =
+  let env = Match.liftv acc.e_values in
+  let l = Env.to_list env in
   let v = 
-    Coiteration.try_vexp_into_bool acc.e_globals (Match.liftv acc.e_values) e in
+    Coiteration.try_vexp_into_bool acc.e_globals env e in
   match v with
   | Ok(v) -> Some(v) | _ -> None
 
@@ -538,10 +542,17 @@ and exp_of_value v =
        Erecord r_list
     | Vstuple(v_list) ->
        Etuple (List.map exp_of_value v_list)
-    | Vtuple _ | Vpresent _ | Vabsent  
-    | Vstate0 _ | Vstate1 _ 
-    | Varray _ | Vfun _  
-    | Vclosure _ | Vsizefun _ | Vsizefix _ -> assert false in
+    | Vtuple(v_list) ->
+       assert false
+    | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ ->
+       (* no such values should be produced statically *)
+       assert false
+    | Varray _ -> assert false
+    | Vfun _  -> assert false
+    | Vclosure _ -> assert false
+    | Vsizefun _ | Vsizefix _ -> 
+       (* there should be no static computation anymore *)
+       assert false in
   { e_desc; e_loc = Location.no_location; e_info = no_info }
 
 (* The main function. Reduce every definition *)
@@ -568,10 +579,11 @@ let program genv { p_impl_list; p_index } =
   | Reduce(error) ->
      match error with
      | Eval { kind; loc } -> Error.message loc kind; raise Error
-     | NotStatic ->
+     | NotStatic(loc) ->
         Format.eprintf
-          "@[Internal error (static reduction):@,\
-           the expression to be reduced is not static.@.@]";
+          "@[%aInternal error (static reduction):@,\
+           the expression to be reduced is not static.@.@]"
+        Location.output_location loc;
         raise Error
      | NotStaticExp(e) ->
         Format.eprintf
