@@ -1,10 +1,9 @@
 (test
- (name zruntest)
- ; name of the test
- (modules zruntest)
- ; ml file test runner
- (deps (glob_files good/*.zls) (glob_files bad/*.zls))
- ; files dependencies
- (libraries
-   zrun.ast_lib zrun.zrun_lib alcotest))
- ; libraries dependencies
+ (name zruntest) ; name of the test
+ (modules zruntest) ; .ml file test runner
+ (deps ; files dependencies
+  (glob_files good/*.zls)
+  (glob_files bad/*.zls))
+ (libraries zrun.interpreter alcotest)
+ (flags
+  (:standard -open Zrun_global -open Zrun_frontend -open Zrun_interpreter)))
