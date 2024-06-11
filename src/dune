@@ -1,14 +1,17 @@
 (executable
  (name zrun)
-  (modes (byte exe))
-  (modules zrun)
-  (libraries zrun.frontend zrun.interpreter)
-  (promote (until-clean) (into ..))
-  (flags (:standard -open Zrun_common -open Zrun_frontend -open Zrun_interpreter)))
+ (modes
+  (byte exe))
+ (modules zrun)
+ (libraries zrun.interpreter)
+ (promote
+  (until-clean)
+  (into ..))
+ (flags
+  (:standard -open Zrun_global -open Zrun_frontend -open Zrun_interpreter)))
 
 (install
  (package zrun)
  (section bin)
- (files (zrun.exe as zrun)))
-
-
+ (files
+  (zrun.exe as zrun)))

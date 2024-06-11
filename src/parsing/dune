@@ -1,9 +1,14 @@
 (library
-  (name zrun_frontend)
-  (public_name zrun.frontend)
-  (libraries zrun.common menhirLib)
-  (flags (:standard -open Zrun_common)))
+ (name zrun_frontend)
+ (public_name zrun.frontend)
+ (libraries menhirLib zrun.global)
+ (flags
+  (:standard -open Zrun_global)))
 
-(ocamllex (modules lexer))
+(ocamllex
+ (modules lexer))
 
-(menhir (modules parser) (infer true) (flags --table))
+(menhir
+ (modules parser)
+ (infer true)
+ (flags --table))

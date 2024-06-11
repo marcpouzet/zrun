@@ -1,5 +1,6 @@
 (library
-  (name zrun_interpreter)
-  (public_name zrun.interpreter)  
-  (libraries zrun.frontend)
-  (flags (:standard -open Zrun_common -open Zrun_frontend)))
+ (name zrun_interpreter)
+ (public_name zrun.interpreter)
+ (libraries zrun.frontend)
+ (flags
+  (:standard -open Zrun_global -open Zrun_frontend)))
