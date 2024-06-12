@@ -1,8 +1,14 @@
-(*
-let f g h x = h g x + 1
+let f h g x = h g x + 1
 
-let g x = f (x + 1)
-*)
+let g x returns o
+  let static m = f (fun g y -> g y) (fun x -> x + 1) 1 in
+  if m = 3 then do o = 1 done else do o = 2 done
+
+let static rec r1<<n>>(y) returns (o)
+  if n = 0 then do o = y done
+  else do o = r1<<n-1>>(y) + 1 done
+
+let r2 x = r1<<42>>
 
 let static x = 1 + 2
 
