@@ -293,7 +293,8 @@ let sizefun_defs_or_values genv env l_eq =
        if one_value then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
        else return (Env.add sf_id { s_params = sf_id_list; 
-                              s_body = sf_e; s_genv = genv; s_env = env } acc,
+                              s_body = sf_e; s_genv = genv; 
+                              s_env = env } acc,
                  one_value)
     | EQand(eq_list) ->
        fold split (acc, one_value) eq_list
@@ -1532,7 +1533,8 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      return (env_p, s)
   | EQsizefun { sf_id; sf_id_list; sf_e }, s ->
      let v =
-       { s_params = sf_id_list; s_body = sf_e; s_genv = genv; s_env = env } in
+       { s_params = sf_id_list; s_body = sf_e; 
+         s_genv = genv; s_env = env } in
      return (Env.singleton sf_id (Match.entry (Vsizefun v)), s)
   | EQder { id; e; e_opt; handlers },
     Slist (Scstate({ pos } as sc) :: s :: Sopt(x0_opt) :: s0 :: s_list) ->
