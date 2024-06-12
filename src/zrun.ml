@@ -44,6 +44,8 @@ let doc_esterel =
   "\t Sets the interpretation of if/then/else to be constructive"
 let doc_lustre =
   "\t Sets the interpretation of if/then/else to be strict (that of Lustre)"
+let doc_reduce =
+  "\t Reduce compile-time expressions"
                    
 let errmsg = "Options are:"
 
@@ -63,7 +65,8 @@ let main () =
            "-fix", Arg.Set Misc.print_number_of_fixpoint_iterations,
            doc_number_of_fixpoint_iterations;
            "-esterel", Arg.Set Misc.set_esterel, doc_esterel;
-           "-lustre", Arg.Set Misc.set_lustre, doc_lustre
+           "-lustre", Arg.Set Misc.set_lustre, doc_lustre;
+           "-reduce", Arg.Set Misc.set_reduce, doc_reduce;
       ])
       main
       errmsg

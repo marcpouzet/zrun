@@ -118,7 +118,7 @@ type 'a record = { mutable label: Lident.t; arg: 'a }
 type 'info pattern =
   { mutable pat_desc: 'info pattern_desc; (* descriptor *)
     pat_loc: Location.t; (* its location in the source file *)
-    pat_env: 'info Ident.Env.t; (* environment *)
+    pat_info: 'info; (* info *)
   }
 
 and 'info pattern_desc = 
@@ -240,6 +240,7 @@ and ('info, 'size, 'body) forloop =
     for_input : 'info for_input_desc localized list;
     for_body : 'body;
     for_resume : bool; (* resume or restart *)
+    for_env : 'info Ident.Env.t;
   }
 
 (* result expression of a loop *)
@@ -247,8 +248,9 @@ and 'info for_exp =
   | Forexp : { exp : 'info exp; default : 'info exp option } -> 'info for_exp
   (* [for[each|ward] ... do e done] *)
   | Forreturns :
-      { returns : 'info exp for_vardec_desc localized list;
-        body : ('info, 'info exp, 'info eq) block;
+      { returns : 'info exp for_vardec_desc localized list; (* return *)
+        body : ('info, 'info exp, 'info eq) block; (* body *)
+        r_env : 'info Ident.Env.t; (* environment *)
       } -> 'info for_exp
 (* [for[each|ward] ... returns (...) local ... do eq ... done] *)
 
@@ -277,8 +279,7 @@ and 'info eq =
 and 'info eq_desc =
   | EQeq : 'info pattern * 'info exp -> 'info eq_desc  (* [p = e] *)
   (* a size-parameterized expression [id <n1,...,nk> = e] *)
-  | EQsizefun : { id: Ident.t; id_list: Ident.t list; e : 'info exp } -> 
-      'info eq_desc
+  | EQsizefun : 'info sizefun -> 'info eq_desc
   | EQder :
       { id: Ident.t; e: 'info exp; e_opt: 'info exp option;
         handlers: ('info, 'info scondpat, 'info exp) present_handler list }
@@ -364,8 +365,8 @@ and ('info, 'body) automaton_handler =
     s_trans: ('info, 'info scondpat, 'info exp, 'info leq, 'body) escape list;
     s_loc: Location.t;
     mutable s_reset: bool; (* is the state always entered by reset? *)
+    s_env: 'info Ident.Env.t; (* env. for parameter names in [s_state] *) 
   }
-
 
 and 'a default =
   | Init : 'a -> 'a default | Else : 'a -> 'a default | NoDefault
@@ -380,6 +381,14 @@ and 'info funexp =
     f_body: 'info result;
     f_loc: Location.t;
     f_env: 'info Ident.Env.t;
+  }
+
+and 'info sizefun =
+  { sf_id: Ident.t;
+    sf_id_list: Ident.t list;
+    sf_e : 'info exp;
+    sf_loc: Location.t;
+    sf_env: 'info Ident.Env.t;
   }
 
 and 'info arg = 'info exp vardec list

@@ -512,8 +512,8 @@ result:
   | EQUAL seq = seq_expression %prec prec_result
     { make (Exp(seq)) $startpos(seq) $endpos(seq) }
   | EQUAL seq = seq_expression WHERE 
-      i = is_rec eq = where_equation_and_list %prec prec_result
-    { make (Exp(make (Elet(make { l_rec = i; l_kind = Kany; l_eq = eq }
+      v = vkind_opt i = is_rec eq = where_equation_and_list %prec prec_result
+    { make (Exp(make (Elet(make { l_rec = i; l_kind = v; l_eq = eq }
 			  $startpos(eq) $endpos(eq), seq))
 		$startpos(seq) $endpos(eq)))
       $startpos $endpos }

@@ -90,5 +90,8 @@ let set_esterel = ref false
 let set_lustre = ref false
 
 (* no information associated to expressions *)
-type noinfo = unit
-let noinfo: noinfo = ()
+type no_info = unit
+let no_info: no_info = ()
+
+(* static reduction *)
+let set_reduce = ref false

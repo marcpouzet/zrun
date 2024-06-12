@@ -50,9 +50,10 @@ module Env =
       fold (fun x v acc -> update x (function _ -> Some(v)) acc)
         env0 env
     
-    let fprint_t fprint_v ff s =
+    let fprint_t fprint_v ff env =
       Format.fprintf ff "@[<hov 2>{@ ";
-      iter (fun k v -> Format.fprintf ff "@[%a: %a@]@ " M.fprint k fprint_v v) s;
+      iter (fun k v -> Format.fprintf ff "@[%a: %a@]@ " M.fprint k fprint_v v) 
+        env;
       Format.fprintf ff "}@]"
   end
 

@@ -338,7 +338,7 @@ let rec pattern_translate env { desc; loc } =
          (List.map (fun (lname, p) -> { Ast.label = longname lname;
                                         Ast.arg = pattern_translate env p })
 	    l_p_list) in
-  { Ast.pat_desc = desc; Ast.pat_loc = loc; Ast.pat_env = Ident.Env.empty }
+  { Ast.pat_desc = desc; Ast.pat_loc = loc; Ast.pat_info = Misc.no_info }
   
 and pattern_translate_list env p_list = List.map (pattern_translate env) p_list
 
@@ -388,7 +388,9 @@ let rec equation env_pat env { desc; loc } =
        let x_list, env = 
          Util.mapfold 
            (fun acc n -> let m = fresh n in m, Env.add n m acc) env x_list in
-       Ast.EQsizefun { id = x; id_list = x_list; e = expression env e }
+       Ast.EQsizefun
+         { sf_id = x; sf_id_list = x_list; sf_e = expression env e;
+           sf_loc = loc; sf_env = Ident.Env.empty }
     | EQder(x, e, e_opt, p_h_list) ->
        Ast.EQder { id = name loc env_pat x; e = expression env e;
                    e_opt = Util.optional_map (expression env) e_opt;
@@ -538,7 +540,8 @@ and forloop_eq env_pat env { for_size; for_kind; for_index; for_input; for_resum
       Ast.for_index = for_index;
       Ast.for_input = for_input;
       Ast.for_body = { for_out; for_block };
-      Ast.for_resume = for_resume }
+      Ast.for_resume = for_resume;
+      Ast.for_env = Ident.Env.empty }
 
 (** Translating a sequence of local declarations *)
 and leqs env l = Util.mapfold letin env l
@@ -647,8 +650,8 @@ and automaton_handler is_weak env_for_states env_pat env
     List.map (escape env_for_states env_pat env)
       (if is_weak then s_until else s_unless) in
   { Ast.s_state = s_state; Ast.s_let = s_let; Ast.s_body = s_body;
-    Ast.s_trans = s_trans; Ast.s_loc = loc;
-    Ast.s_reset = false }
+    Ast.s_trans = s_trans; Ast.s_loc = loc; Ast.s_reset = false; 
+    Ast.s_env = Ident.Env.empty }
   
 and escape env_for_states env_pat env
 { desc = { e_reset; e_cond; e_let; e_body; e_next_state }; loc } = 
@@ -785,7 +788,7 @@ and expression env { desc; loc } =
     | Eforloop(f) ->
        Ast.Eforloop(forloop_exp env f)
   in
-  { Ast.e_desc = desc; Ast.e_loc = loc; Ast.e_info = Misc.noinfo }
+  { Ast.e_desc = desc; Ast.e_loc = loc; Ast.e_info = Misc.no_info }
   
 and forloop_exp env 
     { for_size; for_kind; for_index; for_input; for_body; for_resume } =
@@ -806,15 +809,17 @@ and forloop_exp env
        let returns, env_v_list = for_vardec_list env returns in
        let env = Env.append env_v_list env in
        let env_body, body = block equation env_v_list env body in
-       env_body, Ast.Forreturns { returns; body } in
+       env_body, Ast.Forreturns { returns; body; r_env = Ident.Env.empty } in
   let for_kind =
     match for_kind with
     | Kforeach -> Ast.Kforeach
     | Kforward(e_opt) ->
        Ast.Kforward(Util.optional_map (exit_expression env_body) e_opt) in
   { Ast.for_size = for_size; Ast.for_kind = for_kind;
-    Ast.for_index = for_index; Ast.for_input = for_input; Ast.for_body = for_body;
-    Ast.for_resume = for_resume }
+    Ast.for_index = for_index; Ast.for_input = for_input; 
+    Ast.for_body = for_body;
+    Ast.for_resume = for_resume;
+    Ast.for_env = Ident.Env.empty }
 
 and exit_expression env { for_exit_kind; for_exit } =
   let k = match for_exit_kind with 
