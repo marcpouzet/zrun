@@ -47,6 +47,10 @@ let empty genv =
     e_sizes = Ident.Env.empty;
   }
 
+let update acc genv env =
+  { e_renaming = Ident.Env.empty; e_values = env;
+    e_globals = genv; e_sizes = Ident.Env.empty }
+
 (** Build a renaming from an environment *)
 let build ({ e_renaming } as acc) env =
   let buildrec n entry (env, renaming) =
@@ -55,6 +59,18 @@ let build ({ e_renaming } as acc) env =
     Env.add n m renaming in
   let env, e_renaming = Env.fold buildrec env (Env.empty, e_renaming) in
   env, { acc with e_renaming }
+
+let catch loc v =
+  match v with | Ok(v) -> v | Error(error) -> raise (Reduce (Eval error))
+
+let pvalue loc c_env =
+  let add acc (x, { Value.cur = v }) =
+    let* v = Primitives.pvalue v |>
+               Opt.to_result ~none: { Error.kind = Etype; loc } in
+    return (Env.add x v acc) in
+  let c_env = Env.to_seq c_env in
+  let c_env = seqfold add Env.empty c_env in
+  catch loc c_env
 
 let rename { e_renaming } n = Env.find n e_renaming
 
@@ -246,16 +262,11 @@ let rec expression acc ({ e_desc; e_loc } as e) =
      let v = expression_e acc f in
      let size_list = List.map (size_e e_loc acc) size_list in
      let v = Coiteration.sizeapply e_loc v size_list in
-     let v = 
-       match v with
-       | Ok(v) -> v | Error(error) -> raise (Reduce (Eval error)) in
-     exp_of_value v, acc
-  | Efun ({ f_args; f_body; f_env } as funexp) ->
-     let f_env, acc = build acc f_env in
-     let arg acc v_list = Util.mapfold vardec acc v_list in
-     let f_args, acc = Util.mapfold arg acc f_args in
-     let f_body, acc = result acc f_body in
-     { e with e_desc = Efun { funexp with f_args; f_body; f_env } }, acc
+     let v = catch e_loc v in
+     exp_of_value e_loc acc v, acc
+  | Efun f ->
+     let f, acc = funexp acc f in
+     { e with e_desc = Efun f }, acc
   | Eforloop
      ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
      let for_vardec_t acc ({ desc = { for_array; for_vardec } } as f) =
@@ -284,16 +295,22 @@ let rec expression acc ({ e_desc; e_loc } as e) =
                   { f with for_size; for_kind; for_index; for_input;
                            for_body; for_env } }, acc
 
+and funexp acc ({ f_args; f_body; f_env } as f) =
+  let f_env, acc = build acc f_env in
+  let arg acc v_list = Util.mapfold vardec acc v_list in
+  let f_args, acc = Util.mapfold arg acc f_args in
+  let f_body, acc = result acc f_body in
+  { f with f_args; f_body; f_env }, acc
+
 (** Eval an expression *)
 and expression_e acc e =
   let v = Coiteration.vexp acc.e_globals (Match.liftv acc.e_values) e in
-  match v with
-  | Ok(v) -> v | Error(error) -> raise (Reduce (Eval error))
+  catch e.e_loc v
 
 (** Try to evaluate and expression; expect the result to be boolean *)
 and try_expression_bool acc e =
   let env = Match.liftv acc.e_values in
-  let l = Env.to_list env in
+  (* let l = Env.to_list env in *)
   let v = 
     Coiteration.try_vexp_into_bool acc.e_globals env e in
   match v with
@@ -523,37 +540,48 @@ and result acc ({ r_desc } as r) =
 
 
 (** Convert a value into an expression. **)
-and exp_of_value v =
-  let open Value in
-  let e_desc = match v with
-    | Vint(v) -> Econst(Eint(v))
-    | Vbool(v) -> Econst(Ebool(v))
-    | Vfloat(v) -> Econst(Efloat(v))
-    | Vchar(v) -> Econst(Echar(v))
-    | Vstring(v) -> Econst(Estring(v))
-    | Vvoid -> Econst(Evoid)
-    | Vconstr0 lname -> Econstr0 { lname }
-    | Vconstr1(lname, v_list) -> 
-       Econstr1 { lname; arg_list = List.map exp_of_value v_list }
-    | Vrecord(r_list) ->
-       let r_list =
-         List.map (fun { label; arg } -> { label; arg = exp_of_value arg })
-           r_list in
-       Erecord r_list
-    | Vstuple(v_list) ->
-       Etuple (List.map exp_of_value v_list)
-    | Vtuple(v_list) ->
-       assert false
-    | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ ->
-       (* no such values should be produced statically *)
-       assert false
-    | Varray _ -> assert false
-    | Vfun _  -> assert false
-    | Vclosure _ -> assert false
-    | Vsizefun _ | Vsizefix _ -> 
-       (* there should be no static computation anymore *)
-       assert false in
-  { e_desc; e_loc = Location.no_location; e_info = no_info }
+and exp_of_value loc acc v =
+  let rec exp_of_value acc v =
+    let open Value in
+    let e_desc = match v with
+      | Vint(v) -> Econst(Eint(v))
+      | Vbool(v) -> Econst(Ebool(v))
+      | Vfloat(v) -> Econst(Efloat(v))
+      | Vchar(v) -> Econst(Echar(v))
+      | Vstring(v) -> Econst(Estring(v))
+      | Vvoid -> Econst(Evoid)
+      | Vconstr0 lname -> Econstr0 { lname }
+      | Vconstr1(lname, v_list) -> 
+         Econstr1 { lname; arg_list = List.map (exp_of_value acc) v_list }
+      | Vrecord(r_list) ->
+         let r_list =
+           List.map (fun { label; arg } -> { label; arg = exp_of_value acc arg })
+             r_list in
+         Erecord r_list
+      | Vstuple(v_list) ->
+         Etuple (List.map (exp_of_value acc) v_list)
+      | Vtuple(v_list) ->
+         let exp_of_value acc v = 
+           match v with 
+             Vbot | Vnil -> raise (Reduce(NotStatic loc)) 
+             | Value(v) -> exp_of_value acc v in
+         let e_list = List.map (exp_of_value acc) v_list in
+         Etuple(e_list)
+      | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ ->
+         (* no such values should be produced statically *)
+         assert false
+      | Varray _ -> assert false
+      | Vfun _  -> assert false
+      | Vclosure { c_funexp; c_genv; c_env } ->
+         (* Warning: add part of [g_env and c_env] in acc *)
+         let c_env = pvalue loc c_env in
+         let acc = update acc c_genv c_env in
+         let f, _ = funexp acc c_funexp in Efun f
+      | Vsizefun _ | Vsizefix _ -> 
+         (* there should be no static computation anymore *)
+         assert false in
+    { e_desc; e_loc = Location.no_location; e_info = no_info } in
+  exp_of_value acc v
 
 (* The main function. Reduce every definition *)
 let implementation acc ({ desc } as impl) =
