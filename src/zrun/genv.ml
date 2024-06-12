@@ -124,3 +124,4 @@ let write { current } oc = Marshal.to_channel oc current [Marshal.Closures]
 
 let current = { name = ""; values = E.empty }
 let modules = { current = current; opened = []; modules = E.empty }
+
