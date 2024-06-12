@@ -1,0 +1,6 @@
+(library
+ (name zrun_rewrite)
+ (public_name zrun.rewrite)
+ (libraries menhirLib zrun.global)
+ (flags
+  (:standard -open Zrun_global)))
