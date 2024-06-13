@@ -23,22 +23,15 @@ open Opt
 open Result
 open Defnames
 
-type error =
-  | Eval of Error.error (* error during evaluation *)
-  | NotStatic of Location.t
-  | NotStaticExp of no_info exp
-  | NotStaticEq of no_info eq
+exception Reduce of Error.error
 
-exception Reduce of error
-
-(* Invariant: defined names in the four environment are pairwise distinct *)
-(* this is ensured if this is the case in the source *)
-(* this compiler pass ensures it too *)
+(* Invariant: defined names in the four environments are pairwise distinct *)
+(* For that, all defined names in the source must be pairwise distinct *)
 type 'a env =
   { e_renaming: Ident.t Ident.Env.t; (* environment for renaming *)
     e_values: 'a Ident.Env.t;  (* environment of values *)
     e_globals: 'a Genv.genv;   (* global environment *)
-    e_sizes: int Ident.Env.t; (* environment of sizes *)}
+    e_sizes: int Ident.Env.t;  (* environment of sizes *)}
 
 let empty genv =
   { e_renaming = Ident.Env.empty;
@@ -60,8 +53,8 @@ let build ({ e_renaming } as acc) env =
   let env, e_renaming = Env.fold buildrec env (Env.empty, e_renaming) in
   env, { acc with e_renaming }
 
-let catch loc v =
-  match v with | Ok(v) -> v | Error(error) -> raise (Reduce (Eval error))
+let catch v =
+  match v with | Ok(v) -> v | Error(error) -> raise (Reduce error)
 
 let pvalue loc c_env =
   let add acc (x, { Value.cur = v }) =
@@ -70,13 +63,12 @@ let pvalue loc c_env =
     return (Env.add x v acc) in
   let c_env = Env.to_seq c_env in
   let c_env = seqfold add Env.empty c_env in
-  catch loc c_env
-
-let rename { e_renaming } n = Env.find n e_renaming
+  catch c_env
 
 let rename_t ({ e_renaming } as acc) n = Env.find n e_renaming, acc
 
 let write_t acc { dv; di; der } =
+  let rename { e_renaming } n = Env.find n e_renaming in
   let dv = S.map (rename acc) dv in
   let di = S.map (rename acc) di in
   let der = S.map (rename acc) der in
@@ -84,31 +76,9 @@ let write_t acc { dv; di; der } =
 
 let type_expression acc ty = ty, acc
 
-(* size expressions *)
-let size_e e_loc acc si =
-  let rec size_e { desc } =
-    match desc with
-    | Sint(v) -> v
-    | Sfrac { num; denom } ->
-       let v = size_e num in v / denom
-    | Sident(n) ->
-       let v = 
-         try Env.find n acc.e_sizes 
-         with Not_found -> raise (Reduce(NotStatic e_loc)) in
-       v
-    | Splus(s1, s2) ->
-       let v1 = size_e s1 in
-       let v2 = size_e s2 in
-       v1 + v2
-    | Sminus(s1, s2) ->
-       let v1 = size_e s1 in
-       let v2 = size_e s2 in
-       v1 - v2
-    | Smult(s1, s2) ->
-       let v1 = size_e s1 in
-       let v2 = size_e s2 in
-       v1 * v2 in
-  size_e si
+(* static evaluation of size expressions *)
+let size_e { e_values } si =
+  catch (Coiteration.size (Match.liftv e_values) si)
 
 (** Renaming of patterns *)
 let rec pattern f acc ({ pat_desc } as p) =
@@ -252,7 +222,7 @@ let rec expression acc ({ e_desc; e_loc } as e) =
        Util.mapfold body acc handlers in
      { e with e_desc = Ematch { m with e; handlers } }, acc
   | Eassert e -> let e, acc = expression acc e in
-                              { e with e_desc = Eassert(e) }, acc
+                 { e with e_desc = Eassert(e) }, acc
   | Ereset(e_body, e_c) ->
      let e_body, acc = expression acc e_body in
      let e_c, acc = expression acc e_c in
@@ -260,9 +230,9 @@ let rec expression acc ({ e_desc; e_loc } as e) =
   | Esizeapp { f; size_list } -> 
      (* after this step, there should be no static expressions left *)
      let v = expression_e acc f in
-     let size_list = List.map (size_e e_loc acc) size_list in
-     let v = Coiteration.sizeapply e_loc v size_list in
-     let v = catch e_loc v in
+     let v_list = List.map (size_e acc) size_list in
+     let v = Coiteration.sizeapply e_loc v v_list in
+     let v = catch v in
      exp_of_value e_loc acc v, acc
   | Efun f ->
      let f, acc = funexp acc f in
@@ -302,22 +272,21 @@ and funexp acc ({ f_args; f_body; f_env } as f) =
   let f_body, acc = result acc f_body in
   { f with f_args; f_body; f_env }, acc
 
-(** Eval an expression *)
+(** Evaluation of an expression *)
 and expression_e acc e =
   let v = Coiteration.vexp acc.e_globals (Match.liftv acc.e_values) e in
-  catch e.e_loc v
+  catch v
 
-(** Try to evaluate and expression; expect the result to be boolean *)
+(** Try to evaluate an expression; expect the result to be a boolean *)
 and try_expression_bool acc e =
   let env = Match.liftv acc.e_values in
   (* let l = Env.to_list env in *)
   let v = 
     Coiteration.try_vexp_into_bool acc.e_globals env e in
-  match v with
-  | Ok(v) -> Some(v) | _ -> None
+  Result.to_option v
 
 (** Equations **)
-and equation acc ({ eq_desc; eq_write } as eq) = 
+and equation acc ({ eq_desc; eq_write; eq_loc } as eq) = 
   let eq_write, acc = write_t acc eq_write in
   let eq, acc = match eq_desc with
     | EQeq(p, e) ->
@@ -463,14 +432,16 @@ and equation acc ({ eq_desc; eq_write } as eq) =
        let leq, acc = leq_t acc leq in
        let eq, acc = equation acc eq in
        { eq with eq_desc = EQlet(leq, eq) }, acc
-    | EQsizefun ({ sf_id; sf_id_list; sf_e; sf_env } as sf) ->
+    | EQsizefun _ ->
+       raise (Reduce { Error.kind = Eshould_be_static; loc = eq_loc }) in
+(* ({ sf_id; sf_id_list; sf_e; sf_env } as sf) ->
        let sf_env, acc = build acc sf_env in
        let sf_id, acc = rename_t acc sf_id in
        let sf_id_list, acc = Util.mapfold rename_t acc sf_id_list in
        let sf_e, acc = expression acc sf_e in
        { eq with eq_desc = 
                    EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
-       acc in
+       acc in *)
   { eq with eq_write }, acc
 
 and slet acc leq_list = Util.mapfold leq_t acc leq_list
@@ -479,8 +450,7 @@ and slet acc leq_list = Util.mapfold leq_t acc leq_list
 and leq_e acc leq =
   let l_env =
     Coiteration.vleq acc.e_globals (Match.liftv acc.e_values) leq in
-  match l_env with
-  | Ok(l_env) -> l_env | Error(error) -> raise (Reduce (Eval error))
+  catch l_env
 
 and leq_t acc ({ l_kind; l_eq; l_env } as leq) =
   let l_env, acc = build acc l_env in
@@ -489,6 +459,7 @@ and leq_t acc ({ l_kind; l_eq; l_env } as leq) =
     | Kconst | Kstatic ->
        (* static evaluation *)
        let l_env = leq_e acc leq in
+       (* let l = Env.to_list l_env in *)
        { acc with e_values = Env.append l_env acc.e_values }
     | Kany -> acc in
   { leq with l_eq; l_env }, acc
@@ -562,9 +533,10 @@ and exp_of_value loc acc v =
          Etuple (List.map (exp_of_value acc) v_list)
       | Vtuple(v_list) ->
          let exp_of_value acc v = 
-           match v with 
-             Vbot | Vnil -> raise (Reduce(NotStatic loc)) 
-             | Value(v) -> exp_of_value acc v in
+           let v = 
+             catch (Primitives.pvalue v |>
+                      Opt.to_result ~none: { Error.kind = Etype; loc }) in
+           exp_of_value acc v in
          let e_list = List.map (exp_of_value acc) v_list in
          Etuple(e_list)
       | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ ->
@@ -604,24 +576,8 @@ let program genv { p_impl_list; p_index } =
     let p_index = get_index_t () in
     { p_impl_list; p_index }
   with
-  | Reduce(error) ->
-     match error with
-     | Eval { kind; loc } -> Error.message loc kind; raise Error
-     | NotStatic(loc) ->
-        Format.eprintf
-          "@[%aInternal error (static reduction):@,\
-           the expression to be reduced is not static.@.@]"
-        Location.output_location loc;
-        raise Error
-     | NotStaticExp(e) ->
-        Format.eprintf
-          "@[%aInternal error (static reduction):@,\
-           static evaluation failed because the expression is not static.@.@]"
-          Printer.expression e;
-        raise Error
-     | NotStaticEq(eq) ->
-        Format.eprintf
-          "@[%aInternal error (static reduction):@,\
-           static evaluation failed because the equation is not static.@.@]"
-          Printer.equation eq;
-        raise Error
+  | Reduce { kind; loc } ->
+     Format.eprintf
+       "Error during static reduction\n";
+     Error.message loc kind;
+     raise Error
