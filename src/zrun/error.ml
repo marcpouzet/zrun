@@ -25,6 +25,7 @@ type kind =
   | Eunbound_lident : Lident.t -> kind (* unbound global variable *)
   | Eundefined_ident : Ident.t -> kind (* no definition is given *)
   | Eshould_be_a_node : kind (* the expression should return a node *)
+  | Eshould_be_static : kind
   | Eshould_be_combinatorial : kind
   (* the maximum number of fix-point iteration has been reached *)
   | Efixpoint_limit : kind
@@ -90,6 +91,9 @@ let message loc kind =
        output_location loc 
   | Eshould_be_a_node ->
      eprintf "@[%aZrun: this expression should return a node.@.@]"
+       output_location loc 
+  | Eshould_be_static ->
+     eprintf "@[%aZrun: this expression should be static.@.@]"
        output_location loc 
   | Eshould_be_combinatorial ->
      eprintf "@[%aZrun: this expression should be combinatorial.@.@]"
