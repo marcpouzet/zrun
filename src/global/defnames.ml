@@ -28,6 +28,7 @@ let cur_names acc { dv; di } = Ident.S.union dv (Ident.S.union di acc)
 (* empty set of defined names *)
 (** Making values *)
 let empty = { dv = Ident.S.empty; di = Ident.S.empty; der = Ident.S.empty }
+let singleton x = { empty with dv = Ident.S.singleton x }
 let union { dv = dv1; di = di1; der = der1 }
       { dv = dv2; di = di2; der = der2  } =
   { dv = Ident.S.union dv1 dv2;
