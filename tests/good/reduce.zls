@@ -9,7 +9,17 @@ let static rec r1<<n>>(y) returns (o)
   if n = 0 then do o = y done
   else do o = r1<<n-1>>(y) + 1 done
 
-let r2 x = r1<<2>>
+let r2 x = r1<<2>>(x)
+
+let static r1_2 (y1) returns (o1)
+  do o1 = r1_1(y) + 1 done
+
+let static r1_1(y2) = returns (o2)
+  do o2 = r1_0(y2) + 1 done
+
+let static r1_0(y3) returns (o3)
+  do o = y done
+
 
 (*
 let static x = 1 + 2
