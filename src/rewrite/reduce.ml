@@ -37,8 +37,13 @@ type 'a env =
     (* extra definitions of static values produced during *)
     (* the static reduction *)
     e_exp: no_info exp Ident.Env.t;
-    (* if [x] has a static value, the associated expression to it *)
+    (* if [x] has a static value, associate an expression to it *)
   }
+
+(* E.g., ... let static x = e in body => 
+  body + add a global definition let static x = ve
+  where ve is that static value of e
+*)
 
 let empty genv =
   { e_renaming = Ident.Env.empty;
@@ -80,7 +85,9 @@ let no_leq loc =
     l_eq = { eq_desc = EQempty; eq_write = Defnames.empty; eq_loc = loc }; 
     l_env = Ident.Env.empty }
 
-let rename_t ({ e_renaming } as acc) n = Env.find n e_renaming, acc
+let rename_t ({ e_renaming } as acc) n = 
+  let l = Env.to_list e_renaming in
+  Env.find n e_renaming, acc
 
 let write_t acc { dv; di; der } =
   let rename { e_renaming } n = Env.find n e_renaming in
@@ -292,11 +299,11 @@ let rec expression acc ({ e_desc; e_loc } as e) =
                            for_body; for_env } }, acc
 
 and funexp acc ({ f_args; f_body; f_env } as f) =
-  let f_env, acc = build acc f_env in
+  let f_env, acc_local = build acc f_env in
   let arg acc v_list = Util.mapfold vardec acc v_list in
-  let f_args, acc = Util.mapfold arg acc f_args in
-  let f_body, acc = result acc f_body in
-  { f with f_args; f_body; f_env }, acc
+  let f_args, acc_local = Util.mapfold arg acc_local f_args in
+  let f_body, acc_local = result acc_local f_body in
+  { f with f_args; f_body; f_env }, { acc with e_defs = acc_local.e_defs }
 
 (** Evaluation of an expression *)
 and expression_e acc e =
@@ -564,14 +571,15 @@ and value_t loc acc v =
       | Vclosure { c_funexp; c_genv; c_env } ->
          (* Warning: add part of [g_env and c_env] in acc *)
          let c_env = pvalue loc c_env in
-         let acc = update acc c_genv c_env in
-         let f, acc = funexp acc c_funexp in 
+         let acc_local = update acc c_genv c_env in
+         let f, acc_local = funexp acc_local c_funexp in 
          (* add a definition in the global environment *)
          let m = Ident.fresh "reduce" in
          Eglobal { lname = Name(Ident.name m) },
          { acc with e_defs = 
-                      Env.add m (make (Efun(f))) acc.e_defs }
-      | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ | Vsizefun _ | Vsizefix _ ->
+                      Env.add m (make (Efun(f))) acc_local.e_defs }
+      | Vpresent _ | Vabsent | Vstate0 _ 
+        | Vstate1 _ | Vsizefun _ | Vsizefix _ ->
          (* none of them should appear *)
          catch (error { Error.kind = Etype; loc })
       | Varray _ -> catch (error { Error.kind = Enot_implemented; loc })
@@ -601,9 +609,10 @@ let add_global_defs { e_defs } impl_list =
     { l_rec = false; l_kind = Kstatic; l_eq = eq x e; 
       l_loc = Location.no_location; l_env = Env.singleton x no_info } in
   let impl x e acc = 
-    { desc = Eletdecl { d_names = [Ident.name x, x];
+    { desc = Eletdecl { d_names = [];
                         d_leq = leq x e }; loc = e.e_loc } :: acc in
-  Env.fold impl e_defs impl_list
+  let i_list = List.rev (Env.fold impl e_defs []) in
+  i_list @ impl_list
 
 (* The main function. Reduce every definition *)
 let implementation acc ({ desc } as impl) =
