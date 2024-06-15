@@ -86,7 +86,6 @@ let no_leq loc =
     l_env = Ident.Env.empty }
 
 let rename_t ({ e_renaming } as acc) n = 
-  let l = Env.to_list e_renaming in
   Env.find n e_renaming, acc
 
 let write_t acc { dv; di; der } =
