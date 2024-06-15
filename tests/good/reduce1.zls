@@ -1,0 +1,6 @@
+let h1 () =
+  let static m = 42 + 1 in
+  m
+
+let x = 1 + 2
+

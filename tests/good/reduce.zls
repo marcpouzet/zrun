@@ -33,9 +33,9 @@ let hh () =
   m
 
 let node h0 () =
-  let static m = 42 + 1 in
+  let static m = 42 + 2 in
   m
 
 let h1 () =
-  let static m = 42 + 1 in
+  let static m = 42 + 3 in
   m

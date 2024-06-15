@@ -178,14 +178,11 @@ let rec expression acc ({ e_desc; e_loc } as e) =
   | Evar(x) ->
      (* If [x] has a static value, [x] is replaced by this value *)
      (* otherwise, it is renamed *)
-     if Env.mem x acc.e_exp then
-       let { e_desc } = Env.find x acc.e_exp in
-       { e with e_desc }, acc
+     if Env.mem x acc.e_exp then Env.find x acc.e_exp, acc
      else
        if Env.mem x acc.e_values then
          let v = Env.find x acc.e_values in
-         let ({ e_desc } as e), acc = value_t e_loc acc v in
-         { e with e_desc }, acc
+         value_t e_loc acc v
        else
          let x, acc = rename_t acc x in
          { e with e_desc = Evar(x) }, acc
@@ -595,10 +592,19 @@ and value_t loc acc v =
     { e with e_desc = Eglobal { lname = Name(Ident.name m) } },
     { acc with e_defs = Env.add m e acc.e_defs }
   else e, acc
-         
+
+(* a global value can be any static value except functional *)
+(* values which expect a static argument *)
+let gvalue_t loc (acc, d_names) (gname, n) v =
+  let open Value in
+  match v with
+    | Vsizefix _ | Vsizefun _ -> acc, d_names
+    | _ -> let _, acc = value_t loc acc v in
+           acc, (gname, n) :: d_names
+
 
 (* add global definitions in the list of global declarations of the module *)
-let add_global_defs { e_defs } impl_list =
+let add_global_defs { e_defs } =
   let pat x = 
     { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info } in
   let eq x e =
@@ -611,29 +617,41 @@ let add_global_defs { e_defs } impl_list =
     { desc = Eletdecl { d_names = [];
                         d_leq = leq x e }; loc = e.e_loc } :: acc in
   let i_list = List.rev (Env.fold impl e_defs []) in
-  i_list @ impl_list
+  i_list
 
-(* The main function. Reduce every definition *)
-let implementation acc ({ desc } as impl) =
+(* for every name in [l_names] convert its value in [acc] into an expression *)
+let def_of_values loc acc d_names =
+  let def_of_value (acc, d_names) (gname, n) =
+    let v = Env.find n acc.e_values in
+    gvalue_t loc (acc, d_names) (gname, n) v in
+  List.fold_left def_of_value (acc, []) d_names
+
+ (* The main function. Reduce every definition *)
+let implementation acc ({ desc; loc } as impl) =
   let desc, acc = match desc with
     | Eopen _ -> desc, acc
     | Eletdecl { d_names; d_leq } ->
-       let d_leq, acc = leq_t acc d_leq in
-       Eletdecl { d_names; d_leq }, acc
+       (* [d_leq] must be static *)
+       let l_env = leq_e acc d_leq in
+       let acc = { acc with e_values = Env.append l_env acc.e_values } in
+       (* add the definition for values *)
+       let acc, d_names = def_of_values loc acc d_names in
+       Eletdecl { d_names = []; d_leq = no_leq loc }, acc
     | Etypedecl _ -> desc, acc in
   { impl with desc }, acc
 
 let set_index_t n = Ident.set n
 let get_index_t () = Ident.get ()
 
+      
 let program genv { p_impl_list; p_index } =
   try
     set_index_t p_index;
     let p_impl_list, acc = 
       Util.mapfold implementation (empty genv) p_impl_list in
-    (* add global definitions from [acc] in the list of global declarations *)
-    (* of the module *)
-    let p_impl_list = add_global_defs acc p_impl_list in
+    (* add global definitions from values in [acc] to the *)
+    (* list of global declarations of the module *)
+    let p_impl_list = (add_global_defs acc) @ p_impl_list in
     let p_index = get_index_t () in
     { p_impl_list; p_index }
   with
