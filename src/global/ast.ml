@@ -273,7 +273,6 @@ and 'info eq =
   { eq_desc: 'info eq_desc; (* descriptor *)
     mutable eq_write: Defnames.defnames; (* set of defined variables *)
     eq_loc: Location.t; (* its location *)
-    eq_env: 'info Ident.Env.t;
   }
 
 and 'info eq_desc =

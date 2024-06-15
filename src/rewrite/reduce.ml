@@ -15,6 +15,7 @@
 (** reduce static expressions *)
 
 open Misc
+open Location
 open Ident
 open Lident
 open Ast
@@ -25,24 +26,30 @@ open Defnames
 
 exception Reduce of Error.error
 
-(* Invariant: defined names in the four environments are pairwise distinct *)
-(* For that, all defined names in the source must be pairwise distinct *)
+(* Invariant: defined names in [e_renaming] and [e_values] *)
+(* are pairwise distinct. For that, all defined names in the source *)
+(* must be pairwise distinct *)
 type 'a env =
   { e_renaming: Ident.t Ident.Env.t; (* environment for renaming *)
-    e_values: 'a Ident.Env.t;  (* environment of values *)
+    e_values: 'a Ident.Env.t;  (* environment of static values *)
     e_globals: 'a Genv.genv;   (* global environment *)
-    e_sizes: int Ident.Env.t;  (* environment of sizes *)}
+    e_global_defs: no_info exp Ident.Env.t;  
+    (* extra definitions of static values produced during the static reduction *)
+    e_lnames: Lident.t Ident.Env.t;
+    (* the name of the global variable which contain the value of [x] *)
+  }
 
 let empty genv =
   { e_renaming = Ident.Env.empty;
     e_values = Ident.Env.empty;
     e_globals = genv;
-    e_sizes = Ident.Env.empty;
+    e_global_defs = Ident.Env.empty;
+    e_lnames = Ident.Env.empty;
   }
 
 let update acc genv env =
-  { e_renaming = Ident.Env.empty; e_values = env;
-    e_globals = genv; e_sizes = Ident.Env.empty }
+  { acc with e_renaming = Ident.Env.empty; e_values = env;
+             e_globals = genv }
 
 (** Build a renaming from an environment *)
 let build ({ e_renaming } as acc) env =
@@ -64,6 +71,13 @@ let pvalue loc c_env =
   let c_env = Env.to_seq c_env in
   let c_env = seqfold add Env.empty c_env in
   catch c_env
+
+let no_leq loc =
+  { l_loc = loc;
+    l_kind = Kstatic; 
+    l_rec = false;
+    l_eq = { eq_desc = EQempty; eq_write = Defnames.empty; eq_loc = loc }; 
+    l_env = Ident.Env.empty }
 
 let rename_t ({ e_renaming } as acc) n = Env.find n e_renaming, acc
 
@@ -155,8 +169,14 @@ let rec expression acc ({ e_desc; e_loc } as e) =
   match e_desc with
   | Econst _ | Econstr0 _ | Eglobal _ -> e, acc
   | Evar(x) ->
-     let x, acc = rename_t acc x in
-     { e with e_desc = Evar(x) }, acc
+     (* If [x] has a static value, [x] is replaced by a global name in which *)
+     (* the value is stored; otherwise, it is renamed *)
+     if Env.mem x acc.e_values then
+       let lname = Env.find x acc.e_lnames in
+       { e with e_desc = Eglobal { lname } }, acc
+     else
+       let x, acc = rename_t acc x in
+       { e with e_desc = Evar(x) }, acc
   | Elast(x) ->
      let x, acc = rename_t acc x in
      { e with e_desc = Elast(x) }, acc
@@ -233,7 +253,7 @@ let rec expression acc ({ e_desc; e_loc } as e) =
      let v_list = List.map (size_e acc) size_list in
      let v = Coiteration.sizeapply e_loc v v_list in
      let v = catch v in
-     exp_of_value e_loc acc v, acc
+     value_t e_loc acc v
   | Efun f ->
      let f, acc = funexp acc f in
      { e with e_desc = Efun f }, acc
@@ -434,14 +454,6 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
        { eq with eq_desc = EQlet(leq, eq) }, acc
     | EQsizefun _ ->
        raise (Reduce { Error.kind = Eshould_be_static; loc = eq_loc }) in
-(* ({ sf_id; sf_id_list; sf_e; sf_env } as sf) ->
-       let sf_env, acc = build acc sf_env in
-       let sf_id, acc = rename_t acc sf_id in
-       let sf_id_list, acc = Util.mapfold rename_t acc sf_id_list in
-       let sf_e, acc = expression acc sf_e in
-       { eq with eq_desc = 
-                   EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
-       acc in *)
   { eq with eq_write }, acc
 
 and slet acc leq_list = Util.mapfold leq_t acc leq_list
@@ -452,17 +464,17 @@ and leq_e acc leq =
     Coiteration.vleq acc.e_globals (Match.liftv acc.e_values) leq in
   catch l_env
 
-and leq_t acc ({ l_kind; l_eq; l_env } as leq) =
-  let l_env, acc = build acc l_env in
-  let l_eq, acc = equation acc l_eq in
-  let acc = match l_kind with
-    | Kconst | Kstatic ->
-       (* static evaluation *)
-       let l_env = leq_e acc leq in
-       (* let l = Env.to_list l_env in *)
-       { acc with e_values = Env.append l_env acc.e_values }
-    | Kany -> acc in
-  { leq with l_eq; l_env }, acc
+and leq_t acc ({ l_kind; l_eq; l_env; l_loc } as leq) =
+  match l_kind with
+  | Kconst | Kstatic ->
+     (* static evaluation *)
+     let l_env = leq_e acc leq in
+     (* let l = Env.to_list l_env in *)
+     no_leq l_loc, { acc with e_values = Env.append l_env acc.e_values }
+  | Kany -> 
+     let l_env, acc = build acc l_env in
+     let l_eq, acc = equation acc l_eq in
+     { leq with l_eq; l_env }, acc
 
 and scondpat acc ({ desc = desc } as scpat) =
   match desc with
@@ -509,51 +521,69 @@ and result acc ({ r_desc } as r) =
     | Returns(b_eq) -> let b_eq, acc = block acc b_eq in Returns(b_eq), acc in
   { r with r_desc }, acc
 
+(** translate a static value - introduce global definitions for functions *)
+and value_t loc acc v =
+  let make e_desc = { e_desc; e_loc = Location.no_location; e_info = no_info } in
+  let open Value in
+  let e_desc, acc = match v with
+    | Vint(v) -> Econst(Eint(v)), acc
+    | Vbool(v) -> Econst(Ebool(v)), acc
+    | Vfloat(v) -> Econst(Efloat(v)), acc
+    | Vchar(v) -> Econst(Echar(v)), acc
+    | Vstring(v) -> Econst(Estring(v)), acc
+    | Vvoid -> Econst(Evoid), acc
+    | Vconstr0 lname -> Econstr0 { lname }, acc
+    | Vconstr1(lname, v_list) ->
+       let arg_list, acc = Util.mapfold (value_t loc) acc v_list in
+       Econstr1 { lname; arg_list }, acc
+    | Vrecord(r_list) ->
+     let e_list, acc =
+       Util.mapfold
+         (fun acc { label; arg } -> 
+           let arg, acc = value_t loc acc arg in 
+           { label; arg}, acc) acc r_list in
+     Erecord e_list, acc
+  | Vstuple(v_list) ->
+     let e_list, acc = Util.mapfold (value_t loc) acc v_list in
+     Etuple e_list, acc
+  | Vtuple(v_list) ->
+     let value_t loc acc v =
+       let v = 
+         catch (Primitives.pvalue v |>
+                  Opt.to_result ~none: { Error.kind = Etype; loc }) in
+       value_t loc acc v in
+     let e_list, acc = Util.mapfold (value_t loc) acc v_list in
+     Etuple(e_list), acc
+  | Vclosure { c_funexp; c_genv; c_env } ->
+     (* Warning: add part of [g_env and c_env] in acc *)
+     let c_env = pvalue loc c_env in
+     let acc = update acc c_genv c_env in
+     let f, acc = funexp acc c_funexp in 
+     (* add a definition in the global environment *)
+     let m = Ident.fresh "reduce" in
+     Eglobal { lname = Name(Ident.name m) },
+     { acc with e_global_defs = Env.add m (make (Efun(f))) acc.e_global_defs }
+  | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ | Vsizefun _ | Vsizefix _ ->
+     (* none of them should appear *)
+     catch (error { Error.kind = Etype; loc })
+  | Varray _ -> catch (error { Error.kind = Enot_implemented; loc })
+  | Vfun _  -> catch (error { Error.kind = Enot_implemented; loc }) in
+  make e_desc, acc
 
-(** Convert a value into an expression. **)
-and exp_of_value loc acc v =
-  let rec exp_of_value acc v =
-    let open Value in
-    let e_desc = match v with
-      | Vint(v) -> Econst(Eint(v))
-      | Vbool(v) -> Econst(Ebool(v))
-      | Vfloat(v) -> Econst(Efloat(v))
-      | Vchar(v) -> Econst(Echar(v))
-      | Vstring(v) -> Econst(Estring(v))
-      | Vvoid -> Econst(Evoid)
-      | Vconstr0 lname -> Econstr0 { lname }
-      | Vconstr1(lname, v_list) -> 
-         Econstr1 { lname; arg_list = List.map (exp_of_value acc) v_list }
-      | Vrecord(r_list) ->
-         let r_list =
-           List.map (fun { label; arg } -> { label; arg = exp_of_value acc arg })
-             r_list in
-         Erecord r_list
-      | Vstuple(v_list) ->
-         Etuple (List.map (exp_of_value acc) v_list)
-      | Vtuple(v_list) ->
-         let exp_of_value acc v = 
-           let v = 
-             catch (Primitives.pvalue v |>
-                      Opt.to_result ~none: { Error.kind = Etype; loc }) in
-           exp_of_value acc v in
-         let e_list = List.map (exp_of_value acc) v_list in
-         Etuple(e_list)
-      | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ ->
-         (* no such values should be produced statically *)
-         assert false
-      | Varray _ -> assert false
-      | Vfun _  -> assert false
-      | Vclosure { c_funexp; c_genv; c_env } ->
-         (* Warning: add part of [g_env and c_env] in acc *)
-         let c_env = pvalue loc c_env in
-         let acc = update acc c_genv c_env in
-         let f, _ = funexp acc c_funexp in Efun f
-      | Vsizefun _ | Vsizefix _ -> 
-         (* there should be no static computation anymore *)
-         assert false in
-    { e_desc; e_loc = Location.no_location; e_info = no_info } in
-  exp_of_value acc v
+(* add global definitions in the list of global declarations of the module *)
+let add_global_defs { e_global_defs } impl_list =
+  let pat x = 
+    { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info } in
+  let eq x e =
+    { eq_desc = EQeq(pat x, e); eq_loc = Location.no_location;
+      eq_write = Defnames.singleton x } in
+  let leq x e = 
+    { l_rec = false; l_kind = Kstatic; l_eq = eq x e; 
+      l_loc = Location.no_location; l_env = Env.singleton x no_info } in
+  let impl x e acc = 
+    { desc = Eletdecl { d_names = [Ident.name x, x];
+                        d_leq = leq x e }; loc = e.e_loc } :: acc in
+  Env.fold impl e_global_defs impl_list
 
 (* The main function. Reduce every definition *)
 let implementation acc ({ desc } as impl) =
@@ -573,6 +603,9 @@ let program genv { p_impl_list; p_index } =
     set_index_t p_index;
     let p_impl_list, acc = 
       Util.mapfold implementation (empty genv) p_impl_list in
+    (* add global definitions from [acc] in the list of global declarations *)
+    (* of the module *)
+    let p_impl_list = add_global_defs acc p_impl_list in
     let p_index = get_index_t () in
     { p_impl_list; p_index }
   with
@@ -581,3 +614,13 @@ let program genv { p_impl_list; p_index } =
        "Error during static reduction\n";
      Error.message loc kind;
      raise Error
+
+
+(* ({ sf_id; sf_id_list; sf_e; sf_env } as sf) ->
+       let sf_env, acc = build acc sf_env in
+       let sf_id, acc = rename_t acc sf_id in
+       let sf_id_list, acc = Util.mapfold rename_t acc sf_id_list in
+       let sf_e, acc = expression acc sf_e in
+       { eq with eq_desc = 
+                   EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
+       acc in *)

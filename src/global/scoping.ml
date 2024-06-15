@@ -464,8 +464,7 @@ let rec equation env_pat env { desc; loc } =
        Ast.EQforloop(forloop_eq env_pat env f)
   in
   (* set the names defined in the equation *)
-  { Ast.eq_desc = eq_desc; Ast.eq_write = Defnames.empty;
-    Ast.eq_loc = loc; Ast.eq_env = Ident.Env.empty }
+  { Ast.eq_desc = eq_desc; Ast.eq_write = Defnames.empty; Ast.eq_loc = loc }
 
 and trans_for_input env acc i_list =
   let input acc { desc; loc } =
