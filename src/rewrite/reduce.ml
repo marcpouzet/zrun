@@ -33,8 +33,9 @@ type 'a env =
   { e_renaming: Ident.t Ident.Env.t; (* environment for renaming *)
     e_values: 'a Ident.Env.t;  (* environment of static values *)
     e_globals: 'a Genv.genv;   (* global environment *)
-    e_global_defs: no_info exp Ident.Env.t;  
-    (* extra definitions of static values produced during the static reduction *)
+    e_defs: no_info exp Ident.Env.t;  
+    (* extra definitions of static values produced during *)
+    (* the static reduction *)
     e_exp: no_info exp Ident.Env.t;
     (* if [x] has a static value, the associated expression to it *)
   }
@@ -43,7 +44,7 @@ let empty genv =
   { e_renaming = Ident.Env.empty;
     e_values = Ident.Env.empty;
     e_globals = genv;
-    e_global_defs = Ident.Env.empty;
+    e_defs = Ident.Env.empty;
     e_exp = Ident.Env.empty;
   }
 
@@ -175,8 +176,13 @@ let rec expression acc ({ e_desc; e_loc } as e) =
        let { e_desc } = Env.find x acc.e_exp in
        { e with e_desc }, acc
      else
-       let x, acc = rename_t acc x in
-       { e with e_desc = Evar(x) }, acc
+       if Env.mem x acc.e_values then
+         let v = Env.find x acc.e_values in
+         let ({ e_desc } as e), acc = value_t e_loc acc v in
+         { e with e_desc }, acc
+       else
+         let x, acc = rename_t acc x in
+         { e with e_desc = Evar(x) }, acc
   | Elast(x) ->
      let x, acc = rename_t acc x in
      { e with e_desc = Elast(x) }, acc
@@ -563,8 +569,8 @@ and value_t loc acc v =
          (* add a definition in the global environment *)
          let m = Ident.fresh "reduce" in
          Eglobal { lname = Name(Ident.name m) },
-         { acc with e_global_defs = 
-                      Env.add m (make (Efun(f))) acc.e_global_defs }
+         { acc with e_defs = 
+                      Env.add m (make (Efun(f))) acc.e_defs }
       | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ | Vsizefun _ | Vsizefix _ ->
          (* none of them should appear *)
          catch (error { Error.kind = Etype; loc })
@@ -580,12 +586,12 @@ and value_t loc acc v =
     (* add a definition in the global environment *)
     let m = Ident.fresh "reduce" in
     { e with e_desc = Eglobal { lname = Name(Ident.name m) } },
-    { acc with e_global_defs = Env.add m e acc.e_global_defs }
+    { acc with e_defs = Env.add m e acc.e_defs }
   else e, acc
          
 
 (* add global definitions in the list of global declarations of the module *)
-let add_global_defs { e_global_defs } impl_list =
+let add_global_defs { e_defs } impl_list =
   let pat x = 
     { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info } in
   let eq x e =
@@ -597,7 +603,7 @@ let add_global_defs { e_global_defs } impl_list =
   let impl x e acc = 
     { desc = Eletdecl { d_names = [Ident.name x, x];
                         d_leq = leq x e }; loc = e.e_loc } :: acc in
-  Env.fold impl e_global_defs impl_list
+  Env.fold impl e_defs impl_list
 
 (* The main function. Reduce every definition *)
 let implementation acc ({ desc } as impl) =
