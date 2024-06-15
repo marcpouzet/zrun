@@ -35,8 +35,8 @@ type 'a env =
     e_globals: 'a Genv.genv;   (* global environment *)
     e_global_defs: no_info exp Ident.Env.t;  
     (* extra definitions of static values produced during the static reduction *)
-    e_lnames: Lident.t Ident.Env.t;
-    (* the name of the global variable which contain the value of [x] *)
+    e_exp: no_info exp Ident.Env.t;
+    (* if [x] has a static value, the associated expression to it *)
   }
 
 let empty genv =
@@ -44,7 +44,7 @@ let empty genv =
     e_values = Ident.Env.empty;
     e_globals = genv;
     e_global_defs = Ident.Env.empty;
-    e_lnames = Ident.Env.empty;
+    e_exp = Ident.Env.empty;
   }
 
 let update acc genv env =
@@ -169,11 +169,11 @@ let rec expression acc ({ e_desc; e_loc } as e) =
   match e_desc with
   | Econst _ | Econstr0 _ | Eglobal _ -> e, acc
   | Evar(x) ->
-     (* If [x] has a static value, [x] is replaced by a global name in which *)
-     (* the value is stored; otherwise, it is renamed *)
-     if Env.mem x acc.e_values then
-       let lname = Env.find x acc.e_lnames in
-       { e with e_desc = Eglobal { lname } }, acc
+     (* If [x] has a static value, [x] is replaced by this value *)
+     (* otherwise, it is renamed *)
+     if Env.mem x acc.e_exp then
+       let { e_desc } = Env.find x acc.e_exp in
+       { e with e_desc }, acc
      else
        let x, acc = rename_t acc x in
        { e with e_desc = Evar(x) }, acc
@@ -523,52 +523,66 @@ and result acc ({ r_desc } as r) =
 
 (** translate a static value - introduce global definitions for functions *)
 and value_t loc acc v =
-  let make e_desc = { e_desc; e_loc = Location.no_location; e_info = no_info } in
-  let open Value in
-  let e_desc, acc = match v with
-    | Vint(v) -> Econst(Eint(v)), acc
-    | Vbool(v) -> Econst(Ebool(v)), acc
-    | Vfloat(v) -> Econst(Efloat(v)), acc
-    | Vchar(v) -> Econst(Echar(v)), acc
-    | Vstring(v) -> Econst(Estring(v)), acc
-    | Vvoid -> Econst(Evoid), acc
-    | Vconstr0 lname -> Econstr0 { lname }, acc
-    | Vconstr1(lname, v_list) ->
-       let arg_list, acc = Util.mapfold (value_t loc) acc v_list in
-       Econstr1 { lname; arg_list }, acc
-    | Vrecord(r_list) ->
-     let e_list, acc =
-       Util.mapfold
-         (fun acc { label; arg } -> 
-           let arg, acc = value_t loc acc arg in 
-           { label; arg}, acc) acc r_list in
-     Erecord e_list, acc
-  | Vstuple(v_list) ->
-     let e_list, acc = Util.mapfold (value_t loc) acc v_list in
-     Etuple e_list, acc
-  | Vtuple(v_list) ->
-     let value_t loc acc v =
-       let v = 
-         catch (Primitives.pvalue v |>
-                  Opt.to_result ~none: { Error.kind = Etype; loc }) in
-       value_t loc acc v in
-     let e_list, acc = Util.mapfold (value_t loc) acc v_list in
-     Etuple(e_list), acc
-  | Vclosure { c_funexp; c_genv; c_env } ->
-     (* Warning: add part of [g_env and c_env] in acc *)
-     let c_env = pvalue loc c_env in
-     let acc = update acc c_genv c_env in
-     let f, acc = funexp acc c_funexp in 
-     (* add a definition in the global environment *)
-     let m = Ident.fresh "reduce" in
-     Eglobal { lname = Name(Ident.name m) },
-     { acc with e_global_defs = Env.add m (make (Efun(f))) acc.e_global_defs }
-  | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ | Vsizefun _ | Vsizefix _ ->
-     (* none of them should appear *)
-     catch (error { Error.kind = Etype; loc })
-  | Varray _ -> catch (error { Error.kind = Enot_implemented; loc })
-  | Vfun _  -> catch (error { Error.kind = Enot_implemented; loc }) in
-  make e_desc, acc
+  let rec value_t acc v =
+    let make e_desc = 
+      { e_desc; e_loc = Location.no_location; e_info = no_info } in
+    let open Value in
+    let e_desc, acc = match v with
+      | Vint(v) -> Econst(Eint(v)), acc
+      | Vbool(v) -> Econst(Ebool(v)), acc
+      | Vfloat(v) -> Econst(Efloat(v)), acc
+      | Vchar(v) -> Econst(Echar(v)), acc
+      | Vstring(v) -> Econst(Estring(v)), acc
+      | Vvoid -> Econst(Evoid), acc
+      | Vconstr0 lname -> Econstr0 { lname }, acc
+      | Vconstr1(lname, v_list) ->
+         let arg_list, acc = Util.mapfold value_t acc v_list in
+         Econstr1 { lname; arg_list }, acc
+      | Vrecord(r_list) ->
+         let e_list, acc =
+           Util.mapfold
+             (fun acc { label; arg } -> let arg, acc = value_t acc arg in 
+                                        { label; arg}, acc) acc r_list in
+         Erecord e_list, acc
+      | Vstuple(v_list) ->
+         let e_list, acc = Util.mapfold value_t acc v_list in
+         Etuple e_list, acc
+      | Vtuple(v_list) ->
+         let value_t acc v =
+           let v = 
+             catch (Primitives.pvalue v |>
+                      Opt.to_result ~none: { Error.kind = Etype; loc }) in
+           value_t acc v in
+         let e_list, acc = Util.mapfold value_t acc v_list in
+         Etuple(e_list), acc
+      | Vclosure { c_funexp; c_genv; c_env } ->
+         (* Warning: add part of [g_env and c_env] in acc *)
+         let c_env = pvalue loc c_env in
+         let acc = update acc c_genv c_env in
+         let f, acc = funexp acc c_funexp in 
+         (* add a definition in the global environment *)
+         let m = Ident.fresh "reduce" in
+         Eglobal { lname = Name(Ident.name m) },
+         { acc with e_global_defs = 
+                      Env.add m (make (Efun(f))) acc.e_global_defs }
+      | Vpresent _ | Vabsent | Vstate0 _ | Vstate1 _ | Vsizefun _ | Vsizefix _ ->
+         (* none of them should appear *)
+         catch (error { Error.kind = Etype; loc })
+      | Varray _ -> catch (error { Error.kind = Enot_implemented; loc })
+      | Vfun _  -> catch (error { Error.kind = Enot_implemented; loc }) in
+  make e_desc, acc in
+  let immediate { e_desc } =
+    match e_desc with 
+    | Econst _ | Evar _ | Eglobal _ | Econstr0 _ -> true | _ -> false in
+  let e, acc = value_t acc v in
+  (* if [e] is not immediate, add a global definition to store it *)
+  if immediate e then
+    (* add a definition in the global environment *)
+    let m = Ident.fresh "reduce" in
+    { e with e_desc = Eglobal { lname = Name(Ident.name m) } },
+    { acc with e_global_defs = Env.add m e acc.e_global_defs }
+  else e, acc
+         
 
 (* add global definitions in the list of global declarations of the module *)
 let add_global_defs { e_global_defs } impl_list =
@@ -614,13 +628,3 @@ let program genv { p_impl_list; p_index } =
        "Error during static reduction\n";
      Error.message loc kind;
      raise Error
-
-
-(* ({ sf_id; sf_id_list; sf_e; sf_env } as sf) ->
-       let sf_env, acc = build acc sf_env in
-       let sf_id, acc = rename_t acc sf_id in
-       let sf_id_list, acc = Util.mapfold rename_t acc sf_id_list in
-       let sf_e, acc = expression acc sf_e in
-       { eq with eq_desc = 
-                   EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
-       acc in *)
