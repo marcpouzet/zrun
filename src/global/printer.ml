@@ -136,7 +136,7 @@ let vkind ff k =
   | Kany -> fprintf ff ""
 
 let print_writes ff { dv ; di; der } =
-  if !verbose then begin
+  if !vverbose then begin
     let dv = Ident.S.elements dv in
     let di = Ident.S.elements di in
     let der = Ident.S.elements der in
@@ -152,7 +152,7 @@ let print_writes ff { dv ; di; der } =
   end
 
 let print_env_names ff env =
-  if !verbose && not (Ident.Env.is_empty env) then 
+  if !vverbose && not (Ident.Env.is_empty env) then 
     Ident.Env.fprint_t (fun ff _ -> ()) ff env
 
 let print_eq_info ff { eq_write } =

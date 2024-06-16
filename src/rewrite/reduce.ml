@@ -643,7 +643,6 @@ let implementation acc ({ desc; loc } as impl) =
 let set_index_t n = Ident.set n
 let get_index_t () = Ident.get ()
 
-      
 let program genv { p_impl_list; p_index } =
   try
     set_index_t p_index;

@@ -34,6 +34,7 @@ let doc_main = "\tThe main node to evaluate"
 let doc_all = "\tEvaluate all nodes"
 let doc_number_of_steps = "\tThe number of steps"
 let doc_verbose = "\tVerbose mode"
+let doc_vverbose = "\t Set even more verbose mode"
 let doc_debug = "\t Set debug mode"
 let doc_no_assert = "\tNo check of assertions"
 let doc_nocausality = "\tTurn off the check that are variables are non bottom"
@@ -58,6 +59,7 @@ let main () =
            "-all", Arg.Set Misc.all, doc_all;
            "-n", Arg.Int Misc.set_number_of_steps, doc_number_of_steps;
            "-v", Arg.Unit set_verbose, doc_verbose;
+           "-vv", Arg.Unit set_vverbose, doc_vverbose;
            "-debug", Arg.Unit set_debug, doc_debug;
            "-iv", Arg.Set print_values, doc_print_values;
            "-noassert", Arg.Set Misc.no_assert, doc_no_assert;

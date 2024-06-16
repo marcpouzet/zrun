@@ -48,11 +48,16 @@ let show_version () =
   ()
 
 let verbose = ref false
+let vverbose = ref false
 let debug = ref false
 
 let set_verbose () =
   verbose := true;
   Printexc.record_backtrace true
+
+let set_vverbose () =
+  vverbose := true;
+  set_verbose ()
 
 let set_debug () =
   debug := true;
