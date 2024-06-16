@@ -586,12 +586,12 @@ and value_t loc acc v =
     | Econst _ | Evar _ | Eglobal _ | Econstr0 _ -> true | _ -> false in
   let e, acc = value_t acc v in
   (* if [e] is not immediate, add a global definition to store it *)
-  if immediate e then
+  if immediate e then e, acc
+  else 
     (* add a definition in the global environment *)
     let m = Ident.fresh "reduce" in
     { e with e_desc = Eglobal { lname = Name(Ident.name m) } },
     { acc with e_defs = Env.add m e acc.e_defs }
-  else e, acc
 
 (* a global value can be any static value except functional *)
 (* values which expect a static argument *)
@@ -599,9 +599,9 @@ let gvalue_t loc (acc, d_names) (gname, n) v =
   let open Value in
   match v with
     | Vsizefix _ | Vsizefun _ -> acc, d_names
-    | _ -> let _, acc = value_t loc acc v in
-           acc, (gname, n) :: d_names
-
+    | _ -> let e, acc = value_t loc acc v in
+           { acc with e_defs = Env. add n e acc.e_defs }, 
+           (gname, n) :: d_names
 
 (* add global definitions in the list of global declarations of the module *)
 let add_global_defs { e_defs } =
@@ -636,7 +636,7 @@ let implementation acc ({ desc; loc } as impl) =
        let acc = { acc with e_values = Env.append l_env acc.e_values } in
        (* add the definition for values *)
        let acc, d_names = def_of_values loc acc d_names in
-       Eletdecl { d_names = []; d_leq = no_leq loc }, acc
+       Eletdecl { d_names; d_leq = no_leq loc }, acc
     | Etypedecl _ -> desc, acc in
   { impl with desc }, acc
 
