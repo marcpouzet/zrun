@@ -593,14 +593,14 @@ and value_t loc acc v =
     { e with e_desc = Eglobal { lname = Name(Ident.name m) } },
     { acc with e_defs = Env.add m e acc.e_defs }
 
-(* a global value can be any static value except functional *)
-(* values which expect a static argument *)
+(* a global value can be any static value except a function *)
+(* which expect a static argument *)
 let gvalue_t loc (acc, d_names) (gname, n) v =
   let open Value in
   match v with
     | Vsizefix _ | Vsizefun _ -> acc, d_names
     | _ -> let e, acc = value_t loc acc v in
-           { acc with e_defs = Env. add n e acc.e_defs }, 
+           { acc with e_defs = Env.add n e acc.e_defs }, 
            (gname, n) :: d_names
 
 (* add global definitions in the list of global declarations of the module *)
@@ -619,7 +619,7 @@ let add_global_defs { e_defs } =
   let i_list = List.rev (Env.fold impl e_defs []) in
   i_list
 
-(* for every name in [l_names] convert its value in [acc] into an expression *)
+(* for every name in [d_names] convert its value in [acc] into an expression *)
 let def_of_values loc acc d_names =
   let def_of_value (acc, d_names) (gname, n) =
     let v = Env.find n acc.e_values in
