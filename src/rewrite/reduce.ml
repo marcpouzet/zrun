@@ -32,30 +32,28 @@ exception Reduce of Error.error
 type 'a env =
   { e_renaming: Ident.t Ident.Env.t; (* environment for renaming *)
     e_values: 'a Ident.Env.t;  (* environment of static values *)
-    e_globals: 'a Genv.genv;   (* global environment *)
-    e_defs: no_info exp Ident.Env.t;  
-    (* extra definitions of static values produced during *)
-    (* the static reduction *)
-    e_exp: no_info exp Ident.Env.t;
-    (* if [x] has a static value, associate an expression to it *)
+    e_gvalues: 'a Genv.genv;   (* global environment of static values *)
+    e_defs: (Ident.t * no_info exp) list;
+    (* global definitions of static values introduced during the reduction *)
+    (* the head of the list is the last added value *)
+    e_exp: no_info exp Ident.Env.t; (* the expression associated to [x] *)
+                                    (* when [x] is a static value *)
   }
 
-(* E.g., ... let static x = e in body => 
-  body + add a global definition let static x = ve
-  where ve is that static value of e
-*)
+(* All static expressions are reduced. Static expressions bound to variables *)
+(* that are later used in a non static expression are introduced as global *)
+(* declarations *)
 
 let empty genv =
   { e_renaming = Ident.Env.empty;
     e_values = Ident.Env.empty;
-    e_globals = genv;
-    e_defs = Ident.Env.empty;
+    e_gvalues = genv;
+    e_defs = [];
     e_exp = Ident.Env.empty;
   }
 
 let update acc genv env =
-  { acc with e_renaming = Ident.Env.empty; e_values = env;
-             e_globals = genv }
+  { acc with e_renaming = Ident.Env.empty; e_values = env; e_gvalues = genv }
 
 (** Build a renaming from an environment *)
 let build ({ e_renaming } as acc) env =
@@ -177,13 +175,15 @@ let rec expression acc ({ e_desc; e_loc } as e) =
   | Econst _ | Econstr0 _ | Eglobal _ -> e, acc
   | Evar(x) ->
      (* If [x] has a static value, [x] is replaced by this value *)
-     (* otherwise, it is renamed *)
+     (* either there exist a global definition for x *)
      if Env.mem x acc.e_exp then Env.find x acc.e_exp, acc
      else
+       (* or not; then generate a declaration to compute it *)
        if Env.mem x acc.e_values then
          let v = Env.find x acc.e_values in
          value_t e_loc acc v
        else
+         (* otherwise, [x] is not static; it is renamed *)
          let x, acc = rename_t acc x in
          { e with e_desc = Evar(x) }, acc
   | Elast(x) ->
@@ -303,7 +303,7 @@ and funexp acc ({ f_args; f_body; f_env } as f) =
 
 (** Evaluation of an expression *)
 and expression_e acc e =
-  let v = Coiteration.vexp acc.e_globals (Match.liftv acc.e_values) e in
+  let v = Coiteration.vexp acc.e_gvalues (Match.liftv acc.e_values) e in
   catch v
 
 (** Try to evaluate an expression; expect the result to be a boolean *)
@@ -311,7 +311,7 @@ and try_expression_bool acc e =
   let env = Match.liftv acc.e_values in
   (* let l = Env.to_list env in *)
   let v = 
-    Coiteration.try_vexp_into_bool acc.e_globals env e in
+    Coiteration.try_vexp_into_bool acc.e_gvalues env e in
   Result.to_option v
 
 (** Equations **)
@@ -470,7 +470,7 @@ and slet acc leq_list = Util.mapfold leq_t acc leq_list
 (* eval a definition *)
 and leq_e acc leq =
   let l_env =
-    Coiteration.vleq acc.e_globals (Match.liftv acc.e_values) leq in
+    Coiteration.vleq acc.e_gvalues (Match.liftv acc.e_values) leq in
   catch l_env
 
 and leq_t acc ({ l_kind; l_eq; l_env; l_loc } as leq) =
@@ -532,9 +532,9 @@ and result acc ({ r_desc } as r) =
 
 (** translate a static value - introduce global definitions for functions *)
 and value_t loc acc v =
+  let make e_desc = 
+    { e_desc; e_loc = Location.no_location; e_info = no_info } in
   let rec value_t acc v =
-    let make e_desc = 
-      { e_desc; e_loc = Location.no_location; e_info = no_info } in
     let open Value in
     let e_desc, acc = match v with
       | Vint(v) -> Econst(Eint(v)), acc
@@ -572,11 +572,10 @@ and value_t loc acc v =
          (* add a definition in the global environment *)
          let m = Ident.fresh "reduce" in
          Eglobal { lname = Name(Ident.name m) },
-         { acc with e_defs = 
-                      Env.add m (make (Efun(f))) acc_local.e_defs }
+         { acc with e_defs = (m, make (Efun(f))) :: acc_local.e_defs }
       | Vpresent _ | Vabsent | Vstate0 _ 
         | Vstate1 _ | Vsizefun _ | Vsizefix _ ->
-         (* none of them should appear *)
+         (* none of these construct should appear *)
          catch (error { Error.kind = Etype; loc })
       | Varray _ -> catch (error { Error.kind = Enot_implemented; loc })
       | Vfun _  -> catch (error { Error.kind = Enot_implemented; loc }) in
@@ -590,21 +589,22 @@ and value_t loc acc v =
   else 
     (* add a definition in the global environment *)
     let m = Ident.fresh "reduce" in
-    { e with e_desc = Eglobal { lname = Name(Ident.name m) } },
-    { acc with e_defs = Env.add m e acc.e_defs }
+    let e = make (Eglobal { lname = Name(Ident.name m) }) in
+    e, { acc with e_defs = (m, e) :: acc.e_defs;
+                  e_exp = Env.add m e acc.e_exp }
 
-(* a global value can be any static value except a function *)
-(* which expect a static argument *)
+(* a global value can be any static value except a size function *)
 let gvalue_t loc (acc, d_names) (gname, n) v =
   let open Value in
   match v with
     | Vsizefix _ | Vsizefun _ -> acc, d_names
     | _ -> let e, acc = value_t loc acc v in
-           { acc with e_defs = Env.add n e acc.e_defs }, 
+           { acc with e_defs = (n, e) :: acc.e_defs;
+                      e_exp = Env.add n e acc.e_exp }, 
            (gname, n) :: d_names
 
 (* add global definitions in the list of global declarations of the module *)
-let add_global_defs { e_defs } =
+let add_global_defs acc { e_defs } =
   let pat x = 
     { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info } in
   let eq x e =
@@ -613,11 +613,12 @@ let add_global_defs { e_defs } =
   let leq x e = 
     { l_rec = false; l_kind = Kstatic; l_eq = eq x e; 
       l_loc = Location.no_location; l_env = Env.singleton x no_info } in
-  let impl x e acc = 
-    { desc = Eletdecl { d_names = [];
-                        d_leq = leq x e }; loc = e.e_loc } :: acc in
-  let i_list = List.rev (Env.fold impl e_defs []) in
-  i_list
+  let impl acc (x, e) = 
+    { desc = Eletdecl { d_names = []; d_leq = leq x e }; loc = e.e_loc } :: acc 
+  in
+  (* warning; the order in which [e_defs] is the inverse of which *)
+  (* it must appear in the code *)
+  List.fold_left impl acc e_defs
 
 (* for every name in [d_names] convert its value in [acc] into an expression *)
 let def_of_values loc acc d_names =
@@ -650,7 +651,7 @@ let program genv { p_impl_list; p_index } =
       Util.mapfold implementation (empty genv) p_impl_list in
     (* add global definitions from values in [acc] to the *)
     (* list of global declarations of the module *)
-    let p_impl_list = (add_global_defs acc) @ p_impl_list in
+    let p_impl_list = add_global_defs p_impl_list acc in
     let p_index = get_index_t () in
     { p_impl_list; p_index }
   with

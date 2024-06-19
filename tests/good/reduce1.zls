@@ -1,8 +1,14 @@
 let h1 () =
   let static m = 42 + 1 in
+  m + 2
+
+let h2 () =
+  let static m = 42 + 2 in
   m
 
-let h2 () = h1 () + 1
+let h3 () = h1 () + 1
+
+let h4 () = h2 () + 1
 
 
 
