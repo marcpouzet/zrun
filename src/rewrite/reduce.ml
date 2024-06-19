@@ -213,6 +213,8 @@ let rec expression acc ({ e_desc; e_loc } as e) =
           acc l_e_list in
       { e with e_desc = Erecord_with(e_record, l_e_list) }, acc
   | Eapp ({ f; arg_list } as a) ->
+     (* if an application need to be inlined *)
+     (* it must be a static expression *)
      let f, acc = expression acc f in
      let arg_list, acc = Util.mapfold expression acc arg_list in
      { e with e_desc = Eapp { a with f; arg_list } }, acc
