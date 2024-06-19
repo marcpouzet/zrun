@@ -242,8 +242,8 @@ let matching_arg_out loc env arg =
   | [v] -> return v
   | _ -> return (Value(Vtuple(v_list)))
 
-(* Pattern matching *)
-let match_handler_list loc body genv env ve handlers =
+(* Pattern matching - returns the selected handler and substitution or fail *)
+let select loc genv env ve handlers =
   let open Result in
   let open Error in
   let rec match_rec handlers =
@@ -255,11 +255,16 @@ let match_handler_list loc body genv env ve handlers =
        | None ->
           (* this is not the good handler; try an other one *)
           match_rec handlers
-       | Some(env_pat) ->
-          let env_pat = liftv env_pat in
-          let env = Env.append env_pat env in
-          body genv env m_body in
+       | Some(env_pat) -> 
+          return (env_pat, m_body) in
   match_rec handlers
+
+let match_handler_list loc body genv env ve handlers =
+  let open Result in
+  let* env_pat, m_body = select loc genv env ve handlers in
+  let env_pat = liftv env_pat in
+  let env = Env.append env_pat env in
+  body genv env m_body
 
 
 
