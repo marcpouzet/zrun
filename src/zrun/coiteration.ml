@@ -1311,6 +1311,14 @@ and try_vsexp genv env e s =
   | Ok(v) -> 
      match v with | Vbot | Vnil -> return None | Value(v) -> return (Some(v))
 
+and try_vexp genv env e =
+  let v = vexp genv env e in
+  match v with 
+  | Error({ kind = Eunbound_ident _ | Eunbound_last_ident _ }) -> return None
+  | Error(k) -> error k
+  | Ok(v) -> 
+     match v with | Vbot | Vnil -> return None | Value(v) -> return (Some(v))
+
 (* computing the value of an expression from the initial state *)
 (* the expression is supposed to be stateless, that is, *)
 (* the new state must be unchanged *)
