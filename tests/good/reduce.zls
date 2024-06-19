@@ -1,9 +1,9 @@
-(* let f h g x = h g x + 1
+let f h g x = h g x + 1
 
 let g x returns o
   let static m = f (fun g y -> g y) (fun x -> x + 1) 1 in
   if m = 3 then do o = 1 done else do o = 2 done
-*)
+
 
 let static rec r1<<n>>(y) returns (o)
   if n = 0 then do o = y+2 done
