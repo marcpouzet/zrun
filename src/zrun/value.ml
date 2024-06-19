@@ -107,6 +107,11 @@ and 'a instance =
     step : 'a closure; (* step function *)
   }
 
+type topvalue =
+  | CoF : { init: pvalue state; 
+            step: pvalue state -> pvalue * pvalue state } -> topvalue
+  | V : pvalue -> topvalue
+
 (*
 type ('a, 's) costream =
   | CoF : { init : 's;
