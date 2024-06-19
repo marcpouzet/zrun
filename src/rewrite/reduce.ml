@@ -212,11 +212,13 @@ let rec expression acc ({ e_desc; e_loc } as e) =
             let arg, acc = expression acc e in { label; arg }, acc)
           acc l_e_list in
       { e with e_desc = Erecord_with(e_record, l_e_list) }, acc
-  | Eapp ({ f; arg_list } as a) ->
+  | Eapp ({ is_inline; f; arg_list } as a) ->
      (* if an application need to be inlined *)
      (* it must be a static expression *)
-     let f, acc = expression acc f in
      let arg_list, acc = Util.mapfold expression acc arg_list in
+     let f, acc = 
+       if is_inline then let v = expression_e acc f in value_t f.e_loc acc v
+       else expression acc f in
      { e with e_desc = Eapp { a with f; arg_list } }, acc
   | Eop(op, e_list) ->
      let e_list, acc = Util.mapfold expression acc e_list in
@@ -311,10 +313,13 @@ and expression_e acc e =
 (** Try to evaluate an expression; expect the result to be a boolean *)
 and try_expression_bool acc e =
   let env = Match.liftv acc.e_values in
-  (* let l = Env.to_list env in *)
   let v = 
     Coiteration.try_vexp_into_bool acc.e_gvalues env e in
   Result.to_option v
+
+and try_expression acc e =
+  let env = Match.liftv acc.e_values in
+  catch(Coiteration.try_vexp acc.e_gvalues env e)
 
 (** Equations **)
 and equation acc ({ eq_desc; eq_write; eq_loc } as eq) = 
@@ -345,7 +350,7 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let handlers, acc = Util.mapfold body acc handlers in
        { eq with eq_desc = EQder { id; e; e_opt; handlers } }, acc
     | EQif { e; eq_true; eq_false } ->
-       (* two cases; either [e] is a compile-time boolean value or not *)
+       (* two cases; either [e] is a compile-time or not *)
        let v = try_expression_bool acc e in
        let eq, acc = match v with 
          | None -> let e, ac = expression acc e in
@@ -361,10 +366,20 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
          let m_pat, acc = pattern acc m_pat in
          let m_body, acc = equation acc m_body in
          { m_h with m_pat; m_body; m_env }, acc in
-       let e, acc = expression acc e in
-       let handlers, acc =
-         Util.mapfold body acc handlers in
-       { eq with eq_desc = EQmatch { m with e; handlers } }, acc
+       (* two cases; either [e] is compile-time or not *)
+       let v = try_expression acc e in
+       let eq, acc = match v with
+         | None ->
+            let e, acc = expression acc e in
+            let handlers, acc =
+              Util.mapfold body acc handlers in
+            { eq with eq_desc = EQmatch { m with e; handlers } }, acc
+         | Some(v) ->
+            let env_pat, eq = 
+              catch (Match.select eq_loc acc.e_gvalues acc.e_values v handlers)
+            in equation 
+                 { acc with e_values = Env.append env_pat acc.e_values } eq in
+       eq, acc
     | EQlocal(eq_b) ->
        let eq_b, acc = block acc eq_b in
        { eq with eq_desc = EQlocal(eq_b) }, acc
