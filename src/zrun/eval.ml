@@ -25,6 +25,8 @@ open Primitives
 open Error
 open Coiteration
                
+exception Stop
+
 let lexical_error err loc =
   Format.eprintf "%aIllegal character.@." output_location loc;
   raise Error
@@ -94,6 +96,12 @@ let do_step comment step input =
   Debug.print_program output;
   output
 
+let do_optional_stop is_stop p =
+  if is_stop then raise Stop else p
+  
+let do_optional_step is_step comment step p = 
+  if is_step then do_step comment step p else p
+
 (* Evaluate all the definition in a file, store values *)
 let eval_definitions_in_file modname filename =
   (* output file in which values are stored *)
@@ -102,64 +110,65 @@ let eval_definitions_in_file modname filename =
     
   let source_name = filename ^ ".zls" in
 
+  (* set the current opened module *)
   Location.initialize source_name;
 
   (* Parsing *)
   let p = parse_implementation_file source_name in
   Debug.print_message "Parsing done";
 
-  (* Scoping *)
-  let p = do_step "Scoping done" Scoping.program p in
-  
-  (* Write defined variables for equations *)
-  let p = do_step "Write done" Write.program p in
-
-  (* Evaluation of definitions in [filename] *)
+  (* defines the initial global environment for values *)
   let genv = Genv.initialize modname [] in
   (* Add Stdlib *)
   let genv = Genv.add_module genv Primitives.stdlib_env in
   
+  let p = do_step "Scoping done" Scoping.program p in
+  (* Write defined variables for equations *)
+  let p = do_step "Write done" Write.program p in
+  (* Evaluation of definitions in [filename] *)
   let genv = Coiteration.program genv p in
   Debug.print_message "Evaluation of definitions done";
-
-  let _ = 
-    if !set_reduce 
-    then do_step "Reduce done" (Reduce.program genv) p else p in
-
+  
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv) otc;
 
   genv
 
- (* evaluate the body of a list of main nodes *)    
- let main modname filename n_steps main_nodes =
-   let genv = eval_definitions_in_file modname filename in
-     
-   (* evaluate a list of main function/nodes *)
-   List.iter (eval_main genv n_steps) main_nodes
-
  (* evaluate all nodes/functions whose input is () *)
  let all modname filename n_steps =
    let open Genv in
+   let ff = Format.std_formatter in
    let { current = { values } } = eval_definitions_in_file modname filename in
-     
    let eval name v =
      match v with
+     (* we make a special treatment for top level functions whose input *)
+     (* is () *)
      | Vclosure({ c_funexp = { f_kind; f_loc; f_args = [[]] } } as c) ->
         begin match f_kind with
         | Knode _ ->
-           let ff = Format.std_formatter in
            let si = Coiteration.catch (Coiteration.instance f_loc c) in
            Format.fprintf ff "@[Evaluate %d steps of %s@.@]" n_steps name;
            Coiteration.run_node
              no_location (Output.value_flush ff) n_steps si void
         | Kfun _ ->
-           let ff = Format.std_formatter in
            Format.fprintf ff "@[Evaluate %d steps of %s@.@]" n_steps name;
            Coiteration.run_fun
              no_location (Output.value_flush ff) n_steps v [void] end
-     | _ -> () in
+     | _ -> Output.pvalue_flush ff v in
    
      (* evaluate a list of main function/nodes *)
    E.iter eval values
      
+ (* evaluate the body of a list of main nodes *)    
+ let main modname filename n_steps l_nodes =
+   let genv = eval_definitions_in_file modname filename in
+     
+   (* evaluate a list of main function/nodes *)
+   List.iter (eval_main genv n_steps) l_nodes
+
+let transforme_and_compare transform eval compare acc p =
+  let p' = transform acc p in
+  let v = eval p in
+  let v' = eval p' in
+  compare v v'
+
