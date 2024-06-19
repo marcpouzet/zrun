@@ -1,7 +1,12 @@
-let f h g x = h g x + 1
+let f1 h g x = h g x + 1
 
 let g x returns o
-  let static m = f (fun g y -> g y) (fun x -> x + 1) 1 in
+  let static m = f1 (fun g y -> g y) (fun x -> x + 1) 1 in
   if m = 3 then do o = 1 done else do o = 2 done
 
+let y = 1 + 2
+
+let h x y = x + 1
+
+let f2 g x = inline (h y) (g x + 1)
 
