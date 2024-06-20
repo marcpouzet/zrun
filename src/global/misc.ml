@@ -100,3 +100,6 @@ let no_info: no_info = ()
 
 (* static reduction *)
 let set_reduce = ref false
+
+(* check equivalence *)
+let set_check = ref false

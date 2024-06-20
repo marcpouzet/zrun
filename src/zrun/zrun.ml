@@ -47,6 +47,8 @@ let doc_lustre =
   "\t Sets the interpretation of if/then/else to be strict (that of Lustre)"
 let doc_reduce =
   "\t Reduce compile-time expressions"
+let doc_check =
+  "\t Check equivalence at every program transformation for the number of steps"
                    
 let errmsg = "Options are:"
 
@@ -69,6 +71,7 @@ let main () =
            "-esterel", Arg.Set Misc.set_esterel, doc_esterel;
            "-lustre", Arg.Set Misc.set_lustre, doc_lustre;
            "-reduce", Arg.Set Misc.set_reduce, doc_reduce;
+           "-check", Arg.Set Misc.set_check, doc_check;           
       ])
       main
       errmsg
