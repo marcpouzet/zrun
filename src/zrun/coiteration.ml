@@ -2400,3 +2400,27 @@ let run_node loc output n_steps { init; step } v  =
     Debug.print_state "State after:" s;
     output v; return s in
   run_n n_steps init step v
+
+let check run_node_in_lock_step run_fun_in_lock_step n genv0 genv1 =
+  let check v1 v2 =
+    match v1, v2 with
+    | Vclosure({ c_funexp = { f_kind = k1; f_loc = loc1; f_args = [[]] } } as c1),
+      Vclosure({ c_funexp = { f_kind = k2; f_loc = loc2; f_args = [[]] } } as c2) ->
+        begin match k1, k2 with
+        | Knode _, Knode _ ->
+           let si1 = catch (instance loc1 c1) in
+           let si2 = catch (instance loc2 c2) in
+           run_node_in_lock_step n si1 si2 void
+        | Kfun _, Kfun _ ->
+           run_fun_in_lock_step n v1 v2 [void]
+        | _ ->
+           catch (error { kind = Etype; loc = loc1 })
+        end     
+    | _ -> () in
+  let check f v0 =
+    let v1 = Env.find f genv1 in
+    check v0 v1 in
+  Env.iter check genv0
+      
+let check is_check env0 env1 = ()
+

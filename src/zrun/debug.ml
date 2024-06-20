@@ -43,3 +43,5 @@ let print_state comment s =
 
 let print_program p =
   if !verbose then Printer.program Format.err_formatter p
+
+let print_nothing _ = ()
