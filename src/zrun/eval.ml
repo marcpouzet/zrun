@@ -128,7 +128,7 @@ let eval_definitions_in_file modname filename =
   (* Static reduction *)
   let genv_after_reduce =
     do_optional_step !set_reduce "Evaluation of definitions done"
-      Debug.print_nothing (Reduce.program genv0) p in
+      Debug.print_program (Reduce.program genv_after_eval) p in
   Coiteration.check !set_check genv_after_eval genv_after_reduce;
     
   (* Write the values into a file *)
