@@ -134,7 +134,7 @@ let eval_definitions_in_file modname filename =
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv0) otc;
 
-  genv0
+  genv_after_eval
 
  (* evaluate all nodes/functions whose input is () *)
  let all modname filename n_steps =

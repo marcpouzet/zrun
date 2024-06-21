@@ -16,7 +16,7 @@
 
 open Location
 open Format
-   
+
 type kind =
   | Etype : kind (* type error for values *)
   | Estate : kind (* type error for states *)

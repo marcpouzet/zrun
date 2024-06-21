@@ -110,6 +110,17 @@ let check_assertion loc ve ret =
      if !no_assert || v then return ret
      else error { kind = Eassert_failure; loc = loc }
 
+let check_equality loc v0 v1 =
+  match v0, v1 with
+  | (Vbot, Vbot) | (Vnil, Vnil) -> return true
+  | (Vbot, Vnil) | (Vnil, Vbot) -> return false
+  | Value(v0), Value(v1) ->
+     let* v =
+       Primitives.compare_pvalue v0 v1 |> Opt.to_result ~none: { kind = Etype; loc } in
+     return (v = 0)
+  | (Value _, Vnil) | (Vnil, Value _) -> error { kind = Enil; loc }
+  | (Value _, Vbot) | (Vbot, Value _) -> error { kind = Ebot; loc }
+
 (* check that a value is an integer *)
 let is_int loc v =
   let* v = Primitives.pvalue v |>
@@ -2401,7 +2412,26 @@ let run_node loc output n_steps { init; step } v  =
     output v; return s in
   run_n n_steps init step v
 
-let check run_node_in_lock_step run_fun_in_lock_step n genv0 genv1 =
+let run_two_fun loc output fv1 fv2 v_list =
+  ignore (catch
+    (let* v1 = apply loc fv1 v_list in
+     let* v2 = apply loc fv2 v_list in
+     check_equality loc v1 v2))
+
+let run_two_nodes loc output n_steps
+      { init = init1; step = step1 } { init = init2; step = step2 } v =
+  let step (s1, s2) v =
+    Debug.print_state "State before (first node):" s1;
+    let* v1, s1 = runstep loc s1 step1 v in
+    Debug.print_state "State after (first node):" s1;
+    Debug.print_state "State before (second node):" s2;
+    let* v2, s2 = runstep loc s2 step2 v in
+    Debug.print_state "State after (second node):" s2;
+    let* v = check_equality loc v1 v2 in
+    return (s1, s2) in
+  run_n n_steps (init1, init2) step v
+
+let check n_steps genv0 genv1 =
   let check v1 v2 =
     match v1, v2 with
     | Vclosure({ c_funexp = { f_kind = k1; f_loc = loc1; f_args = [[]] } } as c1),
@@ -2410,9 +2440,9 @@ let check run_node_in_lock_step run_fun_in_lock_step n genv0 genv1 =
         | Knode _, Knode _ ->
            let si1 = catch (instance loc1 c1) in
            let si2 = catch (instance loc2 c2) in
-           run_node_in_lock_step n si1 si2 void
+           run_two_nodes Location.no_location Output.value_flush n_steps si1 si2 void
         | Kfun _, Kfun _ ->
-           run_fun_in_lock_step n v1 v2 [void]
+           run_two_fun Location.no_location Output.value_flush v1 v2 [void]
         | _ ->
            catch (error { kind = Etype; loc = loc1 })
         end     
