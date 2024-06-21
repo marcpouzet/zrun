@@ -1,0 +1,6 @@
+let rec node fby_ <<n>>(y) returns (o)
+  if n = 0 then do o = 0 fby y done
+  else do o = 0 fby (fby_<<n-1>>(y)) done
+
+let node r2 x = fby_<<4>>(x)
+

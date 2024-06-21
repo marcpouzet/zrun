@@ -96,7 +96,8 @@ let do_optional_step is_step comment output step p =
   if is_step then do_step comment output step p else p
 
 (* Evaluate all the definition in a file, store values *)
-let eval_definitions_in_file modname filename =
+let eval_definitions_in_file modname filename n_steps =
+  let open Genv in
   (* output file in which values are stored *)
   let obj_name = filename ^ ".zlo" in
   let otc = open_out_bin obj_name in
@@ -121,26 +122,33 @@ let eval_definitions_in_file modname filename =
   let p = do_step "Write done" Debug.print_program Write.program p in
 
   (* Evaluation of definitions *)
-  let genv_after_eval =
+  let { current = { values = values1 } } as genv =
     do_step "Evaluation of definitions done"
       Debug.print_nothing (Coiteration.program genv0) p in
   
   (* Static reduction *)
-  let genv_after_reduce =
-    do_optional_step !set_reduce "Evaluation of definitions done"
-      Debug.print_program (Reduce.program genv_after_eval) p in
-  Coiteration.check !set_check genv_after_eval genv_after_reduce;
+  let p_after_reduce =
+    do_optional_step !set_reduce "Static reduction"
+      Debug.print_program (Reduce.program genv) p in
+  
+  (* Check equivalence *)
+  if !set_check then
+    begin let { current = { values = values2} } as genv_after_reduce = 
+            Coiteration.program genv0 p_after_reduce in
+      Coiteration.check n_steps values1 values2
+    end;
     
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv0) otc;
 
-  genv_after_eval
+  genv
 
  (* evaluate all nodes/functions whose input is () *)
  let all modname filename n_steps =
    let open Genv in
    let ff = Format.std_formatter in
-   let { current = { values } } = eval_definitions_in_file modname filename in
+   let { current = { values } } = 
+     eval_definitions_in_file modname filename n_steps in
    let eval name v =
      match v with
      (* we make a special treatment for top level functions whose input *)
@@ -164,7 +172,7 @@ let eval_definitions_in_file modname filename =
  (* evaluate the body of a list of main nodes *)    
  let main modname filename n_steps l_nodes =
    let ff = Format.std_formatter in
-   let genv = eval_definitions_in_file modname filename in
+   let genv = eval_definitions_in_file modname filename n_steps in
      
    (* evaluate a list of main function/nodes *)
    List.iter (eval ff genv n_steps) l_nodes
