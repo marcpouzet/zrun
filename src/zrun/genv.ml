@@ -122,6 +122,8 @@ let find qualname genv =
   
 let write { current } oc = Marshal.to_channel oc current [Marshal.Closures]
 
-let current = { name = ""; values = E.empty }
-let modules = { current = current; opened = []; modules = E.empty }
+let current { current } = current
 
+let empty = 
+  let current = { name = ""; values = E.empty } in
+  { current; opened = []; modules = E.empty }

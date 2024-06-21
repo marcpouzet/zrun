@@ -135,12 +135,11 @@ let eval_definitions_in_file modname filename n_steps =
     Debug.print_program (Reduce.program genv) 
   (* Equivalence checking *)
   |> do_optional_step (!set_reduce && !set_check)
-    (Coiteration.program genv0 |> (Coiteration.check ff n_steps genv)
+    (Coiteration.program genv0 |> Genv.current |> (Coiteration.check ff n_steps genv)
 *)
 
   (* Evaluation of definitions *)
-  let { current = { values = values1 } } as genv =
-    do_step "Evaluation of definitions done"
+  let genv = do_step "Evaluation of definitions done"
       Debug.print_nothing (Coiteration.program genv0) p in
   
   (* Static reduction *)
@@ -149,16 +148,21 @@ let eval_definitions_in_file modname filename n_steps =
       Debug.print_program (Reduce.program genv) p in
   
   (* Equivalence checking *)
-  (*
+  (* let _ =
+    do_optional_check (!set_reduce && !set_check)
+      (Coiteration.program genv0) |> Genv.current |> 
+    Coiteration.check ff n_steps (Genv.current genv) *)
+(*
     do_optional_step (!set_reduce && !set_check)
       Coiteration.program genv0 |> (Coiteration.check ff n_steps genv) *)
 
   (* Equivalence checking *)
-  if !set_check then
-    begin let { current = { values = values2} } as genv_after_reduce = 
+  (* if !set_check then
+    begin let genv_after_reduce = 
             Coiteration.program genv0 p_after_reduce in
-      Coiteration.check ff n_steps values1 values2
-    end;
+      Coiteration.check ff n_steps 
+        (Genv.current genv) (Genv.current genv_after_reduce)
+    end; *)
     
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv0) otc;
