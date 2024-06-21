@@ -98,10 +98,10 @@ let do_optional_step is_step comment output step p =
 (* Evaluate all the definition in a file, store values *)
 let eval_definitions_in_file modname filename n_steps =
   let open Genv in
+  let ff = Format.std_formatter in
   (* output file in which values are stored *)
   let obj_name = filename ^ ".zlo" in
   let otc = open_out_bin obj_name in
-    
   let source_name = filename ^ ".zls" in
 
   (* set the current opened module *)
@@ -135,7 +135,7 @@ let eval_definitions_in_file modname filename n_steps =
   if !set_check then
     begin let { current = { values = values2} } as genv_after_reduce = 
             Coiteration.program genv0 p_after_reduce in
-      Coiteration.check n_steps values1 values2
+      Coiteration.check ff n_steps values1 values2
     end;
     
   (* Write the values into a file *)
