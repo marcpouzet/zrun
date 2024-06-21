@@ -27,10 +27,10 @@
   (public_name zrun.zrun_lib)
   (wrapped false)
   (modules
+    genv  ; the type of a gloval environment
     error ; error messages
     value ; the type of values
     debug ; all the information for debuging
-    genv  ; the type of a gloval environment
     primitives ; the value of primitives
     find ; find the current value and the last value of a variable
     match ; the evaluation of pattern matching
@@ -39,7 +39,7 @@
     fix ; a bounded fix-point
     monad ; useful monad to deal with errors
     coiteration ; the main execution loop
-    output ; reprentation of the internal state
+    output ; printing
     forloop ; evaluation functions for for loops
     eval ; evaluation of an expression
     rsize ; static evaluation of sizes
