@@ -116,10 +116,27 @@ let eval_definitions_in_file modname filename n_steps =
   (* Add Stdlib *)
   let genv0 = Genv.add_module genv0 Primitives.stdlib_env in
   
+  (* Associate unique index to variables *)
   let p = do_step "Scoping done" Debug.print_program Scoping.program p in
-
   (* Write defined variables for equations *)
   let p = do_step "Write done" Debug.print_program Write.program p in
+
+(*
+  p 
+  (* Associate unique index to variables *)
+  |> do_step "Scoping done" Debug.print_program Scoping.program
+  (* Write defined variables for equations *)
+  |> do_step "Write done" Debug.print_program Write.program
+  (* Evaluation of definitions *)
+  |> do_step "Evaluation of definitions done"
+    Debug.print_nothing (Coiteration.program genv0)
+  (* Static reduction *)
+  |> do_optional_step !set_reduce "Static reduction"
+    Debug.print_program (Reduce.program genv) 
+  (* Equivalence checking *)
+  |> do_optional_step (!set_reduce && !set_check)
+    (Coiteration.program genv0 |> (Coiteration.check ff n_steps genv)
+*)
 
   (* Evaluation of definitions *)
   let { current = { values = values1 } } as genv =
@@ -131,7 +148,12 @@ let eval_definitions_in_file modname filename n_steps =
     do_optional_step !set_reduce "Static reduction"
       Debug.print_program (Reduce.program genv) p in
   
-  (* Check equivalence *)
+  (* Equivalence checking *)
+  (*
+    do_optional_step (!set_reduce && !set_check)
+      Coiteration.program genv0 |> (Coiteration.check ff n_steps genv) *)
+
+  (* Equivalence checking *)
   if !set_check then
     begin let { current = { values = values2} } as genv_after_reduce = 
             Coiteration.program genv0 p_after_reduce in
