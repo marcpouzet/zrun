@@ -76,6 +76,8 @@ type ('a, 'info) global_it_funs =
 type ('a, 'info) it_funs =
   {
     global_funs : ('a, 'info) global_it_funs;
+    build :  ('a, 'info) it_funs -> 'a ->
+            'info Ident.Env.t -> 'info Ident.Env.t * 'a;
     pattern : ('a, 'info) it_funs -> 'a -> 'info pattern -> 'info pattern * 'a;
     type_expression :
       ('a, 'info) it_funs -> 'a -> type_expression -> type_expression * 'a;
@@ -87,6 +89,8 @@ type ('a, 'info) it_funs =
       ('a, 'info) it_funs -> 'a -> 'info eq -> 'info eq * 'a;
     scondpat :
       ('a, 'info) it_funs -> 'a -> 'info scondpat -> 'info scondpat * 'a;
+    size_t :
+      ('a, 'info) it_funs -> 'a -> size -> size * 'a;
     expression :
       ('a, 'info) it_funs -> 'a -> 'info exp -> 'info exp * 'a;
     vardec :
@@ -97,11 +101,20 @@ type ('a, 'info) it_funs =
       ('info, 'info exp, 'info eq) block * 'a;
     result :
       ('a, 'info) it_funs -> 'a -> 'info result -> 'info result * 'a;
+    funexp :
+      ('a, 'info) it_funs -> 'a -> 'info funexp -> 'info funexp * 'a;
+    last :
+      ('a, 'info) it_funs -> 'a -> Ident.t -> Ident.t * 'a;
   }
 
-let rec pattern_it funs acc p =
-  try funs.pattern funs acc p
-  with Fallback -> pattern funs acc p
+(** Build a renaming from an environment *)
+let build_it funs acc env =
+  try funs.build funs acc env
+  with Fallback -> acc, env
+
+let rec pattern_it funs acc pat =
+  try funs.pattern funs acc pat
+  with Fallback -> pattern funs acc pat
 
 and pattern funs acc ({ pat_desc } as p) =
   let pat_desc, acc = match pat_desc with
@@ -136,8 +149,8 @@ and pattern funs acc ({ pat_desc } as p) =
        Etypeconstraintpat(p1, ty), acc in
   { p with pat_desc }, acc
 
-and var_ident_it funs acc x =
-  funs.var_ident funs acc x
+and var_ident_it gloval_funs x =
+  funs.var_ident global_funs acc x
 
 and var_ident funs acc x = x, acc
 
@@ -155,7 +168,7 @@ let rec write_it funs acc { dv; di; der } =
   { dv; di; der }, acc
 
 and write_t funs acc w =
-  try funs.write_t funs acc w with Fallback -> write_t funs acc w
+  try funs.write_t funs acc w with Fallback -> w, acc
 
 let default_t f acc d =
   match d with
@@ -163,31 +176,31 @@ let default_t f acc d =
   | Else(e) -> let e, acc = f acc e in Else(e), acc
   | NoDefault -> NoDefault, acc
 
-let for_exit_t expression acc ({ for_exit } as fe) =
-  let for_exit, acc = expression acc for_exit in
+let for_exit_t funs acc ({ for_exit } as fe) =
+  let for_exit, acc = funs.expression funs acc for_exit in
   { fe with for_exit }, acc
 
-let for_kind_t expression acc for_kind =
+let for_kind_t funs acc for_kind =
   match for_kind with
   | Kforeach -> Kforeach, acc
   | Kforward(for_exit_opt) ->
      let for_exit_opt, acc = 
-       Util.optional_with_map (for_exit_t expression) acc for_exit_opt in
+       Util.optional_with_map (for_exit_t funs) acc for_exit_opt in
      Kforward(for_exit_opt), acc
     
-let for_size_t expression acc e = expression acc e
+let for_size_t funs acc e = funs.expression funs acc e
 
-let for_input_t var_ident expression acc ({ desc } as fi) =
+let for_input_t funs acc ({ desc } as fi) =
   let desc, acc = match desc with
     | Einput {id; e; by } ->
-       let id, acc = var_ident acc id in
-       let e, acc = expression acc e in
-       let by, acc = Util.optional_with_map expression acc by in
+       let id, acc = funs.global_funs.var_ident funs.global_funs acc id in
+       let e, acc = funs.expression funs acc e in
+       let by, acc = Util.optional_with_map (funs.expression funs) acc by in
        Einput { id; e; by }, acc
     | Eindex ({ id; e_left; e_right } as ind) ->
-       let id, acc = var_ident acc id in
-       let e_left, acc = expression acc e_left in
-       let e_right, acc = expression acc e_right in
+       let id, acc = funs.global_funs.var_ident funs.global_funs acc id in
+       let e_left, acc = funs.expression funs acc e_left in
+       let e_right, acc = funs.expression funs acc e_right in
        Eindex { ind with id; e_left; e_right }, acc in
   { fi with desc }, acc
 
@@ -198,7 +211,8 @@ let rec leq_it funs acc leq =
   try funs.leq_t funs acc leq
   with Fallback -> leq_t funs acc leq
 
-and leq_t funs acc ({ l_eq } as leq) =
+and leq_t funs acc ({ l_eq; l_env } as leq) =
+  let l_env, acc = funs.build funs acc l_env in
   let l_eq, acc = funs.equation funs acc l_eq in
   { leq with l_eq }, acc
 
@@ -241,16 +255,24 @@ and vardec funs acc ({ var_default; var_init; var_typeconstraint } as v) =
     Util.optional_with_map (funs.type_expression funs) acc var_typeconstraint in
   { v with var_default; var_init; var_typeconstraint }, acc
 
+let rec last_it funs acc l =
+  try funs.last funs acc l
+  with Fallback -> last funs acc l
+
+and last funs acc l =
+  funs.global_funs.var_ident funs.global_funs acc l
+
 let rec block_it funs acc b =
   try funs.block funs acc b
   with Fallback -> block funs acc b
 
-and block funs acc ({ b_vars; b_body; b_write } as b) =
+and block funs acc ({ b_vars; b_body; b_write; b_env } as b) =
+  let b_env, acc = funs.build funs acc b_env in
   let b_vars, acc = 
     Util.mapfold (funs.vardec funs) acc b_vars in
   let b_body, acc = funs.equation funs acc b_body in
   let b_write, acc = funs.write_t funs acc b_write in
-  { b with b_vars; b_body; b_write }, acc
+  { b with b_vars; b_body; b_env; b_write }, acc
 
 let rec result_it funs acc r =
   try funs.result funs acc r
@@ -264,33 +286,353 @@ and result funs acc ({ r_desc } as r) =
        let b_eq, acc = funs.block funs acc b_eq in Returns(b_eq), acc in
   { r with r_desc }, acc
 
+let rec funexp_it funs acc f =
+  try funs.funexp funs acc f
+  with Fallback -> funexp funs acc f
+
+and funexp funs acc ({ f_args; f_body; f_env } as f) =
+  let arg acc v_list = Util.mapfold (vardec_it funs) acc v_list in
+  let f_args, acc_local = Util.mapfold arg acc f_args in
+  let f_body, acc_local = funs.result funs acc_local f_body in
+  { f with f_args; f_body; f_env }, acc
+
+(* Expressions *)
+let rec size_it funs acc si =
+  try funs.size_t funs acc si
+  with Fallback -> size_t funs acc si
+
+and size_t funs acc ({ desc } as si) =
+  let desc, acc = match desc with
+  | Sint _ -> desc, acc
+  | Sfrac { num; denom } ->
+     let num, acc = funs.size_t funs acc num in
+     Sfrac { num; denom }, acc
+  | Sident(id) ->
+     let id, acc = funs.global_funs.var_ident funs.global_funs acc id in
+     Sident(id), acc
+  | Splus(si1, si2) ->
+     let si1, acc = funs.size_t funs acc si1 in
+     let si2, acc = funs.size_t funs acc si2 in
+     Splus(si1, si2), acc
+  | Sminus(si1, si2) ->
+     let si1, acc = funs.size_t funs acc si1 in
+     let si2, acc = funs.size_t funs acc si2 in
+     Splus(si1, si2), acc
+  | Smult(si1, si2) ->
+     let si1, acc = funs.size_t funs acc si1 in
+     let si2, acc = funs.size_t funs acc si2 in
+     Splus(si1, si2), acc in
+  { si with desc }, acc
+
+(** Expressions **)
+let rec expression_it funs acc e =
+  try funs.expression funs acc e
+  with Fallback -> expression funs acc e
+
+and expression funs acc ({ e_desc; e_loc } as e) =
+  match e_desc with
+  | Econst _ | Econstr0 _ | Eglobal _ -> e, acc
+  | Evar(x) ->
+     let x, acc = funs.global_funs.var_ident funs.global_funs acc x in
+     { e with e_desc = Evar(x) }, acc
+  | Elast(x) ->
+     let x, acc = funs.last funs acc x in
+     { e with e_desc = Elast(x) }, acc
+  | Etuple(e_list) ->
+     let e_list, acc = Util.mapfold (expression_it funs) acc e_list in
+     { e with e_desc = Etuple(e_list) }, acc
+  | Econstr1 { lname; arg_list } ->
+     let arg_list, acc = Util.mapfold (expression_it funs) acc arg_list in
+     { e with e_desc = Econstr1 { lname; arg_list } }, acc
+  | Erecord(l_e_list) -> 
+      let l_e_list, acc =
+        Util.mapfold (fun acc { label; arg } ->
+            let arg, acc = expression_it funs acc arg in 
+            { label; arg }, acc) acc l_e_list in
+      { e with e_desc = Erecord(l_e_list) }, acc
+  | Erecord_access { label; arg } ->
+      let arg, acc = expression_it funs acc arg in
+      { e with e_desc = Erecord_access { label; arg } }, acc
+  | Erecord_with(e_record, l_e_list) -> 
+     let e_record, acc = expression_it funs acc e_record in
+     let l_e_list, acc =
+       Util.mapfold
+	  (fun acc { label; arg } ->
+            let arg, acc = expression_it funs acc e in { label; arg }, acc)
+          acc l_e_list in
+      { e with e_desc = Erecord_with(e_record, l_e_list) }, acc
+  | Eapp ({ f; arg_list } as a) ->
+     let arg_list, acc = Util.mapfold (expression_it funs) acc arg_list in
+     let f, acc = expression_it funs acc f in
+     { e with e_desc = Eapp { a with f; arg_list } }, acc
+  | Eop(op, e_list) ->
+     let e_list, acc = Util.mapfold (expression_it funs) acc e_list in
+     { e with e_desc = Eop(op, e_list) }, acc
+  | Etypeconstraint(e_ty, ty) ->
+     let e_ty, acc = expression_it funs acc e_ty in
+     let ty, acc = type_expression_it funs acc ty in
+     { e with e_desc = Etypeconstraint(e_ty, ty) }, acc
+  | Elet(l, e_let) ->
+     let l, acc = leq_it funs acc l in
+     let e_let, acc = expression_it funs acc e_let in
+     { e with e_desc = Elet(l, e_let) }, acc
+  | Elocal(eq_b, e) ->
+     let eq_b, acc = block_it funs acc eq_b in
+     let e, acc = expression_it funs acc e in
+     { e with e_desc = Elocal(eq_b, e) }, acc
+  | Epresent({ handlers; default_opt }) ->
+     let body acc ({ p_cond; p_body; p_env } as p_b) =
+       let p_env, acc = build_it funs acc p_env in
+       let p_cond, acc = scondpat_it funs acc p_cond in
+       let p_body, acc = funs.expression funs acc p_body in
+       { p_b with p_cond; p_body }, acc in
+     let handlers, acc =
+       Util.mapfold body acc handlers in
+     let default_opt, acc = default_t (expression_it funs) acc default_opt in
+     { e with e_desc = Epresent { handlers; default_opt } }, acc 
+  | Ematch({ e; handlers } as m) ->
+     let body acc ({ m_pat; m_body; m_env } as m_h) =
+       let m_env, acc = build_it funs acc m_env in
+       let m_pat, acc = pattern_it funs acc m_pat in
+       let m_body, acc = expression_it funs acc m_body in
+       { m_h with m_pat; m_body; m_env }, acc in
+     let e, acc = funs.expression funs acc e in
+     let handlers, acc =
+       Util.mapfold body acc handlers in
+     { e with e_desc = Ematch { m with e; handlers } }, acc
+  | Eassert e -> let e, acc = expression_it funs acc e in
+                 { e with e_desc = Eassert(e) }, acc
+  | Ereset(e_body, e_c) ->
+     let e_body, acc = expression_it funs acc e_body in
+     let e_c, acc = expression_it funs acc e_c in
+     { e with e_desc = Ereset(e_body, e_c) }, acc
+  | Esizeapp { f; size_list } -> 
+     let size_list, acc = Util.mapfold (size_it funs) acc size_list in
+     let v, acc = expression_it funs acc f in
+     { e with e_desc = Esizeapp { f; size_list } }, acc
+  | Efun f ->
+     let f, acc = funexp_it funs acc f in
+     { e with e_desc = Efun f }, acc
+  | Eforloop
+     ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
+     let for_vardec_t acc ({ desc = { for_array; for_vardec } } as f) =
+       let for_vardec, acc = vardec_it funs acc for_vardec in
+       { f with desc = { for_array; for_vardec } }, acc in
+     let for_exp_t acc for_exp =
+       match for_exp with
+       | Forexp { exp; default } ->
+          let exp, acc = expression_it funs acc exp in
+          let default, acc =
+            Util.optional_with_map (expression_it funs) acc default in
+          Forexp { exp; default }, acc
+       | Forreturns { returns; body; r_env } ->
+          let r_env, acc = build_it funs acc r_env in
+          let returns, acc = Util.mapfold for_vardec_t acc returns in
+          let body, acc = block_it funs acc body in
+          Forreturns { returns; body; r_env }, acc in
+     let for_env, acc = build_it funs acc for_env in
+     let for_size, acc =
+       Util.optional_with_map (for_size_t funs) acc for_size in
+     let for_kind, acc = for_kind_t funs acc for_kind in
+     let for_input, acc =
+       Util.mapfold (for_input_t funs) acc for_input in
+     let for_body, acc = for_exp_t acc for_body in
+     { e with e_desc =
+                Eforloop
+                  { f with for_size; for_kind; for_index; for_input;
+                           for_body; for_env } }, acc
+
+(** Equations **)
+let rec equation_it funs acc eq =
+  try funs.equation funs acc eq
+  with Fallback -> equation funs acc eq
+
+and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) = 
+  let eq_write, acc = write_t funs acc eq_write in
+  let eq, acc = match eq_desc with
+    | EQeq(p, e) ->
+       let p, acc = pattern_it funs acc p in
+       let e, acc = expression_it funs acc e in
+       { eq with eq_desc = EQeq(p, e) }, acc
+    | EQinit(x, e) ->
+       let e, acc = expression_it funs acc e in
+       let x, acc = var_ident_it funs.global_funs acc x in
+       { eq with eq_desc = EQinit(x, e) }, acc
+    | EQemit(x, e_opt) ->
+       let x, acc = var_ident_it funs.global_funs acc x in
+       let e_opt, acc =
+         Util.optional_with_map (expression_it funs) acc e_opt in
+       { eq with eq_desc = EQemit(x, e_opt) }, acc
+    | EQder { id; e; e_opt; handlers } ->
+       let body acc ({ p_cond; p_body; p_env } as p_b) =
+         let p_env, acc = build_it funs acc p_env in
+         let p_cond, acc = scondpat_it funs acc p_cond in
+         let p_body, acc = expression_it funs acc p_body in
+         { p_b with p_cond; p_body }, acc in
+       let id, acc = var_ident_it funs.global_funs acc id in
+       let e, acc = expression_it funs acc e in
+       let e_opt, acc =
+         Util.optional_with_map (funs.expression funs) acc e_opt in
+       let handlers, acc = Util.mapfold body acc handlers in
+       { eq with eq_desc = EQder { id; e; e_opt; handlers } }, acc
+    | EQif { e; eq_true; eq_false } ->
+       let e, ac = expression_it funs acc e in
+       let eq_true, acc = equation_it funs acc eq_true in
+       let eq_false, acc = funs.equation funs acc eq_false in
+       { eq with eq_desc = EQif { e; eq_true; eq_false } }, acc
+    | EQmatch({ e; handlers } as m) ->
+       let body acc ({ m_pat; m_body; m_env } as m_h) =
+         let m_env, acc = build_it funs acc m_env in
+         let m_pat, acc = pattern_it funs acc m_pat in
+         let m_body, acc = equation_it funs acc m_body in
+         { m_h with m_pat; m_body; m_env }, acc in
+       let e, acc = funs.expression funs acc e in
+       let handlers, acc =
+         Util.mapfold body acc handlers in
+       { eq with eq_desc = EQmatch { m with e; handlers } }, acc
+    | EQlocal(eq_b) ->
+       let eq_b, acc = block_it funs acc eq_b in
+       { eq with eq_desc = EQlocal(eq_b) }, acc
+    | EQand(eq_list) ->
+       let eq_list, acc = Util.mapfold (equation_it funs) acc eq_list in
+       { eq with eq_desc = EQand(eq_list) }, acc
+    | EQpresent({ handlers; default_opt }) ->
+       let body acc ({ p_cond; p_body; p_env } as p_b) =
+         let p_env, acc = build_it funs acc p_env in
+         let p_cond, acc = scondpat_it funs acc p_cond in
+         let p_body, acc = equation_it funs acc p_body in
+         { p_b with p_cond; p_body }, acc in
+       let handlers, acc =
+         Util.mapfold body acc handlers in
+       let default_opt, acc = default_t (equation_it funs) acc default_opt in
+       { eq with eq_desc = EQpresent { handlers; default_opt } }, acc
+    | EQautomaton({ handlers; state_opt } as a) ->
+       let statepat acc ({ desc } as spat) =
+         let desc, acc = match desc with
+           | Estate0pat(id) ->
+              let id, acc = var_ident_it funs.global_funs acc id in
+            Estate0pat(id), acc
+         | Estate1pat(id, id_list) ->
+            let id, ac = var_ident_it funs.global_funs acc id in
+            let id_list, acc =
+              Util.mapfold (var_ident_it funs.global_funs)
+                acc id_list in
+            Estate1pat(id, id_list), acc in
+         { spat with desc }, acc in
+       let rec state acc ({ desc } as st) =
+         let desc, acc  = match desc with
+           | Estate0(id) ->
+              let id, acc = var_ident_it funs.global_funs acc id in
+              Estate0(id), acc
+           | Estate1(id, e_list) ->
+              let id, acc =  var_ident_it funs.global_funs acc id in
+              let e_list, acc =
+                Util.mapfold (expression_it funs) acc e_list in
+              Estate1(id, e_list), acc
+           | Estateif(e, st1, st2) ->
+              let e, acc = expression_it funs acc e in
+              let st1, acc = state acc st1 in
+              let st2, acc = state acc st2 in
+              Estateif(e, st1, st2), acc in
+         { st with desc }, acc in
+       let escape acc ({ e_cond; e_let; e_body; e_next_state; e_env } as esc) =
+         let e_env, acc = build_it funs acc e_env in
+         let e_cond, acc = scondpat_it funs acc e_cond in
+         let e_let, acc = slet_it funs acc e_let in
+         let e_body, acc = block_it funs acc e_body in
+         let e_next_state, acc = state acc e_next_state in
+         { esc with e_cond; e_let; e_body; e_next_state; e_env }, acc in
+       let handler acc ({ s_state; s_let; s_body; s_trans } as h) =
+         let s_state, acc = statepat acc s_state in
+         let s_let, acc = slet_it funs acc s_let in
+         let s_body, acc = block_it funs acc s_body in
+         let s_trans, acc = Util.mapfold escape acc s_trans in
+         { h with s_state; s_let; s_body; s_trans }, acc in
+       let state_opt, acc = Util.optional_with_map state acc state_opt in
+       let handlers, acc = Util.mapfold handler acc handlers in
+       { eq with eq_desc = EQautomaton({ a with handlers; state_opt }) }, acc
+    | EQempty -> eq, acc
+    | EQassert(e) ->
+       let e, acc = expression_it funs acc e in
+       { eq with eq_desc = EQassert(e) }, acc
+    | EQforloop
+       ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
+       let for_eq_t acc { for_out; for_block } =
+         let for_out_t acc
+               ({ desc = { for_name; for_out_name; for_init; for_default } } as f) =
+           let for_name, acc = build_it funs acc for_name in
+           let for_out_name, acc = 
+             Util.optional_with_map (var_ident_it funs) acc for_out_name in
+           let for_init, acc =
+             Util.optional_with_map (expression_it funs) acc for_init in
+           let for_default, acc =
+             Util.optional_with_map (expression_it funs) acc for_default in
+           { f with desc = { for_name; for_out_name; for_init; for_default } },
+           acc in
+         let for_out, acc =
+           Util.mapfold for_out_t acc for_out in
+         let for_block, acc = block_it funs acc for_block in
+         { for_out; for_block }, acc in
+       let for_env, acc = build_it funs acc for_env in
+       let for_size, acc =
+         Util.optional_with_map (for_size_t funs) acc for_size in
+       let for_kind, acc = for_kind_t funs acc for_kind in
+       let for_input, acc =
+         Util.mapfold (for_input_t funs) acc for_input in
+       let for_body, acc = for_eq_t acc for_body in
+       { eq with eq_desc =
+                   EQforloop
+                     { f with for_size; for_kind; for_index; for_input;
+                              for_body; for_env } }, acc
+    | EQreset(eq, e_c) ->
+       let eq, acc = equation_it funs acc eq in
+       let e_c, acc = expression_it funs acc e_c in
+       { eq with eq_desc = EQreset(eq, e_c) }, acc
+    | EQlet(leq, eq) ->
+       let leq, acc = leq_it funs acc leq in
+       let eq, acc = equation_it funs acc eq in
+       { eq with eq_desc = EQlet(leq, eq) }, acc
+    | EQsizefun _ ->
+       error { Error.kind = Eshould_be_static; loc = eq_loc } in
+  { eq with eq_write }, acc
+
 let equation funs acc eq = eq, acc
 
-let expression funs acc e = e, acc
+let build funs acc env = env, acc
 
 let defaults =
   { global_funs = { var_ident };
+    build;
     pattern;
     type_expression;
     write_t;
     leq_t;
     equation;
     scondpat;
+    size_t;
     expression;
     vardec;
     block;
-    result;}
+    result;
+    funexp;
+    last;
+  }
                  
 let defaults_stop =
   { global_funs = { var_ident = stop };
+    build = stop;
     pattern = stop;
     type_expression = stop;
     write_t = stop;
     leq_t = stop;
     equation = stop;
     scondpat = stop;
+    size_t = stop;
     expression = stop;
     vardec = stop;
     block = stop;
-    result = stop }
+    result = stop;
+    funexp = stop;
+    last = stop;
+  }
 
