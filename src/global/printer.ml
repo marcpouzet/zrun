@@ -367,16 +367,17 @@ and result_block ff { b_vars; b_body; b_write } =
     print_writes b_write
     equation b_body
   
+and kind f_kind =
+  match f_kind with
+  | Kfun _ -> "fun"
+  | Knode(k) ->
+     (match k with | Kdiscrete -> "node" | Khybrid -> "hybrid")
+
 and funexp ff { f_vkind; f_kind; f_args; f_body; f_env } =
-  let kind =
-    match f_kind with
-    | Kfun _ -> "fun"
-    | Knode(k) ->
-       (match k with | Kdiscrete -> "node" | Khybrid -> "hybrid") in
   let vkind =
     match f_vkind with | Kconst -> "const" | Kstatic -> "static" | Kany -> "" in
   fprintf ff "@[<hov 2>%s %s %a ->@ %a@ %a@]"
-    kind vkind arg_list f_args result f_body print_env_names f_env
+    (kind f_kind) vkind arg_list f_args result f_body print_env_names f_env
 
 and arg_list ff a_list =
   print_list_r arg "" "" "" ff a_list
