@@ -37,6 +37,7 @@ type kind =
   | Epattern_matching_failure : kind
   | Enil : kind (* value is nil *)
   | Ebot : kind (* value is bottom *)
+  | Eequal : kind (* values that are expected to be equal are not *)
   | Eassert_failure : kind (* assertion is not true *)
   | Emerge_env : kind (* two equations have names in common *)
   | Erecursive_value : kind (* recursive value definition *)
@@ -63,11 +64,15 @@ type kind =
                                       actual_dimension: int } -> kind
   (* the loop iterates on [expected_dimensions] but the input or output array *)
   (* has dimention [actual_dimension] *)
-  | Eunexpected_failure : kind (* an error that should not arrive *)
+  | Eunexpected_failure : { print : formatter -> 'a -> unit; arg : 'a } -> kind
+  (* an error that should not arrive *)
   | Enot_implemented : kind (* not implemented *)
                   
 type error = { kind : kind; loc : Location.t }
-           
+
+let unexpected_failure =
+  Eunexpected_failure { arg = (); print = fun ff () -> () }
+
 let message loc kind =
   match kind with
   | Eunbound_ident(name) ->
@@ -123,6 +128,8 @@ let message loc kind =
      eprintf "@[%aZrun: value is nil.@.@]" output_location loc
   | Ebot ->
      eprintf "@[%aZrun: value is bottom.@.@]" output_location loc
+  | Eequal ->
+     eprintf "@[%aZrun: expressions expected to be equal are not.@.@]" output_location loc
   | Eassert_failure ->
      eprintf "@[%aZrun: assertion is not true.@.@]" output_location loc
   | Emerge_env ->
@@ -180,5 +187,5 @@ let message loc kind =
       output_location loc actual_dimension expected_dimension
   (* the loop iterates on [expected_dimensions] but the input or output array *)
   (* has dimention [actual_dimension] *)
-  | Eunexpected_failure ->
-     eprintf "@[%aZrun: unexpected error.@.@]" output_location loc
+  | Eunexpected_failure { print; arg } ->
+     eprintf "@[%aZrun: unexpected error.@.%a@.@]" output_location loc print arg
