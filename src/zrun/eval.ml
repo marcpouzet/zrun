@@ -53,30 +53,7 @@ let parse parsing_fun lexing_fun source_name =
 let parse_implementation_file source_name =
   parse Parser.implementation_file Lexer.main source_name
                
-(* The main entry function. Execute [n] steps of [main()] or [run main ()]  *)
-let eval ff genv n_steps name =
-  let fv =
-    find_gvalue_opt (Name name) genv in
-  match fv with
-  | None ->
-     Format.eprintf "@[Zrun: the global value %s is unbound.@.@]" name
-  | Some(v) ->
-     match v with
-     | Vclosure({ c_funexp = { f_kind; f_loc; f_args = [[]] } } as c) ->
-        begin match f_kind with
-        | Knode _ ->
-           let si = Coiteration.catch (Coiteration.instance f_loc c) in
-           Format.fprintf ff
-             "@[Evaluate %d steps of %s()@.@]" n_steps name;
-           Coiteration.run_node
-             no_location (Output.value_flush ff) n_steps si void
-        | Kfun _ ->
-           Format.fprintf ff
-             "@[Evaluate %d steps of %s()@.@]" n_steps name;
-           Coiteration.run_fun
-             no_location (Output.value_flush ff) n_steps v [void] end
-     | _ -> Output.pvalue_flush ff v
-             
+           
 let apply_with_close_out f o =
   try
     f o;
@@ -146,40 +123,15 @@ let eval_definitions_in_file modname filename n_steps =
   apply_with_close_out (Genv.write genv) otc;
 
   genv
-
- (* evaluate all nodes/functions whose input is () *)
- let all modname filename n_steps =
-   let open Genv in
-   let ff = Format.std_formatter in
-   let { current = { values } } = 
-     eval_definitions_in_file modname filename n_steps in
-   let eval name v =
-     match v with
-     (* we make a special treatment for top level functions whose input *)
-     (* is () *)
-     | Vclosure({ c_funexp = { f_kind; f_loc; f_args = [[]] } } as c) ->
-        begin match f_kind with
-        | Knode _ ->
-           let si = Coiteration.catch (Coiteration.instance f_loc c) in
-           Format.fprintf ff "@[Evaluate %d steps of %s@.@]" n_steps name;
-           Coiteration.run_node
-             no_location (Output.value_flush ff) n_steps si void
-        | Kfun _ ->
-           Format.fprintf ff "@[Evaluate %d steps of %s@.@]" n_steps name;
-           Coiteration.run_fun
-             no_location (Output.value_flush ff) n_steps v [void] end
-     | _ -> Output.pvalue_flush ff v in
-   
-     (* evaluate a list of main function/nodes *)
-   E.iter eval values
      
  (* evaluate the body of a list of main nodes *)    
- let main modname filename n_steps l_nodes =
+ let main modname filename n_steps is_all l_names =
    let ff = Format.std_formatter in
    let genv = eval_definitions_in_file modname filename n_steps in
      
    (* evaluate a list of main function/nodes *)
-   List.iter (eval ff genv n_steps) l_nodes
+   if is_all then Coiteration.all ff n_steps (Genv.current genv)
+   else Coiteration.eval_list ff n_steps genv l_names
 
 let transforme_and_compare transform eval compare acc p =
   let p' = transform p in
