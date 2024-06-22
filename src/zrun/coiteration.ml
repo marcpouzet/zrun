@@ -2359,6 +2359,7 @@ let implementation genv { desc; loc } =
   | Eletdecl { d_names; d_leq } -> 
      (* evaluate the set of equations *)
      let* env = vleq genv Env.empty d_leq in
+     let l1 = Env.to_list env in
      let f_pvalue_list =
        List.map (fun (n, id) -> (n, Env.find id env)) d_names in
      (* debug info (a bit of imperative code here!) *)
@@ -2473,6 +2474,8 @@ let eval_list ff n_steps genv l_names =
 
 (* check that all [for all n in Dom(g1), value(n) = value(g2(n))] *)
 let check ff n_steps { values = g1 } { values = g2 } =
+  let l1 = E.to_list g1 in
+  let l2 = E.to_list g2 in
   let check name v1 v2 =
     Format.fprintf ff "@[Evaluate %d steps of %s@.@]" n_steps name;
     match v1, v2 with

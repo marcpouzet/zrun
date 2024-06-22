@@ -1,5 +1,8 @@
 let y = 1 + 2
 
+let z = y + 1
+
+    (*
 let f1 h g x = h g x + 1
 
 let g x returns o
@@ -16,3 +19,4 @@ let node f() returns o o = 0 fby o + 1
 let node main() returns o
   let static o' = g 0 in
   do o = o' done
+*)

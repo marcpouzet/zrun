@@ -116,6 +116,13 @@ let add f pvalue ({ current } as genv) =
     { current with values = E.add f pvalue current.values } in
   { genv with current = current }
 
+let add_list f_pvalue_list ({ current } as genv) =
+  let values =
+    List.fold_left (fun acc (f, pvalue) -> E.add f pvalue acc)
+      current.values f_pvalue_list in
+  let current = { current with values } in
+  { genv with current = current }
+
 let find qualname genv =
   let v, _ = find qualname genv in
   v
