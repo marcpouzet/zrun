@@ -32,7 +32,7 @@ type 'a env =
   { e_renaming: Ident.t Ident.Env.t; (* environment for renaming *)
     e_values: 'a Ident.Env.t;  (* environment of static values *)
     e_gvalues: 'a Genv.genv;   (* global environment of static values *)
-    e_defs: (Ident.t * no_info exp) list;
+    e_defs: (name * Ident.t * no_info exp) list;
     (* global definitions of static values introduced during the reduction *)
     (* the head of the list is the last added value *)
     e_exp: no_info exp Ident.Env.t; (* the expression associated to [x] *)
@@ -590,9 +590,10 @@ and value_t loc acc v =
          let acc_local = update acc c_genv c_env in
          let f, acc_local = funexp acc_local c_funexp in 
          (* add a definition in the global environment *)
-         let m = Ident.fresh "reduce" in
+         let m = Ident.fresh "r" in
+         let name = Ident.name m in
          Eglobal { lname = Name(Ident.name m) },
-         { acc with e_defs = (m, make (Efun(f))) :: acc_local.e_defs }
+         { acc with e_defs = (name, m, make (Efun(f))) :: acc_local.e_defs }
       | Vpresent _ | Vabsent | Vstate0 _ 
         | Vstate1 _ | Vsizefun _ | Vsizefix _ ->
          (* none of these construct should appear *)
@@ -609,19 +610,19 @@ and value_t loc acc v =
   else 
     (* add a definition in the global environment *)
     let m = Ident.fresh "reduce" in
-    let lname = Ident.name m in
-    let e = make (Eglobal { lname = Name(lname) }) in
-    e, { acc with e_defs = (m, e) :: acc.e_defs;
-                  e_gvalues = Genv.add lname v acc.e_gvalues;
+    let name = Ident.name m in
+    let e = make (Eglobal { lname = Name(name) }) in
+    e, { acc with e_defs = (name, m, e) :: acc.e_defs;
+                  e_gvalues = Genv.add name v acc.e_gvalues;
                   e_exp = Env.add m e acc.e_exp }
 
 (* a global value can be any static value except a size function *)
-let gvalue_t loc acc n v =
+let gvalue_t loc acc name id v =
   let open Value in
   match v with
     | Vsizefix _ | Vsizefun _ -> acc
     | _ -> let e, acc = value_t loc acc v in
-           { acc with e_defs = (n, e) :: acc.e_defs }
+           { acc with e_defs = (name, id, e) :: acc.e_defs }
 
 (* add global definitions in the list of global declarations of the module *)
 let add_global_defs acc { e_defs } =
@@ -633,8 +634,8 @@ let add_global_defs acc { e_defs } =
   let leq x e = 
     { l_rec = false; l_kind = Kstatic; l_eq = eq x e; 
       l_loc = Location.no_location; l_env = Env.singleton x no_info } in
-  let impl acc (x, e) = 
-    { desc = Eletdecl { d_names = [Ident.name x, x]; d_leq = leq x e };
+  let impl acc (name, x, e) = 
+    { desc = Eletdecl { d_names = [name, x]; d_leq = leq x e };
       loc = e.e_loc } :: acc 
   in
   (* warning; the order in which [e_defs] is the inverse of which *)
@@ -642,7 +643,7 @@ let add_global_defs acc { e_defs } =
   List.fold_left impl acc e_defs
 
 (* for every name in [d_names] convert its value in [acc] into an expression *)
-let def_of_values loc n v acc = gvalue_t loc acc n v
+let def_of_value loc acc (name, id, v) = gvalue_t loc acc name id v
 
  (* The main function. Reduce every definition *)
 let implementation acc ({ desc; loc } as impl) =
@@ -653,18 +654,19 @@ let implementation acc ({ desc; loc } as impl) =
     | Eletdecl { d_names; d_leq } ->
        (* [d_leq] must be static *)
        let env = leq_e acc d_leq in
-       let l1 = Env.to_list env in
-       (* add the definitions for values *)
-       let acc = Env.fold (def_of_values loc) env acc in
        (* add all entries in the current global environment *)
        let f_pvalue_list =
-         List.map (fun (n, id) -> (n, Env.find id env)) d_names in
+         List.map (fun (name, id) -> (name, id, Env.find id env)) d_names in
+       (* add the definitions for values *)
+       let acc = List.fold_left (def_of_value loc) acc f_pvalue_list in
        (* debug info (a bit of imperative code here) *)
+       let f_pvalue_list =
+         List.map (fun (name, _, v) -> (name, v)) f_pvalue_list in
        if !print_values then Output.letdecl Format.std_formatter f_pvalue_list;
        (* add all entries in the current global environment *)
        let acc =
          { acc with e_gvalues = Genv.add_list f_pvalue_list acc.e_gvalues } in
-       Eletdecl { d_names; d_leq = no_leq loc },
+       Eletdecl { d_names = []; d_leq = no_leq loc },
        acc
     | Etypedecl _ -> desc, acc in
   { impl with desc }, acc

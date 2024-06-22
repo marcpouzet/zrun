@@ -2474,10 +2474,7 @@ let eval_list ff n_steps genv l_names =
 
 (* check that all [for all n in Dom(g1), value(n) = value(g2(n))] *)
 let check ff n_steps { values = g1 } { values = g2 } =
-  let l1 = E.to_list g1 in
-  let l2 = E.to_list g2 in
   let check name v1 v2 =
-    Format.fprintf ff "@[Evaluate %d steps of %s@.@]" n_steps name;
     match v1, v2 with
     | Vclosure
       ({ c_funexp = { f_kind = k1; f_loc = loc1; f_args = [[]] } } as c1),
