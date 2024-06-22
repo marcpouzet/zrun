@@ -23,11 +23,8 @@ let main file =
     let filename = Filename.chop_extension file in
     let modname = String.capitalize_ascii (Filename.basename filename) in
     let n_steps = !Misc.number_of_steps in
-    let l_nodes = !Misc.main_nodes in
-    if !Misc.all then
-      Eval.all modname filename n_steps 
-    else
-      Eval.main modname filename n_steps l_nodes
+    let l_names = !Misc.main_nodes in
+    Eval.main modname filename n_steps !Misc.all l_names
   else raise (Arg.Bad "Expected *.zls file.")
 
 let doc_main = "\tThe main node to evaluate"
