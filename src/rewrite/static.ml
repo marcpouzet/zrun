@@ -532,7 +532,8 @@ and vardec acc ({ var_name; var_default; var_init; var_typeconstraint } as v) =
   let var_default, acc =
     Util.optional_with_map expression acc var_default in
   let var_init, acc = Util.optional_with_map expression acc var_init in
-  let var_typeconstraint, acc = type_expression acc var_typeconstraint in
+  let var_typeconstraint, acc =
+    Util.optional_with_map type_expression acc var_typeconstraint in
   { v with var_name; var_default; var_init; var_typeconstraint }, acc
 
                  
