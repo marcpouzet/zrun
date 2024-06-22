@@ -2432,13 +2432,14 @@ let run_two_nodes loc output n_steps
     else error { kind = Etype; loc } in
   run_n n_steps (init1, init2) step v
 
-let check ff n_steps genv0 genv1 =
+let check ff n_steps { values = g1 } { values = g2 } =
   let check name v1 v2 =
     Format.fprintf ff "@[Evaluate %d steps of %s@.@]" n_steps name;
     match v1, v2 with
-    | Vclosure({ c_funexp = { f_kind = k1; f_loc = loc1; f_args = [[]] } } as c1),
-      Vclosure({ c_funexp = { f_kind = k2; f_loc = loc2; f_args = [[]] } } as c2) 
-      ->
+    | Vclosure
+      ({ c_funexp = { f_kind = k1; f_loc = loc1; f_args = [[]] } } as c1),
+      Vclosure
+        ({ c_funexp = { f_kind = k2; f_loc = loc2; f_args = [[]] } } as c2) ->
         begin match k1, k2 with
         | Knode _, Knode _ ->
            let si1 = catch (instance loc1 c1) in
@@ -2451,9 +2452,9 @@ let check ff n_steps genv0 genv1 =
            catch (error { kind = Etype; loc = loc1 })
         end     
     | _ -> () in
-  let check name v0 =
-    let v1 = E.find name genv1 in
-    check name v0 v1 in
-  E.iter check genv0
+  let check name v1 =
+    let v2 = E.find name g2 in
+    check name v1 v2 in
+  E.iter check g1
       
 

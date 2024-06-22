@@ -23,8 +23,7 @@ open Monad
 open Opt
 open Result
 open Defnames
-
-exception Reduce of Error.error
+open Error
 
 (* Invariant: defined names in [e_renaming] and [e_values] *)
 (* are pairwise distinct. For that, all defined names in the source *)
@@ -64,8 +63,11 @@ let build ({ e_renaming } as acc) env =
   let env, e_renaming = Env.fold buildrec env (Env.empty, e_renaming) in
   env, { acc with e_renaming }
 
-let catch v =
-  match v with | Ok(v) -> v | Error(error) -> raise (Reduce error)
+let error { kind; loc } = Format.eprintf "Error during static reduction\n";
+     Error.message loc kind;
+     raise Error
+
+let catch v = match v with | Ok(v) -> v | Error(v) -> error v
 
 let pvalue loc c_env =
   let add acc (x, { Value.cur = v }) =
@@ -479,7 +481,7 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let eq, acc = equation acc eq in
        { eq with eq_desc = EQlet(leq, eq) }, acc
     | EQsizefun _ ->
-       raise (Reduce { Error.kind = Eshould_be_static; loc = eq_loc }) in
+       error { Error.kind = Eshould_be_static; loc = eq_loc } in
   { eq with eq_write }, acc
 
 and slet acc leq_list = Util.mapfold leq_t acc leq_list
@@ -647,7 +649,9 @@ let def_of_values loc acc d_names =
  (* The main function. Reduce every definition *)
 let implementation acc ({ desc; loc } as impl) =
   let desc, acc = match desc with
-    | Eopen _ -> desc, acc
+    | Eopen(name) ->
+       (* add [name] in the list of known modules *)
+       desc, { acc with e_gvalues = Genv.open_module acc.e_gvalues name }
     | Eletdecl { d_names; d_leq } ->
        (* [d_leq] must be static *)
        let l_env = leq_e acc d_leq in
@@ -662,18 +666,12 @@ let set_index_t n = Ident.set n
 let get_index_t () = Ident.get ()
 
 let program genv { p_impl_list; p_index } =
-  try
-    set_index_t p_index;
-    let p_impl_list, acc = 
-      Util.mapfold implementation (empty genv) p_impl_list in
-    (* add global definitions from values in [acc] to the *)
-    (* list of global declarations of the module *)
-    let p_impl_list = add_global_defs p_impl_list acc in
-    let p_index = get_index_t () in
-    { p_impl_list; p_index }
-  with
-  | Reduce { kind; loc } ->
-     Format.eprintf
-       "Error during static reduction\n";
-     Error.message loc kind;
-     raise Error
+  set_index_t p_index;
+  let p_impl_list, acc = 
+    Util.mapfold implementation (empty genv) p_impl_list in
+  (* add global definitions from values in [acc] to the *)
+  (* list of global declarations of the module *)
+  let p_impl_list = add_global_defs p_impl_list acc in
+  let p_index = get_index_t () in
+  { p_impl_list; p_index }
+  

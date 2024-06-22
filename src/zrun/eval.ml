@@ -121,51 +121,29 @@ let eval_definitions_in_file modname filename n_steps =
   (* Write defined variables for equations *)
   let p = do_step "Write done" Debug.print_program Write.program p in
 
-(*
-  p 
-  (* Associate unique index to variables *)
-  |> do_step "Scoping done" Debug.print_program Scoping.program
-  (* Write defined variables for equations *)
-  |> do_step "Write done" Debug.print_program Write.program
-  (* Evaluation of definitions *)
-  |> do_step "Evaluation of definitions done"
-    Debug.print_nothing (Coiteration.program genv0)
-  (* Static reduction *)
-  |> do_optional_step !set_reduce "Static reduction"
-    Debug.print_program (Reduce.program genv) 
-  (* Equivalence checking *)
-  |> do_optional_step (!set_reduce && !set_check)
-    (Coiteration.program genv0 |> Genv.current |> (Coiteration.check ff n_steps genv)
-*)
-
   (* Evaluation of definitions *)
   let genv = do_step "Evaluation of definitions done"
       Debug.print_nothing (Coiteration.program genv0) p in
   
   (* Static reduction *)
-  let p_after_reduce =
+  let p =
     do_optional_step !set_reduce "Static reduction"
-      Debug.print_program (Reduce.program genv) p in
+      Debug.print_program (Reduce.program genv0) p in
   
   (* Equivalence checking *)
-  (* let _ =
-    do_optional_check (!set_reduce && !set_check)
-      (Coiteration.program genv0) |> Genv.current |> 
-    Coiteration.check ff n_steps (Genv.current genv) *)
-(*
-    do_optional_step (!set_reduce && !set_check)
-      Coiteration.program genv0 |> (Coiteration.check ff n_steps genv) *)
+  let check (genv_before, p) =
+    let genv_after = Coiteration.program genv0 p in
+    Coiteration.check ff n_steps
+      (Genv.current genv_before) (Genv.current genv_after);
+    (genv_after, p) in
 
-  (* Equivalence checking *)
-  (* if !set_check then
-    begin let genv_after_reduce = 
-            Coiteration.program genv0 p_after_reduce in
-      Coiteration.check ff n_steps 
-        (Genv.current genv) (Genv.current genv_after_reduce)
-    end; *)
-    
+  let genv, p =
+    do_optional_step
+      (!set_reduce && !set_check) "Equivalence checking"
+      Debug.print_nothing check (genv, p) in
+      
   (* Write the values into a file *)
-  apply_with_close_out (Genv.write genv0) otc;
+  apply_with_close_out (Genv.write genv) otc;
 
   genv
 
