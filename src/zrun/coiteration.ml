@@ -664,7 +664,7 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
        (* if no initialisation code is given *)
        let* a_h =
          List.nth_opt handlers 0 |>
-         Opt.to_result ~none:{ kind = Eunexpected_failure; loc = eq_loc } in
+         Opt.to_result ~none:{ kind = unexpected_failure; loc = eq_loc } in
        let* i, si = initial_state_of_automaton is_fun genv env a_h state_opt in
        (* two state variables: initial state of the automaton and reset bit *)
        return (Slist(i :: Sval(Value(Vbool(false))) :: si :: s_list))
@@ -1720,7 +1720,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        | _, Init _, s ->
           (* this case should not arrive because it is syntactically *)
           (* incorrect *)
-          error { kind = Eunexpected_failure; loc = eq_loc } in
+          error { kind = unexpected_failure; loc = eq_loc } in
      (* complete missing entries in the environment *)
      let* env_handler = Fix.by eq_loc env env_handler (names eq_write) in
      return (env_handler, Slist (s :: s_list))
@@ -2371,17 +2371,25 @@ let implementation genv { desc; loc } =
   | Etypedecl _ ->
      return genv
 
+let error { kind; loc } =
+  Format.eprintf "Error during evaluation\n";
+  Error.message loc kind;
+  raise Error
+
+let catch v = match v with | Ok(v) -> v | Error(v) -> error v
+
 let catch e =
   match e with
   | Ok(r) -> r
   | Error { kind; loc } ->  Error.message loc kind; raise Error
 
-let program genv { p_impl_list } = catch (fold implementation genv p_impl_list)
-
 (* The main functions *)
 
+let program genv { p_impl_list } = catch (fold implementation genv p_impl_list)
+
+
 (* run a unit process for [n_steps] steps *)
-let run_n n_steps init step v_list =
+let eval_n n_steps init step v_list =
   let rec apply_rec s i =
     if i = n_steps then s
     else
@@ -2395,43 +2403,75 @@ let run_n n_steps init step v_list =
          apply_rec s (i+1) in
   let _ = apply_rec init 0 in ()
 
-let run_fun loc output n_steps fv v_list =
-  let step s v_list =
-    Debug.print_state "State before:" s;
-    let* v = apply loc fv v_list in
-    output v;
-    Debug.print_state "State after:" s;
-    return s in
-  run_n n_steps Sempty step v_list
-
-let run_node loc output n_steps { init; step } v  =
+let eval_node loc output n_steps { init; step } v  =
   let step s v =
     Debug.print_state "State before:" s;
     let* v, s = runstep loc s step v in
     Debug.print_state "State after:" s;
     output v; return s in
-  run_n n_steps init step v
+  eval_n n_steps init step v
 
-let run_two_fun loc output fv1 fv2 v_list =
-  ignore (catch
-    (let* v1 = apply loc fv1 v_list in
-     let* v2 = apply loc fv2 v_list in
-     check_equality loc v1 v2))
+let print ff (v1, v2) =
+     Format.eprintf "@[The two values are not equal\n\
+              first is: %a\n\
+              second is: %a@]" Output.value v1 Output.value v2
 
-let run_two_nodes loc output n_steps
+let eval_two_fun loc output fv1 fv2 v_list =
+  (let* v1 = apply loc fv1 v_list in
+   let* v2 = apply loc fv2 v_list in
+   let* v = check_equality loc v1 v2 in
+   if v then return () else
+     error
+       { kind = Eunexpected_failure { print; arg = (v1, v2) }; loc }) |> catch
+
+let eval_two_nodes loc output n_steps
       { init = init1; step = step1 } { init = init2; step = step2 } v =
   let step (s1, s2) v =
     Debug.print_state "State before (first node):" s1;
-    let* v1, s1 = runstep loc s1 step1 v in
+    let v1, s1 = catch (runstep loc s1 step1 v) in
     Debug.print_state "State after (first node):" s1;
     Debug.print_state "State before (second node):" s2;
-    let* v2, s2 = runstep loc s2 step2 v in
+    let v2, s2 = catch (runstep loc s2 step2 v) in
     Debug.print_state "State after (second node):" s2;
     let* v = check_equality loc v1 v2 in
-    if v then return (s1, s2)
-    else error { kind = Etype; loc } in
-  run_n n_steps (init1, init2) step v
+    if v then return (s1, s2) else
+      error { kind = Eunexpected_failure { print; arg = (v1, v2) }; loc } in
+  eval_n n_steps (init1, init2) step v
 
+(* Eval and print [v] *)
+(* If [v] is a function with a void argument, execute its body; if [v] *)
+(* is a node with a void argument, execute its body for [n] steps *)
+let eval ff n_steps name v =
+  match v with
+  | Vclosure({ c_funexp = { f_kind; f_loc; f_args = [[]] } } as c) ->
+     begin match f_kind with
+     | Knode _ ->
+        let si = catch (instance f_loc c) in
+        Format.fprintf ff
+          "@[val %s() for %d steps = @.@]" name n_steps;
+        eval_node Location.no_location (Output.value_flush ff) n_steps si void
+     | Kfun _ ->
+        let v = catch (apply Location.no_location v [void]) in
+        Format.fprintf ff
+          "@[val %s() = %a@.@]" name Output.value v
+     end
+  | _ ->
+     Format.fprintf ff "@[val %s = %a@.@]" name Output.pvalue v
+
+(* evaluate all entries in the environment *)
+let all ff n_steps { values } = E.iter (eval ff n_steps) values
+
+(* evaluate entries in [l_names] *)
+let eval_list ff n_steps genv l_names =
+  let eval name =
+    let v =
+       find_gvalue_opt (Name name) genv |>
+         Opt.to_result ~none:{ kind = Eunbound_lident(Name name);
+                               loc = Location.no_location } |> catch in
+    eval ff n_steps name v in
+  List.iter eval l_names
+
+(* check that all [for all n in Dom(g1), value(n) = value(g2(n))] *)
 let check ff n_steps { values = g1 } { values = g2 } =
   let check name v1 v2 =
     Format.fprintf ff "@[Evaluate %d steps of %s@.@]" n_steps name;
@@ -2444,10 +2484,10 @@ let check ff n_steps { values = g1 } { values = g2 } =
         | Knode _, Knode _ ->
            let si1 = catch (instance loc1 c1) in
            let si2 = catch (instance loc2 c2) in
-           run_two_nodes 
+           eval_two_nodes 
              Location.no_location Output.value_flush n_steps si1 si2 void
         | Kfun _, Kfun _ ->
-           run_two_fun Location.no_location Output.value_flush v1 v2 [void]
+           eval_two_fun Location.no_location Output.value_flush v1 v2 [void]
         | _ ->
            catch (error { kind = Etype; loc = loc1 })
         end     
