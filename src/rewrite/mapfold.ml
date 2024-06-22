@@ -108,9 +108,11 @@ type ('a, 'info) it_funs =
   }
 
 (** Build a renaming from an environment *)
-let build_it funs acc env =
+let rec build_it funs acc env =
   try funs.build funs acc env
-  with Fallback -> acc, env
+  with Fallback -> build funs acc env
+
+and build funs acc env = env, acc
 
 let rec pattern_it funs acc pat =
   try funs.pattern funs acc pat
@@ -149,10 +151,11 @@ and pattern funs acc ({ pat_desc } as p) =
        Etypeconstraintpat(p1, ty), acc in
   { p with pat_desc }, acc
 
-and var_ident_it gloval_funs x =
-  funs.var_ident global_funs acc x
+and var_ident_it global_funs acc x =
+  try global_funs.var_ident global_funs acc x
+  with Fallback -> var_ident global_funs acc x
 
-and var_ident funs acc x = x, acc
+and var_ident global_funs acc x = x, acc
 
 and type_expression_it funs acc ty =
   try funs.type_expression funs acc ty
@@ -160,15 +163,16 @@ and type_expression_it funs acc ty =
 
 and type_expression funs acc ty = ty, acc
 
-let rec write_it funs acc { dv; di; der } =
-  let rename n = let m, _ = var_ident_it funs acc n in m in
+let rec write_it funs acc w =
+  try funs.write_t funs acc w
+  with Fallback -> write_t funs acc w
+
+and write_t funs acc { dv; di; der } =
+  let rename n = let m, _ = var_ident_it funs.global_funs acc n in m in
   let dv = Ident.S.map rename dv in
   let di = Ident.S.map rename di in
   let der = Ident.S.map rename der in
   { dv; di; der }, acc
-
-and write_t funs acc w =
-  try funs.write_t funs acc w with Fallback -> w, acc
 
 let default_t f acc d =
   match d with
@@ -559,10 +563,12 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
        let for_eq_t acc { for_out; for_block } =
          let for_out_t acc
-               ({ desc = { for_name; for_out_name; for_init; for_default } } as f) =
-           let for_name, acc = build_it funs acc for_name in
+               ({ desc = { for_name; for_out_name; for_init; for_default } } as f)
+           =
+           let for_name, acc = var_ident_it funs.global_funs acc for_name in
            let for_out_name, acc = 
-             Util.optional_with_map (var_ident_it funs) acc for_out_name in
+             Util.optional_with_map
+               (var_ident_it funs.global_funs) acc for_out_name in
            let for_init, acc =
              Util.optional_with_map (expression_it funs) acc for_init in
            let for_default, acc =
@@ -592,13 +598,15 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let leq, acc = leq_it funs acc leq in
        let eq, acc = equation_it funs acc eq in
        { eq with eq_desc = EQlet(leq, eq) }, acc
-    | EQsizefun _ ->
-       error { Error.kind = Eshould_be_static; loc = eq_loc } in
+    | EQsizefun({ sf_id; sf_id_list; sf_e; sf_env } as sf) ->
+       let sf_env, acc = build_it funs acc sf_env in
+       let sf_id, acc = var_ident_it funs.global_funs acc sf_id in
+       let sf_id_list, acc =
+         Util.mapfold (var_ident_it funs.global_funs) acc sf_id_list in
+       let sf_e, acc = expression_it funs acc sf_e in
+       { eq with eq_desc = EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
+       acc in
   { eq with eq_write }, acc
-
-let equation funs acc eq = eq, acc
-
-let build funs acc env = env, acc
 
 let defaults =
   { global_funs = { var_ident };
