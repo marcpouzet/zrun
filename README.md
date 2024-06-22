@@ -12,26 +12,30 @@ initialized delay (fby). Streams can be defined by mutually recursive
 definitions. It also provides richer programming constructs that were introduced
 in Lucid Synchrone but are not in Lustre: by-case definition of
 streams with a possible default and initial value, the last computed value of a 
-signal, hierarchical automata with parameters, stream function with static
+stream, hierarchical automata with parameters, stream functions with static
 parameters that are either know at compile time or at instanciation time,
-and array operations. 
+and array operations. It also provides a limit form of recursion on
+a set of size parameters.
 
-The objective of this prototype is to give a reference executable
-semantics. It can be used independently of a compiler, e.g., as an
-oracle for compiler testing. It can be used as a reference to prove
-the correctness of compiler steps (e.g., that a well
-typed/causal/initialized program does not lead to an error; to prove
-semantics preservation of source-to-source transformations like static
-scheduling or the compilation of automata), to execute unfinished
-programs or programs that are semantically correct but are statically
-rejected by the compiler. It is defined generically to illustrate some
-of the difference in the treatment of causality between Lustre, Lucid Synchrone/Scade/Zelus and Esterel. Examples of correct but rejected
-programs are those with cyclic circuits accepted by an Esterel
-compiler (the so-called "constructively causal" programs) but that are
-rejected by Lustre (and also Lucid Synchrone, Scade and Zélus) because
-the compiler imposes stronger causality constraints. Finally, being
-independent of a compiler, this semantics can be used to prototype new
-language constructs before considering their compilation.
+The objective of this prototype is to be a reference executable
+semantics; to be used independently of a compiler, e.g., as an oracle
+for compiler testing; to prove the correctness of compiler steps
+(e.g., that a well typed/causal/initialized program does not lead to
+an error; to prove semantics preservation of source-to-source
+transformations like static scheduling or the compilation of
+automata); to execute unfinished programs or programs that are
+semantically correct but are statically rejected by the compiler. It
+is defined is a quite generic manner w.r.t the treatment of
+causality loops, that is, how instantaneous feedback are treated. It
+is made to illustrate the differences in the
+treatment of causality between Lustre, Lucid Synchrone/Scade/Zelus and
+Esterel. Examples of correct but rejected programs are those with
+cyclic circuits accepted by an Esterel compiler (the so-called
+"constructively causal" programs) but that are rejected by Lustre (and
+also Lucid Synchrone, Scade and Zélus) because the compiler imposes
+stronger causality constraints. Finally, being independent of a
+compiler, this semantics can be used to prototype new language
+constructs before considering their compilation.
 
 The long term goal of this work is to define an executable semantics
 that deal with all the language features of Zélus. We are far away
@@ -83,17 +87,22 @@ This will generate a `zrun.exe` executable.
 ```bash
  ./zrun.exe --help
 Options are:
-  -s            The main node to evaluate
+ -s            The main node to evaluate
   -all          Evaluate all nodes
   -n            The number of steps
   -v            Verbose mode
+  -vv           Set even more verbose mode
   -debug        Set debug mode
-  -iv           Print values
+  -print        Print values
   -noassert     No check of assertions
   -nocausality  Turn off the check that are variables are non bottom
   -fix          Print the number of steps for fixpoints
-  -esterel      Sets the interpretation of if/then/else to that of Esterel
-  -lustre       Sets the interpretation of if/then/else to that of Lustre
+  -esterel      Sets the interpretation of if/then/else to be constructive
+  -lustre       Sets the interpretation of if/then/else to be strict 
+		(that of Lustre)
+  -reduce       Reduce compile-time expressions
+  -check        Check equivalence at every program transformation 
+		for the number of steps
   -help         Display this list of options
   --help        Display this list of options
 ```
