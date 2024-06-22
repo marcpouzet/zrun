@@ -2359,7 +2359,6 @@ let implementation genv { desc; loc } =
   | Eletdecl { d_names; d_leq } -> 
      (* evaluate the set of equations *)
      let* env = vleq genv Env.empty d_leq in
-     let l1 = Env.to_list env in
      let f_pvalue_list =
        List.map (fun (n, id) -> (n, Env.find id env)) d_names in
      (* debug info (a bit of imperative code here!) *)
