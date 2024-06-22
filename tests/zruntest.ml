@@ -11,7 +11,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* Initial version from Guillaume Baudart, INRIA *)
+(* Initial idea and code from Guillaume Baudart from the Zelus source code *)
 
 open Misc
 
@@ -31,13 +31,14 @@ let _ =
  *)
 
 let n_steps = 10
+let is_all = true
 
 (* Run one file. *)
 let good_one filename =
   (* Modules.clear (); *)
   let modname = String.capitalize_ascii (Filename.basename filename) in
   (* evaluate all functions whose input is () *)
-  Eval.all modname filename n_steps
+  Eval.main modname filename n_steps is_all []
 
 exception Error
 
