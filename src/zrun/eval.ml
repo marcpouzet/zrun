@@ -105,7 +105,7 @@ let eval_definitions_in_file modname filename n_steps =
   (* Static reduction *)
   let p =
     do_optional_step !set_reduce "Static reduction"
-      Debug.print_program (Reduce.program genv0) p in
+      Debug.print_program (Static.program genv0) p in
   
   (* Equivalence checking *)
   let check (genv_before, p) =
@@ -140,5 +140,5 @@ let transforme_and_compare transform eval compare acc p =
   compare v v'
 
 let transform genv p =
-  Reduce.program genv p
+  Static.program genv p
   
