@@ -63,9 +63,10 @@ let build ({ e_renaming } as acc) env =
   let env, e_renaming = Env.fold buildrec env (Env.empty, e_renaming) in
   env, { acc with e_renaming }
 
-let error { kind; loc } = Format.eprintf "Error during static reduction\n";
-     Error.message loc kind;
-     raise Error
+let error { kind; loc } =
+  Format.eprintf "Error during static reduction\n";
+  Error.message loc kind;
+  raise Error
 
 let catch v = match v with | Ok(v) -> v | Error(v) -> error v
 
@@ -654,11 +655,22 @@ let implementation acc ({ desc; loc } as impl) =
        desc, { acc with e_gvalues = Genv.open_module acc.e_gvalues name }
     | Eletdecl { d_names; d_leq } ->
        (* [d_leq] must be static *)
-       let l_env = leq_e acc d_leq in
-       let acc = { acc with e_values = Env.append l_env acc.e_values } in
+       let env = leq_e acc d_leq in
+       let acc = { acc with e_values = Env.append env acc.e_values } in
        (* add the definition for values *)
        let acc, d_names = def_of_values loc acc d_names in
-       Eletdecl { d_names; d_leq = no_leq loc }, acc
+       (* add all entries in the current global environment *)
+       let f_pvalue_list =
+         List.map (fun (n, id) -> (n, Env.find id env)) d_names in
+       (* add all entries in the current global environment *)
+       let genv =
+         List.fold_left 
+           (fun acc (f, pvalue) -> Genv.add f pvalue acc)
+           acc.e_gvalues f_pvalue_list in
+       (* debug info (a bit of imperative code here!) *)
+       if !print_values then Output.letdecl Format.std_formatter f_pvalue_list;
+       Eletdecl { d_names; d_leq = no_leq loc },
+       { acc with e_gvalues = genv }
     | Etypedecl _ -> desc, acc in
   { impl with desc }, acc
 

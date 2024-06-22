@@ -39,14 +39,16 @@ let doc_print_values = "\tPrint values"
 let doc_number_of_fixpoint_iterations =
   "\tPrint the number of steps for fixpoints"
 let doc_esterel =
-  "\t Sets the interpretation of if/then/else to be constructive"
+  "\tSets the interpretation of if/then/else to be constructive"
 let doc_lustre =
-  "\t Sets the interpretation of if/then/else to be strict (that of Lustre)"
+  "\tSets the interpretation of if/then/else to be strict \n\
+   \t\t(that of Lustre)"
 let doc_reduce =
-  "\t Reduce compile-time expressions"
+  "\tReduce compile-time expressions"
 let doc_check =
-  "\t Check equivalence at every program transformation for the number of steps"
-                   
+  "\tCheck equivalence at every program transformation \n\
+   \t\tfor the number of steps"
+                  
 let errmsg = "Options are:"
 
 
@@ -60,7 +62,7 @@ let main () =
            "-v", Arg.Unit set_verbose, doc_verbose;
            "-vv", Arg.Unit set_vverbose, doc_vverbose;
            "-debug", Arg.Unit set_debug, doc_debug;
-           "-iv", Arg.Set print_values, doc_print_values;
+           "-print", Arg.Set print_values, doc_print_values;
            "-noassert", Arg.Set Misc.no_assert, doc_no_assert;
            "-nocausality", Arg.Set Misc.set_nocausality, doc_nocausality;
            "-fix", Arg.Set Misc.print_number_of_fixpoint_iterations,
@@ -68,7 +70,7 @@ let main () =
            "-esterel", Arg.Set Misc.set_esterel, doc_esterel;
            "-lustre", Arg.Set Misc.set_lustre, doc_lustre;
            "-reduce", Arg.Set Misc.set_reduce, doc_reduce;
-           "-check", Arg.Set Misc.set_check, doc_check;           
+           "-check", Arg.Set Misc.set_check, doc_check
       ])
       main
       errmsg
