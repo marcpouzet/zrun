@@ -145,7 +145,7 @@ let update loc v i w =
 (* [| v with i1 <- [| v.(i1) with i2,...,in <- w |] |] *)
 let rec update_list loc v i_list w =
   match i_list with
-  | [] -> error { kind = Eunexpected_failure; loc }
+  | [] -> error { kind = unexpected_failure; loc }
   | i :: i_list ->
      let* w = match i_list with
        | [] -> return w
