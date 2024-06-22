@@ -42,8 +42,8 @@
     output ; printing
     forloop ; evaluation functions for for loops
     eval ; evaluation of an expression
-    rsize ; static evaluation of sizes
-    reduce ; static reduction
+    static ; static reduction
+    mapfold ; generic mapfold
     inline ; inlining
   )   	 
   (libraries zrun.ast_lib))
