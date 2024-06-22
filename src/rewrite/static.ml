@@ -242,7 +242,7 @@ let rec expression acc ({ e_desc; e_loc } as e) =
        let p_env, acc = build acc p_env in
        let p_cond, acc = scondpat acc p_cond in
        let p_body, acc = expression acc p_body in
-       { p_b with p_cond; p_body }, acc in
+       { p_b with p_cond; p_body; p_env }, acc in
      let handlers, acc =
        Util.mapfold body acc handlers in
      let default_opt, acc = default_t expression acc default_opt in
