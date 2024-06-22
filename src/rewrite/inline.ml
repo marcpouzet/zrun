@@ -26,6 +26,21 @@ let error { kind; loc } =
   Error.message loc kind;
   raise Error
 
+(* returns [let p1' = e1 and ... and pn' = en in e[p1'/p1,...,p'n/pn] *)
+(* in which [p1,...,pn] are renamed into [p1',...,pn'] and [e] is *)
+(* recursively inlined *)
+        (*
+          let letin renaming env p_list e_list e =
+  let eqmake p e = eqmake (EQeq(p, e)) in
+
+  let env, renaming0 = build env in
+  let renaming = Env.append renaming0 renaming in
+  let p_list = List.map (pattern renaming) p_list in
+  { e with e_desc =
+      Elet({ l_rec = false; l_env = env; l_eq = List.map2 eqmake p_list e_list;
+             l_loc = Zlocation.no_location }, expression renaming e) }
+         *)
+
 let expression funs acc ({ e_desc } as e) =
   match e_desc with
   | Eapp { is_inline = true;
@@ -39,6 +54,7 @@ let expression funs acc ({ e_desc } as e) =
      | Vclosure
        { c_funexp = { f_vkind; f_kind; f_atomic; f_args; f_body;
                                f_env }; c_genv; c_env } ->
+        (* letin renaming env p_list e_list *)
         e, acc
      | _ -> error { kind = Etype; loc = f_loc }
      end
