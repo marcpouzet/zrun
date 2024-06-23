@@ -115,8 +115,8 @@ let expression funs acc e =
   | _ -> raise Fallback *)
 
 let program genv0 p =
-  let { current } = genv0 in
-  let l = E.to_list current.values in
+  (* let { current } = genv0 in *)
+  (* let l = E.to_list current.values in *)
   let funs =
     { Mapfold.defaults with expression } in
   let p, _ = Mapfold.program_it funs { genv = genv0 } p in
