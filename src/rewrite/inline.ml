@@ -86,6 +86,8 @@ let expression funs acc e =
   match e.e_desc with
   | Eapp { is_inline = true;
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
+     let { current } = acc.genv in
+     let l = E.to_list current.values in
      let { Genv.info } = Genv.find lname acc.genv in
      begin match info with
      | Vclosure
@@ -98,6 +100,8 @@ let expression funs acc e =
   | _ -> raise Mapfold.Fallback
 
 let program genv0 p =
+  let { current } = genv0 in
+  let l = E.to_list current.values in
   let funs =
     { Mapfold.defaults with expression } in
   let p, _ = Mapfold.program_it funs { genv = genv0 } p in
