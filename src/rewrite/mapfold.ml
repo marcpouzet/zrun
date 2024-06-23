@@ -81,7 +81,9 @@ type ('a, 'info) global_it_funs =
       ((name * name list * name list * type_decl) as 'ty) -> 'ty * 'a;
     kind :
       ('a, 'info) global_it_funs -> 'a -> kind -> kind * 'a;
-    }
+    interface :
+      ('a, 'info) global_it_funs -> 'a -> interface -> interface * 'a;
+  }
 
 type ('a, 'info) it_funs =
   {
@@ -228,22 +230,22 @@ and size_t funs acc ({ desc } as si) =
   let desc, acc = match desc with
   | Sint _ -> desc, acc
   | Sfrac { num; denom } ->
-     let num, acc = funs.size_t funs acc num in
+     let num, acc = size_it funs acc num in
      Sfrac { num; denom }, acc
   | Sident(id) ->
-     let id, acc = funs.global_funs.var_ident funs.global_funs acc id in
+     let id, acc = var_ident_it funs.global_funs acc id in
      Sident(id), acc
   | Splus(si1, si2) ->
-     let si1, acc = funs.size_t funs acc si1 in
-     let si2, acc = funs.size_t funs acc si2 in
+     let si1, acc = size_it funs acc si1 in
+     let si2, acc = size_it funs acc si2 in
      Splus(si1, si2), acc
   | Sminus(si1, si2) ->
-     let si1, acc = funs.size_t funs acc si1 in
-     let si2, acc = funs.size_t funs acc si2 in
+     let si1, acc = size_it funs acc si1 in
+     let si2, acc = size_it funs acc si2 in
      Splus(si1, si2), acc
   | Smult(si1, si2) ->
-     let si1, acc = funs.size_t funs acc si1 in
-     let si2, acc = funs.size_t funs acc si2 in
+     let si1, acc = size_it funs acc si1 in
+     let si2, acc = size_it funs acc si2 in
      Splus(si1, si2), acc in
   { si with desc }, acc
 
@@ -302,7 +304,7 @@ and leq_it funs acc leq =
 and leq_t funs acc ({ l_eq; l_env } as leq) =
   let l_env, acc = build_it funs acc l_env in
   let l_eq, acc = equation_it funs acc l_eq in
-  { leq with l_eq }, acc
+  { leq with l_eq; l_env }, acc
 
 and scondpat_it funs acc scpat =
   try funs.scondpat funs acc scpat
@@ -363,9 +365,9 @@ and result_it funs acc r =
 and result funs acc ({ r_desc } as r) =
   let r_desc, acc = match r_desc with
     | Exp(e) ->
-       let e, acc = funs.expression funs acc e in Exp(e), acc
+       let e, acc = expression_it funs acc e in Exp(e), acc
     | Returns(b_eq) ->
-       let b_eq, acc = funs.block funs acc b_eq in Returns(b_eq), acc in
+       let b_eq, acc = block_it funs acc b_eq in Returns(b_eq), acc in
   { r with r_desc }, acc
 
 and funexp_it funs acc f =
@@ -375,7 +377,7 @@ and funexp_it funs acc f =
 and funexp funs acc ({ f_args; f_body; f_env } as f) =
   let arg acc v_list = Util.mapfold (vardec_it funs) acc v_list in
   let f_args, acc_local = Util.mapfold arg acc f_args in
-  let f_body, acc_local = funs.result funs acc_local f_body in
+  let f_body, acc_local = result_it funs acc_local f_body in
   { f with f_args; f_body; f_env }, acc
 
 (** Expressions **)
@@ -387,10 +389,10 @@ and expression funs acc ({ e_desc; e_loc } as e) =
   match e_desc with
   | Econst _ | Econstr0 _ | Eglobal _ -> e, acc
   | Evar(x) ->
-     let x, acc = funs.global_funs.var_ident funs.global_funs acc x in
+     let x, acc = var_ident_it funs.global_funs acc x in
      { e with e_desc = Evar(x) }, acc
   | Elast(x) ->
-     let x, acc = funs.last funs acc x in
+     let x, acc = last_it funs acc x in
      { e with e_desc = Elast(x) }, acc
   | Etuple(e_list) ->
      let e_list, acc = Util.mapfold (expression_it funs) acc e_list in
@@ -438,7 +440,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      let body acc ({ p_cond; p_body; p_env } as p_b) =
        let p_env, acc = build_it funs acc p_env in
        let p_cond, acc = scondpat_it funs acc p_cond in
-       let p_body, acc = funs.expression funs acc p_body in
+       let p_body, acc = expression_it funs acc p_body in
        { p_b with p_cond; p_body }, acc in
      let handlers, acc =
        Util.mapfold body acc handlers in
@@ -450,7 +452,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
        let m_pat, acc = pattern_it funs acc m_pat in
        let m_body, acc = expression_it funs acc m_body in
        { m_h with m_pat; m_body; m_env }, acc in
-     let e, acc = funs.expression funs acc e in
+     let e, acc = expression_it funs acc e in
      let handlers, acc =
        Util.mapfold body acc handlers in
      { e with e_desc = Ematch { m with e; handlers } }, acc
@@ -532,7 +534,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
     | EQif { e; eq_true; eq_false } ->
        let e, ac = expression_it funs acc e in
        let eq_true, acc = equation_it funs acc eq_true in
-       let eq_false, acc = funs.equation funs acc eq_false in
+       let eq_false, acc = equation_it funs acc eq_false in
        { eq with eq_desc = EQif { e; eq_true; eq_false } }, acc
     | EQmatch({ e; handlers } as m) ->
        let body acc ({ m_pat; m_body; m_env } as m_h) =
@@ -556,8 +558,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
          let p_cond, acc = scondpat_it funs acc p_cond in
          let p_body, acc = equation_it funs acc p_body in
          { p_b with p_cond; p_body }, acc in
-       let handlers, acc =
-         Util.mapfold body acc handlers in
+       let handlers, acc = Util.mapfold body acc handlers in
        let default_opt, acc = default_t (equation_it funs) acc default_opt in
        { eq with eq_desc = EQpresent { handlers; default_opt } }, acc
     | EQautomaton({ handlers; state_opt } as a) ->
@@ -685,7 +686,8 @@ and implementation funs acc ({ desc; loc } as impl) =
        Eletdecl { d_names; d_leq }, acc
     | Etypedecl { name; ty_params; size_params; ty_decl } ->
        let (name, ty_params, size_params, ty_decl), acc =
-         typedecl_it funs.global_funs acc (name, ty_params, size_params, ty_decl) in
+         typedecl_it
+           funs.global_funs acc (name, ty_params, size_params, ty_decl) in
        Etypedecl { name; ty_params; size_params; ty_decl }, acc in
   { impl with desc }, acc
 
@@ -703,6 +705,12 @@ and program funs acc { p_impl_list; p_index } =
   let p_index, acc = get_index funs acc n in
   { p_impl_list; p_index }, acc  
 
+let rec interface_it global_funs acc interf =
+  try global_funs.interface global_funs acc interf
+  with Fallback -> interface global_funs acc interf
+
+and interface global_funs acc interf = interf, acc
+
 let default_global_funs =
   { var_ident;
     typevar;
@@ -710,6 +718,7 @@ let default_global_funs =
     kind;
     type_expression;
     typedecl;
+    interface;
   }
 
 let defaults =
@@ -738,6 +747,7 @@ let default_global_stop =
     kind = stop;
     type_expression = stop;
     typedecl = stop;
+    interface = stop;
   }
 let defaults_stop =
   { global_funs = default_global_stop;
