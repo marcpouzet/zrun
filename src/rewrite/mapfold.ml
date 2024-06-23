@@ -105,7 +105,15 @@ type ('a, 'info) it_funs =
       ('a, 'info) it_funs -> 'a -> 'info funexp -> 'info funexp * 'a;
     last :
       ('a, 'info) it_funs -> 'a -> Ident.t -> Ident.t * 'a;
-  }
+    typedecl :
+      ('a, 'info) it_funs -> 'a ->
+      ((name * name list * name list * type_decl) as 'ty) -> 'ty * 'a;
+    implementation :
+      ('a, 'info) it_funs -> 'a ->
+      'info implementation -> 'info implementation * 'a;
+    program :
+    ('a, 'info) it_funs -> 'a -> 'info program -> 'info program * 'a;
+    }
 
 (** Build a renaming from an environment *)
 let rec build_it funs acc env =
@@ -608,6 +616,51 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        acc in
   { eq with eq_write }, acc
 
+let rec typedecl_it funs acc ty_decl =
+  try funs.typedecl funs acc ty_decl
+  with Fallback -> typedecl funs acc ty_decl
+
+and typedecl funs acc ty_decl = ty_decl, acc
+
+let open_t funs acc name = name, acc
+
+let rec implementation_it funs acc impl =
+  try funs.implementation funs acc impl
+  with Fallback -> implementation funs acc impl
+
+and implementation funs acc ({ desc; loc } as impl) =
+  let desc, acc = match desc with
+    | Eopen(name) ->
+       let name, acc = open_t funs acc name in
+       Eopen(name), acc
+    | Eletdecl { d_names; d_leq } ->
+       let d_leq, acc = leq_it funs acc d_leq in
+       let d_names, acc =
+         Util.mapfold
+           (fun acc (name, id) ->
+             let id, acc = var_ident_it funs.global_funs acc id in (name, id), acc)
+           acc d_names in
+       Eletdecl { d_names; d_leq }, acc
+    | Etypedecl { name; ty_params; size_params; ty_decl } ->
+       let (name, ty_params, size_params, ty_decl), acc =
+         typedecl_it funs acc (name, ty_params, size_params, ty_decl) in
+       Etypedecl { name; ty_params; size_params; ty_decl }, acc in
+  { impl with desc }, acc
+
+let set_index funs acc n = n, acc
+let get_index funs acc n = n, acc
+
+let rec program_it funs acc p =
+  try funs.program funs acc p
+  with Fallback -> program funs acc p
+
+and program funs acc { p_impl_list; p_index } =
+  let n, acc = set_index funs acc p_index in
+  let p_impl_list, acc = 
+    Util.mapfold (implementation_it funs) acc p_impl_list in
+  let p_index, acc = get_index funs acc n in
+  { p_impl_list; p_index }, acc  
+
 let defaults =
   { global_funs = { var_ident };
     build;
@@ -624,6 +677,9 @@ let defaults =
     result;
     funexp;
     last;
+    typedecl;
+    implementation;
+    program
   }
                  
 let defaults_stop =
@@ -642,5 +698,8 @@ let defaults_stop =
     result = stop;
     funexp = stop;
     last = stop;
+    typedecl = stop;
+    implementation = stop;
+    program = stop 
   }
 
