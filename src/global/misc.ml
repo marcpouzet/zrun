@@ -21,9 +21,6 @@ exception Error
         
 let name_of_stdlib_module = "Stdlib"
 
-let nil_name = "[]"
-let cons_name = "::"
-
 let standard_lib = Config.stdlib
 
 (* list of modules initially opened *)

@@ -22,7 +22,7 @@ type lexical_error =
     Illegal_character
   | Unterminated_comment
   | Bad_char_constant
-  | Unterminated_string;;
+  | Unterminated_string
 
 exception Lexical_error of lexical_error * Location.t
 

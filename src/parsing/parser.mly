@@ -40,14 +40,17 @@ let unary_minus_int x = -x
 and unary_minus_float x = -.x
 
 (* Representation of lists. [] for Stdlib.[] *)
-(* [e1;...;en] for StdlibPervasives.(::) e1 (... Stdlib.[]) *)
-let list_name n = Modname { qual = Misc.name_of_stdlib_module; id = n }
+(* [e1;...;en] for Stdlib.(::) e1 (... Stdlib.[]) *)
+let nil_name = "[]"
+let cons_name = "::"
 
-let nil_desc = Evar(list_name Misc.nil_name)
+let list_name n = Name(n)
+
+let nil_desc = Evar(list_name nil_name)
 
 let cons_desc x l start_pos end_pos =
   Eapp(false,
-       make (Evar(list_name Misc.cons_name)) start_pos end_pos,
+       make (Evar(list_name cons_name)) start_pos end_pos,
        [make (Etuple [x; l]) start_pos end_pos])
 
 let rec cons_list_desc l start_pos end_pos =
