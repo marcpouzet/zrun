@@ -86,8 +86,8 @@ let expression funs acc e =
   match e.e_desc with
   | Eapp { is_inline = true;
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
-     let { current } = acc.genv in
-     let l = E.to_list current.values in
+     (* let { current } = acc.genv in
+     let l = E.to_list current.values in *)
      let { Genv.info } = Genv.find lname acc.genv in
      begin match info with
      | Vclosure
@@ -97,7 +97,22 @@ let expression funs acc e =
      end
   | Eapp { f = { e_desc = Efun { f_args; f_body } }; arg_list } ->
      let e = local_in f_args arg_list f_body in e, acc
-  | _ -> raise Mapfold.Fallback
+  | _ -> e, acc
+
+(* let implementation acc ({ desc } as impl) =
+  match desc with
+    (* inlining is done after static reduction; global *)
+    (* names are head normal forms (HNF), that is, *)
+    (* immediate constants, constructors of hnf and functions)*)
+    Eletdecl { d_names; d_leq } ->
+     match d_names, d_leq with
+     | [name; id], { l_eq = EQeq({ p_desc = Evarpat(actual_name) }, e) } when
+       name = actual_name->
+        let e, acc = hnf acc e in
+        Eletdecl { d_names; d_leq = { d_leq with l_eq = EQeq(p, e) } },
+        add name e acc
+     | _ -> raise Fallback
+  | _ -> raise Fallback *)
 
 let program genv0 p =
   let { current } = genv0 in

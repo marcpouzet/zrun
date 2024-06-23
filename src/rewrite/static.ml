@@ -255,10 +255,20 @@ let rec expression acc ({ e_desc; e_loc } as e) =
        let m_pat, acc = pattern acc m_pat in
        let m_body, acc = expression acc m_body in
        { m_h with m_pat; m_body; m_env }, acc in
-     let e, acc = expression acc e in
-     let handlers, acc =
-       Util.mapfold body acc handlers in
-     { e with e_desc = Ematch { m with e; handlers } }, acc
+     (* two cases; either [e] is compile-time or not *)
+     let v = try_expression acc e in
+     let e, acc = match v with
+       | None ->
+          let e, acc = expression acc e in
+          let handlers, acc =
+            Util.mapfold body acc handlers in
+          { e with e_desc = Ematch { m with e; handlers } }, acc
+       | Some(v) ->
+          let env_pat, e = 
+            catch (Match.select e_loc acc.e_gvalues acc.e_values v handlers)
+          in expression 
+               { acc with e_values = Env.append env_pat acc.e_values } e in
+       e, acc
   | Eassert e -> let e, acc = expression acc e in
                  { e with e_desc = Eassert(e) }, acc
   | Ereset(e_body, e_c) ->
