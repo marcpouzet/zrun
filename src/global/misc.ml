@@ -86,20 +86,25 @@ let reset_number_of_fixpoint_iterations () = number_of_fixpoint_iterations := 0
 let no_assert = ref false
 
 (* remove the check that fix-point equation produce non bottom values *)
-let set_nocausality = ref false
+let no_causality = ref false
 
 (* sets the interpretation of the if/then/else to Esterel *)
-let set_esterel = ref false
+let esterel = ref false
 
 (* sets the interpretation of the if/then/else to Lustre *)
-let set_lustre = ref false
+let lustre = ref false
 
 (* no information associated to expressions *)
 type no_info = unit
 let no_info: no_info = ()
 
 (* static reduction *)
-let set_reduce = ref false
+let static_reduction = ref false
 
 (* check equivalence *)
-let set_check = ref false
+let equivalence_checking = ref false
+
+(* sets the inline flags *)
+let inlining_level = ref 10
+let set_inlining_level l = inlining_level := l
+let inline_all = ref false
