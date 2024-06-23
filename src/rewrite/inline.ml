@@ -12,7 +12,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* inlining; this step assumes that static reduction is already done *)
+(* inlining; this step assumes that static reduction is done already *)
 (* this means that all variable defined at top level in declarations *)
 (* are of the form [let x = e] where [x] is a value *)
 (* a close term in head normal form *)
