@@ -1,7 +1,7 @@
 (***********************************************************************)
 (*                                                                     *)
 (*                                                                     *)
-(*          Zélus, a synchronous language for hybrid systems           *)
+(*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
 (*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
@@ -16,7 +16,12 @@
 (* function calls [inline f e1 ... en] are inlined *)
 
 open Misc
+open Location
 open Ast
+open Ident
+open Lident
+open Defnames
+open Genv
 open Value
 open Error
 open Mapfold
@@ -26,36 +31,81 @@ let error { kind; loc } =
   Error.message loc kind;
   raise Error
 
-(* returns [let p1' = e1 and ... and pn' = en in e[p1'/p1,...,p'n/pn] *)
-(* in which [p1,...,pn] are renamed into [p1',...,pn'] and [e] is *)
-(* recursively inlined *)
-        (*
-          let letin renaming env p_list e_list e =
-  let eqmake p e = eqmake (EQeq(p, e)) in
+let fresh () = Ident.fresh "inline"
 
-  let env, renaming0 = build env in
-  let renaming = Env.append renaming0 renaming in
-  let p_list = List.map (pattern renaming) p_list in
-  { e with e_desc =
-      Elet({ l_rec = false; l_env = env; l_eq = List.map2 eqmake p_list e_list;
-             l_loc = Zlocation.no_location }, expression renaming e) }
-         *)
+let pat x = 
+    { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
 
-let expression funs acc ({ e_desc } as e) =
-  match e_desc with
+let eq dv p e =
+  { eq_desc = EQeq(p, e); eq_loc = Location.no_location;
+    eq_write = { Defnames.empty with dv } }
+
+let leq l_kind p e = 
+  let dv = Write.fv_pat S.empty p in
+  { l_rec = false; l_kind; l_eq = eq dv p e; 
+    l_loc = Location.no_location;
+    l_env = S.fold (fun x acc -> Env.add x no_info acc) dv Env.empty }
+
+let leq_list l_kind eq = 
+  { l_rec = false; l_kind; l_eq = eq; 
+    l_loc = Location.no_location;
+    l_env = Env.empty }
+  
+let pat_of_vardec { var_name } = pat var_name
+
+let pat_of_vardec_list vardec_list =
+  match vardec_list with
+  | [] -> Aux.pmake Ewildpat Misc.no_info
+  | _ -> Aux.pmake (Etuplepat(List.map pat_of_vardec vardec_list)) no_info
+
+let eq_of_f_arg_arg f_arg arg =
+  let p = pat_of_vardec_list f_arg in
+  let dv = Write.fv_pat S.empty p in
+  Aux.eqmake { Defnames.empty with dv } (EQeq(p, arg))
+
+let returns_of_vardec { var_name } = Aux.emake (Evar(var_name)) no_info
+
+let returns_of_vardec_list vardec_list =
+  match vardec_list with
+  | [] -> Aux.emake (Econst(Evoid)) no_info
+  | _ -> Aux.emake (Etuple(List.map returns_of_vardec vardec_list)) no_info
+  
+(* [(\v_list1 ... v_listn. e) e1 ... en] 
+ *- rewrites to:
+ *- [local v_list1,...,v_listn do p1 = e1 ... pn = en in e]
+ *- [(\(v_list1 ... v_listn. v_ret eq) e1 ... en
+ *- rewrites to:
+ *- [local v_list1,...,v_listn, v_ret
+ *-  do p1 = e1 ... pn = en and eq in p_v *)
+
+let local_in f_args arg_list { r_desc } =
+  (* build a list of equations *)
+  let eq_list = List.map2 eq_of_f_arg_arg f_args arg_list in
+  let vardec_list =
+    List.fold_left (fun acc vardec_list -> vardec_list @ acc) [] f_args in
+  match r_desc with
+  | Exp(e_r) ->
+     Aux.emake (Elocal(Aux.blockmake vardec_list eq_list, e_r)) no_info
+  | Returns { b_vars; b_body; b_write; b_env } ->
+     let vardec_list = b_vars @ vardec_list in
+     let eq_list = b_body :: eq_list in
+     Aux.emake
+       (Elocal(Aux.blockmake vardec_list eq_list,
+               returns_of_vardec_list b_vars)) no_info
+
+let expression funs acc e = 
+  let e, acc = Mapfold.expression funs acc e in
+  match e.e_desc with
   | Eapp { is_inline = true;
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
-     (* a function call [inline f e1 ... en] is replaced by *)
-     (* [let x1 = e1 in ... let xn = en in
-         local o do eq in o_res] *)
-     (* if [f = [fun|node] p1...pn returns o eq] *)
      let { Genv.info } = Genv.find lname acc in
      begin match info with
      | Vclosure
-       { c_funexp = { f_vkind; f_kind; f_atomic; f_args; f_body;
-                               f_env }; c_genv; c_env } ->
-        (* letin renaming env p_list e_list *)
+       { c_funexp = { f_args; f_body; f_env }; c_genv; c_env } ->
+        let e = local_in f_args arg_list f_body in
         e, acc
      | _ -> error { kind = Etype; loc = f_loc }
      end
-  | _ -> raise Mapfold.Fallback
+  | Eapp { f = { e_desc = Efun { f_args; f_body; f_env } }; arg_list } ->
+     let e = local_in f_args arg_list f_body in e, acc
+  | _ -> e, acc
