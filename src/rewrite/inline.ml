@@ -26,31 +26,16 @@ open Value
 open Error
 open Mapfold
 
-let error { kind; loc } =
-  Format.eprintf "Error during inlining\n";
-  Error.message loc kind;
-  raise Error
-
 let fresh () = Ident.fresh "inline"
+
+(* the type of the accumulator *)
+type acc = { genv : Value.pvalue Genv.genv }
+
+let empty = { genv = Genv.empty }
 
 let pat x = 
     { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
 
-let eq dv p e =
-  { eq_desc = EQeq(p, e); eq_loc = Location.no_location;
-    eq_write = { Defnames.empty with dv } }
-
-let leq l_kind p e = 
-  let dv = Write.fv_pat S.empty p in
-  { l_rec = false; l_kind; l_eq = eq dv p e; 
-    l_loc = Location.no_location;
-    l_env = S.fold (fun x acc -> Env.add x no_info acc) dv Env.empty }
-
-let leq_list l_kind eq = 
-  { l_rec = false; l_kind; l_eq = eq; 
-    l_loc = Location.no_location;
-    l_env = Env.empty }
-  
 let pat_of_vardec { var_name } = pat var_name
 
 let pat_of_vardec_list vardec_list =
@@ -98,14 +83,23 @@ let expression funs acc e =
   match e.e_desc with
   | Eapp { is_inline = true;
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
-     let { Genv.info } = Genv.find lname acc in
+     let { Genv.info } = Genv.find lname acc.genv in
      begin match info with
      | Vclosure
        { c_funexp = { f_args; f_body; f_env }; c_genv; c_env } ->
         let e = local_in f_args arg_list f_body in
         e, acc
-     | _ -> error { kind = Etype; loc = f_loc }
+     | _ -> e, acc
      end
   | Eapp { f = { e_desc = Efun { f_args; f_body; f_env } }; arg_list } ->
      let e = local_in f_args arg_list f_body in e, acc
   | _ -> e, acc
+
+let block funs acc b = b, acc
+
+let program p =
+  let funs =
+    { Mapfold.defaults with expression; block } in
+  let p, acc = Mapfold.program funs empty p in
+  p
+
