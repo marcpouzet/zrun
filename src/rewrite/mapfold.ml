@@ -70,6 +70,8 @@ let stop funs _ _ = raise Fallback
 
 type ('a, 'info) global_it_funs =
   {
+    build :  ('a, 'info) global_it_funs -> 'a ->
+            'info Ident.Env.t -> 'info Ident.Env.t * 'a;
     var_ident : ('a, 'info) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
     typevar : ('a, 'info) global_it_funs -> 'a -> name -> name * 'a;
     typeconstr : ('a, 'info) global_it_funs -> 'a -> Lident.t -> Lident.t * 'a;
@@ -88,8 +90,6 @@ type ('a, 'info) global_it_funs =
 type ('a, 'info) it_funs =
   {
     global_funs : ('a, 'info) global_it_funs;
-    build :  ('a, 'info) it_funs -> 'a ->
-            'info Ident.Env.t -> 'info Ident.Env.t * 'a;
     pattern : ('a, 'info) it_funs -> 'a -> 'info pattern -> 'info pattern * 'a;
     write_t :
       ('a, 'info) it_funs -> 'a -> defnames -> defnames * 'a;
@@ -302,7 +302,7 @@ and leq_it funs acc leq =
   with Fallback -> leq_t funs acc leq
 
 and leq_t funs acc ({ l_eq; l_env } as leq) =
-  let l_env, acc = build_it funs acc l_env in
+  let l_env, acc = build_it funs.global_funs acc l_env in
   let l_eq, acc = equation_it funs acc l_eq in
   { leq with l_eq; l_env }, acc
 
@@ -351,7 +351,7 @@ and block_it funs acc b =
   with Fallback -> block funs acc b
 
 and block funs acc ({ b_vars; b_body; b_write; b_env } as b) =
-  let b_env, acc = build_it funs acc b_env in
+  let b_env, acc = build_it funs.global_funs acc b_env in
   let b_vars, acc = 
     Util.mapfold (vardec_it funs) acc b_vars in
   let b_body, acc = equation_it funs acc b_body in
@@ -438,7 +438,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      { e with e_desc = Elocal(eq_b, e) }, acc
   | Epresent({ handlers; default_opt }) ->
      let body acc ({ p_cond; p_body; p_env } as p_b) =
-       let p_env, acc = build_it funs acc p_env in
+       let p_env, acc = build_it funs.global_funs acc p_env in
        let p_cond, acc = scondpat_it funs acc p_cond in
        let p_body, acc = expression_it funs acc p_body in
        { p_b with p_cond; p_body }, acc in
@@ -448,7 +448,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      { e with e_desc = Epresent { handlers; default_opt } }, acc 
   | Ematch({ e; handlers } as m) ->
      let body acc ({ m_pat; m_body; m_env } as m_h) =
-       let m_env, acc = build_it funs acc m_env in
+       let m_env, acc = build_it funs.global_funs acc m_env in
        let m_pat, acc = pattern_it funs acc m_pat in
        let m_body, acc = expression_it funs acc m_body in
        { m_h with m_pat; m_body; m_env }, acc in
@@ -482,11 +482,11 @@ and expression funs acc ({ e_desc; e_loc } as e) =
             Util.optional_with_map (expression_it funs) acc default in
           Forexp { exp; default }, acc
        | Forreturns { returns; body; r_env } ->
-          let r_env, acc = build_it funs acc r_env in
+          let r_env, acc = build_it funs.global_funs acc r_env in
           let returns, acc = Util.mapfold for_vardec_t acc returns in
           let body, acc = block_it funs acc body in
           Forreturns { returns; body; r_env }, acc in
-     let for_env, acc = build_it funs acc for_env in
+     let for_env, acc = build_it funs.global_funs acc for_env in
      let for_size, acc =
        Util.optional_with_map (for_size_t funs) acc for_size in
      let for_kind, acc = for_kind_t funs acc for_kind in
@@ -521,7 +521,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        { eq with eq_desc = EQemit(x, e_opt) }, acc
     | EQder { id; e; e_opt; handlers } ->
        let body acc ({ p_cond; p_body; p_env } as p_b) =
-         let p_env, acc = build_it funs acc p_env in
+         let p_env, acc = build_it funs.global_funs acc p_env in
          let p_cond, acc = scondpat_it funs acc p_cond in
          let p_body, acc = expression_it funs acc p_body in
          { p_b with p_cond; p_body }, acc in
@@ -538,7 +538,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        { eq with eq_desc = EQif { e; eq_true; eq_false } }, acc
     | EQmatch({ e; handlers } as m) ->
        let body acc ({ m_pat; m_body; m_env } as m_h) =
-         let m_env, acc = build_it funs acc m_env in
+         let m_env, acc = build_it funs.global_funs acc m_env in
          let m_pat, acc = pattern_it funs acc m_pat in
          let m_body, acc = equation_it funs acc m_body in
          { m_h with m_pat; m_body; m_env }, acc in
@@ -554,7 +554,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        { eq with eq_desc = EQand(eq_list) }, acc
     | EQpresent({ handlers; default_opt }) ->
        let body acc ({ p_cond; p_body; p_env } as p_b) =
-         let p_env, acc = build_it funs acc p_env in
+         let p_env, acc = build_it funs.global_funs acc p_env in
          let p_cond, acc = scondpat_it funs acc p_cond in
          let p_body, acc = equation_it funs acc p_body in
          { p_b with p_cond; p_body }, acc in
@@ -591,7 +591,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
               Estateif(e, st1, st2), acc in
          { st with desc }, acc in
        let escape acc ({ e_cond; e_let; e_body; e_next_state; e_env } as esc) =
-         let e_env, acc = build_it funs acc e_env in
+         let e_env, acc = build_it funs.global_funs acc e_env in
          let e_cond, acc = scondpat_it funs acc e_cond in
          let e_let, acc = slet_it funs acc e_let in
          let e_body, acc = block_it funs acc e_body in
@@ -630,7 +630,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
            Util.mapfold for_out_t acc for_out in
          let for_block, acc = block_it funs acc for_block in
          { for_out; for_block }, acc in
-       let for_env, acc = build_it funs acc for_env in
+       let for_env, acc = build_it funs.global_funs acc for_env in
        let for_size, acc =
          Util.optional_with_map (for_size_t funs) acc for_size in
        let for_kind, acc = for_kind_t funs acc for_kind in
@@ -650,7 +650,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let eq, acc = equation_it funs acc eq in
        { eq with eq_desc = EQlet(leq, eq) }, acc
     | EQsizefun({ sf_id; sf_id_list; sf_e; sf_env } as sf) ->
-       let sf_env, acc = build_it funs acc sf_env in
+       let sf_env, acc = build_it funs.global_funs acc sf_env in
        let sf_id, acc = var_ident_it funs.global_funs acc sf_id in
        let sf_id_list, acc =
          Util.mapfold (var_ident_it funs.global_funs) acc sf_id_list in
@@ -712,7 +712,8 @@ let rec interface_it global_funs acc interf =
 and interface global_funs acc interf = interf, acc
 
 let default_global_funs =
-  { var_ident;
+  { build;
+    var_ident;
     typevar;
     typeconstr;
     kind;
@@ -723,7 +724,6 @@ let default_global_funs =
 
 let defaults =
   { global_funs = default_global_funs;
-    build;
     pattern;
     write_t;
     leq_t;
@@ -741,7 +741,8 @@ let defaults =
   }
                  
 let default_global_stop =
-  { var_ident = stop;
+  { build = stop;
+    var_ident = stop;
     typevar = stop;
     typeconstr = stop;
     kind = stop;
@@ -751,7 +752,6 @@ let default_global_stop =
   }
 let defaults_stop =
   { global_funs = default_global_stop;
-    build = stop;
     pattern = stop;
     write_t = stop;
     leq_t = stop;
