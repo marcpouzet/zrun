@@ -51,6 +51,8 @@ let empty genv =
     e_exp = Ident.Env.empty;
   }
 
+let fresh () = Ident.fresh "reduce"
+
 let update acc genv env =
   { acc with e_renaming = Ident.Env.empty; e_values = env; e_gvalues = genv }
 
@@ -610,7 +612,7 @@ and value_t loc acc v =
   if immediate e then e, acc
   else 
     (* add a definition in the global environment *)
-    let m = Ident.fresh "reduce" in
+    let m = fresh () in
     let name = Ident.name m in
     let e = make (Eglobal { lname = Name(name) }) in
     e, { acc with e_defs = (name, m, e) :: acc.e_defs;
