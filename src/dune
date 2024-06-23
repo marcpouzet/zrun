@@ -44,6 +44,7 @@
     eval ; evaluation of an expression
     static ; static reduction
     mapfold ; generic mapfold
+    aux ; auxiliary function for building terms
     inline ; inlining
   )   	 
   (libraries zrun.ast_lib))
