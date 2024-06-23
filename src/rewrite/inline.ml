@@ -12,8 +12,11 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* static inlining; this step assumes that static reduction is done *)
-(* function calls [inline f e1 ... en] are inlined *)
+(* inlining; this step assumes that static reduction is already done *)
+(* this means that all variable defined at top level in declarations *)
+(* are of the form [let x = e] where [x] is a value *)
+(* a close term in head normal form *)
+(* all function calls [inline f e1 ... en] are inlined *)
 
 open Misc
 open Location
