@@ -31,6 +31,17 @@ open Mapfold
 
 let fresh () = Ident.fresh "inline"
 
+                           (*
+                             (** Build a renaming from an environment *)
+let build global_funs ({ e_renaming } as acc) env =
+  let buildrec n entry (env, renaming) =
+    let m = Ident.fresh (Ident.source n) in
+    Env.add m entry env,
+    Env.add n m renaming in
+  let env, e_renaming = Env.fold buildrec env (Env.empty, e_renaming) in
+  env, { acc with e_renaming }
+                            *)
+
 (* the type of the accumulator *)
 type acc = { genv : Value.pvalue Genv.genv }
 
