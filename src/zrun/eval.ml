@@ -121,7 +121,7 @@ let eval_definitions_in_file modname filename n_steps =
   (* Inlining *)
   let _ =
     do_optional_step !inline_all "Inlining"
-      Debug.print_program (Inline.program genv0) p in
+      Debug.print_program (Inline.program genv) p in
   
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv) otc;
