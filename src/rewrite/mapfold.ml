@@ -671,7 +671,7 @@ let rec implementation_it funs acc impl =
   try funs.implementation funs acc impl
   with Fallback -> implementation funs acc impl
 
-and implementation funs acc ({ desc; loc } as impl) =
+and implementation funs acc ({ desc } as impl) =
   let desc, acc = match desc with
     | Eopen(name) ->
        let name, acc = open_t funs acc name in
