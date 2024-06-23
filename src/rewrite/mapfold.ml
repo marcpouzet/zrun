@@ -71,7 +71,17 @@ let stop funs _ _ = raise Fallback
 type ('a, 'info) global_it_funs =
   {
     var_ident : ('a, 'info) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
-  }
+    typevar : ('a, 'info) global_it_funs -> 'a -> name -> name * 'a;
+    typeconstr : ('a, 'info) global_it_funs -> 'a -> Lident.t -> Lident.t * 'a;
+    type_expression :
+      ('a, 'info) global_it_funs -> 'a ->
+      type_expression -> type_expression * 'a;
+    typedecl :
+      ('a, 'info) global_it_funs -> 'a ->
+      ((name * name list * name list * type_decl) as 'ty) -> 'ty * 'a;
+    kind :
+      ('a, 'info) global_it_funs -> 'a -> kind -> kind * 'a;
+    }
 
 type ('a, 'info) it_funs =
   {
@@ -79,8 +89,6 @@ type ('a, 'info) it_funs =
     build :  ('a, 'info) it_funs -> 'a ->
             'info Ident.Env.t -> 'info Ident.Env.t * 'a;
     pattern : ('a, 'info) it_funs -> 'a -> 'info pattern -> 'info pattern * 'a;
-    type_expression :
-      ('a, 'info) it_funs -> 'a -> type_expression -> type_expression * 'a;
     write_t :
       ('a, 'info) it_funs -> 'a -> defnames -> defnames * 'a;
     leq_t :
@@ -105,9 +113,6 @@ type ('a, 'info) it_funs =
       ('a, 'info) it_funs -> 'a -> 'info funexp -> 'info funexp * 'a;
     last :
       ('a, 'info) it_funs -> 'a -> Ident.t -> Ident.t * 'a;
-    typedecl :
-      ('a, 'info) it_funs -> 'a ->
-      ((name * name list * name list * type_decl) as 'ty) -> 'ty * 'a;
     implementation :
       ('a, 'info) it_funs -> 'a ->
       'info implementation -> 'info implementation * 'a;
@@ -121,6 +126,13 @@ let rec build_it funs acc env =
   with Fallback -> build funs acc env
 
 and build funs acc env = env, acc
+
+let rec last_it funs acc l =
+  try funs.last funs acc l
+  with Fallback -> last funs acc l
+
+and last funs acc l =
+  funs.global_funs.var_ident funs.global_funs acc l
 
 let rec pattern_it funs acc pat =
   try funs.pattern funs acc pat
@@ -155,7 +167,7 @@ and pattern funs acc ({ pat_desc } as p) =
        Eorpat(p1, p2), acc
     | Etypeconstraintpat(p1, ty) ->
        let p1, acc = pattern_it funs acc p1 in
-       let ty, acc = type_expression_it funs acc ty in
+       let ty, acc = type_expression_it funs.global_funs acc ty in
        Etypeconstraintpat(p1, ty), acc in
   { p with pat_desc }, acc
 
@@ -165,11 +177,75 @@ and var_ident_it global_funs acc x =
 
 and var_ident global_funs acc x = x, acc
 
-and type_expression_it funs acc ty =
-  try funs.type_expression funs acc ty
-  with Fallback -> type_expression funs acc ty
+and typevar_it global_funs acc x =
+  try global_funs.typevar global_funs acc x
+  with Fallback -> typevar global_funs acc x
 
-and type_expression funs acc ty = ty, acc
+and typevar global_funs acc x = x, acc
+
+and typeconstr_it global_funs acc x =
+  try global_funs.typeconstr global_funs acc x
+  with Fallback -> typeconstr global_funs acc x
+
+and typeconstr global_funs acc x = x, acc
+
+and kind_it global_funs acc k =
+  try global_funs.kind global_funs acc k
+  with Fallback -> kind global_funs acc k
+
+and kind global_funs acc k = k, acc
+
+and type_expression_it global_funs acc ty =
+  try global_funs.type_expression global_funs acc ty
+  with Fallback -> type_expression global_funs acc ty
+
+and type_expression global_funs acc ({ desc } as ty) =
+  let desc, acc = match desc with
+  | Etypevar(name) ->
+     let name, acc = typevar_it global_funs acc name in
+     Etypevar(name), acc
+  | Etypeconstr(lname, ty_list) ->
+     let lname, acc = typeconstr_it global_funs acc lname in
+     let ty_list, acc =
+       Util.mapfold (type_expression_it global_funs) acc ty_list in
+     Etypeconstr(lname, ty_list), acc 
+  | Etypetuple(ty_list) ->
+     let ty_list, acc =
+       Util.mapfold (type_expression_it global_funs) acc ty_list in
+     Etypetuple(ty_list), acc     
+  | Etypefun(kind, ty1, ty2) ->
+     let kind, acc = kind_it global_funs acc kind in
+     let ty1, acc = type_expression_it global_funs acc ty1 in
+     let ty2, acc = type_expression_it global_funs acc ty2 in
+     Etypefun(kind, ty1, ty2), acc in
+  { ty with desc }, acc
+
+let rec size_it funs acc si =
+  try funs.size_t funs acc si
+  with Fallback -> size_t funs acc si
+
+and size_t funs acc ({ desc } as si) =
+  let desc, acc = match desc with
+  | Sint _ -> desc, acc
+  | Sfrac { num; denom } ->
+     let num, acc = funs.size_t funs acc num in
+     Sfrac { num; denom }, acc
+  | Sident(id) ->
+     let id, acc = funs.global_funs.var_ident funs.global_funs acc id in
+     Sident(id), acc
+  | Splus(si1, si2) ->
+     let si1, acc = funs.size_t funs acc si1 in
+     let si2, acc = funs.size_t funs acc si2 in
+     Splus(si1, si2), acc
+  | Sminus(si1, si2) ->
+     let si1, acc = funs.size_t funs acc si1 in
+     let si2, acc = funs.size_t funs acc si2 in
+     Splus(si1, si2), acc
+  | Smult(si1, si2) ->
+     let si1, acc = funs.size_t funs acc si1 in
+     let si2, acc = funs.size_t funs acc si2 in
+     Splus(si1, si2), acc in
+  { si with desc }, acc
 
 let rec write_it funs acc w =
   try funs.write_t funs acc w
@@ -216,16 +292,16 @@ let for_input_t funs acc ({ desc } as fi) =
        Eindex { ind with id; e_left; e_right }, acc in
   { fi with desc }, acc
 
-let slet_it funs acc leq_list =
-  Util.mapfold (funs.leq_t funs) acc leq_list
+let rec slet_it funs acc leq_list =
+  Util.mapfold (leq_it funs) acc leq_list
 
-let rec leq_it funs acc leq =
+and leq_it funs acc leq =
   try funs.leq_t funs acc leq
   with Fallback -> leq_t funs acc leq
 
 and leq_t funs acc ({ l_eq; l_env } as leq) =
-  let l_env, acc = funs.build funs acc l_env in
-  let l_eq, acc = funs.equation funs acc l_eq in
+  let l_env, acc = build_it funs acc l_env in
+  let l_eq, acc = equation_it funs acc l_eq in
   { leq with l_eq }, acc
 
 and scondpat_it funs acc scpat =
@@ -235,58 +311,52 @@ and scondpat_it funs acc scpat =
 and scondpat funs acc ({ desc = desc } as scpat) =
   match desc with
   | Econdand(scpat1, scpat2) ->
-     let scpat1, acc = funs.scondpat funs acc scpat1 in
-     let scpat2, acc = funs.scondpat funs acc scpat2 in
+     let scpat1, acc = scondpat_it funs acc scpat1 in
+     let scpat2, acc = scondpat_it funs acc scpat2 in
      { scpat with desc = Econdand(scpat1, scpat2) }, acc
   | Econdor(scpat1, scpat2) ->
-     let scpat1, acc = funs.scondpat funs acc scpat1 in
-     let scpat2, acc = funs.scondpat funs acc scpat2 in
+     let scpat1, acc = scondpat_it funs acc scpat1 in
+     let scpat2, acc = scondpat_it funs acc scpat2 in
      { scpat with desc = Econdor(scpat1, scpat2) }, acc
   | Econdexp(e) ->
-     let e, acc = funs.expression funs acc e in
+     let e, acc = expression_it funs acc e in
      { scpat with desc = Econdexp(e) }, acc
   | Econdpat(e, p) ->
-     let e, acc = funs.expression funs acc e in
-     let p, acc = funs.pattern funs acc p in
+     let e, acc = expression_it funs acc e in
+     let p, acc = pattern_it funs acc p in
      { scpat with desc = Econdpat(e, p) }, acc
   | Econdon(scpat, e) ->
-     let scpat, acc = funs.scondpat funs acc scpat in
-     let e, acc = funs.expression funs acc e in
+     let scpat, acc = scondpat_it funs acc scpat in
+     let e, acc = expression_it funs acc e in
      { scpat with desc = Econdon(scpat, e) }, acc
 
-let rec vardec_it funs acc v =
+and vardec_it funs acc v =
   try funs.vardec funs acc v
   with Fallback -> vardec funs acc v
 
 and vardec funs acc ({ var_default; var_init; var_typeconstraint } as v) =
   let var_default, acc =
-    Util.optional_with_map (funs.expression funs) acc var_default in
+    Util.optional_with_map (expression_it funs) acc var_default in
   let var_init, acc =
-    Util.optional_with_map (funs.expression funs) acc var_init in
+    Util.optional_with_map (expression_it funs) acc var_init in
   let var_typeconstraint, acc =
-    Util.optional_with_map (funs.type_expression funs) acc var_typeconstraint in
+    Util.optional_with_map
+      (type_expression_it funs.global_funs) acc var_typeconstraint in
   { v with var_default; var_init; var_typeconstraint }, acc
 
-let rec last_it funs acc l =
-  try funs.last funs acc l
-  with Fallback -> last funs acc l
-
-and last funs acc l =
-  funs.global_funs.var_ident funs.global_funs acc l
-
-let rec block_it funs acc b =
+and block_it funs acc b =
   try funs.block funs acc b
   with Fallback -> block funs acc b
 
 and block funs acc ({ b_vars; b_body; b_write; b_env } as b) =
-  let b_env, acc = funs.build funs acc b_env in
+  let b_env, acc = build_it funs acc b_env in
   let b_vars, acc = 
-    Util.mapfold (funs.vardec funs) acc b_vars in
-  let b_body, acc = funs.equation funs acc b_body in
-  let b_write, acc = funs.write_t funs acc b_write in
+    Util.mapfold (vardec_it funs) acc b_vars in
+  let b_body, acc = equation_it funs acc b_body in
+  let b_write, acc = write_t funs acc b_write in
   { b with b_vars; b_body; b_env; b_write }, acc
 
-let rec result_it funs acc r =
+and result_it funs acc r =
   try funs.result funs acc r
   with Fallback -> result funs acc r
 
@@ -298,7 +368,7 @@ and result funs acc ({ r_desc } as r) =
        let b_eq, acc = funs.block funs acc b_eq in Returns(b_eq), acc in
   { r with r_desc }, acc
 
-let rec funexp_it funs acc f =
+and funexp_it funs acc f =
   try funs.funexp funs acc f
   with Fallback -> funexp funs acc f
 
@@ -308,36 +378,8 @@ and funexp funs acc ({ f_args; f_body; f_env } as f) =
   let f_body, acc_local = funs.result funs acc_local f_body in
   { f with f_args; f_body; f_env }, acc
 
-(* Expressions *)
-let rec size_it funs acc si =
-  try funs.size_t funs acc si
-  with Fallback -> size_t funs acc si
-
-and size_t funs acc ({ desc } as si) =
-  let desc, acc = match desc with
-  | Sint _ -> desc, acc
-  | Sfrac { num; denom } ->
-     let num, acc = funs.size_t funs acc num in
-     Sfrac { num; denom }, acc
-  | Sident(id) ->
-     let id, acc = funs.global_funs.var_ident funs.global_funs acc id in
-     Sident(id), acc
-  | Splus(si1, si2) ->
-     let si1, acc = funs.size_t funs acc si1 in
-     let si2, acc = funs.size_t funs acc si2 in
-     Splus(si1, si2), acc
-  | Sminus(si1, si2) ->
-     let si1, acc = funs.size_t funs acc si1 in
-     let si2, acc = funs.size_t funs acc si2 in
-     Splus(si1, si2), acc
-  | Smult(si1, si2) ->
-     let si1, acc = funs.size_t funs acc si1 in
-     let si2, acc = funs.size_t funs acc si2 in
-     Splus(si1, si2), acc in
-  { si with desc }, acc
-
 (** Expressions **)
-let rec expression_it funs acc e =
+and expression_it funs acc e =
   try funs.expression funs acc e
   with Fallback -> expression funs acc e
 
@@ -382,7 +424,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      { e with e_desc = Eop(op, e_list) }, acc
   | Etypeconstraint(e_ty, ty) ->
      let e_ty, acc = expression_it funs acc e_ty in
-     let ty, acc = type_expression_it funs acc ty in
+     let ty, acc = type_expression_it funs.global_funs acc ty in
      { e with e_desc = Etypeconstraint(e_ty, ty) }, acc
   | Elet(l, e_let) ->
      let l, acc = leq_it funs acc l in
@@ -455,7 +497,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
                            for_body; for_env } }, acc
 
 (** Equations **)
-let rec equation_it funs acc eq =
+and equation_it funs acc eq =
   try funs.equation funs acc eq
   with Fallback -> equation funs acc eq
 
@@ -498,7 +540,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
          let m_pat, acc = pattern_it funs acc m_pat in
          let m_body, acc = equation_it funs acc m_body in
          { m_h with m_pat; m_body; m_env }, acc in
-       let e, acc = funs.expression funs acc e in
+       let e, acc = expression_it funs acc e in
        let handlers, acc =
          Util.mapfold body acc handlers in
        { eq with eq_desc = EQmatch { m with e; handlers } }, acc
@@ -643,7 +685,7 @@ and implementation funs acc ({ desc; loc } as impl) =
        Eletdecl { d_names; d_leq }, acc
     | Etypedecl { name; ty_params; size_params; ty_decl } ->
        let (name, ty_params, size_params, ty_decl), acc =
-         typedecl_it funs acc (name, ty_params, size_params, ty_decl) in
+         typedecl_it funs.global_funs acc (name, ty_params, size_params, ty_decl) in
        Etypedecl { name; ty_params; size_params; ty_decl }, acc in
   { impl with desc }, acc
 
@@ -661,11 +703,19 @@ and program funs acc { p_impl_list; p_index } =
   let p_index, acc = get_index funs acc n in
   { p_impl_list; p_index }, acc  
 
+let default_global_funs =
+  { var_ident;
+    typevar;
+    typeconstr;
+    kind;
+    type_expression;
+    typedecl;
+  }
+
 let defaults =
-  { global_funs = { var_ident };
+  { global_funs = default_global_funs;
     build;
     pattern;
-    type_expression;
     write_t;
     leq_t;
     equation;
@@ -677,16 +727,22 @@ let defaults =
     result;
     funexp;
     last;
-    typedecl;
     implementation;
     program
   }
                  
+let default_global_stop =
+  { var_ident = stop;
+    typevar = stop;
+    typeconstr = stop;
+    kind = stop;
+    type_expression = stop;
+    typedecl = stop;
+  }
 let defaults_stop =
-  { global_funs = { var_ident = stop };
+  { global_funs = default_global_stop;
     build = stop;
     pattern = stop;
-    type_expression = stop;
     write_t = stop;
     leq_t = stop;
     equation = stop;
@@ -698,7 +754,6 @@ let defaults_stop =
     result = stop;
     funexp = stop;
     last = stop;
-    typedecl = stop;
     implementation = stop;
     program = stop 
   }
