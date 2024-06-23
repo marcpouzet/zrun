@@ -104,7 +104,7 @@ let eval_definitions_in_file modname filename n_steps =
   
   (* Static reduction *)
   let p =
-    do_optional_step !set_reduce "Static reduction"
+    do_optional_step !static_reduction "Static reduction"
       Debug.print_program (Static.program genv0) p in
   
   (* Equivalence checking *)
@@ -115,10 +115,14 @@ let eval_definitions_in_file modname filename n_steps =
     (genv_after, p) in
 
   let genv, p =
-    do_optional_step
-      (!set_reduce && !set_check) "Equivalence checking"
-      Debug.print_nothing check (genv, p) in
+    do_optional_step (!static_reduction && !equivalence_checking)
+      "Equivalence checking" Debug.print_nothing check (genv, p) in
       
+  (* Inlining *)
+  let _ =
+    do_optional_step !inline_all "Inlining"
+      Debug.print_program (Inline.program genv0) p in
+  
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv) otc;
 

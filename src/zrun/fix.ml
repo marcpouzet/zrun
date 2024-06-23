@@ -43,7 +43,7 @@ let causal loc
   let bot_names =
     if Env.for_all (fun _ { cur } -> not (bot cur)) env
     then S.filter bot_name names else S.empty in
-  if !set_nocausality then return ()
+  if !no_causality then return ()
   else 
     if S.is_empty bot_names then return ()
     else

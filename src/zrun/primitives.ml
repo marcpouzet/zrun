@@ -331,8 +331,8 @@ let and_gate(x,y) = if x then y else false
 Hence, [x = x or true] == [x = if x then true else true = true]
 *)
 let ifthenelse v1 v2 v3 =
-  if !set_lustre then lustre_ifthenelse v1 v2 v3 else
-    if !set_esterel then esterel_ifthenelse v1 v2 v3
+  if !lustre then lustre_ifthenelse v1 v2 v3 else
+    if !esterel then esterel_ifthenelse v1 v2 v3
     else lazy_ifthenelse v1 v2 v3
 
 (* lift a unary operator: [op bot = bot]; [op nil = nil] *)
@@ -490,10 +490,7 @@ let list_of_random_primitives =
 let to_env acc l = List.fold_left (fun acc (n, v) -> Genv.E.add n v acc) acc l
 
 let list_of_esterel_primitives =
-  if !set_esterel
-  then ["or", esterel_or_op;
-        "&", esterel_and_op]
-  else []
+  if !esterel then ["or", esterel_or_op; "&", esterel_and_op] else []
 
 let stdlib_env =
   { Genv.name = "Stdlib";

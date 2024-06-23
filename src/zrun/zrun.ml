@@ -43,11 +43,13 @@ let doc_esterel =
 let doc_lustre =
   "\tSets the interpretation of if/then/else to be strict \n\
    \t\t(that of Lustre)"
-let doc_reduce =
-  "\tReduce compile-time expressions"
+let doc_static_reduction =
+  "\tReduce static (compile-time) expressions"
 let doc_check =
   "\tCheck equivalence at every program transformation \n\
    \t\tfor the number of steps"
+and doc_inlining_level = "<n> \t Level of inlining"
+and doc_inline_all = "\t Inline all function calls"
                   
 let errmsg = "Options are:"
 
@@ -59,18 +61,20 @@ let main () =
          [ "-s", Arg.String Misc.set_main, doc_main;
            "-all", Arg.Set Misc.all, doc_all;
            "-n", Arg.Int Misc.set_number_of_steps, doc_number_of_steps;
-           "-v", Arg.Unit set_verbose, doc_verbose;
-           "-vv", Arg.Unit set_vverbose, doc_vverbose;
-           "-debug", Arg.Unit set_debug, doc_debug;
-           "-print", Arg.Set print_values, doc_print_values;
+           "-v", Arg.Unit Misc.set_verbose, doc_verbose;
+           "-vv", Arg.Unit Misc.set_vverbose, doc_vverbose;
+           "-debug", Arg.Unit Misc.set_debug, doc_debug;
+           "-print", Arg.Set Misc.print_values, doc_print_values;
            "-noassert", Arg.Set Misc.no_assert, doc_no_assert;
-           "-nocausality", Arg.Set Misc.set_nocausality, doc_nocausality;
+           "-nocausality", Arg.Set Misc.no_causality, doc_nocausality;
            "-fix", Arg.Set Misc.print_number_of_fixpoint_iterations,
            doc_number_of_fixpoint_iterations;
-           "-esterel", Arg.Set Misc.set_esterel, doc_esterel;
-           "-lustre", Arg.Set Misc.set_lustre, doc_lustre;
-           "-reduce", Arg.Set Misc.set_reduce, doc_reduce;
-           "-check", Arg.Set Misc.set_check, doc_check
+           "-esterel", Arg.Set Misc.esterel, doc_esterel;
+           "-lustre", Arg.Set Misc.lustre, doc_lustre;
+           "-static", Arg.Set Misc.static_reduction, doc_static_reduction;
+           "-check", Arg.Set Misc.equivalence_checking, doc_check;
+           "-inline", Arg.Int Misc.set_inlining_level, doc_inlining_level;
+          "-inlineall", Arg.Set inline_all, doc_inline_all;
       ])
       main
       errmsg

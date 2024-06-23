@@ -12,7 +12,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* static inlining; warning: this step must be done after static reduction *)
+(* static inlining; this step assumes that static reduction is done *)
 (* function calls [inline f e1 ... en] are inlined *)
 
 open Misc
@@ -33,8 +33,7 @@ type acc = { genv : Value.pvalue Genv.genv }
 
 let empty = { genv = Genv.empty }
 
-let pat x = 
-    { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
+let pat x = { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
 
 let pat_of_vardec { var_name } = pat var_name
 
@@ -93,13 +92,11 @@ let expression funs acc e =
      end
   | Eapp { f = { e_desc = Efun { f_args; f_body } }; arg_list } ->
      let e = local_in f_args arg_list f_body in e, acc
-  | _ -> e, acc
+  | _ -> raise Mapfold.Fallback
 
-let block funs acc b = b, acc
-
-let program p =
+let program genv0 p =
   let funs =
-    { Mapfold.defaults with expression; block } in
-  let p, acc = Mapfold.program funs empty p in
+    { Mapfold.defaults with expression } in
+  let p, _ = Mapfold.program funs { genv = genv0 } p in
   p
 
