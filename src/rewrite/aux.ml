@@ -12,7 +12,8 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* Functions to build expressions *)
+(* Functions to build terms *)
+(* Invariant: writes (variables defined an equation) must be correct *)
 
 open Misc
 open Location
@@ -38,5 +39,7 @@ let blockmake vardec_list eq_list =
     | [] -> eqmake Defnames.empty EQempty
     | [eq] -> eq
     | _ -> eqmake Defnames.empty (EQand(eq_list)) in
-  { b_vars = vardec_list; b_env = Env.empty; b_loc = no_location;
-    b_write = Defnames.empty; b_body }
+  let b = { b_vars = vardec_list; b_env = Env.empty; b_loc = no_location;
+            b_write = Defnames.empty; b_body } in
+  let b, _, _ = Write.block b in
+  b
