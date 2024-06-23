@@ -17,7 +17,7 @@
 
 open Location
 open Misc
-open Ast
+open Zelus
 open Defnames
 open Pp_tools
 open Format

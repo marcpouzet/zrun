@@ -64,7 +64,7 @@ let rec pvalue ff v =
        (Pp_tools.print_list_r 
           (fun ff (name, _) -> Ident.fprint_t ff name) "" "," "") n_list
   | Vrecord(l) ->
-     let one ff { Ast.arg; Ast.label } =
+     let one ff { Zelus.arg; Zelus.label } =
        fprintf ff "@[<hov2>%a =@ %a@]"
          pvalue arg Lident.fprint_t label in
      (Pp_tools.print_list_r one "{" ";" "}") ff l

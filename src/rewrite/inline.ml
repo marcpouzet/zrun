@@ -17,7 +17,7 @@
 
 open Misc
 open Location
-open Ast
+open Zelus
 open Ident
 open Lident
 open Defnames
@@ -97,6 +97,6 @@ let expression funs acc e =
 let program genv0 p =
   let funs =
     { Mapfold.defaults with expression } in
-  let p, _ = Mapfold.program funs { genv = genv0 } p in
+  let p, _ = Mapfold.program_it funs { genv = genv0 } p in
   p
 

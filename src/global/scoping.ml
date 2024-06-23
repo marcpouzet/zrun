@@ -20,6 +20,8 @@
 open Parsetree
 open Ident
 
+module Ast = Zelus
+
 module Error =
   struct
     type error =

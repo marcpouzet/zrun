@@ -16,9 +16,11 @@
   (public_name zrun.ast_lib)
   (wrapped false)
   (modules
-    config misc
-    lexer parser parsetree
-    ident lident defnames location util ast write scoping pp_tools printer)
+    config misc ; general configuration and common global variables
+    lexer parser parsetree ; parsing
+    ident lident defnames location util
+    zelus
+    write scoping pp_tools printer)
   (libraries menhirLib))
 
 ; all the necessary modules to make zrun except the entry module

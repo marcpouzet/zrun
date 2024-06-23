@@ -18,7 +18,7 @@ open Misc
 open Location
 open Ident
 open Lident
-open Ast
+open Zelus
 open Monad
 open Opt
 open Result
@@ -648,7 +648,7 @@ let add_global_defs acc { e_defs } =
 (* for every name in [d_names] convert its value in [acc] into an expression *)
 let def_of_value loc acc (name, id, v) = gvalue_t loc acc name id v
 
- (* The main function. Reduce every definition *)
+(* The main function. Reduce every definition *)
 let implementation acc ({ desc; loc } as impl) =
   let desc, acc = match desc with
     | Eopen(name) ->

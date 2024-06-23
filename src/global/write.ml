@@ -18,7 +18,7 @@
 (* compute write variables for every equation and block *)
 
 open Ident
-open Ast
+open Zelus
 open Defnames
 
 (* build an environment *)

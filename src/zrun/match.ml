@@ -14,7 +14,7 @@
 (* *********************************************************************)
 
 (* Pattern matching *)
-open Ast
+open Zelus
 open Value
 open Monad
 open Opt

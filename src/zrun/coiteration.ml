@@ -49,7 +49,7 @@ open Result
 open Ident
 open Genv
 open Find
-open Ast
+open Zelus
 open Value
 open Primitives
 open Match

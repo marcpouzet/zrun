@@ -15,7 +15,7 @@
 (* *********************************************************************)
 
 open Misc
-open Ast
+open Zelus
 open Value
 open Ident
 open Genv

@@ -36,7 +36,7 @@ type pvalue =
   | Vvoid : pvalue
   | Vconstr0 : Lident.t -> pvalue
   | Vconstr1 : Lident.t * pvalue list -> pvalue
-  | Vrecord : pvalue Ast.record list -> pvalue
+  | Vrecord : pvalue Zelus.record list -> pvalue
   | Vpresent : pvalue -> pvalue
   | Vabsent : pvalue
   | Vstuple : pvalue list -> pvalue
@@ -73,13 +73,13 @@ and 'a map =
 (* a size parameterized expression - f <n1,...,nk> = e *)
 and 'a sizefun = 
   { s_params: Ident.t list; 
-    s_body: Misc.no_info Ast.exp; 
+    s_body: Misc.no_info Zelus.exp; 
     s_genv: 'a Genv.genv; 
     s_env: 'a star ientry Ident.Env.t }
                                    
 (* a functional value - [fun|node] x1 ... xn -> e *)
 and 'a closure =
-  { c_funexp : Misc.no_info Ast.funexp;
+  { c_funexp : Misc.no_info Zelus.funexp;
     c_genv: 'a Genv.genv;
     c_env: 'a star ientry Ident.Env.t }
                                      

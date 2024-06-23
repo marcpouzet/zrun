@@ -59,7 +59,7 @@
 
 open Misc
 open Error
-open Ast
+open Zelus
 open Defnames
 
 (* preliminary version *)

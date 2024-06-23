@@ -13,7 +13,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-open Ast
+open Zelus
 open Monad
 open Find
 open Primitives

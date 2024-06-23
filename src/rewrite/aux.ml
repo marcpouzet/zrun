@@ -17,7 +17,7 @@
 
 open Misc
 open Location
-open Ast
+open Zelus
 open Ident
 open Lident
 
