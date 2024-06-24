@@ -14,8 +14,9 @@ let l x returns o
   end
 
 let node main1 () =
+  let static v = 1 + 2 in
   let rec nat = 0 fby nat + 1 in
-  f nat
+  f (v + nat)
 
 let node main2 () =
   let rec nat = 0 fby nat + 1 in
