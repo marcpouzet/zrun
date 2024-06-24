@@ -111,7 +111,11 @@ let expression funs ({ genv } as acc) e =
   match e.e_desc with
   | Eapp { is_inline = true;
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
-     let { Genv.info } = Genv.find lname genv in
+    let { Genv.info } =
+      try Genv.find lname genv with Not_found ->
+        Format.eprintf "Inline error: unbound %s\n" (Lident.modname lname);
+        raise Error
+    in
      begin match info with
      | Vclosure
        { c_funexp = { f_args; f_body }; c_genv } ->
