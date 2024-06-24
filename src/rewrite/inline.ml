@@ -29,8 +29,6 @@ open Value
 open Error
 open Mapfold
 
-let fresh () = Ident.fresh "inline"
-
 (* the type of the accumulator *)
 type acc =
   { genv : Value.pvalue Genv.genv;
@@ -48,10 +46,14 @@ let build global_funs ({ renaming } as acc) env =
     Env.add m entry env,
     Env.add n m renaming in
   let env, renaming = Env.fold buildrec env (Env.empty, renaming) in
+  let l = Env.to_list renaming in
+  let l = List.map (fun (n, m) -> Ident.name n, Ident.name m) l in
   env, { acc with renaming }
 
 let var_ident global_funs ({ renaming } as acc) x =
-  try Env.find x renaming, acc with Not_found -> x, acc
+  try Env.find x renaming, acc with Not_found ->
+    Debug.print_string "Inline: unbound identifier" (Ident.name x);
+    x, acc
 
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
@@ -107,37 +109,20 @@ let expression funs acc e =
   match e.e_desc with
   | Eapp { is_inline = true;
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
-     (* let { current } = acc.genv in
-     let l = E.to_list current.values in *)
      let { Genv.info } = Genv.find lname acc.genv in
      begin match info with
      | Vclosure
        { c_funexp = { f_args; f_body }; c_genv; c_env } ->
-        let e = local_in f_args arg_list f_body in e, acc
+        let e = local_in f_args arg_list f_body in
+        expression funs acc e
      | _ -> e, acc
      end
   | Eapp { f = { e_desc = Efun { f_args; f_body } }; arg_list } ->
-     let e = local_in f_args arg_list f_body in e, acc
+     let e = local_in f_args arg_list f_body in
+     expression funs acc e
   | _ -> e, acc
 
-(* let implementation acc ({ desc } as impl) =
-  match desc with
-    (* inlining is done after static reduction; global *)
-    (* names are head normal forms (HNF), that is, *)
-    (* immediate constants, constructors of hnf and functions)*)
-    Eletdecl { d_names; d_leq } ->
-     match d_names, d_leq with
-     | [name; id], { l_eq = EQeq({ p_desc = Evarpat(actual_name) }, e) } when
-       name = actual_name->
-        let e, acc = hnf acc e in
-        Eletdecl { d_names; d_leq = { d_leq with l_eq = EQeq(p, e) } },
-        add name e acc
-     | _ -> raise Fallback
-  | _ -> raise Fallback *)
-
 let program genv p =
-  (* let { current } = genv0 in *)
-  (* let l = E.to_list current.values in *)
   let global_funs = { Mapfold.default_global_funs with build; var_ident } in
   let funs =
     { Mapfold.defaults with expression; global_funs; set_index; get_index } in
