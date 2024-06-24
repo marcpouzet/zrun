@@ -627,10 +627,10 @@ and value_t loc acc v =
     (* add a definition in the global environment *)
     let m = fresh () in
     let name = Ident.name m in
-    let e = make (Eglobal { lname = Name(name) }) in
+    let gname = make (Eglobal { lname = Name(name) }) in
     e, { acc with e_defs = (name, m, e) :: acc.e_defs;
                   e_gvalues = Genv.add name v acc.e_gvalues;
-                  e_exp = Env.add m e acc.e_exp }
+                  e_exp = Env.add m gname acc.e_exp }
 
 (* a global value can be any static value except a size function *)
 let gvalue_t loc acc name id v =
