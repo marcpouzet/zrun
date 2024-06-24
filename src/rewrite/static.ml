@@ -88,11 +88,14 @@ let no_leq loc =
     l_eq = { eq_desc = EQempty; eq_write = Defnames.empty; eq_loc = loc }; 
     l_env = Ident.Env.empty }
 
-let rename_t ({ e_renaming } as acc) n = 
-  Env.find n e_renaming, acc
+let rename_t ({ e_renaming } as acc) x = 
+  try Env.find x e_renaming, acc
+  with Not_found ->
+    Debug.print_string "Static: unbound identifier" (Ident.name x);
+    x, acc
 
 let write_t acc { dv; di; der } =
-  let rename { e_renaming } n = Env.find n e_renaming in
+  let rename acc x = let x, _ = rename_t acc x in x in
   let dv = S.map (rename acc) dv in
   let di = S.map (rename acc) di in
   let der = S.map (rename acc) der in
