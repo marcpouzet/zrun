@@ -72,6 +72,13 @@ let do_optional_stop is_stop p =
 let do_optional_step is_step comment output step p = 
   if is_step then do_step comment output step p else p
 
+(* Equivalence checking *)
+  let check ff genv0 n_steps (genv_before, p) =
+    let genv_after = Coiteration.program genv0 p in
+    Coiteration.check ff n_steps
+      (Genv.current genv_before) (Genv.current genv_after);
+    (genv_after, p)
+
 (* Evaluate all the definition in a file, store values *)
 let eval_definitions_in_file modname filename n_steps =
   let open Genv in
@@ -107,22 +114,21 @@ let eval_definitions_in_file modname filename n_steps =
     do_optional_step !static_reduction "Static reduction"
       Debug.print_program (Static.program genv0) p in
   
-  (* Equivalence checking *)
-  let check (genv_before, p) =
-    let genv_after = Coiteration.program genv0 p in
-    Coiteration.check ff n_steps
-      (Genv.current genv_before) (Genv.current genv_after);
-    (genv_after, p) in
-
   let genv, p =
     do_optional_step (!static_reduction && !equivalence_checking)
-      "Equivalence checking" Debug.print_nothing check (genv, p) in
+      "Equivalence checking" Debug.print_nothing
+      (check ff genv0 n_steps) (genv, p) in
       
   (* Inlining *)
-  let _ =
+  let p =
     do_optional_step !inline_all "Inlining"
       Debug.print_program (Inline.program genv) p in
   
+  let genv, p =
+    do_optional_step (!inline_all && !equivalence_checking)
+      "Equivalence checking" Debug.print_nothing
+      (check ff genv0 n_steps) (genv, p) in
+      
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv) otc;
 

@@ -12,3 +12,16 @@ let l x returns o
   | S1 -> do o = inline f (x + 1) until (o = 2) then S2
   | S2 -> do reset o = inline f (x + 2) every inline f (x + 3) done
   end
+
+let main1 () =
+  let rec nat = 0 fby nat + 1 in
+  f x
+
+let main2 () =
+  let rec nat = 0 fby nat + 1 in
+  g nat
+
+let main3 () =
+  let rec nat = 0 fby nat + 1 in
+  h nat
+

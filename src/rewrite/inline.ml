@@ -46,8 +46,6 @@ let build global_funs ({ renaming } as acc) env =
     Env.add m entry env,
     Env.add n m renaming in
   let env, renaming = Env.fold buildrec env (Env.empty, renaming) in
-  let l = Env.to_list renaming in
-  let l = List.map (fun (n, m) -> Ident.name n, Ident.name m) l in
   env, { acc with renaming }
 
 let var_ident global_funs ({ renaming } as acc) x =
@@ -108,16 +106,18 @@ let local_in funs f_args arg_list acc { r_desc } =
      acc
 
 (** Expressions *)
-let rec expression funs acc e = 
+let expression funs ({ genv } as acc) e = 
   let e, acc = Mapfold.expression funs acc e in
   match e.e_desc with
   | Eapp { is_inline = true;
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
-     let { Genv.info } = Genv.find lname acc.genv in
+     let { Genv.info } = Genv.find lname genv in
      begin match info with
      | Vclosure
-       { c_funexp = { f_args; f_body }; c_genv; c_env } ->
-        local_in funs f_args arg_list acc f_body
+       { c_funexp = { f_args; f_body }; c_genv } ->
+        let e, acc =
+          local_in funs f_args arg_list { acc with genv = c_genv } f_body in
+        e, { acc with genv }
      | _ -> e, acc
      end
   | Eapp { f = { e_desc = Efun { f_args; f_body } }; arg_list } ->
