@@ -189,7 +189,8 @@ let rec expression acc ({ e_desc; e_loc } as e) =
        (* or not; then generate a declaration to compute it *)
        if Env.mem x acc.e_values then
          let v = Env.find x acc.e_values in
-         value_t e_loc acc v
+         let e, acc = value_t e_loc acc v in
+         e, { acc with e_exp = Env.add x e acc.e_exp }
        else
          (* otherwise, [x] is not static; it is renamed *)
          let x, acc = rename_t acc x in
@@ -616,7 +617,7 @@ and value_t loc acc v =
          catch (error { Error.kind = Etype; loc })
       | Varray _ -> catch (error { Error.kind = Enot_implemented; loc })
       | Vfun _  -> catch (error { Error.kind = Enot_implemented; loc }) in
-  make e_desc, acc in
+    make e_desc, acc in
   let immediate { e_desc } =
     match e_desc with 
     | Econst _ | Evar _ | Eglobal _ | Econstr0 _ -> true | _ -> false in
@@ -628,9 +629,8 @@ and value_t loc acc v =
     let m = fresh () in
     let name = Ident.name m in
     let gname = make (Eglobal { lname = Name(name) }) in
-    e, { acc with e_defs = (name, m, e) :: acc.e_defs;
-                  e_gvalues = Genv.add name v acc.e_gvalues;
-                  e_exp = Env.add m gname acc.e_exp }
+    gname, { acc with e_defs = (name, m, e) :: acc.e_defs;
+                      e_gvalues = Genv.add name v acc.e_gvalues }
 
 (* a global value can be any static value except a size function *)
 let gvalue_t loc acc name id v =
