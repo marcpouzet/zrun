@@ -31,21 +31,31 @@ open Mapfold
 
 let fresh () = Ident.fresh "inline"
 
-                           (*
-                             (** Build a renaming from an environment *)
-let build global_funs ({ e_renaming } as acc) env =
+(* the type of the accumulator *)
+type acc =
+  { genv : Value.pvalue Genv.genv;
+    (* the global environment *)
+    renaming : Ident.t Env.t;
+    (* name to name environment *)
+  }
+
+let empty = { genv = Genv.empty; renaming = Env.empty }
+
+(* Build a renaming from an environment *)
+let build global_funs ({ renaming } as acc) env =
   let buildrec n entry (env, renaming) =
     let m = Ident.fresh (Ident.source n) in
     Env.add m entry env,
     Env.add n m renaming in
-  let env, e_renaming = Env.fold buildrec env (Env.empty, e_renaming) in
-  env, { acc with e_renaming }
-                            *)
+  let env, renaming = Env.fold buildrec env (Env.empty, renaming) in
+  env, { acc with renaming }
 
-(* the type of the accumulator *)
-type acc = { genv : Value.pvalue Genv.genv }
+let var_ident global_funs ({ renaming } as acc) x =
+  try Env.find x renaming, acc with Not_found -> x, acc
 
-let empty = { genv = Genv.empty }
+let set_index funs acc n =
+  let _ = Ident.set n in n, acc
+let get_index funs acc n = Ident.get (), acc
 
 let pat x = { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
 
@@ -125,11 +135,12 @@ let expression funs acc e =
      | _ -> raise Fallback
   | _ -> raise Fallback *)
 
-let program genv0 p =
+let program genv p =
   (* let { current } = genv0 in *)
   (* let l = E.to_list current.values in *)
+  let global_funs = { Mapfold.default_global_funs with build; var_ident } in
   let funs =
-    { Mapfold.defaults with expression } in
-  let p, _ = Mapfold.program_it funs { genv = genv0 } p in
+    { Mapfold.defaults with expression; global_funs; set_index; get_index } in
+  let p, _ = Mapfold.program_it funs { empty with genv } p in
   p
 

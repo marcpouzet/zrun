@@ -72,9 +72,12 @@ type ('a, 'info) global_it_funs =
   {
     build :  ('a, 'info) global_it_funs -> 'a ->
             'info Ident.Env.t -> 'info Ident.Env.t * 'a;
-    var_ident : ('a, 'info) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
-    typevar : ('a, 'info) global_it_funs -> 'a -> name -> name * 'a;
-    typeconstr : ('a, 'info) global_it_funs -> 'a -> Lident.t -> Lident.t * 'a;
+    var_ident :
+      ('a, 'info) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+    typevar :
+      ('a, 'info) global_it_funs -> 'a -> name -> name * 'a;
+    typeconstr :
+      ('a, 'info) global_it_funs -> 'a -> Lident.t -> Lident.t * 'a;
     type_expression :
       ('a, 'info) global_it_funs -> 'a ->
       type_expression -> type_expression * 'a;
@@ -119,8 +122,12 @@ type ('a, 'info) it_funs =
       ('a, 'info) it_funs -> 'a ->
       'info implementation -> 'info implementation * 'a;
     program :
-    ('a, 'info) it_funs -> 'a -> 'info program -> 'info program * 'a;
-    }
+      ('a, 'info) it_funs -> 'a -> 'info program -> 'info program * 'a;
+    get_index :
+     ('a, 'info) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
+    set_index :
+      ('a, 'info) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
+  }
 
 (** Build a renaming from an environment *)
 let rec build_it funs acc env =
@@ -691,18 +698,27 @@ and implementation funs acc ({ desc } as impl) =
        Etypedecl { name; ty_params; size_params; ty_decl }, acc in
   { impl with desc }, acc
 
-let set_index funs acc n = n, acc
-let get_index funs acc n = n, acc
+let rec set_index_it funs acc n =
+  try funs.set_index funs acc n 
+  with Fallback -> set_index funs acc n
+
+and set_index funs acc n = n, acc
+
+let rec get_index_it funs acc n =
+  try funs.get_index funs acc n
+  with Fallback -> get_index funs acc n
+
+and get_index funs acc n = n, acc
 
 let rec program_it funs acc p =
   try funs.program funs acc p
   with Fallback -> program funs acc p
 
 and program funs acc { p_impl_list; p_index } =
-  let n, acc = set_index funs acc p_index in
+  let n, acc = set_index_it funs acc p_index in
   let p_impl_list, acc = 
     Util.mapfold (implementation_it funs) acc p_impl_list in
-  let p_index, acc = get_index funs acc n in
+  let p_index, acc = get_index_it funs acc n in
   { p_impl_list; p_index }, acc  
 
 let rec interface_it global_funs acc interf =
@@ -737,7 +753,9 @@ let defaults =
     funexp;
     last;
     implementation;
-    program
+    program;
+    get_index;
+    set_index;
   }
                  
 let default_global_stop =
@@ -765,6 +783,8 @@ let defaults_stop =
     funexp = stop;
     last = stop;
     implementation = stop;
-    program = stop 
+    program = stop;
+    get_index = stop;
+    set_index = stop;
   }
 
