@@ -170,15 +170,16 @@ let block exp body ff { b_vars; b_body; b_write; b_env } =
        body b_body
 
 let match_handler body ff { m_pat; m_body; m_reset; m_zero; m_env } =
-  fprintf ff "@[<hov 4>| %a -> %s%s@,%a@ %a@]"
-    pattern m_pat (if m_reset then "(* reset *)" else "")
+  fprintf ff "@[<hov 4>| %a@ %a -> %s%s@,%a@]"
+    pattern m_pat
+    print_env_names m_env
+    (if m_reset then "(* reset *)" else "")
                 (if m_zero then "(* zero *)" else "")
     body m_body
-    print_env_names m_env
-
+    
 let present_handler scondpat body ff { p_cond; p_body; p_env } =
-  fprintf ff "@[<hov4>| (%a) ->@ @[<v 0>%a@ %a@]@]"
-    scondpat p_cond body p_body print_env_names p_env
+  fprintf ff "@[<hov4>| (%a)@ %a ->@ @[<v 0>%a@]@]"
+    scondpat p_cond  print_env_names p_env body p_body
 
 let with_default body ff default_opt =
   match default_opt with
@@ -225,16 +226,16 @@ let automaton_handler_list
       leqs ff e_let;
       if is_empty_block e_body
       then
-        fprintf ff "@[<v4>| %a %s@ %a@ %a@]"
+        fprintf ff "@[<v4>| %a@ %a %s@ %a@]"
           (scondpat expression) e_cond
-          (if e_reset then "then" else "continue") state e_next_state
           print_env_names e_env
+          (if e_reset then "then" else "continue") state e_next_state
       else
-         fprintf ff "@[<v4>| %a %s@ %a @ %a in %a@]"
+         fprintf ff "@[<v4>| %a@ %a %s@ %a in %a@]"
            (scondpat expression) e_cond
+           print_env_names e_env
            (if e_reset then "then" else "continue")
            body_in_escape e_body 
-           print_env_names e_env
            state e_next_state in
     
     let escape_list ff t_list =
@@ -376,8 +377,8 @@ and kind f_kind =
 and funexp ff { f_vkind; f_kind; f_args; f_body; f_env } =
   let vkind =
     match f_vkind with | Kconst -> "const" | Kstatic -> "static" | Kany -> "" in
-  fprintf ff "@[<hov 2>%s %s %a ->@ %a@ %a@]"
-    (kind f_kind) vkind arg_list f_args result f_body print_env_names f_env
+  fprintf ff "@[<hov 2>%s %s %a %a@ ->@ %a@]"
+    (kind f_kind) vkind arg_list f_args print_env_names f_env result f_body 
 
 and arg_list ff a_list =
   print_list_r arg "" "" "" ff a_list
@@ -446,10 +447,10 @@ and equation ff ({ eq_desc = desc } as eq) =
   | EQeq(p, e) ->
      fprintf ff "@[<hov 2>%a =@ %a@]" pattern p expression e
   | EQsizefun { sf_id; sf_id_list; sf_e; sf_env } ->
-     fprintf ff "@[<hov 2>%a%a =@ %a@ %a@]" name sf_id
+     fprintf ff "@[<hov 2>%a%a@ %a =@ %a@]" name sf_id
        (print_list_l name "<<" "," ">>") sf_id_list
-       expression sf_e
        print_env_names sf_env
+       expression sf_e
   | EQder { id; e; e_opt; handlers = [] } ->
       fprintf ff "@[<hov 2>der %a =@ %a%a@]"
         name id expression e
@@ -581,7 +582,7 @@ and block_of_equation ff b_eq =
 and leq ff { l_rec; l_kind; l_eq; l_env } =
   let s = if l_rec then " rec " else "" in
   fprintf ff "@[<v0>@[<hov2>let%a%s@ %a@ %a@]@ @]" 
-    vkind l_kind s equation l_eq print_env_names l_env
+    vkind l_kind s equation l_eq print_env_names l_env 
 
 and leqs ff l =  print_if_not_empty (print_list_l leq "" "in" "in") ff l
 
