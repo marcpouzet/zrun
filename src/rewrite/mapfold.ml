@@ -343,7 +343,10 @@ and vardec_it funs acc v =
   try funs.vardec funs acc v
   with Fallback -> vardec funs acc v
 
-and vardec funs acc ({ var_default; var_init; var_typeconstraint } as v) =
+and vardec funs acc
+  ({ var_name; var_default; var_init; var_typeconstraint } as v) =
+  let var_name, acc =
+    var_ident_it funs.global_funs acc var_name in
   let var_default, acc =
     Util.optional_with_map (expression_it funs) acc var_default in
   let var_init, acc =
@@ -351,7 +354,7 @@ and vardec funs acc ({ var_default; var_init; var_typeconstraint } as v) =
   let var_typeconstraint, acc =
     Util.optional_with_map
       (type_expression_it funs.global_funs) acc var_typeconstraint in
-  { v with var_default; var_init; var_typeconstraint }, acc
+  { v with var_name; var_default; var_init; var_typeconstraint }, acc
 
 and block_it funs acc b =
   try funs.block funs acc b
@@ -383,8 +386,9 @@ and funexp_it funs acc f =
 
 and funexp funs acc ({ f_args; f_body; f_env } as f) =
   let arg acc v_list = Util.mapfold (vardec_it funs) acc v_list in
-  let f_args, acc_local = Util.mapfold arg acc f_args in
-  let f_body, acc_local = result_it funs acc_local f_body in
+  let f_env, acc = build_it funs.global_funs acc f_env in
+  let f_args, acc = Util.mapfold arg acc f_args in
+  let f_body, acc = result_it funs acc f_body in
   { f with f_args; f_body; f_env }, acc
 
 (** Expressions **)
@@ -494,6 +498,8 @@ and expression funs acc ({ e_desc; e_loc } as e) =
           let body, acc = block_it funs acc body in
           Forreturns { returns; body; r_env }, acc in
      let for_env, acc = build_it funs.global_funs acc for_env in
+     let for_index, acc =
+       Util.optional_with_map (var_ident_it funs.global_funs) acc for_index in
      let for_size, acc =
        Util.optional_with_map (for_size_t funs) acc for_size in
      let for_kind, acc = for_kind_t funs acc for_kind in
@@ -518,8 +524,8 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let e, acc = expression_it funs acc e in
        { eq with eq_desc = EQeq(p, e) }, acc
     | EQinit(x, e) ->
-       let e, acc = expression_it funs acc e in
        let x, acc = var_ident_it funs.global_funs acc x in
+       let e, acc = expression_it funs acc e in
        { eq with eq_desc = EQinit(x, e) }, acc
     | EQemit(x, e_opt) ->
        let x, acc = var_ident_it funs.global_funs acc x in
@@ -621,8 +627,8 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
        let for_eq_t acc { for_out; for_block } =
          let for_out_t acc
-               ({ desc = { for_name; for_out_name; for_init; for_default } } as f)
-           =
+               ({ desc = { for_name; for_out_name; for_init; for_default } }
+                as f) =
            let for_name, acc = var_ident_it funs.global_funs acc for_name in
            let for_out_name, acc = 
              Util.optional_with_map
@@ -662,7 +668,8 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let sf_id_list, acc =
          Util.mapfold (var_ident_it funs.global_funs) acc sf_id_list in
        let sf_e, acc = expression_it funs acc sf_e in
-       { eq with eq_desc = EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
+       { eq with eq_desc =
+                   EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
        acc in
   { eq with eq_write }, acc
 
@@ -688,7 +695,8 @@ and implementation funs acc ({ desc } as impl) =
        let d_names, acc =
          Util.mapfold
            (fun acc (name, id) ->
-             let id, acc = var_ident_it funs.global_funs acc id in (name, id), acc)
+             let id, acc =
+               var_ident_it funs.global_funs acc id in (name, id), acc)
            acc d_names in
        Eletdecl { d_names; d_leq }, acc
     | Etypedecl { name; ty_params; size_params; ty_decl } ->
