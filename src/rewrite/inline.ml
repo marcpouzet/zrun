@@ -88,23 +88,27 @@ let returns_of_vardec_list vardec_list =
  *- rewrites to:
  *- [local v_list1,...,v_listn, v_ret
  *-  do p1 = e1 ... pn = en and eq in p_v *)
-let local_in f_args arg_list { r_desc } =
+let local_in funs f_args arg_list acc { r_desc } =
   (* build a list of equations *)
   let eq_list = List.map2 eq_of_f_arg_arg f_args arg_list in
   let vardec_list =
     List.fold_left (fun acc vardec_list -> vardec_list @ acc) [] f_args in
   match r_desc with
   | Exp(e_r) ->
-     Aux.emake (Elocal(Aux.blockmake vardec_list eq_list, e_r)) no_info
+     let e_r, acc = funs.expression funs acc e_r in
+     Aux.emake (Elocal(Aux.blockmake vardec_list eq_list, e_r)) no_info,
+     acc
   | Returns { b_vars; b_body; b_write; b_env } ->
+     let b_body, acc = funs.equation funs acc b_body in
      let vardec_list = b_vars @ vardec_list in
      let eq_list = b_body :: eq_list in
      Aux.emake
        (Elocal(Aux.blockmake vardec_list eq_list,
-               returns_of_vardec_list b_vars)) no_info
+               returns_of_vardec_list b_vars)) no_info,
+     acc
 
 (** Expressions *)
-let expression funs acc e = 
+let rec expression funs acc e = 
   let e, acc = Mapfold.expression funs acc e in
   match e.e_desc with
   | Eapp { is_inline = true;
@@ -113,13 +117,11 @@ let expression funs acc e =
      begin match info with
      | Vclosure
        { c_funexp = { f_args; f_body }; c_genv; c_env } ->
-        let e = local_in f_args arg_list f_body in
-        expression funs acc e
+        local_in funs f_args arg_list acc f_body
      | _ -> e, acc
      end
   | Eapp { f = { e_desc = Efun { f_args; f_body } }; arg_list } ->
-     let e = local_in f_args arg_list f_body in
-     expression funs acc e
+     local_in funs f_args arg_list acc f_body
   | _ -> e, acc
 
 let program genv p =
