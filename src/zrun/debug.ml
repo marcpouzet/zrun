@@ -27,7 +27,10 @@ let fprint_ientry ff { cur; last; default } =
 
 let print_number comment n =
   if !debug then Format.eprintf "@[%s %d@]@\n" comment n
-  
+
+let print_string comment s =
+  if !debug then Format.eprintf "@[%s %s@]@\n" comment s
+
 let fprint_ienv comment ff env =
   Format.fprintf ff
       "@[%s (env): @,%a@]@\n" comment (Env.fprint_t fprint_ientry) env
