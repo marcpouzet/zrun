@@ -73,11 +73,11 @@ let do_optional_step is_step comment output step p =
   if is_step then do_step comment output step p else p
 
 (* Equivalence checking *)
-  let check ff genv0 n_steps (genv_before, p) =
-    let genv_after = Coiteration.program genv0 p in
-    Coiteration.check ff n_steps
-      (Genv.current genv_before) (Genv.current genv_after);
-    (genv_after, p)
+let check ff genv0 n_steps (genv_before, p) =
+  let genv_after = Coiteration.program genv0 p in
+  Coiteration.check ff n_steps
+    (Genv.current genv_before) (Genv.current genv_after);
+  (genv_after, p)
 
 (* Evaluate all the definition in a file, store values *)
 let eval_definitions_in_file modname filename n_steps =
