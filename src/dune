@@ -1,13 +1,85 @@
-;dune build --display verbose
+(include_subdirs unqualified)
 
-(executables 
-    (names zrun)
-    (modes byte exe)
-    (promote (until-clean) (into ..)))	
-	     
-(ocamllex (modules lexer))
-(menhir (modules parser)) ;;(flags --explain))
+(rule
+ (copy %{project_root}/config.ml config.ml))
 
-(env
- (dev
-  (flags (:standard -w -9-27-32-33-35 -warn-error -A))))
+(subdir parsing
+  (ocamllex lexer))
+
+(subdir parsing
+  (menhir (modules parser) (infer true) (flags --explain --table)
+  ))
+
+; all the modules necessary to parse
+(library
+  (name parse_lib)
+  (public_name zrun.parse_lib)
+  (wrapped false)
+  (modules
+    location ; position in the source file
+    lexer parser parsetree ; parsing
+  )
+  (libraries menhirLib))
+
+; all the modules necessary to generate an ast
+(library
+  (name ast_lib)
+  (public_name zrun.ast_lib)
+  (wrapped false)
+  (modules
+    config misc ; general configuration and common global variables
+    ident lident defnames util
+    zelus
+    write scoping pp_tools printer)
+  (libraries parse_lib))
+
+; all the necessary modules to make zrun except the entry module
+(library
+  (name zrun_lib)
+  (public_name zrun.zrun_lib)
+  (wrapped false)
+  (modules
+    genv  ; the type of a gloval environment
+    error ; error messages
+    value ; the type of values
+    debug ; all the information for debuging
+    primitives ; the value of primitives
+    find ; find the current value and the last value of a variable
+    match ; the evaluation of pattern matching
+    arrays ; representing an array value
+    records ; reprenting a record
+    fix ; a bounded fix-point
+    monad ; useful monad to deal with errors
+    coiteration ; the main execution loop
+    output ; printing
+    forloop ; evaluation functions for for loops
+    eval ; evaluation of an expression
+    static ; static reduction
+    mapfold ; generic mapfold
+    aux ; auxiliary function for building terms
+    inline ; inlining
+  )   	 
+  (libraries zrun.parse_lib zrun.ast_lib))
+
+; rewriting steps
+; (library
+;  (name rewrite_lib)
+;  (public_name zrun.rewrite_lib)
+;  (wrapped false)
+;  (modules
+;    reduce ; static reduction
+;  )
+;  (libraries zrun.ast_lib zrun.zrun_lib)
+;)
+
+(executable
+ (name zrun)
+  (modes (byte exe))
+  (modules zrun)
+  (libraries zrun.parse_lib zrun.ast_lib zrun.zrun_lib)
+  (promote (until-clean) (into ..)))
+  
+(install
+ (package zrun)
+ (section bin)
+ (files (zrun.exe as zrun)))

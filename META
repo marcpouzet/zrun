@@ -1,0 +1,3 @@
+directory = "/usr/local/lib/zrun"
+version = "1.0"
+description = "The Zrun Interpreter"
