@@ -14,8 +14,8 @@
 
 (* inlining; this step assumes that static reduction is done already *)
 (* this means that all variable defined at top level in declarations *)
-(* are of the form [let x = e] where [x] is a value *)
-(* a close term in head normal form *)
+(* are of the form [let x = e] where [x] is a close term in head normal form *)
+(* for the moment, we only consider explicit lambdas (form \x1... e) as hnf *)
 (* all function calls [inline f e1 ... en] are inlined *)
 
 open Misc
@@ -128,6 +128,35 @@ let expression funs ({ genv } as acc) e =
      local_in funs f_args arg_list acc f_body
   | _ -> e, acc
 
+(* check that an expression is either a lambda or a global name; update [acc] *)
+let value ({ genv } as acc) name { e_desc } =
+  match e_desc with
+  | Efun c_funexp ->
+     let v = Vclosure { c_funexp; c_genv = genv; c_env = Env.empty } in
+     let genv = Genv.add name v genv in { acc with genv }
+  | Eglobal { lname } ->
+     let { Genv.info } =
+       try Genv.find lname genv with Not_found ->
+         Format.eprintf "Inline error: unbound %s\n" (Lident.modname lname);
+         raise Error in
+     let genv = Genv.add name info genv in
+     { acc with genv }
+  | _ -> raise Fallback
+
+let implementation funs acc ({ desc } as impl) =
+  let acc = match desc with
+    (* the right-hand side of definitions that are inlined *)
+    (* must be either lambdas or global names *)
+    | Eletdecl { d_names = [name, id];
+                 d_leq =
+                   { l_eq = { eq_desc = EQeq({ pat_desc = Evarpat(n) }, e ) } } }
+      when id = n -> value acc name e
+    | _ -> raise Fallback in
+  impl, acc
+
+and open_t funs ({ genv } as acc) modname =
+  let genv = Genv.open_module genv modname in { acc with genv }
+                                   
 let program genv p =
   let global_funs = { Mapfold.default_global_funs with build; var_ident } in
   let funs =
