@@ -127,6 +127,8 @@ type ('a, 'info) it_funs =
      ('a, 'info) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
     set_index :
       ('a, 'info) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
+    open_t :
+      ('a, 'info) it_funs -> 'a -> name -> name * 'a;
   }
 
 (** Build a renaming from an environment *)
@@ -679,6 +681,8 @@ let rec typedecl_it funs acc ty_decl =
 
 and typedecl funs acc ty_decl = ty_decl, acc
 
+let open_it funs acc name = funs.open_t funs acc name
+
 let open_t funs acc name = name, acc
 
 let rec implementation_it funs acc impl =
@@ -688,7 +692,7 @@ let rec implementation_it funs acc impl =
 and implementation funs acc ({ desc } as impl) =
   let desc, acc = match desc with
     | Eopen(name) ->
-       let name, acc = open_t funs acc name in
+       let name, acc = open_it funs acc name in
        Eopen(name), acc
     | Eletdecl { d_names; d_leq } ->
        let d_leq, acc = leq_it funs acc d_leq in
@@ -764,6 +768,7 @@ let defaults =
     program;
     get_index;
     set_index;
+    open_t;
   }
                  
 let default_global_stop =
@@ -794,5 +799,6 @@ let defaults_stop =
     program = stop;
     get_index = stop;
     set_index = stop;
+    open_t = stop;
   }
   
