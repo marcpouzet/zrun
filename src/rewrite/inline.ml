@@ -50,7 +50,7 @@ let build global_funs ({ renaming } as acc) env =
 
 let var_ident global_funs ({ renaming } as acc) x =
   try Env.find x renaming, acc with Not_found ->
-    Debug.print_string "Inline: unbound identifier" (Ident.name x);
+    Debug.print_string "Inline error: unbound " (Ident.name x);
     x, acc
 
 let set_index funs acc n =
@@ -113,7 +113,7 @@ let expression funs ({ genv } as acc) e =
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
     let { Genv.info } =
       try Genv.find lname genv with Not_found ->
-        Format.eprintf "Inline error: unbound %s\n" (Lident.modname lname);
+        Format.eprintf "Inline error: unbound global %s\n" (Lident.modname lname);
         raise Error
     in
      begin match info with
@@ -143,8 +143,9 @@ let value ({ genv } as acc) name { e_desc } =
      { acc with genv }
   | _ -> raise Fallback
 
-let implementation funs acc ({ desc } as impl) =
-  let acc = match desc with
+let implementation funs acc impl =
+  let impl, acc = Mapfold.implementation funs acc impl in
+  let acc = match impl.desc with
     (* the right-hand side of definitions that are inlined *)
     (* must be either lambdas or global names *)
     | Eletdecl { d_names = [name, id];
@@ -155,12 +156,13 @@ let implementation funs acc ({ desc } as impl) =
   impl, acc
 
 and open_t funs ({ genv } as acc) modname =
-  let genv = Genv.open_module genv modname in { acc with genv }
+  let genv = Genv.open_module genv modname in modname, { acc with genv }
                                    
 let program genv p =
   let global_funs = { Mapfold.default_global_funs with build; var_ident } in
   let funs =
-    { Mapfold.defaults with expression; global_funs; set_index; get_index } in
+    { Mapfold.defaults with
+      expression; global_funs; set_index; get_index; implementation; open_t } in
   let p, _ = Mapfold.program_it funs { empty with genv } p in
   p
 
