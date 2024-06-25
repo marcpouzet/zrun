@@ -21,12 +21,14 @@ let node main1 () =
 
     (*
 let node main2 () =
-  let rec nat = 0 fby nat + 1 in
+
   g nat*)
+  let rec nat = 0 fby nat + 2 in
+  g nat
 
     (*
 let node main3 () =
-  let rec nat = 0 fby nat + 1 in
+  let rec nat = 0 fby nat + 3 in
       h nat
 
 *)
