@@ -2472,7 +2472,8 @@ let eval_list ff n_steps genv l_names =
   List.iter eval l_names
 
 (* check that all [for all n in Dom(g1), value(n) = value(g2(n))] *)
-let check ff n_steps { values = g1 } { values = g2 } =
+let check n_steps
+      { current = { values = g1 } } { current = { values = g2 } } =
   let check name v1 v2 =
     match v1, v2 with
     | Vclosure

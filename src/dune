@@ -58,9 +58,6 @@
     forloop ; evaluation functions for for loops
     static ; static reduction
     eval ; evaluation of an expression
-    ;mapfold ; generic mapfold
-    ;aux ; auxiliary function for building terms
-    ;inline ; inlining
   )   	 
   (libraries zrun.parse_lib zrun.global_lib))
 
@@ -71,8 +68,9 @@
   (wrapped false)
   (modules
     mapfold ; generic mapfold
-    aux; auxiliary functions for building terms
-    inline; inlining of function calls
+    aux ; auxiliary functions for building terms
+    inline ; inlining of function calls
+    rewrite ; rewriting
   )
   (libraries zrun.global_lib zrun.zrun_lib)
 )
@@ -88,7 +86,7 @@
  (name zwrite)
   (modes (byte exe))
   (modules zwrite)
-  (libraries zrun.parse_lib zrun.global_lib)
+  (libraries zrun.parse_lib zrun.global_lib zrun.zrun_lib zrun.rewrite_lib)
   (promote (until-clean) (into ..)))
 
 (install

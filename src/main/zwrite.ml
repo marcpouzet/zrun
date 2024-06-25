@@ -23,9 +23,13 @@ let main file =
   then 
     let filename = Filename.chop_extension file in
     let modname = String.capitalize_ascii (Filename.basename filename) in
-    let n_steps = !Misc.number_of_steps in
-    let l_names = !Misc.main_nodes in
-    Eval.main modname filename n_steps !Misc.all l_names
+    let ff = Format.std_formatter in
+    (* output file in which values are stored *)
+    let obj_name = filename ^ ".zlo" in
+    let otc = open_out_bin obj_name in
+    let source_name = filename ^ ".zls" in
+    let n_steps = !equivalence_checking in
+    Rewrite.main ff modname filename source_name otc n_steps 
   else raise (Arg.Bad "Expected *.zls file.")
 
 let doc_main = "\tThe main node to evaluate"
@@ -35,7 +39,7 @@ let doc_verbose = "\tVerbose mode"
 let doc_vverbose = "\t Set even more verbose mode"
 let doc_debug = "\t Set debug mode"
 let doc_no_assert = "\tNo check of assertions"
-let doc_nocausality = "\tTurn off the check that are variables are non bottom"
+let doc_nocausality = "\tTurn off the check that all variables are non bottom"
 let doc_print_values = "\tPrint values"
 let doc_number_of_fixpoint_iterations =
   "\tPrint the number of steps for fixpoints"
@@ -47,8 +51,7 @@ let doc_lustre =
 let doc_static_reduction =
   "\tReduce static (compile-time) expressions"
 let doc_check =
-  "\tCheck equivalence at every program transformation \n\
-   \t\tfor the number of steps"
+  "<n> \t Check equivalence for that amount of steps"
 and doc_inlining_level = "<n> \t Level of inlining"
 and doc_inline_all = "\t Inline all function calls"
                   
@@ -59,10 +62,7 @@ let main () =
   try
     Arg.parse
       (Arg.align
-         [ "-s", Arg.String Misc.set_main, doc_main;
-           "-all", Arg.Set Misc.all, doc_all;
-           "-n", Arg.Int Misc.set_number_of_steps, doc_number_of_steps;
-           "-v", Arg.Unit Misc.set_verbose, doc_verbose;
+         [ "-v", Arg.Unit Misc.set_verbose, doc_verbose;
            "-vv", Arg.Unit Misc.set_vverbose, doc_vverbose;
            "-debug", Arg.Unit Misc.set_debug, doc_debug;
            "-print", Arg.Set Misc.print_values, doc_print_values;
@@ -72,10 +72,9 @@ let main () =
            doc_number_of_fixpoint_iterations;
            "-esterel", Arg.Set Misc.esterel, doc_esterel;
            "-lustre", Arg.Set Misc.lustre, doc_lustre;
-           "-static", Arg.Set Misc.static_reduction, doc_static_reduction;
-           "-check", Arg.Set Misc.equivalence_checking, doc_check;
+           "-check", Arg.Int set_equivalence_checking, doc_check;
            "-inline", Arg.Int Misc.set_inlining_level, doc_inlining_level;
-          "-inlineall", Arg.Set inline_all, doc_inline_all;
+           "-inlineall", Arg.Set inline_all, doc_inline_all;
       ])
       main
       errmsg

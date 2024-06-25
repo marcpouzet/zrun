@@ -99,7 +99,8 @@ let no_info: no_info = ()
 let static_reduction = ref false
 
 (* check equivalence *)
-let equivalence_checking = ref false
+let equivalence_checking = ref 0
+let set_equivalence_checking n = equivalence_checking := n
 
 (* sets the inline flags *)
 let inlining_level = ref 10

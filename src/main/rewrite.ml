@@ -66,18 +66,20 @@ let do_step comment output step input =
   output o;
   o
 
-let transforme_and_compare message transform eval compare p =
-  let p' = transform p in
-  let v = eval p in
-  let v' = eval p' in
-  compare v v';
-  p
-
-  
-
+let compare n_steps genv0 p p' =
+  let genv = Coiteration.program genv0 p in
+  let genv' = Coiteration.program genv0 p' in
+  Coiteration.check n_steps genv genv'; p'
+    
 (* Apply a sequence of source-to-source transformation *)
 (* do equivalence checking for every step if the flag is turned on *)
-let main ff modname filename source_name n_steps =
+let main ff modname filename source_name otc n_steps =
+  let transform_and_compare comment transform genv p =
+    let p' = transform genv p in
+    Debug.print_program p';
+    Debug.print_message comment;
+    if n_steps = 0 then p' else compare n_steps genv p p' in
+    
   (* set the current opened module *)
   Location.initialize source_name;
 
@@ -95,12 +97,10 @@ let main ff modname filename source_name n_steps =
   (* Write defined variables for equations *)
   let p = do_step "Write done" Debug.print_program Write.program p in
 
-  (* Static reduction *)
-  let p = transform_and_compare "Static reduction"
-      Static.program genv0 Coiteration.program (=) p in
-  
+  (* Source to source transformations start here *)
+  let p = transform_and_compare "Static reduction" Static.program genv0 p in
+    
   (* Inlining *)
-  let p = transform_and_compare "Inlining"
-      Inlining.program genv0 Coiteration.program (=) p in
+  let _ = transform_and_compare "Inlining" Inline.program genv0 p in
 
-  p
+  ()

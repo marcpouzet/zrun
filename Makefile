@@ -1,9 +1,12 @@
-all: build tests
+all: zrun.exe
 
-build:
+zrun.exe:
 	(cd src; dune build -- zrun.exe)
 
-buildv:
+zwrite.exe:
+	(cd src; dune build -- zwrite.exe)
+
+zrun.exe.verbose:
 	(cd src; dune build --verbose -- zrun.exe)
 
 tests:
@@ -11,6 +14,7 @@ tests:
 
 debug:
 	(cd src; dune build --debug-backtraces --debug-dependency-path -- zrun.bc)
+	(cd src; dune build --debug-backtraces --debug-dependency-path -- zwrite.bc)
 
 clean:
 	dune clean;
