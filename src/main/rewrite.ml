@@ -104,3 +104,87 @@ let main ff modname filename source_name otc n_steps =
   let _ = transform_and_compare "Inlining done" Inline.program genv0 p in
 
   ()
+
+    (*
+      let impl_list =
+        step "Remove last in pattern. See below:"
+             Remove_last_in_patterns.implementation_list impl_list in
+      let impl_list =
+        step "Add a copy for [last x] to remore false cycles. See below:"
+             Add_copy_for_last.implementation_list impl_list in
+      let impl_list =
+        step "Translation of automata done. See below:"
+             Automata.implementation_list impl_list in
+      let impl_list =
+        step "Translation of activations done. See below:"
+             Activate.implementation_list impl_list in
+      let impl_list =
+        step "Translation of present done. See below:"
+             Present.implementation_list impl_list in
+      let impl_list =
+        step "Translation of periods done. See below:"
+             Period.implementation_list impl_list in
+      let impl_list =
+        step "Translation of disc done. See below:"
+             Disc.implementation_list impl_list in
+      let impl_list =
+        step "Translation of probabilistic nodes. See below:"
+             Proba.implementation_list impl_list in
+      let impl_list =
+        step
+          "Compilation of memories (fby/pre/next) into (init/last). See below:"
+             Pre.implementation_list impl_list in
+      let impl_list =
+        step "Un-nest let/in blocks. See below:"
+             Letin.implementation_list impl_list in
+      let impl_list =
+        step "Compilation of initialization and resets done. See below:"
+             Reset.implementation_list impl_list in
+      let impl_list =
+        step "Actualize write variables in blocks. See below:"
+             Write.implementation_list impl_list in
+      let impl_list =
+        step "Complete equations with [der x = 0.0]. See below:"
+            Complete.implementation_list impl_list in
+     let impl_list =
+        step "Add an extra discrete step for weak transitions. See below:"
+            Encore.implementation_list impl_list in
+     let impl_list =
+        step "Gather all horizons into a single one per function. See below:"
+            Horizon.implementation_list impl_list in
+     let impl_list =
+       step "Translation into A-normal form. See below:"
+            Aform.implementation_list impl_list in
+     let impl_list =
+        step "Actualize write variables in blocks. See below:"
+             Write.implementation_list impl_list in
+     let impl_list =
+       step "Naming shared variables and memories done. See below:"
+            Shared.implementation_list impl_list in
+     let impl_list =
+       step "Common sub-expression elimination. See below:"
+            Cse.implementation_list impl_list in
+     let impl_list =
+       step "Sharing of zero-crossings. See below:"
+            Zopt.implementation_list impl_list in
+     let impl_list =
+       step "Actualize write variables in blocks. See below:"
+            Write.implementation_list impl_list in
+     let impl_list =
+       if not !no_opt && not !no_deadcode
+       then step "Deadcode removal. See below:"
+                 Zdeadcode.implementation_list impl_list
+       else impl_list in
+     let impl_list =
+       step "Static scheduling done. See below:"
+            Schedule.implementation_list impl_list in
+     let impl_list =
+       if not !no_opt && not !no_deadcode
+       then
+         let impl_list =
+           step "Removing of copy variables done. See below:"
+                Copy.implementation_list impl_list in
+         step "Deadcode removal. See below:"
+              Zdeadcode.implementation_list impl_list
+       else impl_list in
+     *)
