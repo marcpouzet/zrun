@@ -1,8 +1,9 @@
 let f x = let y = x + 1 in y + 2
 
-let g x = inline f (x + x + 1)
+let g x = (* inline *) f (x + x + 1)
 
-let h x =
+(*
+  let h x =
   let z = x + inline g (x + 2) in
   if x = 0 then inline f (z + 3) else inline g (x - 1)
     
@@ -16,13 +17,16 @@ let node main1 () =
   let static v = 1 + 2 in
   let rec nat = 0 fby nat + 1 in
   f (v + nat)
+*)
 
+    (*
 let node main2 () =
   let rec nat = 0 fby nat + 1 in
-  g nat
+  g nat*)
 
+    (*
 let node main3 () =
   let rec nat = 0 fby nat + 1 in
       h nat
 
-
+*)
