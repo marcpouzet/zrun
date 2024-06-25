@@ -66,21 +66,8 @@ let do_step comment output step input =
   output o;
   o
 
-let do_optional_stop is_stop p =
-  if is_stop then raise Stop else p
-  
-let do_optional_step is_step comment output step p = 
-  if is_step then do_step comment output step p else p
-
-(* Equivalence checking *)
-let check ff genv0 n_steps (genv_before, p) =
-  let genv_after = Coiteration.program genv0 p in
-  Coiteration.check ff n_steps
-    (Genv.current genv_before) (Genv.current genv_after);
-  (genv_after, p)
-
 (* Evaluate all the definition in a file, store values *)
-let eval_definitions_in_file modname filename n_steps =
+let main modname filename n_steps is_all l_names =
   let open Genv in
   let ff = Format.std_formatter in
   (* output file in which values are stored *)
@@ -109,46 +96,10 @@ let eval_definitions_in_file modname filename n_steps =
   let genv = do_step "Evaluation of definitions done"
       Debug.print_nothing (Coiteration.program genv0) p in
   
-  (* Static reduction *)
-  let p =
-    do_optional_step !static_reduction "Static reduction"
-      Debug.print_program (Static.program genv0) p in
-  
-  let genv, p =
-    do_optional_step (!static_reduction && !equivalence_checking)
-      "Equivalence checking" Debug.print_nothing
-      (check ff genv0 n_steps) (genv, p) in
-      
-  (* Inlining *)
-  let p =
-    do_optional_step !inline_all "Inlining"
-      Debug.print_program (Inline.program genv) p in
-  
-  let genv, p =
-    do_optional_step (!inline_all && !equivalence_checking)
-      "Equivalence checking" Debug.print_nothing
-      (check ff genv0 n_steps) (genv, p) in
-      
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv) otc;
 
-  genv
-     
- (* evaluate the body of a list of main nodes *)    
- let main modname filename n_steps is_all l_names =
-   let ff = Format.std_formatter in
-   let genv = eval_definitions_in_file modname filename n_steps in
-     
-   (* evaluate a list of main function/nodes *)
-   if is_all then Coiteration.all ff n_steps (Genv.current genv)
-   else Coiteration.eval_list ff n_steps genv l_names
+  (* evaluate a list of main function/nodes *)
+  if is_all then Coiteration.all ff n_steps (Genv.current genv)
+  else Coiteration.eval_list ff n_steps genv l_names
 
-let transforme_and_compare transform eval compare acc p =
-  let p' = transform p in
-  let v = eval p in
-  let v' = eval p' in
-  compare v v'
-
-let transform genv p =
-  Static.program genv p
-  
