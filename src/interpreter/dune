@@ -1,0 +1,6 @@
+(library
+ (name zrun_interpreter)
+ (public_name zrun.interpreter)
+ (libraries zrun.parsing zrun.global)
+ (flags
+  (:standard -open Zrun_parsing -open Zrun_global)))

@@ -22,7 +22,7 @@ open Monad
 open Result
 open Ident
 open Find
-open Ast
+open Zelus
 open Value
 open Primitives
 open Match

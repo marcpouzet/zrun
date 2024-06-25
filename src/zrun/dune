@@ -1,0 +1,41 @@
+(library
+ (name zrun_eval)
+ (public_name zrun.eval)
+ (modules eval)
+ (libraries zrun.parsing zrun.global zrun.interpreter zrun.rewrite)
+ (flags
+  (:standard
+   -open
+   Zrun_parsing
+   -open
+   Zrun_global
+   -open
+   Zrun_interpreter
+   -open
+   Zrun_rewrite)))
+
+(executable
+ (name zrun)
+ (modules zrun)
+ (modes
+  (byte exe))
+ (promote (until-clean))
+ (libraries zrun.parsing zrun.global zrun.interpreter zrun.rewrite zrun.eval)
+ (flags
+  (:standard
+   -open
+   Zrun_parsing
+   -open
+   Zrun_global
+   -open
+   Zrun_interpreter
+   -open
+   Zrun_rewrite
+   -open
+   Zrun_eval)))
+
+(install
+ (package zrun)
+ (section bin)
+ (files
+  (zrun.exe as zrun)))
