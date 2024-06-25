@@ -239,7 +239,7 @@ let rec expression acc ({ e_desc; e_loc } as e) =
      (* it must be a static expression *)
      let arg_list, acc = Util.mapfold expression acc arg_list in
      let f, acc = 
-       if is_inline then let v = expression_e acc f in value_t f.e_loc acc v
+       if is_inline then let v = expression_e acc f in gvalue_t f.e_loc acc f v
        else expression acc f in
      { e with e_desc = Eapp { a with f; arg_list } }, acc
   | Eop(op, e_list) ->
@@ -580,6 +580,10 @@ and result acc ({ r_desc } as r) =
     | Returns(b_eq) -> let b_eq, acc = block acc b_eq in Returns(b_eq), acc in
   { r with r_desc }, acc
 
+and immediate { e_desc } =
+  match e_desc with 
+  | Econst _ | Econstr0 _ | Eglobal _ -> true | _ -> false
+
 (** translate a static value - introduce global definitions for functions *)
 and value_t loc acc v =
   let make e_desc = 
@@ -631,9 +635,6 @@ and value_t loc acc v =
       | Varray _ -> catch (error { Error.kind = Enot_implemented; loc })
       | Vfun _  -> catch (error { Error.kind = Enot_implemented; loc }) in
     make e_desc, acc in
-  let immediate { e_desc } =
-    match e_desc with 
-    | Econst _ | Evar _ | Eglobal _ | Econstr0 _ -> true | _ -> false in
   let e, acc = value_t acc v in
   (* if [e] is not immediate, add a global definition to store it *)
   if immediate e then e, acc
@@ -645,6 +646,9 @@ and value_t loc acc v =
     gname, { acc with e_defs = impl name m e :: acc.e_defs;
                       e_gvalues = Genv.add name v acc.e_gvalues }
 
+and gvalue_t loc acc ({ e_desc } as e) v =
+  if immediate e then e, acc
+  else value_t loc acc v
 
 let letdecl_list loc acc d_names =
   let letdecl acc (name, id) =
