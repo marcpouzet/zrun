@@ -1,4 +1,4 @@
-all: zrun.exe
+all: zrun.exe zwrite.exe
 
 zrun.exe:
 	(cd src; dune build -- zrun.exe)
