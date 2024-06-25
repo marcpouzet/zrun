@@ -19,7 +19,7 @@
  (modules zrun)
  (modes
   (byte exe))
- (promote (until-clean))
+ (promote (until-clean) (into ../..))
  (libraries zrun.parsing zrun.global zrun.interpreter zrun.rewrite zrun.eval)
  (flags
   (:standard

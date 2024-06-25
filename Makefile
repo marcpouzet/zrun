@@ -1,16 +1,16 @@
 all: build tests
 
 build:
-	(cd src; dune build -- zrun.exe)
+	(cd src/zrun; dune build -- zrun.exe)
 
 buildv:
-	(cd src; dune build --verbose -- zrun.exe)
+	(cd src/zrun; dune build --verbose -- zrun.exe)
 
 tests:
 	(cd tests; dune test)
 
 debug:
-	(cd src; dune build --debug-backtraces --debug-dependency-path -- zrun.bc)
+	(cd src/zrun; dune build --debug-backtraces --debug-dependency-path -- zrun.bc)
 
 clean:
 	dune clean;
@@ -22,3 +22,4 @@ wc:
 	parsing/parsetree.ml parsing/*.mll \
 	zrun/*.ml)
 
+.PHONY: build buildv tests debug clean wc
