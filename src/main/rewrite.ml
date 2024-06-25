@@ -76,8 +76,8 @@ let compare n_steps genv0 p p' =
 let main ff modname filename source_name otc n_steps =
   let transform_and_compare comment transform genv p =
     let p' = transform genv p in
-    Debug.print_program p';
     Debug.print_message comment;
+    Debug.print_program p';
     if n_steps = 0 then p' else compare n_steps genv p p' in
     
   (* set the current opened module *)
@@ -98,9 +98,9 @@ let main ff modname filename source_name otc n_steps =
   let p = do_step "Write done" Debug.print_program Write.program p in
 
   (* Source to source transformations start here *)
-  let p = transform_and_compare "Static reduction" Static.program genv0 p in
+  let p = transform_and_compare "Static reduction done" Static.program genv0 p in
     
   (* Inlining *)
-  let _ = transform_and_compare "Inlining" Inline.program genv0 p in
+  let _ = transform_and_compare "Inlining done" Inline.program genv0 p in
 
   ()

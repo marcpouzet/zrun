@@ -1,6 +1,11 @@
 let f x = let y = x + 1 in y + 2
 
-let g x = (* inline *) f (x + x + 1)
+let g x = inline f (x + x + 1)
+
+
+let node main2 () =
+  let rec nat = 0 fby nat + 2 in
+  g nat
 
 (*
   let h x =
@@ -18,13 +23,6 @@ let node main1 () =
   let rec nat = 0 fby nat + 1 in
   f (v + nat)
 *)
-
-    (*
-let node main2 () =
-
-  g nat*)
-  let rec nat = 0 fby nat + 2 in
-  g nat
 
     (*
 let node main3 () =
