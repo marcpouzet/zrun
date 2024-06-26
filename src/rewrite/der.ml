@@ -12,17 +12,14 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* removing equations [der x = e init e0 reset z1 -> e1 | ... | zn -> en] *)
+(* rewrite of an [der x = e init e0 reset z1 -> e1 | ... | zn -> en] *)
+(* into [present z1 -> x = e1 | ... init x = e0 and der x = e] *)
 
 open Misc
 open Location
 open Ident
 open Zelus
 open Aux
-
-(* An equation: [der x = e1 init e0 reset z1 -> e1 | ... | zn -> en] *)
-(* is rewritten *)
-(* [init x = e0 and present z1 -> x = e1 | ... else der x = e] *)
 
 let block_of_eq s pat e =
   { b_vars = []; b_locals = []; b_body = [eqmake (EQeq(pat, e))]; 
