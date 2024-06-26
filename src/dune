@@ -21,7 +21,7 @@
   )
   (libraries menhirLib))
 
-; all the modules necessary for the remaining steps after parsing
+; all the modules necessary for building the ast after parsing
 (library
   (name global_lib)
   (public_name zrun.global_lib)
@@ -40,7 +40,8 @@
     )
   (libraries parse_lib))
 
-; all the necessary modules to make zrun except the entry module
+;; the ZRun interpreter
+; all the necessary modules to make zrun except the entry modules
 (library
   (name zrun_lib)
   (public_name zrun.zrun_lib)
@@ -64,15 +65,21 @@
   )   	 
   (libraries zrun.parse_lib zrun.global_lib))
 
+ ;; the Zelus compiler
  ; type definition and global info in the global type environment
  (library
   (name typing_lib)
   (public_name zrun.typing_lib)
   (wrapped false)
   (modules
+    genames ; generate fresh names
     deftypes ; definition of types
     defcaus; definition of causality types
     definit; definition of initialisation types
+    initial; definition of general types, values
+    ptypes ; printing types
+    pcaus ; printing causality types
+    pinit ; printing initialization types
     global; definition of entries in the global type environment
     modules; global symbol table for typing
     ;interface; interface
