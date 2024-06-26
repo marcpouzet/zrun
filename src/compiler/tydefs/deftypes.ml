@@ -54,12 +54,12 @@ and abbrev =
   | Tcons of typ list * typ
 
 (* type scheme *)
-and ty_scheme =
-    { ty_vars: typ list;
-      ty_size_vars: size list;
-      mutable ty_body: typ }
+and typ_scheme =
+    { typ_vars: typ list;
+      size_vars: size list;
+      mutable typ_body: typ }
 	
-and ty_instance = { ty_instance : typ list }
+and typ_instance = { typ_instance : typ list }
 
 and kind =
   | Tfun : vkind -> kind (* combinatorial expression *)
@@ -100,3 +100,52 @@ and mkind =
   | Discrete (* discrete state variable *)
   | Cont (* continous state variable *)
   | Zero (* zero-crossing *)
+
+(* generic and non generic variables in the various type systems *)
+let generic = -1
+let notgeneric = 0
+let maxlevel = max_int
+
+let binding_level = ref 0
+let top_binding_level () = !binding_level = 0
+
+let push_binding_level () = binding_level := !binding_level + 1
+let pop_binding_level () =
+  binding_level := !binding_level - 1;
+  assert (!binding_level > generic)
+let reset_binding_level () = binding_level := 0
+
+(* making types *)
+let make ty =
+  { t_desc = ty; t_level = generic; t_index = Genames.symbol#name }
+let product ty_list =
+  make (Tproduct(ty_list))
+let vec ty e = make (Tvec(ty, e))
+let const v = make (Sconst(v))
+let size is_singleton si = make (Tsize(is_singleton, si))
+let op o si1 si2 = make (Sop(o, si1, si2))
+let arrowtype k ty_arg ty_res =
+  make (Tarrow(k, ty_arg, ty_res))
+let rec arrowtype_list k ty_arg_list ty_res =
+  match ty_arg_list with
+  | [] -> ty_res
+  | ty :: ty_arg_list ->
+     arrowtype k ty (arrowtype_list k ty_arg_list ty_res)
+                  
+let constr name ty_list abbrev = make (Tconstr(name, ty_list, abbrev))
+let nconstr name ty_list = constr name ty_list (ref Tnil)
+
+let new_size_var () =
+  { t_desc = Svar; t_level = !binding_level; t_index = Genames.symbol#name }
+let new_generic_size_var () =
+  { t_desc = Svar; t_level = generic; t_index = Genames.symbol#name }
+
+let new_var () =
+  { t_desc = Tvar; t_level = !binding_level; t_index = Genames.symbol#name }
+let new_generic_var () =
+  { t_desc = Tvar; t_level = generic; t_index = Genames.symbol#name }
+let rec new_var_list n =
+  match n with
+    0 -> []
+  | n -> (new_var ()) :: new_var_list (n - 1)
+let forall l typ_body = { size_vars = []; typ_vars = l; typ_body = typ_body }
