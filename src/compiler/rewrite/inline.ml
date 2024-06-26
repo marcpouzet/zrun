@@ -88,7 +88,7 @@ let expression funs ({ genv } as acc) e =
   | Eapp { is_inline = true;
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
     let { Genv.info } =
-      try Genv.find lname genv with Not_found ->
+      try Genv.find_value lname genv with Not_found ->
         Format.eprintf "Inline error: unbound global %s\n" (Lident.modname lname);
         raise Error
     in
@@ -112,7 +112,7 @@ let value ({ genv } as acc) name { e_desc } =
      let genv = Genv.add name v genv in { acc with genv }
   | Eglobal { lname } ->
      let { Genv.info } =
-       try Genv.find lname genv with Not_found ->
+       try Genv.find_value lname genv with Not_found ->
          Format.eprintf "Inline error: unbound %s\n" (Lident.modname lname);
          raise Error in
      let genv = Genv.add name info genv in

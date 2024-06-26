@@ -495,5 +495,6 @@ let list_of_esterel_primitives =
 let stdlib_env =
   { Genv.name = "Stdlib";
     Genv.values =
-      to_env (to_env Genv.E.empty list_of_primitives) list_of_random_primitives }
+      to_env (to_env Genv.E.empty list_of_primitives)
+        list_of_random_primitives }
 

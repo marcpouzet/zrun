@@ -20,7 +20,8 @@ open Location
 open Zelus
 open Ident
 open Lident
-
+open Global
+    
 let desc e = e.desc
 let make x = { desc = x; loc = no_location }
 
@@ -84,4 +85,30 @@ let returns_of_vardec_list_make vardec_list =
   match vardec_list with
   | [] -> emake (Econst(Evoid)) no_info
   | _ -> emake (Etuple(List.map returns_of_vardec_make vardec_list)) no_info
- 
+
+(*
+(* translate the internal representation of a type into a type definition *)
+let type_decl_of_type_desc name ty_params size_params ty_decl =
+  (* variant types *)
+  let variant_type
+      { qualid = qualid;
+        info = { constr_arg = arg_l; constr_arity = arit } } =
+    let desc =
+      if arit = 0 then
+        Econstr0decl(Genv.shortname qualid)
+      else Econstr1decl(Genv.shortname qualid,
+                        List.map type_expression_of_typ arg_l) in
+    make desc in
+  (* record types *)
+  let record_type { qualid = qualid; info = { label_arg = arg } } =
+    Genv.shortname qualid, type_expression_of_typ arg in
+
+  let params = List.map (fun i -> "'a" ^ (string_of_int i)) ty_param in
+  let type_decl_desc =
+    match ty_desc with
+      | Abstract_type -> Eabstract_type
+      | Variant_type(c_list) -> Evariant_type(List.map variant_type c_list)
+      | Record_type(l_list) -> Erecord_type(List.map record_type l_list)
+      | Abbrev(_, ty) -> Eabbrev(type_expression_of_typ ty) in
+  (tyname, params, make type_decl_desc)
+*)

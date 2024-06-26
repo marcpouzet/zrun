@@ -21,19 +21,24 @@
   )
   (libraries menhirLib))
 
-; all the modules necessary to generate an ast
+; all the modules necessary for the remaining steps after parsing
 (library
   (name global_lib)
   (public_name zrun.global_lib)
   (wrapped false)
   (modules
     config misc ; general configuration and common global variables
-    ident
-    lident
-    defnames
-    util
-    zelus
-    write scoping pp_tools printer)
+    ident ; idents
+    lident ; long idents
+    defnames ; defined names by an equation
+    util ; useful functions
+    zelus ; the ast
+    global ; entries in the global symbol table
+    write ; computes defined variables for equations
+    scoping ; associate unique names
+    pp_tools ; pretty printer tools
+    printer ; printer for the ast
+    )
   (libraries parse_lib))
 
 ; all the necessary modules to make zrun except the entry module
@@ -42,9 +47,9 @@
   (public_name zrun.zrun_lib)
   (wrapped false)
   (modules
-    genv  ; the type of a gloval environment
     error ; error messages
     value ; the type of values
+    genv ; the type of a global environment
     debug ; all the information for debuging
     primitives ; the value of primitives
     find ; find the current value and the last value of a variable
@@ -71,6 +76,7 @@
     aux ; auxiliary functions for building terms
     inline ; inlining of function calls
     der ; remove the initialization and handler part of a derivative equation
+    ;automata ; rewrite automata into match/reset
     rewrite ; compose rewriting steps
   )
   (libraries zrun.global_lib zrun.zrun_lib)

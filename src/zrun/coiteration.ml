@@ -2159,8 +2159,7 @@ and sescape_list loc genv env escape_list s_list ps pr =
   | _ ->
      error { kind = Estate; loc = loc }
 
-and sscondpat
-  (genv : 'a genv) (env : 'a star ientry Env.t ) { desc; loc } s =
+and sscondpat genv env { desc; loc } s =
   match desc, s with
   | Econdand(sc1, sc2), Slist [s1; s2] ->
      let* (v1, env_sc1), s1 = sscondpat genv env sc1 s1 in

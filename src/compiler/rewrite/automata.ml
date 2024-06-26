@@ -3,7 +3,7 @@
 (*                                                                     *)
 (*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
-(*  (c) 2020 Inria Paris (see the AUTHORS file)                        *)
+(*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -12,22 +12,19 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* removing automata statements *)
-open Zmisc
-open Zlocation
-open Zident
-open Global
-open Deftypes
-open Zaux
+(* removing automata in equations *)
+open Misc
+open Location
+open Ident
+open Aux
 open Zelus
-open Initial
 
 (* Translation of automata. *)
 (* Strong transitions: *)
 (* automaton
    | S1 -> locals in
            do eq_list
-           unless | c'1 then do eq_list''1 in S''1(e'1) | ...
+           unless | c1 then do eq_list'1 in S'1(e'1) | ...
    | S2(p) -> ...p... | c2 then ...p...
    ...
    end
@@ -41,25 +38,25 @@ is translated into:
    match last state with
    | S1 -> reset
              present
-             | c'1 -> eq_list''1
-                      and state = S''1 and p1 = e'1 and res = true
+             | c'1 -> eq_list'1
+                      and state = S'1(e'1) and res = true
              | ...
              else res = false
            every last res
-   | S2 -> ... last p ...
+   | S2(p) -> ... p ...
    end
    and
    match state with
    | S1 -> reset
               locals in do eq_list
            every res
-   | S2 -> ...p... *)
+   | S2(p) -> ...p... *)
 
 (* Weak transitions: *)
 (* automaton
    | S1 -> locals in
            do eq_list
-           until | c1 then do eq_list'1 in S'1(e1) | ... | ck then S'k(ek)
+           until | c1 then do eq_list'1 in S'1(e'1) | ...
    | S2(p) -> ...p... | c2 then ...
    ...
    end
@@ -73,9 +70,11 @@ is translated into:
    | S1 -> reset
               locals
             and
+              eq_list
+            and
               present
               | c1 -> eq_list1 and
-                      state = S'1 and next p1 = e1 and res = true
+                      state = S'1(e'1) and res = true
               | ...
               else res = false
            every last res
@@ -85,6 +84,7 @@ is translated into:
 2. Builds a local table table_of_types for every new type
 *)
 
+(*
 let moduleident n =
   { n with source = (Modules.current_module ()) ^ "_" ^ n.source }
 
@@ -101,24 +101,21 @@ let extend_block eq_list b_opt =
   match b_opt with
     | None -> eblock eq_list
     | Some(b) -> { b with b_body = eq_list @ b.b_body }
+*)
 
-
+(* functions to introduce new type definitions *)
 module TableOfTypes =
 struct
-  let table_of_types = ref []
-  let add tyname ty_desc =
-    table_of_types := (tyname, ty_desc) :: !table_of_types
+  let add tyname ty_desc table_of_types =
+    (tyname, ty_desc) :: table_of_types
   let make desc = { Zelus.desc = desc; Zelus.loc = no_location }
-  let flush continuation =
-    let translate (tyname, ty_desc) continuation =
+  let flush impl_list table_of_types =
+    let translate impl_list (tyname, ty_desc) =
       let n, params, ty_desc =
-        Interface.type_decl_of_type_desc tyname ty_desc in
-      make (Etypedecl(n, params, ty_desc)) :: continuation
-    in
-      let continuation =
-        List.fold_right translate !table_of_types continuation in
-      table_of_types := [];
-      continuation
+        Aux.type_decl_of_type_desc tyname ty_desc in
+      make (Etypedecl { name; ty_params; size_params = [];
+                            ty_decl }) :: impl_list in
+    List.fold_left translate impl_list table_of_types
 end
 
 let constr c ty_list =
@@ -136,7 +133,7 @@ let constr c ty_list =
 let intro_type s_h_list =
 
   (* we introduce a new type *)
-  let name = "state__" ^ (string_of_int(symbol#name)) in
+  let fresh () = Ident.fresh "state__" in
 
   (* introduce a new name for every parameterized state. *)
   (* for the moment, we do not share them *)
@@ -214,159 +211,6 @@ let env_of_parameters n_to_parameters s_h_list se_opt =
           List.map2 (fun n e -> eq_init n e) n_list e_list in
   env, eq_list
 
-(* Translate a generic block *)
-let block locals body ({ b_locals = l_list; b_body = bo } as b) =
-  let l_list = locals l_list in
-  (* translate the body. *)
-  let bo = body bo in
-  { b with b_locals = l_list; b_body = bo }
-
-(* translating a present statement *)
-let present_handlers scondpat body p_h_list =
-  List.map
-    (fun ({ p_cond = scpat; p_body = b } as handler) ->
-      { handler with p_cond = scondpat scpat; p_body = body b })
-    p_h_list
-
-(* translating an expression. [lnames] define state names [x] that must *)
-(* be renamed into [last x] *)
-let rec exp lnames ({ e_desc = desc } as e) =
-  let desc = match desc with
-    | Econst(i) -> Econst(i)
-    | Econstr0(longname) -> Econstr0(longname)
-    | Eglobal(longname) -> Eglobal(longname)
-    | Eop(op, e_list) -> Eop(op, List.map (exp lnames) e_list)
-    | Elocal(name) ->
-       (* if [name] belong to [lnames], it is a state parameter *)
-       (* that must be turn into [last name] *)
-       if S.mem name lnames then Elast(name) else desc
-    | Elast(name) -> Elast(name)
-    | Etuple(e_list) -> Etuple(List.map (exp lnames) e_list)
-    | Econstr1(c, e_list) -> Econstr1(c, List.map (exp lnames) e_list)
-    | Eapp(app, e, e_list) ->
-       Eapp(app, exp lnames e, List.map (exp lnames) e_list)
-    | Erecord(label_e_list) ->
-        Erecord(List.map
-                  (fun (label, e) -> (label, exp lnames e)) label_e_list)
-    | Erecord_access(e_record, longname) ->
-       Erecord_access(exp lnames e_record, longname)
-    | Erecord_with(e_record, label_e_list) ->
-       Erecord_with(exp lnames e_record,
-		    List.map
-                      (fun (label, e) -> (label, exp lnames e)) label_e_list)
-    | Etypeconstraint(e, ty) -> Etypeconstraint(exp lnames e, ty)
-    | Eseq(e1, e2) -> Eseq(exp lnames e1, exp lnames e2)
-    | Eperiod { p_phase = p1; p_period = p2 } ->
-       Eperiod { p_phase = Zmisc.optional_map (exp lnames) p1;
-                 p_period = exp lnames p2 }
-    | Elet(l, e) -> Elet(local lnames l, exp lnames e)
-    | Eblock(b, e) -> Eblock(block_eq_list lnames b, exp lnames e)
-    | Epresent(p_h_list, e_opt) ->
-        let e_opt = Zmisc.optional_map (exp lnames) e_opt in
-        let p_h_list = present_handler_exp_list lnames p_h_list in
-        Epresent(p_h_list, e_opt)
-    | Ematch(total, e, m_h_list) ->
-        let e = exp lnames e in
-        let m_h_list = match_handler_exp_list lnames m_h_list in
-        Ematch(total, e, m_h_list) in
-    { e with e_desc = desc }
-
-(** Translating an equation. [lnames] defines names [x] that must be *)
-(* renamed into [last x] *)
-and equation lnames ({ eq_desc = desc } as eq) =
-  match desc with
-  | EQeq(pat, e) -> { eq with eq_desc = EQeq(pat, exp lnames e) }
-  | EQpluseq(n, e) -> { eq with eq_desc = EQpluseq(n, exp lnames e) }
-  | EQinit(n, e0) ->
-     { eq with eq_desc = EQinit(n, exp lnames e0) }
-  | EQnext(n, e, e0_opt) ->
-     { eq with eq_desc = EQnext(n, exp lnames e,
-                                optional_map (exp lnames) e0_opt) }
-  | EQder(n, e, e0_opt, p_h_e_list) ->
-     { eq with eq_desc =
-                 EQder(n, exp lnames e, optional_map (exp lnames) e0_opt,
-                       present_handler_exp_list lnames p_h_e_list) }
-  | EQemit(name, e_opt) ->
-     { eq with eq_desc = EQemit(name, optional_map (exp lnames) e_opt) }
-  | EQmatch(total, e, m_h_list) ->
-     let m_h_list = match_handler_block_eq_list lnames m_h_list in
-     { eq with eq_desc = EQmatch(total, exp lnames e, m_h_list) }
-  | EQpresent(p_h_b_eq_list, b_opt) ->
-     let p_h_b_eq_list =
-       present_handler_block_eq_list lnames p_h_b_eq_list in
-     let b_opt =
-       match b_opt with
-       | None -> None | Some(b) -> Some(block_eq_list lnames b) in
-     { eq with eq_desc = EQpresent(p_h_b_eq_list, b_opt) }
-  | EQautomaton(is_weak, state_handler_list, se_opt) ->
-     automaton lnames is_weak state_handler_list se_opt
-  | EQreset(res_eq_list, e) ->
-     let res_eq_list = equation_list lnames res_eq_list in
-     { eq with eq_desc = EQreset(res_eq_list, exp lnames e) }
-  | EQand(and_eq_list) ->
-     let and_eq_list = equation_list lnames and_eq_list in
-     { eq with eq_desc = EQand(and_eq_list) }
-  | EQbefore(before_eq_list) ->
-     let before_eq_list = equation_list lnames before_eq_list in
-     { eq with eq_desc = EQbefore(before_eq_list) }
-  | EQblock(b_eq_list) ->
-     { eq with eq_desc = EQblock(block_eq_list lnames b_eq_list) }
-  | EQforall ({ for_index = i_list; for_init = init_list;
-		for_body = b_eq_list } as body) ->
-     let index ({ desc = desc } as ind) =
-       let desc = match desc with
-	 | Einput(x, e) -> Einput(x, exp lnames e)
-	 | Eoutput _ -> desc
-	 | Eindex(x, e1, e2) -> Eindex(x, exp lnames e1, exp lnames e2) in
-       { ind with desc = desc } in
-     let init ({ desc = desc } as ini) =
-       let desc = match desc with
-	 | Einit_last(x, e) -> Einit_last(x, exp lnames e) in
-       { ini with desc = desc } in
-     let i_list = List.map index i_list in
-     let init_list = List.map init init_list in
-     let b_eq_list = block_eq_list lnames b_eq_list in
-     { eq with eq_desc = EQforall { body with for_index = i_list;
-					      for_init = init_list;
-					      for_body = b_eq_list } }
-
-and equation_list lnames eq_list = List.map (equation lnames) eq_list
-
-and block_eq_list lnames b =
-  let locals l_list = List.map (local lnames) l_list in
-  let body eq_list = equation_list lnames eq_list in
-  block locals body b
-
-and present_handler_exp_list lnames p_h_e_list =
-  present_handlers (scondpat lnames) (exp lnames) p_h_e_list
-
-and present_handler_block_eq_list lnames p_h_b_eq_list =
-  present_handlers (scondpat lnames) (block_eq_list lnames) p_h_b_eq_list
-
-and match_handler_exp_list lnames m_h_list =
-  List.map
-    (fun ({ m_body = e } as handler) ->
-      { handler with m_body = exp lnames e }) m_h_list
-
-and match_handler_block_eq_list lnames m_h_list =
-  List.map
-    (fun ({ m_body = b } as handler) ->
-      { handler with m_body = block_eq_list lnames b }) m_h_list
-
-and local lnames ({ l_eq = eq_list } as l) =
-  { l with l_eq = equation_list lnames eq_list }
-
-and scondpat lnames ({ desc = desc } as scpat) =
-    let desc = match desc with
-      | Econdand(scpat1, scpat2) ->
-         Econdand(scondpat lnames scpat1, scondpat lnames scpat2)
-      | Econdor(scpat1, scpat2) ->
-         Econdor(scondpat lnames scpat1, scondpat lnames scpat2)
-      | Econdexp(e) -> Econdexp(exp lnames e)
-      | Econdpat(e, p) -> Econdpat(exp lnames e, p)
-      | Econdon(scpat, e) -> Econdon(scondpat lnames scpat, exp lnames e) in
-    { scpat with desc = desc }
-
 (** Translating an automaton *)
 (** [eq_list] is a list of equations. The translation returns *)
 (** an extended list containing [eq_list] and new equations *)
@@ -428,8 +272,8 @@ and automaton lnames is_weak handler_list se_opt =
 
   (* [state_name] is the target state computed in the current step *)
   (* [reset_name] is the target reset bit computed in the current step *)
-  let state_name = Zident.fresh "s" in
-  let reset_name = Zident.fresh "r" in
+  let state_name = Ident.fresh "s" in
+  let reset_name = Ident.fresh "r" in
 
   let state_var n = var n statetype in
   let bool_var n = var n typ_bool in
@@ -516,15 +360,19 @@ and automaton lnames is_weak handler_list se_opt =
     (eq_init reset_name efalse) :: eq_list in
   Zaux.eq_block (Zaux.make_block env eq_list)
 
-let implementation impl =
-  match impl.desc with
-    | Eopen _ | Etypedecl _ -> impl
-    | Econstdecl(n, is_static, e) ->
-        let e = exp S.empty e in
-        { impl with desc = Econstdecl(n, is_static, e) }
-    | Efundecl(n, ({ f_body = e } as body)) ->
-        { impl with desc = Efundecl(n, { body with f_body = exp S.empty e }) }
+(* Translation of equations *)
+let equation funs acc eq =
+  let eq, acc = Mapfold.equation funs acc eq in
+  match eq.eq_desc with
+  | EQautomaton { is_weak; handlers; state_opt } ->
+    automaton funs acc is_weak handlers state_opt
+  | _ -> raise Mapfold.Fallback
+         
+let program genv0 p =
+  let global_funs = Mapfold.default_global_funs in
+  let funs =
+    { Mapfold.defaults with equation; global_funs } in
+  let p, _ = Mapfold.program_it funs genv0 p in
+    TableOfTypes.flush impl_list
 
-let implementation_list impl_list =
-  let impl_list = Zmisc.iter implementation impl_list in
-  TableOfTypes.flush impl_list
+  p

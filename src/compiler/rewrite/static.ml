@@ -31,7 +31,8 @@ open Error
 type 'a env =
   { e_renaming: Ident.t Ident.Env.t; (* environment for renaming *)
     e_values: 'a Ident.Env.t;  (* environment of static values *)
-    e_gvalues: 'a Genv.genv;   (* global environment of static values *)
+    e_gvalues: 'a Genv.genv;
+    (* global environment of static values *)
     e_defs: no_info implementation list;
     (* global definitions of static values introduced during the reduction *)
     (* the head of the list is the last added value *)
