@@ -15,11 +15,8 @@
 (* rewrite of an [der x = e init e0 reset z1 -> e1 | ... | zn -> en] *)
 (* into [present z1 -> x = e1 | ... init x = e0 and der x = e] *)
 
-open Misc
 open Location
-open Ident
 open Zelus
-open Aux
 
 (* turns [z1 -> e1|...|zn -> en] into [z1 -> id = e1|...|id = en] *)
 let p_handlers id handlers =
@@ -45,7 +42,7 @@ let equation funs acc eq =
   let { eq_desc }, acc = Mapfold.equation funs acc eq in
   match eq_desc with
     | EQder { id; e; e_opt; handlers } -> 
-       let eq = present id e_opt handlers (eq_der id e) in
+       let eq = present id e_opt handlers (Aux.eq_der id e) in
        eq, acc
     | _ -> raise Mapfold.Fallback
 
