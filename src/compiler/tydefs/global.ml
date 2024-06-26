@@ -17,15 +17,13 @@ open Misc
 open Ident
 open Zelus
 
-type typ = unit
-  
 type 'a info = { qualid : Lident.qualident; info : 'a }
 
 type no_info = unit
   
 (* values in the symbol table *)
 type value_desc =
-    { mutable value_typ: Deftypes.ty_scheme; (* its type scheme *)
+    { mutable value_typ: Deftypes.typ_scheme; (* its type scheme *)
       mutable value_static: bool; (* is-it a static value? *)
       mutable value_caus: Defcaus.tc_scheme option; (* its causality scheme *)
       mutable value_init: Definit.ti_scheme option; (* its init. scheme *)
@@ -46,13 +44,13 @@ and value_code =
 
 (* Value constructors *)
 type constr_desc =
-  { constr_arg: typ list;
-    constr_res: typ;
+  { constr_arg: Deftypes.typ list;
+    constr_res: Deftypes.typ;
     constr_arity: int }
 
 and label_desc =
-    { label_arg: typ; (* if x:arg then x.m: res *)
-      label_res: typ; }
+    { label_arg: Deftypes.typ; (* if x:arg then x.m: res *)
+      label_res: Deftypes.typ; }
 
 type type_desc =
   { type_desc: type_components;
@@ -63,7 +61,7 @@ and type_components =
     | Abstract_type
     | Variant_type of constr_desc info list
     | Record_type of label_desc info list
-    | Abbrev of typ list * typ 
+    | Abbrev of Deftypes.typ list * Deftypes.typ 
         (* type ('a1,...,'an) t = ty *)
 
 let value_code value_exp = { value_exp = value_exp; value_name = None }
