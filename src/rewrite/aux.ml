@@ -28,17 +28,17 @@ let emake desc info =
   { e_desc = desc; e_loc = no_location; e_info = info }
 let pmake desc info =
   { pat_desc = desc; pat_loc = no_location; pat_info = info }
-let eqmake w desc =
-  { eq_desc = desc; eq_loc = no_location; eq_write = w }
+let eqmake desc =
+  { eq_desc = desc; eq_loc = no_location; eq_write = Defnames.empty }
 
 let global lname = Eglobal { lname = lname }
 
 let blockmake vardec_list eq_list =
   let b_body =
     match eq_list with
-    | [] -> eqmake Defnames.empty EQempty
+    | [] -> eqmake EQempty
     | [eq] -> eq
-    | _ -> eqmake Defnames.empty (EQand(eq_list)) in
+    | _ -> eqmake (EQand(eq_list)) in
   let b = { b_vars = vardec_list; b_env = Env.empty; b_loc = no_location;
             b_write = Defnames.empty; b_body } in
   let b, _, _ = Write.block b in
@@ -55,8 +55,7 @@ let pat_of_vardec_list vardec_list =
 
 let eq_of_f_arg_arg f_arg arg =
   let p = pat_of_vardec_list f_arg in
-  let dv = Write.fv_pat S.empty p in
-  eqmake { Defnames.empty with dv } (EQeq(p, arg))
+  eqmake (EQeq(p, arg))
 
 let returns_of_vardec { var_name } = emake (Evar(var_name)) no_info
 
