@@ -43,3 +43,25 @@ let blockmake vardec_list eq_list =
             b_write = Defnames.empty; b_body } in
   let b, _, _ = Write.block b in
   b
+
+let pat x = { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
+
+let pat_of_vardec { var_name } = pat var_name
+
+let pat_of_vardec_list vardec_list =
+  match vardec_list with
+  | [] -> pmake Ewildpat Misc.no_info
+  | _ -> pmake (Etuplepat(List.map pat_of_vardec vardec_list)) no_info
+
+let eq_of_f_arg_arg f_arg arg =
+  let p = pat_of_vardec_list f_arg in
+  let dv = Write.fv_pat S.empty p in
+  eqmake { Defnames.empty with dv } (EQeq(p, arg))
+
+let returns_of_vardec { var_name } = emake (Evar(var_name)) no_info
+
+let returns_of_vardec_list vardec_list =
+  match vardec_list with
+  | [] -> emake (Econst(Evoid)) no_info
+  | _ -> emake (Etuple(List.map returns_of_vardec vardec_list)) no_info
+ 

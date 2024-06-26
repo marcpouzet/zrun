@@ -53,27 +53,7 @@ let var_ident global_funs ({ renaming } as acc) x =
     Debug.print_string "Inline error: unbound " (Ident.name x);
     x, acc
 
-let pat x = { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
 
-let pat_of_vardec { var_name } = pat var_name
-
-let pat_of_vardec_list vardec_list =
-  match vardec_list with
-  | [] -> Aux.pmake Ewildpat Misc.no_info
-  | _ -> Aux.pmake (Etuplepat(List.map pat_of_vardec vardec_list)) no_info
-
-let eq_of_f_arg_arg f_arg arg =
-  let p = pat_of_vardec_list f_arg in
-  let dv = Write.fv_pat S.empty p in
-  Aux.eqmake { Defnames.empty with dv } (EQeq(p, arg))
-
-let returns_of_vardec { var_name } = Aux.emake (Evar(var_name)) no_info
-
-let returns_of_vardec_list vardec_list =
-  match vardec_list with
-  | [] -> Aux.emake (Econst(Evoid)) no_info
-  | _ -> Aux.emake (Etuple(List.map returns_of_vardec vardec_list)) no_info
-  
 (** Main transformation *)
 (* [(\v_list1 ... v_listn. e) e1 ... en] 
  *- rewrites to:
@@ -84,7 +64,7 @@ let returns_of_vardec_list vardec_list =
  *-  do p1 = e1 ... pn = en and eq in p_v *)
 let local_in funs f_args arg_list acc { r_desc } =
   (* build a list of equations *)
-  let eq_list = List.map2 eq_of_f_arg_arg f_args arg_list in
+  let eq_list = List.map2 Aux.eq_of_f_arg_arg f_args arg_list in
   let vardec_list =
     List.fold_left (fun acc vardec_list -> vardec_list @ acc) [] f_args in
   match r_desc with
@@ -98,7 +78,7 @@ let local_in funs f_args arg_list acc { r_desc } =
      let eq_list = b_body :: eq_list in
      Aux.emake
        (Elocal(Aux.blockmake vardec_list eq_list,
-               returns_of_vardec_list b_vars)) no_info,
+               Aux.returns_of_vardec_list b_vars)) no_info,
      acc
 
 (** Expressions *)
