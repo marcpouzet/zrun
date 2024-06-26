@@ -101,11 +101,14 @@ let main ff modname filename source_name otc n_steps =
   let p = transform_and_compare "Static reduction done" Static.program genv0 p in
     
   (* Inlining *)
-  let _ = transform_and_compare "Inlining done" Inline.program genv0 p in
+  let p = transform_and_compare "Inlining done" Inline.program genv0 p in
 
+  (* Normalise derivative equations - remove the handler () *)
+  
+  let _ = transform_and_compare
+            "Remove handlers in definitions of derivatives" Der.program genv0 p in
   ()
-
-    (*
+  (*
       let impl_list =
         step "Remove last in pattern. See below:"
              Remove_last_in_patterns.implementation_list impl_list in

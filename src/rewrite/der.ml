@@ -49,9 +49,9 @@ let equation funs acc eq =
        eq, acc
     | _ -> raise Mapfold.Fallback
 
-let program acc p =
+let program genv0 p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
     { Mapfold.defaults with equation; global_funs } in
-  let p, _ = Mapfold.program_it funs () p in
+  let p, _ = Mapfold.program_it funs genv0 p in
   p
