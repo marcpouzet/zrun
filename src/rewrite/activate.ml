@@ -21,8 +21,8 @@ open Zelus
 open Aux
 
 (* An equation: [der x = e1 init e0 reset z1 -> e1 | ... | zn -> en] *)
-(* into: [init x = e0 *)
-(*        and present (z1) -> do x = e1 done | ... end and der x = e] *)
+(* is rewritten *)
+(* [init x = e0 and present z1 -> x = e1 | ... else der x = e] *)
 
 let block_of_eq s pat e =
   { b_vars = []; b_locals = []; b_body = [eqmake (EQeq(pat, e))]; 
@@ -41,26 +41,37 @@ let block_spat_e_list s pat spat_e_list =
         p_body = block_of_eq s pat e;
         p_env = env; p_zero = zero }) spat_e_list
 
-let present s x spat_e_list e eq_list =
+let present id e handlers eq_list =
   let spat_b_list =
     block_spat_e_list s (varpat x Initial.typ_float) spat_e_list in
   (* only generate a present if [spat_b_list] is not empty *)
-  match spat_b_list with
-    | [] -> (eq_der x e) :: eq_list
-    | _ -> (eqmake (EQpresent(spat_b_list, None))) :: (eq_der x e) :: eq_list
+  match handlers with
+  | [] -> (eq_der id e) :: eq_list
+  | _ ->
+     let handlers = eq_of_handlers id handlers in
+     let default_opt = Else(eq_der id e) in
+     (eqmake (EQpresent { handlers; default_opt })) :: eq_list
 
-let der_present x e e0_opt spat_e_list eq_list =
-  (* present z1 -> do x = e1 done | ... | zn -> do x = en done
-     else der x = e and init x = e0 *)
-  let eq_list = 
-    match e0_opt with
-    | None -> eq_list
-    | Some(e0) -> (eq_init x e0) :: eq_list in
-  present (S.singleton x) x spat_e_list e eq_list  
+let der_present id e e0_opt handlers =
+  let eq_list =
+    match e0_opt with | None -> [] | Some(e0) -> [eq_init id e0] in
+  present id e handlers eq_list
 
-let equation funs ({ eq_desc = desc } as eq) =
-  match desc with
-    | EQder(n, e, e0_opt, p_h_e_list) ->
-        der_present n e e0_opt p_h_e_list eq_list
+let equation funs acc eq =
+  let { eq_desc }, acc = funs.equation acc eq in
+  match eq_desc with
+    | EQder { id; e; e_opt; handlers } ->
+        der_present id e e0_opt handlers
     | _ -> raise Mapfold.Fallback
 
+let set_index funs acc n =
+  let _ = Ident.set n in n, acc
+let get_index funs acc n = Ident.get (), acc
+
+let program genv p =
+  let global_funs = Mapfold.default_global_funs in
+  let funs =
+    { Mapfold.defaults with
+      equation; set_index; get_index } in
+  let p, _ = Mapfold.program_it funs { empty with genv } p in
+  p
