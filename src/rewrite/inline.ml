@@ -70,14 +70,14 @@ let local_in funs f_args arg_list acc { r_desc } =
   match r_desc with
   | Exp(e_r) ->
      let e_r, acc = funs.expression funs acc e_r in
-     Aux.emake (Elocal(Aux.blockmake vardec_list eq_list, e_r)) no_info,
+     Aux.emake (Elocal(Aux.block_make vardec_list eq_list, e_r)) no_info,
      acc
   | Returns { b_vars; b_body; b_write; b_env } ->
      let b_body, acc = funs.equation funs acc b_body in
      let vardec_list = b_vars @ vardec_list in
      let eq_list = b_body :: eq_list in
      Aux.emake
-       (Elocal(Aux.blockmake vardec_list eq_list,
+       (Elocal(Aux.block_make vardec_list eq_list,
                Aux.returns_of_vardec_list b_vars)) no_info,
      acc
 
