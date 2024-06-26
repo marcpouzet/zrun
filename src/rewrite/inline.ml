@@ -64,7 +64,7 @@ let var_ident global_funs ({ renaming } as acc) x =
  *-  do p1 = e1 ... pn = en and eq in p_v *)
 let local_in funs f_args arg_list acc { r_desc } =
   (* build a list of equations *)
-  let eq_list = List.map2 Aux.eq_of_f_arg_arg f_args arg_list in
+  let eq_list = List.map2 Aux.eq_of_f_arg_arg_make f_args arg_list in
   let vardec_list =
     List.fold_left (fun acc vardec_list -> vardec_list @ acc) [] f_args in
   match r_desc with
@@ -78,7 +78,7 @@ let local_in funs f_args arg_list acc { r_desc } =
      let eq_list = b_body :: eq_list in
      Aux.emake
        (Elocal(Aux.block_make vardec_list eq_list,
-               Aux.returns_of_vardec_list b_vars)) no_info,
+               Aux.returns_of_vardec_list_make b_vars)) no_info,
      acc
 
 (** Expressions *)

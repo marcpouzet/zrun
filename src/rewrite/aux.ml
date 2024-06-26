@@ -33,9 +33,16 @@ let eqmake w desc =
 
 let global lname = Eglobal { lname = lname }
 
+let pat_make x =
+  { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
+
 let eq_make p e =
   let w = { Defnames.empty with dv = Write.fv_pat S.empty p } in
   eqmake w (EQeq(p, e))
+
+let id_eq_make id e =
+  let w = Defnames.singleton id in
+  eqmake w (EQeq(pat_make id, e))
 
 let eq_init_make id e =
   let eq = eqmake (Defnames.singleton id) (EQinit(id, e)) in
@@ -60,23 +67,21 @@ let block_make vardec_list eq_list =
   let b, _, _ = Write.block b in
   b
 
-let pat x = { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
+let pat_of_vardec_make { var_name } = pat_make var_name
 
-let pat_of_vardec { var_name } = pat var_name
-
-let pat_of_vardec_list vardec_list =
+let pat_of_vardec_list_make vardec_list =
   match vardec_list with
   | [] -> pmake Ewildpat Misc.no_info
-  | _ -> pmake (Etuplepat(List.map pat_of_vardec vardec_list)) no_info
+  | _ -> pmake (Etuplepat(List.map pat_of_vardec_make vardec_list)) no_info
 
-let eq_of_f_arg_arg f_arg arg =
-  let p = pat_of_vardec_list f_arg in
+let eq_of_f_arg_arg_make f_arg arg =
+  let p = pat_of_vardec_list_make f_arg in
   eq_make p arg
 
-let returns_of_vardec { var_name } = emake (Evar(var_name)) no_info
+let returns_of_vardec_make { var_name } = emake (Evar(var_name)) no_info
 
-let returns_of_vardec_list vardec_list =
+let returns_of_vardec_list_make vardec_list =
   match vardec_list with
   | [] -> emake (Econst(Evoid)) no_info
-  | _ -> emake (Etuple(List.map returns_of_vardec vardec_list)) no_info
+  | _ -> emake (Etuple(List.map returns_of_vardec_make vardec_list)) no_info
  

@@ -25,13 +25,13 @@ open Aux
 let p_handlers id handlers =
   List.map 
     (fun { p_cond; p_body = e; p_zero; p_env; p_loc } ->
-      { p_cond; p_zero; p_env; p_loc; p_body = eq id e })
+      { p_cond; p_zero; p_env; p_loc; p_body = Aux.id_eq_make id e })
   handlers
 
 let present id e0_opt handlers eq =
-  let else_branch =
+  let default_opt =
     match e0_opt with
-    | None -> NoDefault | Some(e0) -> Aux.eq_init_make id e0 in
+    | None -> NoDefault | Some(e0) -> Init(Aux.eq_init_make id e0) in
   match handlers with
   | [] -> eq
   | _ ->
@@ -42,15 +42,16 @@ let present id e0_opt handlers eq =
        eq
 
 let equation funs acc eq =
-  let { eq_desc }, acc = funs.equation acc eq in
+  let { eq_desc }, acc = Mapfold.equation funs acc eq in
   match eq_desc with
     | EQder { id; e; e_opt; handlers } -> 
-        present id e0_opt handlers (eq_der id e) 
+       let eq = present id e_opt handlers (eq_der id e) in
+       eq, acc
     | _ -> raise Mapfold.Fallback
 
-let program genv p =
+let program acc p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
-    { Mapfold.defaults with equation } in
-  let p, _ = Mapfold.program_it funs { empty with genv } p in
+    { Mapfold.defaults with equation; global_funs } in
+  let p, _ = Mapfold.program_it funs () p in
   p

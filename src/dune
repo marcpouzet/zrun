@@ -70,7 +70,8 @@
     mapfold ; generic mapfold
     aux ; auxiliary functions for building terms
     inline ; inlining of function calls
-    rewrite ; rewriting
+    der ; remove the initialization and handler part of a derivative equation
+    rewrite ; compose rewriting steps
   )
   (libraries zrun.global_lib zrun.zrun_lib)
 )
