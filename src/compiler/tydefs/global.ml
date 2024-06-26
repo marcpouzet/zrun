@@ -17,10 +17,6 @@ open Misc
 open Ident
 open Zelus
 
-type ty_scheme = unit
-type tc_scheme = unit
-type ti_scheme = unit
-
 type typ = unit
   
 type 'a info = { qualid : Lident.qualident; info : 'a }

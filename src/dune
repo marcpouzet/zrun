@@ -33,7 +33,6 @@
     defnames ; defined names by an equation
     util ; useful functions
     zelus ; the ast
-    global ; entries in the global symbol table
     write ; computes defined variables for equations
     scoping ; associate unique names
     pp_tools ; pretty printer tools
@@ -62,11 +61,24 @@
     output ; printing
     forloop ; evaluation functions for for loops
     static ; static reduction
-    eval ; evaluation of an expression
   )   	 
   (libraries zrun.parse_lib zrun.global_lib))
 
- ;rewriting steps
+ ; type definition and global info in the global type environment
+ (library
+  (name typing_lib)
+  (public_name zrun.typing_lib)
+  (wrapped false)
+  (modules
+    deftypes ; definition of types
+    defcaus; definition of causality types
+    definit; definition of initialisation types
+    global; definition of entries in the global type environment
+  )
+  (libraries zrun.global_lib)
+)
+
+;rewriting steps
  (library
   (name rewrite_lib)
   (public_name zrun.rewrite_lib)
@@ -85,7 +97,10 @@
 (executable
  (name zrun)
   (modes (byte exe))
-  (modules zrun)
+  (modules 
+    eval ; evaluation of an expression
+    zrun ; the main function
+  )
   (libraries zrun.parse_lib zrun.global_lib zrun.zrun_lib)
   (promote (until-clean) (into ..)))
 

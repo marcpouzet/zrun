@@ -3,7 +3,7 @@
 (*                                                                     *)
 (*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
-(*  (c) 2020 Inria Paris (see the AUTHORS file)                        *)
+(*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -14,11 +14,9 @@
 
 (* initialization types *)
 (* based on Colaco and Pouzet (STTT'04) *)
-(* base types 0 and 1 are extended with 1/2, with (non-strict) *)
-(* order 0 < 1/2 < 1 *)
+(* base types 0 and 1; order 0 < 1 *)
 (* 0 means non nil at any instant >= 0 *)
 (* 1 means non nil at any instant >= 1 *)
-(* 1/2 means non nil at any instant >= 1/2; denotes a major step instant *)
 
 (** Type definitions. *)
 
@@ -56,7 +54,7 @@ and desc =
   | Ivar 
   | Ilink of t
 
-and value = | Izero | Ione | Ihalf
+and value = | Izero | Ione
 
 and polarity = Punknown | Pplus | Pminus | Pplusminus
 

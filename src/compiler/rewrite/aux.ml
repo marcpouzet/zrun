@@ -20,7 +20,6 @@ open Location
 open Zelus
 open Ident
 open Lident
-open Global
     
 let desc e = e.desc
 let make x = { desc = x; loc = no_location }
