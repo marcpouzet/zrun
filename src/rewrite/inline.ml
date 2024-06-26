@@ -53,10 +53,6 @@ let var_ident global_funs ({ renaming } as acc) x =
     Debug.print_string "Inline error: unbound " (Ident.name x);
     x, acc
 
-let set_index funs acc n =
-  let _ = Ident.set n in n, acc
-let get_index funs acc n = Ident.get (), acc
-
 let pat x = { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
 
 let pat_of_vardec { var_name } = pat var_name
@@ -157,7 +153,11 @@ let implementation funs acc impl =
 
 and open_t funs ({ genv } as acc) modname =
   let genv = Genv.open_module genv modname in modname, { acc with genv }
-                                   
+
+let set_index funs acc n =
+  let _ = Ident.set n in n, acc
+let get_index funs acc n = Ident.get (), acc
+
 let program genv p =
   let global_funs = { Mapfold.default_global_funs with build; var_ident } in
   let funs =
