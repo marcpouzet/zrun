@@ -13,7 +13,7 @@
 (* *********************************************************************)
 
 (* global symbol tables *)
-open Zmisc
+open Misc
 open Lident
 open Deftypes
 open Global

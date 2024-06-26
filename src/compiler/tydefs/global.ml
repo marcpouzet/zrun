@@ -25,10 +25,10 @@ type no_info = unit
   
 (* values in the symbol table *)
 type value_desc =
-    { mutable value_typ: ty_scheme; (* its type scheme *)
+    { mutable value_typ: Deftypes.ty_scheme; (* its type scheme *)
       mutable value_static: bool; (* is-it a static value? *)
-      mutable value_caus: tc_scheme option; (* its causality scheme *)
-      mutable value_init: ti_scheme option; (* its init. scheme *)
+      mutable value_caus: Defcaus.tc_scheme option; (* its causality scheme *)
+      mutable value_init: Definit.ti_scheme option; (* its init. scheme *)
       mutable value_code: value_code; (* source code *)
     }
 
@@ -36,13 +36,13 @@ type value_desc =
 and value_exp =
   | Vconst of immediate (* constant *)
   | Vfun of no_info funexp * value_code Env.t
-        (* a closure: the function body; the environment of values *)
+  (* a closure: the function body; the environment of values *)
   | Vabstract of Lident.qualident (* no implementation is given *)
 
 and value_code =
   { value_exp: value_exp; (* the value descriptor *)
     value_name: Lident.qualident option;
-                          (* when the value is defined globally *) }
+    (* when the value is defined globally *) }
 
 (* Value constructors *)
 type constr_desc =

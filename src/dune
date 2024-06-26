@@ -74,6 +74,8 @@
     defcaus; definition of causality types
     definit; definition of initialisation types
     global; definition of entries in the global type environment
+    modules; global symbol table for typing
+    ;interface; interface
   )
   (libraries zrun.global_lib)
 )
@@ -84,12 +86,12 @@
   (public_name zrun.rewrite_lib)
   (wrapped false)
   (modules
-    mapfold ; generic mapfold
-    aux ; auxiliary functions for building terms
-    inline ; inlining of function calls
-    der ; remove the initialization and handler part of a derivative equation
-    ;automata ; rewrite automata into match/reset
-    rewrite ; compose rewriting steps
+    mapfold; generic mapfold
+    aux; auxiliary functions for building terms
+    inline; inlining of function calls
+    der; remove the initialization and handler part of a derivative equation
+    ;automata; rewrite automata into match/reset
+    rewrite; compose rewriting steps
   )
   (libraries zrun.global_lib zrun.zrun_lib)
 )

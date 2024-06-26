@@ -54,12 +54,12 @@ and abbrev =
   | Tcons of typ list * typ
 
 (* type scheme *)
-and typ_scheme =
-    { typ_vars: typ list;
-      size_vars: size list;
-      mutable typ_body: typ }
+and ty_scheme =
+    { ty_vars: typ list;
+      ty_size_vars: size list;
+      mutable ty_body: typ }
 	
-and typ_instance = { typ_instance : typ list }
+and ty_instance = { ty_instance : typ list }
 
 and kind =
   | Tfun : vkind -> kind (* combinatorial expression *)
