@@ -22,18 +22,18 @@ open Zelus
 let p_handlers id handlers =
   List.map 
     (fun { p_cond; p_body = e; p_zero; p_env; p_loc } ->
-      { p_cond; p_zero; p_env; p_loc; p_body = Aux.id_eq_make id e })
+      { p_cond; p_zero; p_env; p_loc; p_body = Aux.id_eq id e })
   handlers
 
 let present id e0_opt handlers eq =
   let default_opt =
     match e0_opt with
-    | None -> NoDefault | Some(e0) -> Init(Aux.eq_init_make id e0) in
+    | None -> NoDefault | Some(e0) -> Init(Aux.eq_init id e0) in
   match handlers with
   | [] -> eq
   | _ ->
      let handlers = p_handlers id handlers in
-     Aux.eq_and_make
+     Aux.eq_and
        (Aux.eqmake (Defnames.singleton id)
           (EQpresent { handlers; default_opt }))
        eq

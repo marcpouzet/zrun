@@ -62,6 +62,29 @@ let immediate ff = function
   | Echar c -> fprintf ff "'%c'" c
   | Evoid -> fprintf ff "()"
 
+(* size expressions *)
+let size ff e =
+  let rec size prio ff { desc } =
+    match desc with
+    | Sint(i) -> fprintf ff "%d" i
+    | Sfrac { num; denom } -> 
+       if prio >= 2 then fprintf ff "(";
+       fprintf ff "(%a/%d)" (size 1) num denom;
+       if prio >= 2 then fprintf ff ")"
+    | Sident(n) -> name ff n
+    | Splus(s1, s2) -> 
+      (* if the surrending operator has a greater priority *)
+      if prio >= 1 then fprintf ff "(";
+      fprintf ff "@[%a + %a@]" (size 0) s1 (size 0) s2;
+      if prio >= 1 then fprintf ff ")"
+    | Sminus(s1, s2) -> 
+      (* if the surrending operator has a greater priority *)
+      if prio >= 1 then fprintf ff "(";
+      fprintf ff "@[%a - %a@]" (size 1) s1 (size 1) s2;
+      if prio >= 1 then fprintf ff ")"
+    | Smult(s1, s2) -> fprintf ff "@[%a * %a@]" (size 2) s1 (size 2) s2 in
+  size 0 ff e
+
 let rec ptype ff { desc } =
   match desc with
   | Etypevar(s) -> fprintf ff "'%s" s
@@ -80,7 +103,11 @@ let rec ptype ff { desc } =
           (match k with
            | Kdiscrete -> "-D->" | Khybrid -> "-C->") in
      fprintf ff "@[<hov2>%a %s %a@]" ptype ty_arg s ptype ty_res
-
+  | Esize(is_singleton, s) ->
+     if is_singleton then fprintf ff "@[<%a>@]" size s
+     else fprintf ff "@[[%a]@]" size s
+  | Evec(ty, s) -> fprintf ff "@[[%a]]%a@]" size s ptype ty
+                     
 let print_type_params ff pl =
   print_list_r_empty (fun ff s -> fprintf ff "'%s" s) "("","") " ff pl
 
@@ -257,29 +284,6 @@ let automaton_handler_list
 	 (if is_weak then "(* weak *)" else "(* strong *)")
 	 automaton_handler_list s_h_list
 	 (print_opt (print_with_braces state " init" "")) e_opt
-
-(* size expressions *)
-let size ff e =
-  let rec size prio ff { desc } =
-    match desc with
-    | Sizeconst(i) -> fprintf ff "%d" i
-    | Sizefrac { num; denom } -> 
-       if prio >= 2 then fprintf ff "(";
-       fprintf ff "(%a/%d)" (size 1) num denom;
-       if prio >= 2 then fprintf ff ")"
-    | Sizevar(n) -> name ff n
-    | Sizeop(op, s1, s2) -> 
-      (* if the surrending operator has a greater priority *)
-      if prio >= 1 then fprintf ff "(";
-      fprintf ff "@[%a + %a@]" (size 0) s1 (size 0) s2;
-      if prio >= 1 then fprintf ff ")"
-    | Sminus(s1, s2) -> 
-      (* if the surrending operator has a greater priority *)
-      if prio >= 1 then fprintf ff "(";
-      fprintf ff "@[%a - %a@]" (size 1) s1 (size 1) s2;
-      if prio >= 1 then fprintf ff ")"
-    | Smult(s1, s2) -> fprintf ff "@[%a * %a@]" (size 2) s1 (size 2) s2 in
-  size 0 ff e
 
 let rec expression ff e =
   let exp ff { e_desc } =

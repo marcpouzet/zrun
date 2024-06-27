@@ -46,11 +46,11 @@ let eq_make p e =
   let w = { Defnames.empty with dv = Write.fv_pat S.empty p } in
   eqmake w (EQeq(p, e))
 
-let id_eq_make id e =
+let id_eq id e =
   let w = Defnames.singleton id in
   eqmake w (EQeq(pat_make id, e))
 
-let eq_init_make id e =
+let eq_init id e =
   let eq = eqmake (Defnames.singleton id) (EQinit(id, e)) in
   let eq, _ = Write.equation eq in eq
 
@@ -58,7 +58,7 @@ let eq_der id e =
   let w = { Defnames.empty with der = S.singleton id } in
   eqmake w (EQder { id; e; e_opt = None; handlers = [] })
 
-let eq_and_make eq1 eq2 =
+let eq_and eq1 eq2 =
   let w = Defnames.union eq1.eq_write eq2.eq_write in
   eqmake w (EQand [eq1; eq2])
 
@@ -79,6 +79,15 @@ let eq_match e handlers =
             (fun acc { m_body = { eq_write } } -> Defnames.union eq_write acc)
             Defnames.empty handlers in
   eqmake w (EQmatch { is_total = true; e; handlers })
+let eq_present handlers default_opt =
+  let w = List.fold_left
+            (fun acc { p_body = { eq_write } } -> Defnames.union eq_write acc)
+            Defnames.empty handlers in
+  let w =
+    match default_opt with
+    | NoDefault -> w | Init(eq) | Else(eq) -> Defnames.union eq.eq_write w in
+  eqmake w (EQpresent { handlers; default_opt })
+    
 let eq_local b = eqmake b.b_write (EQlocal(b))
 
 let match_handler p b =
@@ -99,6 +108,14 @@ let par eq_list =
   | [eq] -> eq
   | _ -> eqmake (defnames eq_list) (EQand(eq_list))
 
+let rec eq_let_list leq_list eq =
+  match leq_list with
+  | [] -> eq
+  | leq :: leq_list -> eq_let leq (eq_let_list leq_list eq)
+
+and eq_let leq eq =
+  eqmake eq.eq_write (EQlet(leq, eq))
+    
 let pat_of_vardec_make { var_name } = pat_make var_name
 
 let pat_of_vardec_list_make vardec_list =

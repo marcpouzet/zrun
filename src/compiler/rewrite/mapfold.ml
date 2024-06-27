@@ -88,6 +88,8 @@ type ('a, 'info) global_it_funs =
       ('a, 'info) global_it_funs -> 'a -> kind -> kind * 'a;
     interface :
       ('a, 'info) global_it_funs -> 'a -> interface -> interface * 'a;
+    size_t :
+      ('a, 'info) global_it_funs -> 'a -> size -> size * 'a;
   }
 
 type ('a, 'info) it_funs =
@@ -102,8 +104,6 @@ type ('a, 'info) it_funs =
       ('a, 'info) it_funs -> 'a -> 'info eq -> 'info eq * 'a;
     scondpat :
       ('a, 'info) it_funs -> 'a -> 'info scondpat -> 'info scondpat * 'a;
-    size_t :
-      ('a, 'info) it_funs -> 'a -> size -> size * 'a;
     expression :
       ('a, 'info) it_funs -> 'a -> 'info exp -> 'info exp * 'a;
     vardec :
@@ -228,33 +228,40 @@ and type_expression global_funs acc ({ desc } as ty) =
      let kind, acc = kind_it global_funs acc kind in
      let ty1, acc = type_expression_it global_funs acc ty1 in
      let ty2, acc = type_expression_it global_funs acc ty2 in
-     Etypefun(kind, ty1, ty2), acc in
+     Etypefun(kind, ty1, ty2), acc
+  | Esize(is_singleton, si) ->
+     let si, acc = size_it global_funs acc si in
+     Esize(is_singleton, si), acc
+  | Evec(ty, si) ->
+    let ty, acc = type_expression_it global_funs acc ty in
+    let si, acc = size_it global_funs acc si in
+    Evec(ty, si), acc in
   { ty with desc }, acc
 
-let rec size_it funs acc si =
-  try funs.size_t funs acc si
-  with Fallback -> size_t funs acc si
+and size_it global_funs acc si =
+  try global_funs.size_t global_funs acc si
+  with Fallback -> size_t global_funs acc si
 
-and size_t funs acc ({ desc } as si) =
+and size_t global_funs acc ({ desc } as si) =
   let desc, acc = match desc with
   | Sint _ -> desc, acc
   | Sfrac { num; denom } ->
-     let num, acc = size_it funs acc num in
+     let num, acc = size_it global_funs acc num in
      Sfrac { num; denom }, acc
   | Sident(id) ->
-     let id, acc = var_ident_it funs.global_funs acc id in
+     let id, acc = var_ident_it global_funs acc id in
      Sident(id), acc
   | Splus(si1, si2) ->
-     let si1, acc = size_it funs acc si1 in
-     let si2, acc = size_it funs acc si2 in
+     let si1, acc = size_it global_funs acc si1 in
+     let si2, acc = size_it global_funs acc si2 in
      Splus(si1, si2), acc
   | Sminus(si1, si2) ->
-     let si1, acc = size_it funs acc si1 in
-     let si2, acc = size_it funs acc si2 in
+     let si1, acc = size_it global_funs acc si1 in
+     let si2, acc = size_it global_funs acc si2 in
      Splus(si1, si2), acc
   | Smult(si1, si2) ->
-     let si1, acc = size_it funs acc si1 in
-     let si2, acc = size_it funs acc si2 in
+     let si1, acc = size_it global_funs acc si1 in
+     let si2, acc = size_it global_funs acc si2 in
      Splus(si1, si2), acc in
   { si with desc }, acc
 
@@ -476,7 +483,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      let e_c, acc = expression_it funs acc e_c in
      { e with e_desc = Ereset(e_body, e_c) }, acc
   | Esizeapp { f; size_list } -> 
-     let size_list, acc = Util.mapfold (size_it funs) acc size_list in
+     let size_list, acc = Util.mapfold (size_it funs.global_funs) acc size_list in
      let v, acc = expression_it funs acc f in
      { e with e_desc = Esizeapp { f; size_list } }, acc
   | Efun f ->
@@ -748,6 +755,7 @@ let default_global_funs =
     type_expression;
     typedecl;
     interface;
+    size_t;
   }
 
 let defaults =
@@ -757,7 +765,6 @@ let defaults =
     leq_t;
     equation;
     scondpat;
-    size_t;
     expression;
     vardec;
     block;
@@ -780,6 +787,7 @@ let default_global_stop =
     type_expression = stop;
     typedecl = stop;
     interface = stop;
+    size_t = stop;
   }
 let defaults_stop =
   { global_funs = default_global_stop;
@@ -788,7 +796,6 @@ let defaults_stop =
     leq_t = stop;
     equation = stop;
     scondpat = stop;
-    size_t = stop;
     expression = stop;
     vardec = stop;
     block = stop;

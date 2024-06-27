@@ -664,7 +664,7 @@ and escape env_for_states env_pat env
   let e_next_state = state env_for_states env e_next_state in
   { Ast.e_reset; Ast.e_cond = e_cond; Ast.e_let = e_let;
     Ast.e_body = e_body; Ast.e_next_state = e_next_state;
-    Ast.e_loc = loc; Ast.e_env = Ident.Env.empty }
+    Ast.e_loc = loc; Ast.e_env = Ident.Env.empty; e_zero = false; }
   
 and scondpat env scpat =
   (* first build the set of names *)

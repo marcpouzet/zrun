@@ -82,7 +82,6 @@
     pinit ; printing initialization types
     global ; definition of entries in the global type environment
     modules ; global symbol table for typing
-    interface; interface
   )
   (libraries zrun.global_lib)
 )

@@ -51,12 +51,12 @@ and is_singleton = bool
 and size = size_desc localized
 
 and size_desc =
-  | Sizeconst : int -> size_desc
-  | Sizevar : name -> size_desc
-  | Sizefrac : { num: size; denom: int } -> size_desc
-  | Sizeop : size_op * size * size -> size_desc
-
-and size_op = Esize_minus | Esize_plus | Esize_mult
+  | Sint : int -> size_desc
+  | Sident : Ident.t -> size_desc
+  | Sfrac : { num: size; denom: int } -> size_desc
+  | Splus : size * size -> size_desc
+  | Sminus : size * size -> size_desc
+  | Smult : size * size -> size_desc
 
 (* constants *)
 type immediate =
@@ -199,6 +199,7 @@ type ('info, 'scondpat, 'exp, 'leq, 'body) escape =
     e_body: 'body;
     e_next_state: 'exp state;
     e_loc: Location.t;
+    e_zero: bool;
     e_env: 'info Ident.Env.t;
   }
 
