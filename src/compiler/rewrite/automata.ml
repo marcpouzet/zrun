@@ -244,7 +244,7 @@ let equation funs acc eq =
     automaton acc is_weak handlers state_opt
   | _ -> raise Mapfold.Fallback
          
-let program p =
+let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
     { Mapfold.defaults with equation; global_funs } in

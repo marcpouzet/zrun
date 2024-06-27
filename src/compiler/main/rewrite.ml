@@ -105,8 +105,10 @@ let main ff modname filename source_name otc n_steps =
 
   (* Normalise derivative equations - remove the handler () *)
   
-  let _ = transform_and_compare
+  let p = transform_and_compare
             "Remove handlers in definitions of derivatives" Der.program genv0 p in
+  let _ = transform_and_compare
+            "Translation of automata" Automata.program genv0 p in
   ()
   (*
       let impl_list =
