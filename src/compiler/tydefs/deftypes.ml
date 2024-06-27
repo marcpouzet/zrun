@@ -76,30 +76,42 @@ and tkind =
 
 (* entry in the typing environment *)
 type 'a tentry = 
-  { t_path : tsort list; (* [k1 on ... on kn x : t] *)
-    mutable t_sort: tsort; (* sort *)
-    mutable t_default: 'a option; (* default value *)
-    mutable t_init: 'a minit; (* init value *)
-    mutable t_typ: typ (* its type *)
+  { t_path : 'a tsort list; (* [k1 on ... on kn x : t] *)
+    t_sort: 'a tsort; (* sort *)
+    t_typ: typ (* its type *)
   }
 
-and tsort =
+and 'a tsort =
   | Sort_const (* a variable whose value is known at compile time *)
   | Sort_static (* the value is known at instantiation time *)
   | Sort_val (* a let variable *)
   | Sort_var (* a shared variable *)
-  | Sort_mem : { m_kind: mkind } -> tsort (* a state variable *)
+  | Sort_mem of 'a mem
 
-and 'a minit =
-  | NoInit (* no initialisation given *)
-  | InitEq (* the initial value is given in the body of equations *)
-  | InitDecl of 'a (* it is given at the declaration point *)
+and 'a mem =
+  { m_kind: mkind option;
+    m_previous: bool; (* [last x] or [x] is used *)
+    m_init: 'a init; (* is-it initialized? *)
+    m_default: 'a init; (* default value *)
+  }
+
+and 'a init =
+  | No (* no initialisation given *)
+  | Eq (* the initial value is given in the body of equations *)
+  | Decl of 'a option (* it is given at the declaration point *)
+
+and constant =
+  | Cimmediate of Zelus.immediate
+  | Cglobal of Lident.t
 
 (* the different kinds of internal state variables *)
 and mkind =
-  | Discrete (* discrete state variable *)
-  | Cont (* continous state variable *)
+  | Cont (* continous state variable; position + derivative *)
   | Zero (* zero-crossing *)
+  | Horizon (* an event defined as an horizon *)
+  | Period (* an event defined as a period *)
+  | Encore (* a cascade event *)
+  | Major (* true in discrete mode; could we use Encore instead? *)
 
 (* generic and non generic variables in the various type systems *)
 let generic = -1
@@ -149,3 +161,32 @@ let rec new_var_list n =
     0 -> []
   | n -> (new_var ()) :: new_var_list (n - 1)
 let forall l typ_body = { size_vars = []; typ_vars = l; typ_body = typ_body }
+
+let no_typ = make (Tproduct [])
+let rec is_no_typ { t_desc = desc } =
+  match desc with
+  | Tproduct [] -> true | Tlink(link) -> is_no_typ link | _ -> false
+let no_typ_scheme = { typ_vars = []; size_vars = []; typ_body = no_typ }
+let no_typ_instance = { typ_instance = [] }
+let no_abbrev () = ref Tnil
+
+(* basic entries for variables *)
+let static = Sort_static
+let value = Sort_val
+let variable = Sort_var
+let empty_mem = { m_kind = None; m_previous = false; m_init = No; m_default = No }
+let initialized mem = { mem with m_init = Eq }
+let previous mem = { mem with m_previous = true }
+let zero mem = Sort_mem { mem with m_kind = Some Zero }
+let horizon mem = Sort_mem { mem with m_kind = Some Horizon }
+let major () = Sort_mem { empty_mem with m_kind = Some Major }
+let imem = initialized empty_mem
+let mem = previous imem
+let memory = Sort_mem mem
+let imemory = Sort_mem imem
+		   
+let entry sort ty = { t_path = []; t_sort = sort; t_typ = ty }
+
+let desc ty = ty.t_desc
+let index ty = ty.t_index
+

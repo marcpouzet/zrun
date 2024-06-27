@@ -68,21 +68,21 @@
  ;; the Zelus compiler
  ; type definition and global info in the global type environment
  (library
-  (name typing_lib)
-  (public_name zrun.typing_lib)
+  (name typdefs_lib)
+  (public_name zrun.typdefs_lib)
   (wrapped false)
   (modules
     genames ; generate fresh names
     deftypes ; definition of types
-    defcaus; definition of causality types
-    definit; definition of initialisation types
-    initial; definition of general types, values
+    defcaus ; definition of causality types
+    definit ; definition of initialisation types
+    initial ; definition of general types, values
     ptypes ; printing types
     pcaus ; printing causality types
     pinit ; printing initialization types
-    global; definition of entries in the global type environment
-    modules; global symbol table for typing
-    ;interface; interface
+    global ; definition of entries in the global type environment
+    modules ; global symbol table for typing
+    interface; interface
   )
   (libraries zrun.global_lib)
 )
@@ -93,14 +93,14 @@
   (public_name zrun.rewrite_lib)
   (wrapped false)
   (modules
-    mapfold; generic mapfold
-    aux; auxiliary functions for building terms
-    inline; inlining of function calls
-    der; remove the initialization and handler part of a derivative equation
-    ;automata; rewrite automata into match/reset
-    rewrite; compose rewriting steps
+    mapfold ; generic mapfold
+    aux ; auxiliary functions for building terms
+    inline ; inlining of function calls
+    der ; remove the initialization and handler part of a derivative equation
+    ;automata ; rewrite automata into match/reset
+    rewrite ; compose rewriting steps
   )
-  (libraries zrun.global_lib zrun.zrun_lib)
+  (libraries zrun.global_lib zrun.typdefs_lib zrun.zrun_lib)
 )
 
 (executable

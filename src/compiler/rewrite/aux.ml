@@ -13,21 +13,27 @@
 (* *********************************************************************)
 
 (* Functions to build terms *)
-(* Invariant: writes (variables defined an equation) must be correct *)
+(* Invariant: variables defined by an equation (writes) must be correct *)
 
 open Misc
 open Location
 open Zelus
 open Ident
 open Lident
-    
+open Initial
+open Deftypes
+
+let defnames eq_list =
+  List.fold_left (fun acc { eq_write } -> Defnames.union eq_write acc)
+    Defnames.empty eq_list
+
 let desc e = e.desc
 let make x = { desc = x; loc = no_location }
 
-let emake desc info =
-  { e_desc = desc; e_loc = no_location; e_info = info }
-let pmake desc info =
-  { pat_desc = desc; pat_loc = no_location; pat_info = info }
+let emake desc =
+  { e_desc = desc; e_loc = no_location; e_info = no_info }
+let pmake desc =
+  { pat_desc = desc; pat_loc = no_location; pat_info = no_info }
 let eqmake w desc =
   { eq_desc = desc; eq_loc = no_location; eq_write = w }
 
@@ -67,47 +73,135 @@ let block_make vardec_list eq_list =
   let b, _, _ = Write.block b in
   b
 
+let eq_reset eq e = eqmake eq.eq_write (EQreset(eq, e))
+let eq_match e handlers =
+  let w = List.fold_left
+            (fun acc { m_body = { eq_write } } -> Defnames.union eq_write acc)
+            Defnames.empty handlers in
+  eqmake w (EQmatch { is_total = true; e; handlers })
+let eq_local b = eqmake b.b_write (EQlocal(b))
+
+let match_handler p b =
+  { m_pat = p; m_body = b; m_env = Env.empty;
+    m_reset = false; m_zero = false; m_loc = no_location }
+
+let eq_ifthenelse e eq_true eq_false =
+  let w = Defnames.union eq_true.eq_write eq_false.eq_write in
+  eqmake w (EQif { e; eq_true; eq_false })
+
+let eq_ifthen e eq_true =
+  let eq_empty = eqmake Defnames.empty EQempty in
+  eq_ifthenelse e eq_true eq_empty
+    
+let par eq_list =
+  match eq_list with
+  | [] -> assert false
+  | [eq] -> eq
+  | _ -> eqmake (defnames eq_list) (EQand(eq_list))
+
 let pat_of_vardec_make { var_name } = pat_make var_name
 
 let pat_of_vardec_list_make vardec_list =
   match vardec_list with
-  | [] -> pmake Ewildpat Misc.no_info
-  | _ -> pmake (Etuplepat(List.map pat_of_vardec_make vardec_list)) no_info
+  | [] -> pmake Ewildpat
+  | _ -> pmake (Etuplepat(List.map pat_of_vardec_make vardec_list))
 
 let eq_of_f_arg_arg_make f_arg arg =
   let p = pat_of_vardec_list_make f_arg in
   eq_make p arg
 
-let returns_of_vardec_make { var_name } = emake (Evar(var_name)) no_info
+let returns_of_vardec_make { var_name } = emake (Evar(var_name))
 
 let returns_of_vardec_list_make vardec_list =
   match vardec_list with
-  | [] -> emake (Econst(Evoid)) no_info
-  | _ -> emake (Etuple(List.map returns_of_vardec_make vardec_list)) no_info
+  | [] -> emake (Econst(Evoid))
+  | _ -> emake (Etuple(List.map returns_of_vardec_make vardec_list))
 
-(*
-(* translate the internal representation of a type into a type definition *)
-let type_decl_of_type_desc name ty_params size_params ty_decl =
-  (* variant types *)
-  let variant_type
-      { qualid = qualid;
-        info = { constr_arg = arg_l; constr_arity = arit } } =
-    let desc =
-      if arit = 0 then
-        Econstr0decl(Genv.shortname qualid)
-      else Econstr1decl(Genv.shortname qualid,
-                        List.map type_expression_of_typ arg_l) in
-    make desc in
-  (* record types *)
-  let record_type { qualid = qualid; info = { label_arg = arg } } =
-    Genv.shortname qualid, type_expression_of_typ arg in
+let global lname = Eglobal { lname = lname }
 
-  let params = List.map (fun i -> "'a" ^ (string_of_int i)) ty_param in
-  let type_decl_desc =
-    match ty_desc with
-      | Abstract_type -> Eabstract_type
-      | Variant_type(c_list) -> Evariant_type(List.map variant_type c_list)
-      | Record_type(l_list) -> Erecord_type(List.map record_type l_list)
-      | Abbrev(_, ty) -> Eabbrev(type_expression_of_typ ty) in
-  (tyname, params, make type_decl_desc)
-*)
+let const c = emake (Econst c)
+let constr0 lname = emake (Econstr0 { lname })
+let evoid = const Evoid
+let efalse = const (Ebool(false))
+let etrue = const (Ebool(true))
+let truepat = pmake (Econstpat(Ebool(true)))
+let falsepat = pmake (Econstpat(Ebool(false)))
+let wildpat = pmake (Ewildpat)
+let zero = emake (Econst(Efloat(0.0)))
+let one = emake (Econst(Efloat(1.0)))
+let minus_one = emake (Econst(Efloat(-1.0)))
+let infinity = emake (global (Modname(Initial.stdlib_name "infinity")))
+let tuplepat pat_list = pmake (Etuplepat(pat_list))
+let tuple e_list = emake (Etuple(e_list))
+let record l_list e_list =
+  emake (Erecord(List.map2 (fun label arg -> { label; arg }) l_list e_list))
+    
+let rec orpat pat_list =
+  match pat_list with
+    | [] -> assert false
+    | [pat] -> pat
+    | pat :: pat_list -> pmake (Eorpat(pat, orpat pat_list))
+
+let varpat name = pmake (Evarpat(name))
+let var name = emake (Evar(name))
+
+let pair e1 e2 =  emake (Etuple([e1; e2]))
+let pairpat p1 p2 = pmake (Etuplepat([p1; p2]))
+
+let patalias p n = pmake (Ealiaspat(p, n))
+let last x = emake (Elast(x))
+let float v = emake (Econst(Efloat(v)))
+let bool v = emake (Econst(Ebool(v)))
+
+let global_in_stdlib lname =
+  emake (global (Modname(Initial.stdlib_name lname)))
+
+let unop op e =
+  emake (Eapp { is_inline = false; f = global_in_stdlib op; arg_list = [e] })
+let binop op e1 e2 =
+  emake (Eapp { is_inline = false; f = global_in_stdlib op;
+                arg_list = [e1;e2] })
+
+let plus e1 e2 = binop "+." e1 e2
+let minus e1 e2 = binop "-." e1 e2
+let diff e1 e2 = binop "<>" e1 e2
+let or_op e1 e2 = binop "||" e1 e2
+let and_op e1 e2 = binop "&&" e1 e2
+let on_op e1 e2 = binop "on" e1 e2
+let min_op e1 e2 = binop "min" e1 e2
+let greater_or_equal e1 e2 = binop ">=" e1 e2
+let greater e1 e2 = binop ">" e1 e2
+let up e = emake (Eop(Eup, [e]))
+let pre e = emake (Eop(Eunarypre, [e]))
+let minusgreater e1 e2 = emake (Eop(Eminusgreater, [e1;e2]))
+let fby e1 e2 = emake (Eop(Efby, [e1;e2]))
+let ifthenelse e1 e2 e3 =
+  emake (Eop(Eifthenelse, [e1;e2;e3]))
+let sgn e =
+  ifthenelse (greater e zero) one minus_one
+let record_access arg label = emake (Erecord_access { arg; label })
+    
+(* find the major step in the current environment *)
+(* If it already exist in the environment *)
+(* returns it. Otherwise, create one *)
+let new_major env =
+  let m = Ident.fresh "major" in
+  let env =
+    Env.add m { t_path = [];
+                t_sort = Deftypes.major (); t_typ = Initial.typ_bool } env in
+  let major = var m in
+  env, major
+	 
+let major env =
+  let exception Return of no_info Zelus.exp in
+  let find x t =
+    match t with
+    | { t_sort = Sort_mem { m_kind = Some(Major) }; t_typ = typ } ->
+       raise (Return(var x))
+    | _ -> () in
+  try
+    Env.iter find env;
+    new_major env
+  with
+  | Return(x) -> env, x 
+

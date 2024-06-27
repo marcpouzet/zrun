@@ -39,6 +39,24 @@ and type_expression_desc =
   | Etypeconstr : Lident.t * type_expression list -> type_expression_desc
   | Etypetuple : type_expression list -> type_expression_desc
   | Etypefun : kind * type_expression * type_expression -> type_expression_desc
+  (* refinement types for integers and arrays *)
+  (* possibly a singleton; or interval [0..s]; if s < 0, interval is empty *)
+  | Esize : is_singleton * size -> type_expression_desc
+  | Evec : type_expression * size -> type_expression_desc
+  (* [size]t *)
+
+and is_singleton = bool
+
+(* sizes for arrays and bounded recursions - only multivariate polynomials *)
+and size = size_desc localized
+
+and size_desc =
+  | Sizeconst : int -> size_desc
+  | Sizevar : name -> size_desc
+  | Sizefrac : { num: size; denom: int } -> size_desc
+  | Sizeop : size_op * size * size -> size_desc
+
+and size_op = Esize_minus | Esize_plus | Esize_mult
 
 (* constants *)
 type immediate =
@@ -186,17 +204,6 @@ type ('info, 'scondpat, 'exp, 'leq, 'body) escape =
 
 type is_weak = bool
 
-(* sizes for arrays and bounded recursions - only multivariate polynomials *)
-type size = size_desc localized
-
-and size_desc =
-  | Sint : int -> size_desc
-  | Sfrac : { num: size; denom: int } -> size_desc
-  | Sident : Ident.t -> size_desc
-  | Splus: size * size -> size_desc
-  | Sminus : size * size -> size_desc
-  | Smult: size * size -> size_desc
-  
 type 'info exp =
   { e_desc: 'info exp_desc; (* descriptor *)
     e_loc: Location.t; (* location *)

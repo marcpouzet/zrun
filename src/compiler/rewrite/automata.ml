@@ -16,8 +16,8 @@
 open Misc
 open Location
 open Ident
-open Aux
 open Zelus
+open Aux
 
 (* Translation of automata. *)
 (* Strong transitions: *)
@@ -84,24 +84,25 @@ is translated into:
 2. Builds a local table table_of_types for every new type
 *)
 
-(*
 let moduleident n =
   { n with source = (Modules.current_module ()) ^ "_" ^ n.source }
 
-let eblock eq_list =
-  { b_vars = []; b_locals = []; b_body = eq_list; b_loc = no_location;
-    b_write = Deftypes.empty; b_env = Env.empty }
+    (*
+      let eblock eq_list =
+  { b_vars = []; b_body = eq_list; b_loc = no_location;
+    b_write = Defnames.empty; b_env = Env.empty }
 let eq_present l_true l_false =
   match l_true, l_false with
   | [], _ -> l_false
   | _, [] -> [eqmake (EQpresent(l_true, None))]
   | _ -> [eqmake (EQpresent(l_true, Some(eblock l_false)))]
-
-let extend_block eq_list b_opt =
+     *)
+    (*
+      let extend_block eq_list b_opt =
   match b_opt with
     | None -> eblock eq_list
     | Some(b) -> { b with b_body = eq_list @ b.b_body }
-*)
+     *)
 
 (* functions to introduce new type definitions *)
 module TableOfTypes =
@@ -112,8 +113,8 @@ struct
   let flush impl_list table_of_types =
     let translate impl_list (tyname, ty_desc) =
       let n, params, ty_desc =
-        Aux.type_decl_of_type_desc tyname ty_desc in
-      make (Etypedecl { name; ty_params; size_params = [];
+        Interface.type_decl_of_type_desc tyname ty_desc in
+      make (Zelus.Etypedecl { name; ty_params; size_params = [];
                             ty_decl }) :: impl_list in
     List.fold_left translate impl_list table_of_types
 end
@@ -133,7 +134,7 @@ let constr c ty_list =
 let intro_type s_h_list =
 
   (* we introduce a new type *)
-  let fresh () = Ident.fresh "state__" in
+  let name = "state__" ^ (string_of_int(Gename.symbol#name)) in
 
   (* introduce a new name for every parameterized state. *)
   (* for the moment, we do not share them *)
@@ -180,9 +181,9 @@ let state_parameter is_init ty =
       Deftypes.Smem (if is_init then Deftypes.initialized mem else mem);
     Deftypes.t_typ = ty }
 
-(** Adds variables used for state parameters to the environment *)
-(** we consider that a parameter variable can be both modified/red with *)
-(** [p = ...], [...p...], [...last p...] *)
+(* Adds variables used for state parameters to the environment *)
+(* we consider that a parameter variable can be both modified/red with *)
+(* [p = ...], [...p...], [...last p...] *)
 let env_of_parameters n_to_parameters s_h_list se_opt =
   (* test whether or not a state equals [se_opt] *)
   let equalstate se_opt { desc = desc } =
@@ -211,9 +212,9 @@ let env_of_parameters n_to_parameters s_h_list se_opt =
           List.map2 (fun n e -> eq_init n e) n_list e_list in
   env, eq_list
 
-(** Translating an automaton *)
-(** [eq_list] is a list of equations. The translation returns *)
-(** an extended list containing [eq_list] and new equations *)
+(* Translating an automaton *)
+(* [eq_list] is a list of equations. The translation returns *)
+(* an extended list containing [eq_list] and new equations *)
 and automaton lnames is_weak handler_list se_opt =
   (* introduce a sum type to represent states and *)
   (* build an environment which associate parameters to states *)

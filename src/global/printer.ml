@@ -262,13 +262,13 @@ let automaton_handler_list
 let size ff e =
   let rec size prio ff { desc } =
     match desc with
-    | Sint(i) -> fprintf ff "%d" i
-    | Sfrac { num; denom } -> 
+    | Sizeconst(i) -> fprintf ff "%d" i
+    | Sizefrac { num; denom } -> 
        if prio >= 2 then fprintf ff "(";
        fprintf ff "(%a/%d)" (size 1) num denom;
        if prio >= 2 then fprintf ff ")"
-    | Sident(n) -> name ff n
-    | Splus(s1, s2) -> 
+    | Sizevar(n) -> name ff n
+    | Sizeop(op, s1, s2) -> 
       (* if the surrending operator has a greater priority *)
       if prio >= 1 then fprintf ff "(";
       fprintf ff "@[%a + %a@]" (size 0) s1 (size 0) s2;
