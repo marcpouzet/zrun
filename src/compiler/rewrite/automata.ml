@@ -121,24 +121,12 @@ let intro_type_for_automaton acc s_h_list =
   acc
 
 (* Translation of an automaton *)
-let automaton funs acc is_weak handlers state_opt =
+let automaton acc is_weak handlers state_opt =
   (* introduce a sum type to represent states *)
   let acc = intro_type_for_automaton acc handlers in
 
-  (* the name of the initial state *)
-  let i_name =
-    match state_opt with
-      | None ->
-          (* the initial state is the first in the list *)
-          begin match (List.hd handlers).s_state.desc with
-          | Estate0pat(n) -> n | _ -> assert false
-        end
-      | Some({ desc = Estate0(n) } | { desc = Estate1(n, _) }) -> n in
-
   let lname id = Lident.Name(Ident.name id) in
   
-  let sname = lname i_name in
-
   (* translate states *)
   let statepat { desc; loc } =
     let desc =
@@ -148,7 +136,7 @@ let automaton funs acc is_weak handlers state_opt =
     { pat_desc = desc; pat_loc = loc; pat_info = no_info } in
 
   (* translating a state *)
-  let state { desc; loc } =
+  let rec state { desc; loc } =
     (* make an equation [n = e] *)
     match desc with
       | Estate0(n) ->
@@ -156,7 +144,23 @@ let automaton funs acc is_weak handlers state_opt =
             e_info = no_info }
       | Estate1(n, e_list) ->
         { e_desc = Econstr1 { lname = lname n; arg_list = [Aux.tuple e_list] };
-          e_loc = loc; e_info = no_info } in
+          e_loc = loc; e_info = no_info }
+      | Estateif(e, st1, st2) ->
+         ifthenelse e (state st1) (state st2) in
+
+  (* the name of the initial state *)
+  let initial_state =
+    match state_opt with
+      | None ->
+          (* the initial state is the first in the list *)
+         let { desc; loc } = (List.hd handlers).s_state in
+         begin match desc with
+         | Estate0pat(n) ->
+            { e_desc = Econstr0 { lname = lname n }; e_loc = loc;
+              e_info = no_info }
+         | _ -> assert false
+         end
+      | Some(si) -> state si in
 
   (* [state_name] is the target state computed in the current step *)
   (* [reset_name] is the target reset bit computed in the current step *)
@@ -176,7 +180,7 @@ let automaton funs acc is_weak handlers state_opt =
         eq_let_list e_let
           (Aux.par [(id_eq state_name (state e_next_state));
                     id_eq reset_name (bool e_reset);
-                    e_body]) } in
+                    eq_local e_body]) } in
 
   (* Translation of strong transitions *)
   let strong { s_state; s_body; s_trans } =
@@ -187,7 +191,7 @@ let automaton funs acc is_weak handlers state_opt =
       eq_reset (eq_present p_h_list (id_eq reset_name efalse))
         (bool_last reset_name) in
     let handler_for_current_active_state =
-      eq_reset e_body (bool_var reset_name) in
+      eq_reset (eq_local s_body) (bool_var reset_name) in
     (pat, handler_to_compute_current_state),
     (pat, handler_for_current_active_state) in
 
@@ -198,7 +202,7 @@ let automaton funs acc is_weak handlers state_opt =
     let p_h_list = List.map escape s_trans in
     let eq_next_state =
       eq_present p_h_list (id_eq reset_name efalse) in
-    let eq = Aux.eq_and eq_next_state s_body in
+    let eq = Aux.eq_and eq_next_state (eq_local s_body) in
     pat, eq_reset eq (bool_last reset_name) in
 
   (* the code generated for automata with strong transitions *)
@@ -220,30 +224,24 @@ let automaton funs acc is_weak handlers state_opt =
   (* the code for automatama with weak transitions *)
   let weak_automaton handlers =
     let handlers = List.map weak handlers in
-    eq_match (state_last state_name)
+    [eq_match (state_last state_name)
               (List.map
                  (fun (m_pat, m_body) ->
                    { m_pat; m_body; m_env = Env.empty; m_loc = no_location;
-                     m_reset = false; m_zero = false }) handlers) in
-  (* the result *)
-  let statetype_entry = state_value statetype in
-  let env =
-    Env.add state_name no_info (Env.add reset_name no_info env) in
+                     m_reset = false; m_zero = false }) handlers)] in
   (* translate the automaton *)
-  let eq =
-    if is_weak then weak_automaton handlers
-    else strong_automaton handlers in
+  let eq_list =
+    if is_weak then weak_automaton handlers else strong_automaton handlers in
   (* initial state and reset value *)
-  par [eq_init state_name (emake (Econstr0(i_name)));
-       eq_init reset_name efalse;
-       eq], acc
+  par (eq_init state_name initial_state ::
+         eq_init reset_name efalse :: eq_list), acc
 
 (* Translation of equations *)
 let equation funs acc eq =
   let eq, acc = Mapfold.equation funs acc eq in
   match eq.eq_desc with
   | EQautomaton { is_weak; handlers; state_opt } ->
-    automaton funs acc is_weak handlers state_opt
+    automaton acc is_weak handlers state_opt
   | _ -> raise Mapfold.Fallback
          
 let program p =

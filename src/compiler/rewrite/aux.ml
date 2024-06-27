@@ -152,7 +152,12 @@ let tuplepat pat_list = pmake (Etuplepat(pat_list))
 let tuple e_list = emake (Etuple(e_list))
 let record l_list e_list =
   emake (Erecord(List.map2 (fun label arg -> { label; arg }) l_list e_list))
-    
+let ifthenelse e e_true e_false =
+  emake (Eop(Eifthenelse, [e_true; e_false]))
+let eq_ifthen e eq_true =
+  let eq_empty = eqmake Defnames.empty EQempty in
+  eq_ifthenelse e eq_true eq_empty
+
 let rec orpat pat_list =
   match pat_list with
     | [] -> assert false
