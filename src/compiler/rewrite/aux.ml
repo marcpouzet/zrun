@@ -138,6 +138,7 @@ let global lname = Eglobal { lname = lname }
 
 let const c = emake (Econst c)
 let constr0 lname = emake (Econstr0 { lname })
+let constr1 lname arg_list = emake (Econstr1 { lname; arg_list })
 let evoid = const Evoid
 let efalse = const (Ebool(false))
 let etrue = const (Ebool(true))

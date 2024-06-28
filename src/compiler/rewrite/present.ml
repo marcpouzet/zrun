@@ -49,16 +49,20 @@ open Mapfold
 
 
 (** representation of signals *)
-(* a [signal] is a pair made of a value and a boolean *)
-let emit e = e, etrue
-let presentpat pat =
-  { pat with p_desc = Etuplepat[pat; truepat];
-             p_typ = tproduct [pat.p_typ; typ_bool] }
+(* a [signal] is represented as an optional value *)
+let present_name = Lident.Modname(Initial.stdlib_name "P")
+let absent_name = Lident.Modname(Initial.stdlib_name "A")
+let emit e = Aux.constr1 present_name [e]
+let absent = Aux.constr0 absent_name
+
+let presentpat pat = Aux.pmake (Econstr1pat(present_name, [pat]))
 
 (* implementation of the presence test ? of a signal *)
-let test e = Eapp(Zaux.prime_app,
-                  Zaux.global_in_stdlib "snd"
-                    (maketype [e.e_typ] Initial.typ_bool),
+(* match e with P _ -> true | A -> false *)
+let test e =
+  Eapp { is_inline = false;
+         f = Aux.global_in_stdlib "snd"
+               (maketype [e.e_typ] Initial.typ_bool),
                   [e])
     
 let eq_match total e l = 

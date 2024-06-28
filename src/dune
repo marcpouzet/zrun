@@ -97,6 +97,7 @@
     inline ; inlining of function calls
     der ; remove the initialization and handler part of a derivative equation
     automata ; rewrite automata into match/reset
+    ;present ; rewrite present into match
     rewrite ; compose rewriting steps
   )
   (libraries zrun.global_lib zrun.typdefs_lib zrun.zrun_lib)
