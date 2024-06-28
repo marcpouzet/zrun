@@ -61,6 +61,7 @@
     coiteration ; the main execution loop
     output ; printing
     forloop ; evaluation functions for for loops
+    eval ; evaluation of an expression
     static ; static reduction
   )   	 
   (libraries zrun.parse_lib zrun.global_lib))
@@ -107,7 +108,6 @@
  (name zrun)
   (modes (byte exe))
   (modules 
-    eval ; evaluation of an expression
     zrun ; the main function
   )
   (libraries zrun.parse_lib zrun.global_lib zrun.zrun_lib)
