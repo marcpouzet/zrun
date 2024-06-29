@@ -176,6 +176,8 @@ let present_handlers handlers default_opt =
 let eq_present_handlers handlers default_opt =
   generic_present_handlers Aux.eq_match handlers default_opt
 
+(* [acc] is the set of variables [id] in [eq] that contains an *)
+(* equation [emit id = ...] *)
 let equation funs acc eq =
   let { eq_desc }, acc = funs.equation funs acc eq in
   match eq_desc with

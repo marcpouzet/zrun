@@ -93,24 +93,29 @@ let main ff modname filename source_name otc n_steps =
   let genv0 = Genv.add_module genv0 Primitives.stdlib_env in
   
   (* Associate unique index to variables *)
-  let p = do_step "Scoping done" Debug.print_program Scoping.program p in
+  let p = do_step "Scoping done. See below:" Debug.print_program
+            Scoping.program p in
   (* Write defined variables for equations *)
-  let p = do_step "Write done" Debug.print_program Write.program p in
-
+  let p = do_step "Write done. See below: " Debug.print_program Write.program p in
   (* Source to source transformations start here *)
-  let p = transform_and_compare "Static reduction done" Static.program genv0 p in
-    
+  let p = transform_and_compare "Static reduction done. See below:"
+            Static.program genv0 p in
   (* Inlining *)
   let p = transform_and_compare "Inlining done" Inline.program genv0 p in
-
   (* Normalise derivative equations - remove the handler () *)
-  
+    let p = transform_and_compare
+              "Remove handlers in definitions of derivatives. See below:"
+              Der.program genv0 p in
   let p = transform_and_compare
-            "Remove handlers in definitions of derivatives" Der.program genv0 p in
+            "Translation of automata. See below:" Automata.program genv0 p in
   let _ = transform_and_compare
-            "Translation of automata" Automata.program genv0 p in
+	    "Compilation of memories (fby/pre) into (init/last). See below:"
+	     Pre.program genv0 p in
+  (* let p = transform_and_compare
+            "Compilation of initialization and resets. See below:"
+            Reset.program genv p in *)
   ()
-  (*
+      (*
       let impl_list =
         step "Remove last in pattern. See below:"
              Remove_last_in_patterns.implementation_list impl_list in

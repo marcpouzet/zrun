@@ -62,16 +62,29 @@ let eq_and eq1 eq2 =
   let w = Defnames.union eq1.eq_write eq2.eq_write in
   eqmake w (EQand [eq1; eq2])
 
+let par eq_list =
+  match eq_list with
+  | [] -> assert false
+  | [eq] -> eq
+  | _ -> eqmake (defnames eq_list) (EQand(eq_list))
+
+let vardec id var_is_last var_init var_default =
+  { var_name = id; var_is_last; var_init; var_default; var_clock = false;
+    var_typeconstraint = None; var_loc = no_location }
+
 let block_make vardec_list eq_list =
   let b_body =
     match eq_list with
     | [] -> eqmake Defnames.empty EQempty
     | [eq] -> eq
-    | _ -> eqmake Defnames.empty (EQand(eq_list)) in
+    | _ -> par eq_list in
   let b = { b_vars = vardec_list; b_env = Env.empty; b_loc = no_location;
             b_write = Defnames.empty; b_body } in
-  let b, _, _ = Write.block b in
-  b
+  let w = defnames eq_list in
+  let def = List.fold_left
+              (fun acc { var_name } -> S.add var_name acc) S.empty vardec_list in
+  let w = Defnames.diff w def in
+{ b with b_write = w }
 
 let eq_reset eq e = eqmake eq.eq_write (EQreset(eq, e))
 let eq_match is_total e handlers =
@@ -102,12 +115,6 @@ let eq_ifthen e eq_true =
   let eq_empty = eqmake Defnames.empty EQempty in
   eq_ifthenelse e eq_true eq_empty
     
-let par eq_list =
-  match eq_list with
-  | [] -> assert false
-  | [eq] -> eq
-  | _ -> eqmake (defnames eq_list) (EQand(eq_list))
-
 let rec eq_let_list leq_list eq =
   match leq_list with
   | [] -> eq
@@ -127,6 +134,8 @@ let eq_of_f_arg_arg_make f_arg arg =
   let p = pat_of_vardec_list_make f_arg in
   eq_make p arg
 
+let eq_local b = eqmake b.b_write (EQlocal(b))
+
 let returns_of_vardec_make { var_name } = emake (Evar(var_name))
 
 let returns_of_vardec_list_make vardec_list =
@@ -138,6 +147,8 @@ let e_present handlers default_opt =
    emake (Epresent { handlers; default_opt })
 let e_match is_total e handlers =
   emake (Ematch { is_total; e; handlers })
+
+let e_local b e = emake (Elocal(b, e))
 
 let global lname = Eglobal { lname = lname }
 
