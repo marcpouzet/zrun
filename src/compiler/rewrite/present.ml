@@ -144,6 +144,13 @@ let pattern exps { p_cond; p_body; p_env } =
   { m_pat = pat; m_body = p_body; m_env = Env.empty; m_loc = no_location; 
     m_reset = false; m_zero = true }
 
+(* add a default value for signals. *)
+(* [local ..., x, ...] becomes [local ..., x default A, ...] *)
+let add_absent_vardec acc ({ var_name } as v) =
+  if S.mem var_name acc then
+    { v with var_default = Some(absent) }, S.remove var_name acc
+  else v, acc
+
 (* Translating a present statement *)
 (* a present statement is translated into a pattern-matching *)
 let generic_present_handlers e_match handlers default_opt =
@@ -177,7 +184,7 @@ let equation funs acc eq =
   | EQemit(id, e_opt) ->
   (* [emit id = e] is replaced by [id = P(e)] *)
      let e = match e_opt with | None -> Aux.evoid | Some(e) -> e in
-     Aux.id_eq id (emit e), acc
+     Aux.id_eq id (emit e), S.add id acc
   | _ -> raise Mapfold.Fallback
 
 and expression funs acc e =
@@ -185,12 +192,19 @@ and expression funs acc e =
   match e_desc with
   | Epresent { handlers; default_opt } ->
      present_handlers handlers default_opt, acc
+  | Eop(Etest, [e]) ->
+     test e, acc
   | _ -> raise Mapfold.Fallback
+
+and block funs acc b =
+  let ({ b_vars } as b), acc = funs.block funs acc b in
+  let b_vars, acc = Util.mapfold add_absent_vardec acc b_vars in
+  { b with b_vars }, acc
 
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
     { Mapfold.defaults with equation; expression; global_funs } in
-  let { p_impl_list } as p, acc = Mapfold.program_it funs [] p in
-  { p with p_impl_list = acc @ p_impl_list }
+  let { p_impl_list } as p, _ = Mapfold.program_it funs S.empty p in
+  { p with p_impl_list = p_impl_list }
 
