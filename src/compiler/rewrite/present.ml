@@ -174,6 +174,10 @@ let equation funs acc eq =
   match eq_desc with
   | EQpresent { handlers; default_opt } ->
      eq_present_handlers handlers default_opt, acc
+  | EQemit(id, e_opt) ->
+  (* [emit id = e] is replaced by [id = P(e)] *)
+     let e = match e_opt with | None -> Aux.evoid | Some(e) -> e in
+     Aux.id_eq id (emit e), acc
   | _ -> raise Mapfold.Fallback
 
 and expression funs acc e =
