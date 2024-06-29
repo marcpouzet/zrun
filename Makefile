@@ -24,5 +24,8 @@ clean:
 wc:
 	(cd src; wc global/*.ml \
 	parsing/parsetree.ml parsing/*.mll \
-	zrun/*.ml)
+	zrun/*.ml \
+	compiler/tydefs/*.ml \
+	compiler/rewrite/*.ml \
+	compiler/main/*.ml)
 

@@ -111,9 +111,12 @@ let main ff modname filename source_name otc n_steps =
   let p = transform_and_compare
 	    "Compilation of memories (fby/pre) into (init/last). See below:"
 	     Pre.program genv0 p in
-  let _ = transform_and_compare
+  let p = transform_and_compare
             "Compilation of initialization and resets. See below:"
             Reset.program genv0 p in
+  let _ = transform_and_compare
+            "Un-nesting of let/in and blocks. See below:"
+            Letin.program genv p in
   ()
       (*
       let impl_list =
