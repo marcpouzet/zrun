@@ -12,16 +12,45 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* Applied to normalized expressions and equations *)
-(* compiling the initialization [->], [initial clock] and [init x = ...] *)
-(* Introduce an initialization bit [init i = true and i = false] *)
-(* per control block when the block contains [init x = e] and *)
-(* [e] is not static *)
+(* removes the initialization operator [e1 -> e2] *)
+(* This operator is equivalent to [if (true fby false) then e1 else e2] *)
+(* that is [if last i then e1 else e2] with [init i = true and i = false] *)
+(* An initialization register [i] with [init i = true and i = false] *)
+(* is introduced for every control block *)
 
 open Misc
 open Location
 open Ident
 open Zelus
+open Mapfold
+
+(*
+  [reset
+   ... init x = e ... (* [e] is static *)
+   every z]
+
+  is unchanged
+
+  [reset
+   ... init x = e ... (* [e] is not static *)
+   every z
+
+   is rewritten:
+
+   reset
+   ... local i init and i = false and reset init x = e every last i
+   every z] is unchanged
+
+   match e with
+   | P1 -> eq1 | ... | Pn -> eqn
+
+   is rewritten:
+
+   match e with
+   | P1 -> local i1 init true and i1 = false and eq1
+   | ...
+   | Pn -> local in init true and in = false and eqn
+*)
 
 (* Static expressions - simple sufficient condition for [e] to be static *)
 let rec static { e_desc = desc } =
@@ -33,104 +62,68 @@ let rec static { e_desc = desc } =
   | Erecord_access { arg } -> static arg
   | _ -> false
 
-let intro = function None -> Zident.fresh "i" | Some(i) -> i
+type acc = { i: Ident.t; } (* the initialization variable *)
 
 (* Surround an equation by a reset *)
-let reset i_opt eq =
-  let equation i =
-    { eq with eq_desc = EQreset([eq], last i Initial.typ_bool) } in
-  let i = intro i_opt in
-  equation i, Some(i)
+let reset_init i eq = Aux.eq_reset eq (Aux.last i)
 
-(* Build a boolean condition from the initialization bit. *)
-let condition i_opt = let i = intro i_opt in last i Initial.typ_bool, Some(i)
+(* Introduce a block [local i init true do i = false and eq] *)
+let intro_init_eq_local i eq =
+  Aux.eq_local (Aux.block_make [Aux.vardec i false (Some(Aux.etrue)) None]
+                  [Aux.eq_and (Aux.id_eq i Aux.efalse) eq])
 
-(* Introduce an equation [init i = true and i = false] *)
-let intro_equation (i_names, i_opt) eq_list =
-  match i_opt with
-  | None -> eq_list, i_names
-  | Some(i) -> Zaux.init i eq_list, i :: i_names
-			 
-(* Introduce the declaration for every name in [i_names] *)
-let intro (i_names, i_opt) n_list env eq_list =
-  let add (acc_n_list, acc_env_list) i =
-    (Zaux.vardec i) :: acc_n_list,
-    Env.add i (Deftypes.entry Deftypes.memory Initial.typ_bool) acc_env_list in
-  let eq_list, i_names = intro_equation (i_names, i_opt) eq_list in
-  let n_list, env = List.fold_left add (n_list, env) i_names in
-  n_list, env, eq_list
+(* Introduce a block [local m, i init true do m = last i and i = false in e] *)
+let intro_init_e_local i e =
+  let m = fresh "m" in
+  Aux.e_local (Aux.block_make [Aux.vardec m false None None;
+                               Aux.vardec i false (Some(Aux.etrue)) None]
+                 [Aux.id_eq m (Aux.last i); Aux.id_eq i (Aux.efalse)]) e
 
-(** Translation of equations. *)
-(* If the equation contains an initialization with an non static *)
-(* value, introduce a fresh initialization variable [i] *)
-let rec equation (i_names, i_opt) ({ eq_desc = desc } as eq) =
-  match desc with
-  | EQeq(p, ({ e_desc = Eop(Eminusgreater, [e1; e2]) } as e)) ->
-     (* [e1 -> e2 = if last i then e1 else e2] *)
-     let cond, i_opt = condition i_opt in
-     { eq with eq_desc =
-		 EQeq(p,
-		      { e with e_desc = Eop(Eifthenelse, [cond; e1; e2]) }) },
-     (i_names, i_opt)
-  | EQeq({ p_desc = Evarpat(x) } as p, { e_desc = Eop(Einitial, []) })
-    -> (* [initial = true fby false] *)
-     let cond, i_opt = condition i_opt in
-     { eq with eq_desc = EQeq(p, cond) }, (i_names, i_opt)
-  | EQeq _ | EQpluseq _ | EQder _ -> eq, (i_names, i_opt)
-  | EQinit(x, e) ->
-     if static e then eq, (i_names, i_opt)
-     else let eq, i_opt = reset i_opt eq in eq, (i_names, i_opt)
-  | EQmatch(total, e, m_h_list) ->
-     let m_h_list =
-       List.map (fun ({ m_body = b } as m_h) -> { m_h with m_body = block b })
-		m_h_list in
-     { eq with eq_desc = EQmatch(total, e, m_h_list) }, (i_names, i_opt)
-  | EQreset(res_eq_list, e) ->
-     let res_eq_list, i_names_i_opt =
-       equation_list (i_names, None) res_eq_list in
-     let res_eq_list, i_names = intro_equation i_names_i_opt res_eq_list in
-     { eq with eq_desc = EQreset(res_eq_list, e) }, (i_names, i_opt)
-  | EQand(and_eq_list) ->
-     let and_eq_list, i_names_i_opt =
-       equation_list (i_names, i_opt) and_eq_list in
-     { eq with eq_desc = EQand(and_eq_list) }, i_names_i_opt
-  | EQbefore(before_eq_list) ->
-     let before_eq_list, i_names_i_opt =
-       equation_list (i_names, i_opt) before_eq_list in
-     { eq with eq_desc = EQbefore(before_eq_list) }, i_names_i_opt
-  | EQforall ({ for_body = b_eq_list } as body) ->
-     let b_eq_list = block b_eq_list in
-     { eq with eq_desc = EQforall { body with for_body = b_eq_list } },
-     (i_names, i_opt)
-  | EQblock _ | EQemit _ | EQnext _ | EQautomaton _ | EQpresent _ ->
-						       assert false
-
-and equation_list i_names_i_opt eq_list =
-  Zmisc.map_fold equation i_names_i_opt eq_list
-
-and local ({ l_eq = eq_list; l_env = l_env } as l) =
-  let eq_list, i_names_i_opt = equation_list ([], None) eq_list in
-  let _, l_env, eq_list = intro i_names_i_opt [] l_env eq_list in
-  { l with l_eq = eq_list; l_env = l_env }
-
-(** Translation of blocks *)
-and block ({ b_vars = n_list; b_body = eq_list; b_env = n_env } as b) =
-  let eq_list, i_names_i_opt = equation_list ([], None) eq_list in
-  let n_list, n_env, eq_list = intro i_names_i_opt n_list n_env eq_list in
-  { b with b_vars = n_list; b_body = eq_list; b_env = n_env }
+(* Equations *)
+let equation funs acc ({ eq_desc } as eq) =
+  match eq_desc with
+  | EQmatch { e; handlers } ->
+     let body acc ({ m_body } as m_h) =
+       (* introduce one init per branch *)
+       let i = Ident.fresh "i" in
+       let m_body, _ = funs.equation funs { i } m_body in
+       { m_h with m_body = intro_init_eq_local i m_body }, acc in
+     let e, acc = funs.expression funs acc e in
+     let handlers, acc =
+       Util.mapfold body acc handlers in
+       { eq with eq_desc = EQmatch { is_total = true; e; handlers } }, acc
+  | _ -> raise Mapfold.Fallback
 
 (** Expressions. *)
-let exp ({ e_desc = desc } as e) =
-  let desc =
-    match desc with
-    | Elet(l, e) -> Elet(local l, e)
-    | _ -> desc in
-  { e with e_desc = desc }
+let expression funs ({ i } as acc) ({ e_desc } as e) =
+  let e_desc, acc = match e_desc with
+  | Eop(Eminusgreater, [e1; e2]) ->
+     let e1, acc = funs.expression funs acc e1 in
+     let e2, acc = funs.expression funs acc e2 in
+     (* [if last i then e1 else e2] *)
+     Eop(Eifthenelse, [Aux.last i; e1; e2]), acc
+    | Ematch({ e; handlers } as m) ->
+       let body acc ({ m_body } as m_h) =
+       (* introduce one init per branch *)
+       let i = Ident.fresh "i" in
+       let m_body, _ = funs.expression funs { i } m_body in
+       { m_h with m_body = intro_init_e_local i m_body }, acc in
+     let e, acc = funs.expression funs acc e in
+     let handlers, acc =
+       Util.mapfold body acc handlers in
+     Ematch { m with e; handlers }, acc
+    | _ -> e_desc, acc in
+  { e with e_desc }, acc
  
-let implementation impl =
-  match impl.desc with
-  | Efundecl(n, ({ f_kind = D | C; f_body = e } as body)) ->
-     { impl with desc = Efundecl(n, { body with f_body = exp e }) }
-  | Eopen _ | Etypedecl _ | Econstdecl _ | Efundecl _ -> impl
+let set_index funs acc n =
+  let _ = Ident.set n in n, acc
+let get_index funs acc n = Ident.get (), acc
 
-let implementation_list impl_list = Zmisc.iter implementation impl_list
+let program _ p =
+  let global_funs = Mapfold.default_global_funs in
+  let funs =
+    { Mapfold.defaults with expression; set_index; get_index; global_funs } in
+  let { p_impl_list } as p, _ =
+    Mapfold.program_it funs { i = Ident.fresh "i" } p in
+  { p with p_impl_list = p_impl_list }
+
