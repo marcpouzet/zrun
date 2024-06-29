@@ -210,13 +210,13 @@ let automaton acc is_weak handlers state_opt =
     let handlers = List.map strong handlers in
     let handler_to_compute_current_state_list,
         handler_for_current_active_state_list = List.split handlers in
-    [eq_match (state_last state_name)
+    [eq_match true (state_last state_name)
               (List.map
                  (fun (m_pat, m_body) ->
                    { m_pat; m_body; m_env = Env.empty; m_loc = no_location;
                      m_reset = false; m_zero = false })
                  handler_to_compute_current_state_list);
-     eq_match (state_var state_name)
+     eq_match true (state_var state_name)
        (List.map (fun (m_pat, m_body) ->
             { m_pat; m_body; m_env = Env.empty; m_loc = no_location;
               m_reset = false; m_zero = false })
@@ -224,7 +224,7 @@ let automaton acc is_weak handlers state_opt =
   (* the code for automatama with weak transitions *)
   let weak_automaton handlers =
     let handlers = List.map weak handlers in
-    [eq_match (state_last state_name)
+    [eq_match true (state_last state_name)
               (List.map
                  (fun (m_pat, m_body) ->
                    { m_pat; m_body; m_env = Env.empty; m_loc = no_location;
