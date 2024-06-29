@@ -74,11 +74,11 @@ let block_make vardec_list eq_list =
   b
 
 let eq_reset eq e = eqmake eq.eq_write (EQreset(eq, e))
-let eq_match e handlers =
+let eq_match is_total e handlers =
   let w = List.fold_left
             (fun acc { m_body = { eq_write } } -> Defnames.union eq_write acc)
             Defnames.empty handlers in
-  eqmake w (EQmatch { is_total = true; e; handlers })
+  eqmake w (EQmatch { is_total; e; handlers })
 let eq_present handlers default_opt =
   let w = List.fold_left
             (fun acc { p_body = { eq_write } } -> Defnames.union eq_write acc)
@@ -133,6 +133,11 @@ let returns_of_vardec_list_make vardec_list =
   match vardec_list with
   | [] -> emake (Econst(Evoid))
   | _ -> emake (Etuple(List.map returns_of_vardec_make vardec_list))
+
+let e_present handlers default_opt =
+   emake (Epresent { handlers; default_opt })
+let e_match is_total e handlers =
+  emake (Ematch { is_total; e; handlers })
 
 let global lname = Eglobal { lname = lname }
 
