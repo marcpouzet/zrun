@@ -108,12 +108,12 @@ let main ff modname filename source_name otc n_steps =
               Der.program genv0 p in
   let p = transform_and_compare
             "Translation of automata. See below:" Automata.program genv0 p in
-  let _ = transform_and_compare
+  let p = transform_and_compare
 	    "Compilation of memories (fby/pre) into (init/last). See below:"
 	     Pre.program genv0 p in
-  (* let p = transform_and_compare
+  let _ = transform_and_compare
             "Compilation of initialization and resets. See below:"
-            Reset.program genv p in *)
+            Reset.program genv0 p in
   ()
       (*
       let impl_list =
