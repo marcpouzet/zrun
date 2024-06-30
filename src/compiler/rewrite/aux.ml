@@ -34,10 +34,31 @@ let emake desc =
   { e_desc = desc; e_loc = no_location; e_info = no_info }
 let pmake desc =
   { pat_desc = desc; pat_loc = no_location; pat_info = no_info }
-let eqmake w desc =
-  { eq_desc = desc; eq_loc = no_location; eq_write = w }
+
 
 let global lname = Eglobal { lname = lname }
+let const c = emake (Econst c)
+let constr0 lname = emake (Econstr0 { lname })
+let constr1 lname arg_list = emake (Econstr1 { lname; arg_list })
+let evoid = const Evoid
+let efalse = const (Ebool(false))
+let etrue = const (Ebool(true))
+let truepat = pmake (Econstpat(Ebool(true)))
+let falsepat = pmake (Econstpat(Ebool(false)))
+let wildpat = pmake (Ewildpat)
+let zero = emake (Econst(Efloat(0.0)))
+let one = emake (Econst(Efloat(1.0)))
+let minus_one = emake (Econst(Efloat(-1.0)))
+let infinity = emake (global (Modname(Initial.stdlib_name "infinity")))
+let tuplepat pat_list = pmake (Etuplepat(pat_list))
+let tuple e_list = emake (Etuple(e_list))
+let record l_list e_list =
+  emake (Erecord(List.map2 (fun label arg -> { label; arg }) l_list e_list))
+let ifthenelse e e_true e_false =
+  emake (Eop(Eifthenelse, [e_true; e_false]))
+
+let eqmake w desc =
+  { eq_desc = desc; eq_loc = no_location; eq_write = w }
 
 let pat_make x =
   { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
@@ -49,6 +70,9 @@ let eq_make p e =
 let id_eq id e =
   let w = Defnames.singleton id in
   eqmake w (EQeq(pat_make id, e))
+
+let wildpat_eq e =
+  eqmake Defnames.empty (EQeq(wildpat, e))
 
 let eq_init id e =
   let eq = eqmake (Defnames.singleton id) (EQinit(id, e)) in
@@ -150,27 +174,6 @@ let e_match is_total e handlers =
 
 let e_local b e = emake (Elocal(b, e))
 
-let global lname = Eglobal { lname = lname }
-
-let const c = emake (Econst c)
-let constr0 lname = emake (Econstr0 { lname })
-let constr1 lname arg_list = emake (Econstr1 { lname; arg_list })
-let evoid = const Evoid
-let efalse = const (Ebool(false))
-let etrue = const (Ebool(true))
-let truepat = pmake (Econstpat(Ebool(true)))
-let falsepat = pmake (Econstpat(Ebool(false)))
-let wildpat = pmake (Ewildpat)
-let zero = emake (Econst(Efloat(0.0)))
-let one = emake (Econst(Efloat(1.0)))
-let minus_one = emake (Econst(Efloat(-1.0)))
-let infinity = emake (global (Modname(Initial.stdlib_name "infinity")))
-let tuplepat pat_list = pmake (Etuplepat(pat_list))
-let tuple e_list = emake (Etuple(e_list))
-let record l_list e_list =
-  emake (Erecord(List.map2 (fun label arg -> { label; arg }) l_list e_list))
-let ifthenelse e e_true e_false =
-  emake (Eop(Eifthenelse, [e_true; e_false]))
 let eq_ifthen e eq_true =
   let eq_empty = eqmake Defnames.empty EQempty in
   eq_ifthenelse e eq_true eq_empty
