@@ -116,7 +116,7 @@ let main ff modname filename source_name otc n_steps =
             Reset.program genv0 p in
   let _ = transform_and_compare
             "Un-nesting of let/in and blocks. See below:"
-            Letin.program genv p in
+            Letin.program genv0 p in
   ()
       (*
       let impl_list =
