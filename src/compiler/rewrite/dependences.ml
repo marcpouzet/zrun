@@ -17,28 +17,28 @@ open Zelus
 open Ident
 open Defnames
 open Graph
+open Vars
 
 type 'a collection =
   | And of 'a collection list (* parallel set of equations *)
   | Then of 'a collection list (* sequentiel set of equations *)
   | Leaf of 'a
 
-let fv_eq _ _ eq = Ident.S.empty, Ident.S.empty
-let fv _ _ e = Ident.S.empty, Ident.S.empty
+let fv_eq eq = Vars.equation eq
+let fv (last_acc, acc) e = Vars.expression (last_acc, acc) e
 
 (** Read/writes of an equation. *)
 (* Control structures are treated as atomic blocks. Their set of write *)
-(* variables is removed the set of read variables *)
+(* variables is removed from the set of read variables *)
 let read ({ eq_write; eq_desc } as eq) =
   let open Ident in
-  let last_acc, acc =
-    fv_eq S.empty (S.empty, S.empty) eq in
+  let last_acc, acc = fv_eq eq in
   match eq_desc with
   | EQmatch { e } | EQreset(_, e) ->
       let w = Defnames.names S.empty eq_write in
       let last_acc = S.diff last_acc w in
       let acc = S.diff acc w in
-      fv S.empty (last_acc, acc) e
+      fv (last_acc, acc) e
   | _ -> last_acc, acc
        
 let def { eq_write = { dv; di } } =

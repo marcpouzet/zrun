@@ -131,7 +131,7 @@ type ('a, 'info) it_funs =
       ('a, 'info) it_funs -> 'a -> name -> name * 'a;
   }
 
-(** Build a renaming from an environment *)
+(** Build from an environment *)
 let rec build_it funs acc env =
   try funs.build funs acc env
   with Fallback -> build funs acc env

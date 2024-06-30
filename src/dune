@@ -105,6 +105,7 @@
     letin ; un-nesting of let/in and blocks
     complete ; complete equations with [der x = 0.0]
     graph ; representation of acyclic graphs
+    vars ; read variables
     dependences ; data-dependences between equations
     control ; fusion of control dependences
     schedule ; static scheduling
