@@ -307,7 +307,7 @@ let sizefun_defs_or_values genv env l_eq =
                               s_body = sf_e; s_genv = genv; 
                               s_env = env } acc,
                  one_value)
-    | EQand(eq_list) ->
+    | EQand { eq_list } ->
        fold split (acc, one_value) eq_list
     | EQempty -> 
        return (acc, one_value)
@@ -637,7 +637,7 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
           else let* seq_false = ieq is_fun genv env eq_false in
           return (Slist [Sstatic(Vbool(false)); Sempty; seq_false]) in
      return s
-  | EQand(eq_list) ->
+  | EQand { eq_list } ->
      let* seq_list = map (ieq is_fun genv env) eq_list in
      return (Slist seq_list)
   | EQlocal(b_eq) ->
@@ -1631,7 +1631,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
                Fix.by eq_loc env env_false (names eq_write) in
              return (env_false, [s_eq_true; s_eq_false]) in
       return (env_eq, Slist (se :: s_list))
-  | EQand(eq_list), Slist(s_list) ->
+  | EQand { eq_list }, Slist(s_list) ->
      let seq genv env acc eq s =
        let* env_eq, s = seq genv env eq s in
        let* acc = merge eq_loc env_eq acc in
