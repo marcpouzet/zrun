@@ -52,20 +52,6 @@ let add_par eq ({ c_eq } as ctx) =
 let add_vardec vardec_list ({ c_vardec } as ctx) =
   { ctx with c_vardec = State.Cons(vardec_list, c_vardec) }
 				   				      
-let optional f e_opt =
-  match e_opt with
-    | None -> None, { c_vardec = State.Empty; c_eq = State.Empty }
-    | Some(e) -> let e, ctx = f e in Some(e), ctx
-
-let par_fold f l =
-  Util.mapfold
-    (fun { c_vardec; c_eq } x ->
-     let y, { c_vardec = v_y; c_eq = c_eq_y } = f x in
-     y, { c_vardec = State.par c_vardec v_y; c_eq = State.par c_eq c_eq_y })
-    { c_vardec = State.Empty; c_eq = State.Empty } l
-
-let before = Aux.par
-
 (* translate a context [ctx] into an environment and an equation *)
 let equations eqs =
   (* computes the set of sequential equations *)
@@ -87,7 +73,7 @@ let equations eqs =
     | State.Seq(eqs1, eqs2) ->
        let seq_eq_list = seq eqs2 [] in
        let seq_eq_list = seq eqs1 seq_eq_list in
-       before seq_eq_list :: eq_list
+       Aux.seq seq_eq_list :: eq_list
     | State.Par(eqs1, eqs2) ->
        par (par eq_list eqs1) eqs2 in
   par [] eqs
@@ -114,19 +100,20 @@ let rec expression funs _ e =
 (** Translate an equation. *)
 and equation funs acc { eq_desc = desc } =
   match desc with 
-  | EQand(eq_list) ->
-     let _, ctx = par_equation_list funs empty eq_list in
+  | EQand { ordered; eq_list } ->
+     let _, ctx = equation_list funs ordered eq_list in
      eqmake Defnames.empty EQempty, ctx
   | EQlocal { b_vars; b_body } ->
      let _, ctx_body = equation funs empty b_body in
      empty_eq, add_vardec b_vars ctx_body
   | _ -> raise Mapfold.Fallback
 
-and par_equation_list funs acc eq_list =
+and equation_list funs ordered eq_list =
+  let compose = if ordered then seq else par in
   Util.mapfold
     (fun ctx eq ->
       let _, ctx_eq = equation funs empty eq in
-      empty_eq, par ctx ctx_eq) empty eq_list
+      empty_eq, compose ctx ctx_eq) empty eq_list
 
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
