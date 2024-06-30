@@ -571,9 +571,9 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
     | EQlocal(eq_b) ->
        let eq_b, acc = block_it funs acc eq_b in
        { eq with eq_desc = EQlocal(eq_b) }, acc
-    | EQand(eq_list) ->
+    | EQand({ eq_list } as a) ->
        let eq_list, acc = Util.mapfold (equation_it funs) acc eq_list in
-       { eq with eq_desc = EQand(eq_list) }, acc
+       { eq with eq_desc = EQand { a with eq_list } }, acc
     | EQpresent({ handlers; default_opt }) ->
        let body acc ({ p_cond; p_body; p_env } as p_b) =
          let p_env, acc = build_it funs.global_funs acc p_env in
