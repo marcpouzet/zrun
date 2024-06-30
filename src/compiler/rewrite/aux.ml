@@ -129,8 +129,6 @@ let eq_present handlers default_opt =
     | NoDefault -> w | Init(eq) | Else(eq) -> Defnames.union eq.eq_write w in
   eqmake w (EQpresent { handlers; default_opt })
     
-let eq_local b = eqmake b.b_write (EQlocal(b))
-
 let match_handler p b =
   { m_pat = p; m_body = b; m_env = Env.empty;
     m_reset = false; m_zero = false; m_loc = no_location }

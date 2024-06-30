@@ -12,7 +12,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* free variables, defined variables. Writes must be correct *)
+(* free variables, defined variables. Writes and env. domains must be correct *)
 
 open Ident
 open Zelus

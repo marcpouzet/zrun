@@ -115,11 +115,14 @@ let main ff modname filename source_name otc n_steps =
             "Compilation of initialization and resets. See below:"
             Reset.program genv0 p in
   let p = transform_and_compare
-            "Un-nesting of let/in and blocks. See below:"
-            Letin.program genv0 p in
-  let p = transform_and_compare
             "Complete equations with [der x = 0.0]. See below:"
             Complete.program genv0 p in
+  (* let p = transform_and_compare
+            "Add an extra discrete step for weak transitions. See below:"
+            Encore.program genv0 p in *)
+  let p = transform_and_compare
+            "Un-nesting of let/in and blocks. See below:"
+            Letin.program genv0 p in
   let _ = transform_and_compare
             "Static scheduling. See below:"
             Schedule.program genv0 p in 

@@ -102,8 +102,8 @@
     present ; rewrite present into match
     pre ; rewrite fby/fby into (init/last)
     reset ; rewrite -> and resets
-    letin ; un-nesting of let/in and blocks
     complete ; complete equations with [der x = 0.0]
+    letin ; un-nesting of let/in and blocks
     graph ; representation of acyclic graphs
     vars ; read variables
     dependences ; data-dependences between equations
