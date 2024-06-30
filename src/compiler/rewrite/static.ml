@@ -45,13 +45,8 @@ type 'a env =
 (* declarations *)
 
 (* add global definitions in the list of global declarations of the module *)
-let pat id = 
-  { pat_desc = Evarpat(id); pat_loc = no_location; pat_info = no_info }
-let eq id e =
-  { eq_desc = EQeq(pat id, e); eq_loc = Location.no_location;
-    eq_write = Defnames.singleton id }
 let leq id e = 
-  { l_rec = false; l_kind = Kstatic; l_eq = eq id e; 
+  { l_rec = false; l_kind = Kstatic; l_eq = Aux.id_eq id e; 
     l_loc = Location.no_location; l_env = Env.singleton id no_info }
 let impl name id e = 
     { desc = Eletdecl { d_names = [name, id]; d_leq = leq id e };
@@ -96,10 +91,9 @@ let pvalue loc c_env =
   catch c_env
 
 let no_leq loc =
-  { l_loc = loc;
-    l_kind = Kstatic; 
-    l_rec = false;
-    l_eq = { eq_desc = EQempty; eq_write = Defnames.empty; eq_loc = loc }; 
+  { l_loc = loc; l_kind = Kstatic;l_rec = false;
+    l_eq = { eq_desc = EQempty; eq_write = Defnames.empty;
+             eq_loc = loc; eq_index = -1; eq_safe = true }; 
     l_env = Ident.Env.empty }
 
 let rename_t ({ e_renaming } as acc) x = 
@@ -416,9 +410,9 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
     | EQlocal(eq_b) ->
        let eq_b, acc = block acc eq_b in
        { eq with eq_desc = EQlocal(eq_b) }, acc
-    | EQand(eq_list) ->
+    | EQand({ eq_list } as a) ->
        let eq_list, acc = Util.mapfold equation acc eq_list in
-       { eq with eq_desc = EQand(eq_list) }, acc
+       { eq with eq_desc = EQand { a with eq_list } }, acc
     | EQpresent({ handlers; default_opt }) ->
        let body acc ({ p_cond; p_body; p_env } as p_b) =
          let p_env, acc = build acc p_env in
