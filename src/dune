@@ -62,7 +62,6 @@
     output ; printing
     forloop ; evaluation functions for for loops
     eval ; evaluation of an expression
-    static ; static reduction
   )   	 
   (libraries zrun.parse_lib zrun.global_lib))
 
@@ -96,6 +95,7 @@
     state ; the data structure to represent a state
     mapfold ; generic mapfold
     aux ; auxiliary functions for building terms
+    static ; static reduction
     inline ; inlining of function calls
     der ; remove the initialization and handler part of a derivative equation
     automata ; rewrite automata into match/reset
@@ -103,6 +103,11 @@
     pre ; rewrite fby/fby into (init/last)
     reset ; rewrite -> and resets
     letin ; un-nesting of let/in and blocks
+    complete ; complete equations with [der x = 0.0]
+    graph ; representation of acyclic graphs
+    dependences ; data-dependences between equations
+    control ; fusion of control dependences
+    schedule ; static scheduling
     rewrite ; compose rewriting steps
   )
   (libraries zrun.global_lib zrun.typdefs_lib zrun.zrun_lib)
