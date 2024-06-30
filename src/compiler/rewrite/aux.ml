@@ -58,7 +58,8 @@ let ifthenelse e e_true e_false =
   emake (Eop(Eifthenelse, [e_true; e_false]))
 
 let eqmake w desc =
-  { eq_desc = desc; eq_loc = no_location; eq_write = w }
+  { eq_desc = desc; eq_loc = no_location; eq_write = w;
+    eq_safe = true; eq_index = -1 }
 
 let pat_make x =
   { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
@@ -84,13 +85,16 @@ let eq_der id e =
 
 let eq_and eq1 eq2 =
   let w = Defnames.union eq1.eq_write eq2.eq_write in
-  eqmake w (EQand [eq1; eq2])
+  eqmake w (EQand { ordered = false; eq_list = [eq1; eq2] })
 
-let par eq_list =
+let par ordered eq_list =
   match eq_list with
-  | [] -> assert false
+  | [] -> eqmake Defnames.empty EQempty
   | [eq] -> eq
-  | _ -> eqmake (defnames eq_list) (EQand(eq_list))
+  | _ -> eqmake (defnames eq_list) (EQand { ordered; eq_list })
+
+let seq eq_list = par true eq_list
+let par eq_list = par false eq_list
 
 let vardec id var_is_last var_init var_default =
   { var_name = id; var_is_last; var_init; var_default; var_clock = false;
