@@ -497,8 +497,9 @@ and equation ff ({ eq_desc = desc } as eq) =
   | EQlet(l_eq, eq) ->
      fprintf ff "@[<hov0>%a@,in@ %a@]" leq l_eq equation eq
   | EQlocal(b_eq) -> block_of_equation ff b_eq
-  | EQand(and_eq_list) ->
-     print_list_l equation "do " "and " " done" ff and_eq_list
+  | EQand { ordered; eq_list } ->
+     let a = if ordered then "and then" else "and" in
+     print_list_l equation "do " a " done" ff eq_list
   | EQempty -> fprintf ff "()"
   | EQassert(e) ->
      fprintf ff "@[<hov2>assert %a@]" expression e

@@ -81,13 +81,13 @@ let rec equation ({ eq_desc } as eq)=
     | EQreset(eq, e) ->
        let eq, def = equation eq in
        EQreset(eq, expression e), def
-    | EQand(and_eq_list) ->
-       let and_eq_list, def =
+    | EQand({ eq_list } as a) ->
+       let eq_list, def =
          Util.mapfold
            (fun acc eq ->
              let eq, def = equation eq in eq, Defnames.union def acc)
-           Defnames.empty and_eq_list in
-       EQand(and_eq_list), def
+           Defnames.empty eq_list in
+       EQand { a with eq_list }, def
     | EQlocal(b_eq) ->
        let b_eq, def_eq, _ = block b_eq in
        EQlocal(b_eq), def_eq

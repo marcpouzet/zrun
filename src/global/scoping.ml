@@ -406,9 +406,9 @@ let rec equation env_pat env { desc; loc } =
        let eq = equation env_pat env eq in
        let e = expression env e in
        Ast.EQreset(eq, e)
-    | EQand(and_eq_list) ->
-       let and_eq_list = List.map (equation env_pat env) and_eq_list in
-       Ast.EQand(and_eq_list)
+    | EQand(eq_list) ->
+       let eq_list = List.map (equation env_pat env) eq_list in
+       Ast.EQand { ordered = false; eq_list }
     | EQlocal(v_list, eq) ->
        let v_list, env_v_list = vardec_list env v_list in
        let env_pat = Env.append env_v_list env_pat in
@@ -466,7 +466,8 @@ let rec equation env_pat env { desc; loc } =
        Ast.EQforloop(forloop_eq env_pat env f)
   in
   (* set the names defined in the equation *)
-  { Ast.eq_desc = eq_desc; Ast.eq_write = Defnames.empty; Ast.eq_loc = loc }
+  { Ast.eq_desc = eq_desc; Ast.eq_write = Defnames.empty; Ast.eq_loc = loc;
+  Ast.eq_safe = true; Ast.eq_index = -1 }
 
 and trans_for_input env acc i_list =
   let input acc { desc; loc } =

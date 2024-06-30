@@ -280,6 +280,8 @@ and 'info leq =
 and 'info eq =
   { eq_desc: 'info eq_desc; (* descriptor *)
     mutable eq_write: Defnames.defnames; (* set of defined variables *)
+    eq_index: int; (* a unique index; used to build a partial order between eqs *)
+    eq_safe: bool; (* the equation calls a possibly unsafe computation *)
     eq_loc: Location.t; (* its location *)
   }
 
@@ -296,7 +298,9 @@ and 'info eq_desc =
   (* [if e then eq1 else eq2] *)
   | EQif : { e: 'info exp; eq_true: 'info eq; eq_false: 'info eq } -> 
       'info eq_desc 
-  | EQand : 'info eq list -> 'info eq_desc (* [eq1 and...and eqn] *)
+  | EQand : { ordered: bool; eq_list: 'info eq list } -> 'info eq_desc
+  (* [eq1 and...and eqn] when [ordered], side effects must be done *)
+  (* in order, from left to right *)
   | EQlocal : ('info, 'info exp, 'info eq) block -> 
       'info eq_desc (* local x [...] do eq done *)
   | EQlet : 'info leq * 'info eq -> 'info eq_desc (* let eq in eq *)
