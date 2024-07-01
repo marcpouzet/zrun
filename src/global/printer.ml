@@ -487,7 +487,7 @@ and equation ff ({ eq_desc = desc } as eq) =
      fprintf ff "@[<hov0>if %a@ then %a@ else %a@]"
        expression e equation eq_true equation eq_false
   | EQpresent { handlers; default_opt } ->
-     fprintf ff "@[<hov0>present@ @[%a@]@%a]"
+     fprintf ff "@[<hov0>present@ @[%a@]@ %a@]"
        (print_list_l
 	  (present_handler (scondpat expression) equation) """""") handlers
        (with_default equation) default_opt
