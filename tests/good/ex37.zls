@@ -1,0 +1,4 @@
+let f(x) returns (o)
+  match x with
+  | true -> o = 1 | false -> o = 2
+	
