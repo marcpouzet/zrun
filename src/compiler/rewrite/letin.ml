@@ -83,29 +83,33 @@ let rec expression funs _ e =
   let { e_desc }, acc = Mapfold.expression funs empty e in
   match e_desc with
   | Elet(l, e_let) ->
-     let _, ctx_l = funs.leq_t funs empty l in
-     let e_let, ctx_e_let = funs.expression funs empty e_let in
+     let _, ctx_l = Mapfold.leq_t funs empty l in
+     let e_let, ctx_e_let = Mapfold.expression funs empty e_let in
      e_let, seq ctx_l ctx_e_let
   | Elocal({ b_vars; b_body }, e) ->
-     let _, ctx_body = equation funs empty b_body in
-     let e, ctx_e = expression funs empty e in
+     let _, ctx_body = Mapfold.equation funs empty b_body in
+     let e, ctx_e = Mapfold.expression funs empty e in
      e, seq (add_vardec b_vars ctx_body) ctx_e
   | Eop(Eseq, [e1; e2]) ->
      (* [e1; e2] is a short-cut for [let _ = e1 in e2] *)
-     let e1, ctx1 = expression funs empty e1 in
-     let e2, ctx2 = expression funs empty e2 in
+     let e1, ctx1 = Mapfold.expression funs empty e1 in
+     let e2, ctx2 = Mapfold.expression funs empty e2 in
      e2, seq ctx1 (add_seq (Aux.wildpat_eq e1) ctx2)
   | _ -> raise Mapfold.Fallback
-				    
+
+and leq_t funs _ ({ l_eq } as leq) =
+  let l_eq, ctx = Mapfold.equation funs empty l_eq in
+  { leq with l_eq }, ctx
+                       
 (** Translate an equation. *)
 and equation funs acc eq =
-  let { eq_desc }, acc = Mapfold.equation funs acc eq in
+  let ({ eq_desc } as eq), acc = Mapfold.equation funs acc eq in
   match eq_desc with 
   | EQand { ordered; eq_list } ->
      let _, ctx = equation_list funs ordered eq_list in
      eqmake Defnames.empty EQempty, ctx
   | EQlocal { b_vars; b_body } ->
-     let _, ctx_body = equation funs empty b_body in
+     let _, ctx_body = Mapfold.equation funs empty b_body in
      empty_eq, add_vardec b_vars ctx_body
   | _ -> raise Mapfold.Fallback
 
@@ -113,13 +117,13 @@ and equation_list funs ordered eq_list =
   let compose = if ordered then seq else par in
   Util.mapfold
     (fun ctx eq ->
-      let _, ctx_eq = equation funs empty eq in
+      let _, ctx_eq = Mapfold.equation funs empty eq in
       empty_eq, compose ctx ctx_eq) empty eq_list
 
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
-    { Mapfold.defaults with expression; equation; global_funs } in
+    { Mapfold.defaults with expression; equation; leq_t; global_funs } in
   let { p_impl_list } as p, _ =
     Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }

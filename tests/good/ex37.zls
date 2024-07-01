@@ -1,4 +1,11 @@
 let f(x) returns (o)
-  match x with
-  | true -> o = 1 | false -> o = 2
+   local y
+   do
+    local m do y = 2 and m = y done
+   and
+    o = let m = (let z = 1 in
+                 z + 1)
+        in let h = m + 1 in
+           h + m
+   done
 	
