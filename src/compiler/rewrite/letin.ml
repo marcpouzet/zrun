@@ -79,13 +79,16 @@ let equations eqs =
   par [] eqs
 
 (* Translation of expressions *)
-let rec expression funs _ e =
-  let { e_desc }, acc = Mapfold.expression funs empty e in
+(* [expression funs { c_vardec; c_eq } e = [e', { c_vardec'; c_eq'}] *)
+(* such that [local c_vardec do c_eq in e] and [local c_vardec' do c_eq' in e'] *)
+(* are equivalent *)
+let rec expression funs acc e =
+  let { e_desc }, acc = Mapfold.expression funs acc e in
   match e_desc with
   | Elet(l, e_let) ->
-     let _, ctx_l = Mapfold.leq_t funs empty l in
-     let e_let, ctx_e_let = Mapfold.expression funs empty e_let in
-     e_let, seq ctx_l ctx_e_let
+     let l, acc_l = Mapfold.leq_t funs acc l in
+     let e_let, acc = Mapfold.expression funs acc_l e_let in
+     e_let, acc
   | Elocal({ b_vars; b_body }, e) ->
      let _, ctx_body = Mapfold.equation funs empty b_body in
      let e, ctx_e = Mapfold.expression funs empty e in
@@ -97,28 +100,35 @@ let rec expression funs _ e =
      e2, seq ctx1 (add_seq (Aux.wildpat_eq e1) ctx2)
   | _ -> raise Mapfold.Fallback
 
-and leq_t funs _ ({ l_eq } as leq) =
+and leq_t funs acc ({ l_eq } as leq) =
   let l_eq, ctx = Mapfold.equation funs empty l_eq in
-  { leq with l_eq }, ctx
+  { leq with l_eq = empty_eq }, add_seq l_eq acc
                        
-(** Translate an equation. *)
+(* Translate an equation. *)
+(* [equation funs { c_vardec; c_eq } eq = [eq', { c_vardec'; c_eq'}] *)
+(* such that [local c_vardec do c_eq and eq] and [local c_vardec' do c_eq' and e']*)
+(* are equivalent *)
 and equation funs acc eq =
   let ({ eq_desc } as eq), acc = Mapfold.equation funs acc eq in
   match eq_desc with 
   | EQand { ordered; eq_list } ->
-     let _, ctx = equation_list funs ordered eq_list in
-     eqmake Defnames.empty EQempty, ctx
+     let _, acc = equation_list funs ordered acc eq_list in
+     eqmake Defnames.empty EQempty, acc
   | EQlocal { b_vars; b_body } ->
-     let _, ctx_body = Mapfold.equation funs empty b_body in
-     empty_eq, add_vardec b_vars ctx_body
-  | _ -> raise Mapfold.Fallback
+     let _, acc = Mapfold.equation funs acc b_body in
+     empty_eq, add_vardec b_vars acc
+  | EQlet(leq, eq) ->
+     let _, acc = Mapfold.leq_t funs acc leq in
+     let b, acc = Mapfold.equation funs acc eq in
+     empty_eq, acc
+  | _ -> empty_eq, add_seq eq acc
 
-and equation_list funs ordered eq_list =
+and equation_list funs ordered acc eq_list =
   let compose = if ordered then seq else par in
   Util.mapfold
-    (fun ctx eq ->
-      let _, ctx_eq = Mapfold.equation funs empty eq in
-      empty_eq, compose ctx ctx_eq) empty eq_list
+    (fun acc eq ->
+      let _, acc_eq = Mapfold.equation funs empty eq in
+      empty_eq, compose acc acc_eq) acc eq_list
 
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
