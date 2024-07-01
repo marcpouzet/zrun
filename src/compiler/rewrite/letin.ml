@@ -82,33 +82,39 @@ let equations eqs =
 (* [expression funs { c_vardec; c_eq } e = [e', { c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq in e] and [local c_vardec' do c_eq' in e'] *)
 (* are equivalent *)
-let rec expression funs acc e =
+let expression funs acc e =
   let { e_desc }, acc = Mapfold.expression funs acc e in
   match e_desc with
   | Elet(l, e_let) ->
-     let l, acc_l = Mapfold.leq_t funs acc l in
-     let e_let, acc = Mapfold.expression funs acc_l e_let in
+     let l, acc = Mapfold.leq_t funs acc l in
+     let e_let, acc = Mapfold.expression funs acc e_let in
      e_let, acc
   | Elocal({ b_vars; b_body }, e) ->
-     let _, ctx_body = Mapfold.equation funs empty b_body in
-     let e, ctx_e = Mapfold.expression funs empty e in
-     e, seq (add_vardec b_vars ctx_body) ctx_e
+     let _, acc = Mapfold.equation funs acc b_body in
+     let e, acc = Mapfold.expression funs acc e in
+     e, add_vardec b_vars acc
   | Eop(Eseq, [e1; e2]) ->
      (* [e1; e2] is a short-cut for [let _ = e1 in e2] *)
-     let e1, ctx1 = Mapfold.expression funs empty e1 in
-     let e2, ctx2 = Mapfold.expression funs empty e2 in
-     e2, seq ctx1 (add_seq (Aux.wildpat_eq e1) ctx2)
-  | _ -> raise Mapfold.Fallback
+     let e1, acc = Mapfold.expression funs acc e1 in
+     let e2, acc = Mapfold.expression funs acc e2 in
+     e2, add_seq (Aux.wildpat_eq e1) acc
+  | _ -> e, acc
 
 and leq_t funs acc ({ l_eq } as leq) =
-  let l_eq, ctx = Mapfold.equation funs empty l_eq in
+  let l_eq, acc = Mapfold.equation funs acc l_eq in
   { leq with l_eq = empty_eq }, add_seq l_eq acc
-                       
+
+(*
+  let funexp funs acc f =
+  let { f_args; f_body; f_env } as f, acc = Mapfold.funexp funs acc f in
+  { f with f_body = doin acc f_body }, empty
+ *)
+
 (* Translate an equation. *)
 (* [equation funs { c_vardec; c_eq } eq = [eq', { c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq and eq] and [local c_vardec' do c_eq' and e']*)
 (* are equivalent *)
-and equation funs acc eq =
+let rec equation funs acc eq =
   let ({ eq_desc } as eq), acc = Mapfold.equation funs acc eq in
   match eq_desc with 
   | EQand { ordered; eq_list } ->
