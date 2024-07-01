@@ -197,7 +197,7 @@ let block exp body ff { b_vars; b_body; b_write; b_env } =
        body b_body
 
 let match_handler body ff { m_pat; m_body; m_reset; m_zero; m_env } =
-  fprintf ff "@[<hov 4>| %a@ %a -> %s%s@,%a@]"
+  fprintf ff "@[<hov 4>| %a@ %a -> %s%s@ %a@]"
     pattern m_pat
     print_env_names m_env
     (if m_reset then "(* reset *)" else "")

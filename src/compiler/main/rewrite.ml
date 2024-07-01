@@ -107,6 +107,8 @@ let main ff modname filename source_name otc n_steps =
   let p = transform_and_compare
             "Translation of automata. See below:" Automata.program genv0 p in
   let p = transform_and_compare
+            "Translation of present. See below:" Present.program genv0 p in
+  let p = transform_and_compare
 	    "Compilation of memories (fby/pre) into (init/last). See below:"
 	     Pre.program genv0 p in
   let p = transform_and_compare

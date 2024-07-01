@@ -179,7 +179,7 @@ let eq_present_handlers handlers default_opt =
 (* [acc] is the set of variables [id] in [eq] that contains an *)
 (* equation [emit id = ...] *)
 let equation funs acc eq =
-  let { eq_desc }, acc = funs.equation funs acc eq in
+  let { eq_desc }, acc = Mapfold.equation funs acc eq in
   match eq_desc with
   | EQpresent { handlers; default_opt } ->
      eq_present_handlers handlers default_opt, acc
@@ -190,7 +190,7 @@ let equation funs acc eq =
   | _ -> raise Mapfold.Fallback
 
 and expression funs acc e =
-  let { e_desc }, acc = funs.expression funs acc e in
+  let { e_desc }, acc = Mapfold.expression funs acc e in
   match e_desc with
   | Epresent { handlers; default_opt } ->
      present_handlers handlers default_opt, acc
@@ -199,7 +199,7 @@ and expression funs acc e =
   | _ -> raise Mapfold.Fallback
 
 and block funs acc b =
-  let ({ b_vars } as b), acc = funs.block funs acc b in
+  let ({ b_vars } as b), acc = Mapfold.block funs acc b in
   let b_vars, acc = Util.mapfold add_absent_vardec acc b_vars in
   { b with b_vars }, acc
 
