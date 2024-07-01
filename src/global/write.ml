@@ -102,9 +102,10 @@ let rec equation ({ eq_desc } as eq)=
        let def = Defnames.union def_true def_false in
        EQif { e; eq_true; eq_false }, def
     | EQmatch({ e; handlers } as m) ->
-       let match_handler acc ({ m_body } as m) =
+       let match_handler acc ({ m_pat; m_body } as m) =
          let m_body, def_body = equation m_body in
-         let m_env = build_from_defnames def_body in
+         let fv = fv_pat S.empty m_pat in
+         let m_env = build_from_names fv in
          { m with m_body = m_body; m_env }, Defnames.union acc def_body in
        let e = expression e in
        let handlers, def =
@@ -117,9 +118,10 @@ let rec equation ({ eq_desc } as eq)=
          Util.mapfold automaton_handler empty handlers in
        EQautomaton({ a_h with handlers; state_opt }), def
     | EQpresent({ handlers; default_opt }) ->
-       let present_handler acc ({ p_body } as p) =
+       let present_handler acc ({ p_cond; p_body } as p) =
          let p_body, def_body = equation p_body in
-         let p_env = build_from_defnames def_body in
+         let p_cond, dv_cond = scondpat S.empty p_cond in
+         let p_env = build_from_names dv_cond in
          { p with p_body = p_body; p_env }, Defnames.union acc def_body in
        let handlers, def =
          Util.mapfold present_handler Defnames.empty handlers in
@@ -174,7 +176,7 @@ and leq ({ l_eq } as l) =
   let l_env = build_from_defnames def in
   { l with l_eq; l_env }
 
-(** [returns a new block whose body is an equation [eq];
+(* [returns a new block whose body is an equation [eq];
  *- [def] the defined variables in [eq] that are not local;
  *- [dv_b] the defined local variables *)
 and block ({ b_vars; b_body } as b) =
