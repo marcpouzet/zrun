@@ -14,7 +14,7 @@
 
 (* An horizon [local horizon h default infinity] with and equation *)
 (* [h = 0.0] is added in every branch activated on a zero-crossing *)
-(* if it write a non local state variable *)
+(* which writes a non local state variable *)
 (* match e with | P1 -> (* zero *) x = ... | Pn -> ... *)
 (* into:  match e with | P1 -> do h = 0.0 and x = ... | ... *)
 

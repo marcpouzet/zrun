@@ -80,7 +80,8 @@ let intro_init_e_local i e =
                  [Aux.id_eq m (Aux.last i); Aux.id_eq i (Aux.efalse)]) e
 
 (* Equations *)
-let equation funs acc ({ eq_desc } as eq) =
+let equation funs acc eq =
+  let { eq_desc } as eq, acc = Mapfold.equation funs acc eq in
   match eq_desc with
   | EQmatch { e; handlers } ->
      let body acc ({ m_body } as m_h) =
@@ -95,7 +96,8 @@ let equation funs acc ({ eq_desc } as eq) =
   | _ -> raise Mapfold.Fallback
 
 (** Expressions. *)
-let expression funs ({ i } as acc) ({ e_desc } as e) =
+let expression funs acc e =
+  let ({ e_desc } as e), ({ i } as acc) = Mapfold.expression funs acc e in
   let e_desc, acc = match e_desc with
   | Eop(Eminusgreater, [e1; e2]) ->
      let e1, acc = funs.expression funs acc e1 in

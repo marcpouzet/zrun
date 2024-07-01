@@ -41,10 +41,12 @@ let present id e0_opt handlers eq =
 let equation funs acc eq =
   let { eq_desc }, acc = Mapfold.equation funs acc eq in
   match eq_desc with
-    | EQder { id; e; e_opt; handlers } -> 
+  | EQder { e_opt = None; handlers = [] } ->
+     eq, acc
+  | EQder { id; e; e_opt; handlers } -> 
        let eq = present id e_opt handlers (Aux.eq_der id e) in
        eq, acc
-    | _ -> raise Mapfold.Fallback
+  | _ -> raise Mapfold.Fallback
 
 let program genv0 p =
   let global_funs = Mapfold.default_global_funs in

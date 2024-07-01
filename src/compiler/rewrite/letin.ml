@@ -80,7 +80,7 @@ let equations eqs =
 
 (* Translation of expressions *)
 let rec expression funs _ e =
-  let { e_desc }, acc = funs.expression funs empty e in
+  let { e_desc }, acc = Mapfold.expression funs empty e in
   match e_desc with
   | Elet(l, e_let) ->
      let _, ctx_l = funs.leq_t funs empty l in
@@ -98,8 +98,9 @@ let rec expression funs _ e =
   | _ -> raise Mapfold.Fallback
 				    
 (** Translate an equation. *)
-and equation funs acc { eq_desc = desc } =
-  match desc with 
+and equation funs acc eq =
+  let { eq_desc }, acc = Mapfold.equation funs acc eq in
+  match eq_desc with 
   | EQand { ordered; eq_list } ->
      let _, ctx = equation_list funs ordered eq_list in
      eqmake Defnames.empty EQempty, ctx

@@ -241,7 +241,7 @@ let equation funs acc eq =
   let eq, acc = Mapfold.equation funs acc eq in
   match eq.eq_desc with
   | EQautomaton { is_weak; handlers; state_opt } ->
-    automaton acc is_weak handlers state_opt
+     automaton acc is_weak handlers state_opt
   | _ -> raise Mapfold.Fallback
          
 let set_index funs acc n =

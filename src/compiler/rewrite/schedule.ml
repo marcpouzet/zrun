@@ -79,8 +79,8 @@ let schedule eq =
     Format.eprintf "Scheduling: unexpected cycle: equations cannot be scheduled";
     raise Misc.Error  
 
-let leq_t funs acc ({ l_eq } as leq) =
-  let l_eq, acc = funs.equation funs acc l_eq in
+let leq_t funs acc leq =
+  let { l_eq } as leq, acc = Mapfold.leq_t funs acc leq in
   let l_eq = Aux.seq (schedule l_eq) in
   { leq with l_eq }, acc
 

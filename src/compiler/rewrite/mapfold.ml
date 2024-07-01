@@ -68,67 +68,70 @@ exception Fallback
 
 let stop funs _ _ = raise Fallback
 
-type ('a, 'info) global_it_funs =
+type ('a, 'info1, 'info2) global_it_funs =
   {
-    build :  ('a, 'info) global_it_funs -> 'a ->
-            'info Ident.Env.t -> 'info Ident.Env.t * 'a;
+    build :  ('a, 'info1, 'info2) global_it_funs -> 'a ->
+            'info1 Ident.Env.t -> 'info2 Ident.Env.t * 'a;
     var_ident :
-      ('a, 'info) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
     typevar :
-      ('a, 'info) global_it_funs -> 'a -> name -> name * 'a;
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> name -> name * 'a;
     typeconstr :
-      ('a, 'info) global_it_funs -> 'a -> Lident.t -> Lident.t * 'a;
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> Lident.t -> Lident.t * 'a;
     type_expression :
-      ('a, 'info) global_it_funs -> 'a ->
+      ('a, 'info1, 'info2) global_it_funs -> 'a ->
       type_expression -> type_expression * 'a;
     typedecl :
-      ('a, 'info) global_it_funs -> 'a ->
+      ('a, 'info1, 'info2) global_it_funs -> 'a ->
       ((name * name list * name list * type_decl) as 'ty) -> 'ty * 'a;
     kind :
-      ('a, 'info) global_it_funs -> 'a -> kind -> kind * 'a;
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> kind -> kind * 'a;
     interface :
-      ('a, 'info) global_it_funs -> 'a -> interface -> interface * 'a;
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> interface -> interface * 'a;
     size_t :
-      ('a, 'info) global_it_funs -> 'a -> size -> size * 'a;
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> size -> size * 'a;
   }
 
-type ('a, 'info) it_funs =
+type ('a, 'info1, 'info2) it_funs =
   {
-    global_funs : ('a, 'info) global_it_funs;
-    pattern : ('a, 'info) it_funs -> 'a -> 'info pattern -> 'info pattern * 'a;
+    global_funs : ('a, 'info1, 'info2) global_it_funs;
+    pattern : ('a, 'info1, 'info2) it_funs -> 'a ->
+              'info1 pattern -> 'info2 pattern * 'a;
     write_t :
-      ('a, 'info) it_funs -> 'a -> defnames -> defnames * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> defnames -> defnames * 'a;
     leq_t :
-      ('a, 'info) it_funs -> 'a -> 'info leq -> 'info leq * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 leq -> 'info2 leq * 'a;
     equation :
-      ('a, 'info) it_funs -> 'a -> 'info eq -> 'info eq * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 eq -> 'info2 eq * 'a;
     scondpat :
-      ('a, 'info) it_funs -> 'a -> 'info scondpat -> 'info scondpat * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a ->
+      'info1 scondpat -> 'info2 scondpat * 'a;
     expression :
-      ('a, 'info) it_funs -> 'a -> 'info exp -> 'info exp * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 exp -> 'info2 exp * 'a;
     vardec :
-      ('a, 'info) it_funs -> 'a -> 'info exp vardec -> 'info exp vardec * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a ->
+      'info1 exp vardec -> 'info2 exp vardec * 'a;
     block :
-      ('a, 'info) it_funs -> 'a ->
-      ('info, 'info exp, 'info eq) block ->
-      ('info, 'info exp, 'info eq) block * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a ->
+      ('info1, 'info1 exp, 'info1 eq) block ->
+      ('info2, 'info2 exp, 'info2 eq) block * 'a;
     result :
-      ('a, 'info) it_funs -> 'a -> 'info result -> 'info result * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 result -> 'info2 result * 'a;
     funexp :
-      ('a, 'info) it_funs -> 'a -> 'info funexp -> 'info funexp * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 funexp -> 'info2 funexp * 'a;
     last :
-      ('a, 'info) it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> Ident.t -> Ident.t * 'a;
     implementation :
-      ('a, 'info) it_funs -> 'a ->
-      'info implementation -> 'info implementation * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a ->
+      'info1 implementation -> 'info2 implementation * 'a;
     program :
-      ('a, 'info) it_funs -> 'a -> 'info program -> 'info program * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 program -> 'info2 program * 'a;
     get_index :
-     ('a, 'info) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
+     ('a, 'info1, 'info2) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
     set_index :
-      ('a, 'info) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
     open_t :
-      ('a, 'info) it_funs -> 'a -> name -> name * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> name -> name * 'a;
   }
 
 (** Build from an environment *)

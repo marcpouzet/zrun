@@ -97,13 +97,11 @@ let main ff modname filename source_name otc n_steps =
             Scoping.program p in
   (* Write defined variables for equations *)
   let p = do_step "Write done. See below: " Debug.print_program Write.program p in
-  (* Source to source transformations start here *)
+  (* Source-to-source transformations start here *)
   let p = transform_and_compare "Static reduction done. See below:"
             Static.program genv0 p in
-  (* Inlining *)
   let p = transform_and_compare "Inlining done" Inline.program genv0 p in
-  (* Normalise derivative equations - remove the handler () *)
-    let p = transform_and_compare
+  let p = transform_and_compare
               "Remove handlers in definitions of derivatives. See below:"
               Der.program genv0 p in
   let p = transform_and_compare

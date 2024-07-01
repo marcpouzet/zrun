@@ -34,7 +34,7 @@ let complete { der = der_global} ({ eq_desc; eq_write } as eq) =
   Aux.par eq_list
 
 let equation funs acc eq =
-  let { eq_desc; eq_write } as eq, acc = funs.equation funs acc eq in
+  let { eq_desc; eq_write } as eq, acc = Mapfold.equation funs acc eq in
   match eq_desc with
   | EQif { e; eq_true; eq_false } ->
      let eq_true = complete eq_write eq_true in
