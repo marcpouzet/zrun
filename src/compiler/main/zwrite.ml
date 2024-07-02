@@ -54,7 +54,23 @@ let doc_check =
   "<n> \t Check equivalence for that amount of steps"
 and doc_inlining_level = "<n> \t Level of inlining"
 and doc_inline_all = "\t Inline all function calls"
-                  
+and doc_set_steps = "\t Option to control source-to-source rewriting steps\n\
+    \t\t +<s> turn on step s\n\
+    \t\t -<s> turn off step s\n\
+    \t\t s can be: +a: takes all; -a: takes none\n\
+    \t\t static: static reduction \n\
+    \t\t inline: inlining \n\
+    \t\t der: normalize derivative \n\
+    \t\t copylast: add copies for lasts \n\
+    \t\t auto: remove automata statements \n\
+    \t\t present: remove present statements \n\
+    \t\t pre: remove pre/fby \n\
+    \t\t reset: normalise resets; remove initialization (->) \n\
+    \t\t complete: complete branches \n\
+    \t\t encore: add an extra step when a zero-crossing \n\
+    \t\t change a discrete-time state variable \n\
+    \t\t letin: fuse blocks \n\
+    \t\t schedule: static scheduling"
 let errmsg = "Options are:"
 
 
@@ -75,6 +91,7 @@ let main () =
            "-check", Arg.Int set_equivalence_checking, doc_check;
            "-inline", Arg.Int Misc.set_inlining_level, doc_inlining_level;
            "-inlineall", Arg.Set inline_all, doc_inline_all;
+           "-step", Arg.String Rewrite.set_steps, doc_set_steps;
       ])
       main
       errmsg

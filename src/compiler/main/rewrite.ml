@@ -66,23 +66,7 @@ let do_step comment output step input =
   output o;
   o
 
-(* option to control source-to-source transformations *)
-(* option -step +<flag> -step -<flag> *)
-(* flag can be:
-   static: static reduction
-   inline: inlining
-   der: normalize derivative
-   copylast: add copies for lasts
-   auto: remove automata statements
-   present: remove present statements
-   pre: remove pre/fby
-   reset: normalise resets; remove ->
-   complete: complete branches
-   encore: add an extra step when a zero-crossing change a state variable
-   letin: fuse blocks
-   schedule: static scheduling *)
-
-let default_rewrite_list =
+let default_list =
   ["static", "Static reduction done. See below:",
    Static.program;
    "inline", "Inlining done. See below:",
@@ -107,6 +91,28 @@ let default_rewrite_list =
    Letin.program;
    "schedule", "Static scheduling. See below:",
    Schedule.program]
+
+(* select the rewritting steps *)
+module S = Set.Make (String)
+let s_all = List.fold_left (fun acc (s, _, _) -> S.add s acc) S.empty default_list
+let s_set = ref s_all
+let step_list = ref s_all
+let set_steps w =
+  let pref = String.sub w 0 1 in
+  let suf = String.sub w 1 (String.length w-1) in
+  let p = match pref with
+    | "+" -> true | "-" -> false | s -> raise (Arg.Bad ("unknown prefix " ^ s)) in
+  s_set :=
+    match suf with
+    | "a" -> if p then s_all else S.empty
+    | _ -> let s = match suf with
+             | "static" | "inline" | "der" | "copylast"
+               | "auto" | "present" | "pre" | "reset"
+               | "complete" | "encore" | "letin" | "schedule" -> suf
+               | _ -> raise (Arg.Bad ("unknown pass " ^ suf)) in
+           if p then S.add s !s_set else S.remove s !s_set
+let rewrite_list () =
+  List.filter (fun (w, _, _) -> S.mem w !s_set) default_list
 
 let compare n_steps genv0 p p' =
   let genv = Coiteration.program genv0 p in
@@ -148,5 +154,5 @@ let main ff modname filename source_name otc n_steps =
   let p = do_step "Write done. See below: "
       Debug.print_program Write.program p in
   (* Source-to-source transformations start here *)
-  let _ = iter genv0 default_rewrite_list p in
+  let _ = iter genv0 (rewrite_list ()) p in
   ()
