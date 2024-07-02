@@ -68,9 +68,10 @@ and doc_set_steps = "\t Option to control source-to-source rewriting steps\n\
     \t\t reset: normalise resets; remove initialization (->) \n\
     \t\t complete: complete branches \n\
     \t\t encore: add an extra step when a zero-crossing \n\
-    \t\t change a discrete-time state variable \n\
+    \t\t\t change a discrete-time state variable \n\
     \t\t letin: fuse blocks \n\
-    \t\t schedule: static scheduling"
+    \t\t schedule: static scheduling \n\
+    \t\t Example: -step -a -step +inline -step +static"
 let errmsg = "Options are:"
 
 
