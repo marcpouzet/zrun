@@ -66,6 +66,47 @@ let do_step comment output step input =
   output o;
   o
 
+    (* option to control source-to-source transformations *)
+    (* option -step +<flag> -step -<flag> *)
+    (* flag can be:
+       auto: remove automata statements;
+       present: remove present
+       reset
+       der
+       pre
+       copylast
+       complete
+       letin
+       schedule
+
+       with the partial order: letin < schedule, auto < present, reset *)
+
+let default_rewrite_list =
+  ["static", "Static reduction done. See below:",
+   Static.program;
+   "inline", "Inlining done. See below:",
+   Inline.program;
+   "der", "Remove handlers in definitions of derivatives. See below:",
+   Der.program;
+   "copylast", "Add a copy for [last x] to remore false cycles. See below:",
+   Copylast.program;
+   "auto", "Translation of automata. See below:",
+   Automata.program;
+   "present", "Translation of present. See below:",
+   Present.program;
+   "pre", "Compilation of memories (fby/pre) into (init/last). See below:",
+   Pre.program;
+   "reset", "Compilation of initialization and resets. See below:",
+   Reset.program;
+   "complete", "Complete equations with [der x = 0.0]. See below:",
+   Complete.program;
+   (* "encore", "Add an extra discrete step for weak transitions. See below:",
+    Encore.program; *)
+   "letin", "Un-nesting of let/in and blocks. See below:",
+   Letin.program;
+   "schedule", "Static scheduling. See below:",
+   Schedule.program]
+
 let compare n_steps genv0 p p' =
   let genv = Coiteration.program genv0 p in
   let genv' = Coiteration.program genv0 p' in
@@ -80,6 +121,13 @@ let main ff modname filename source_name otc n_steps =
     Debug.print_program p';
     if n_steps = 0 then p' else compare n_steps genv p p' in
     
+  let rec iter genv l p =
+    match l with
+    | [] -> p
+    | (_, comment, transform) :: l ->
+       let p = transform_and_compare comment transform genv p in
+       iter genv l p in
+  
   (* set the current opened module *)
   Location.initialize source_name;
 
@@ -99,119 +147,5 @@ let main ff modname filename source_name otc n_steps =
   let p = do_step "Write done. See below: "
       Debug.print_program Write.program p in
   (* Source-to-source transformations start here *)
-  let p = transform_and_compare "Static reduction done. See below:"
-            Static.program genv0 p in
-  let p = transform_and_compare "Inlining done" Inline.program genv0 p in
-  let p = transform_and_compare
-              "Remove handlers in definitions of derivatives. See below:"
-              Der.program genv0 p in
-  let p =
-    transform_and_compare
-      "Add a copy for [last x] to remore false cycles. See below:"
-      Copylast.program genv0 p in
-  let p = transform_and_compare
-            "Translation of automata. See below:" Automata.program genv0 p in
-  let p = transform_and_compare
-            "Translation of present. See below:" Present.program genv0 p in
-  let p = transform_and_compare
-	    "Compilation of memories (fby/pre) into (init/last). See below:"
-	     Pre.program genv0 p in
-  let p = transform_and_compare
-            "Compilation of initialization and resets. See below:"
-            Reset.program genv0 p in
-  let p = transform_and_compare
-            "Complete equations with [der x = 0.0]. See below:"
-            Complete.program genv0 p in
-  (* let p = transform_and_compare
-            "Add an extra discrete step for weak transitions. See below:"
-            Encore.program genv0 p in *)
-  let p = transform_and_compare
-            "Un-nesting of let/in and blocks. See below:"
-            Letin.program genv0 p in
-  let _ = transform_and_compare
-            "Static scheduling. See below:"
-            Schedule.program genv0 p in 
+  let _ = iter genv0 default_rewrite_list p in
   ()
-      (*
-      let impl_list =
-        step "Remove last in pattern. See below:"
-             Remove_last_in_patterns.implementation_list impl_list in
-      let impl_list =
-        step "Add a copy for [last x] to remore false cycles. See below:"
-             Add_copy_for_last.implementation_list impl_list in
-      let impl_list =
-        step "Translation of automata done. See below:"
-             Automata.implementation_list impl_list in
-      let impl_list =
-        step "Translation of activations done. See below:"
-             Activate.implementation_list impl_list in
-      let impl_list =
-        step "Translation of present done. See below:"
-             Present.implementation_list impl_list in
-      let impl_list =
-        step "Translation of periods done. See below:"
-             Period.implementation_list impl_list in
-      let impl_list =
-        step "Translation of disc done. See below:"
-             Disc.implementation_list impl_list in
-      let impl_list =
-        step "Translation of probabilistic nodes. See below:"
-             Proba.implementation_list impl_list in
-      let impl_list =
-        step
-          "Compilation of memories (fby/pre/next) into (init/last). See below:"
-             Pre.implementation_list impl_list in
-      let impl_list =
-        step "Un-nest let/in blocks. See below:"
-             Letin.implementation_list impl_list in
-      let impl_list =
-        step "Compilation of initialization and resets done. See below:"
-             Reset.implementation_list impl_list in
-      let impl_list =
-        step "Actualize write variables in blocks. See below:"
-             Write.implementation_list impl_list in
-      let impl_list =
-        step "Complete equations with [der x = 0.0]. See below:"
-            Complete.implementation_list impl_list in
-     let impl_list =
-        step "Add an extra discrete step for weak transitions. See below:"
-            Encore.implementation_list impl_list in
-     let impl_list =
-        step "Gather all horizons into a single one per function. See below:"
-            Horizon.implementation_list impl_list in
-     let impl_list =
-       step "Translation into A-normal form. See below:"
-            Aform.implementation_list impl_list in
-     let impl_list =
-        step "Actualize write variables in blocks. See below:"
-             Write.implementation_list impl_list in
-     let impl_list =
-       step "Naming shared variables and memories done. See below:"
-            Shared.implementation_list impl_list in
-     let impl_list =
-       step "Common sub-expression elimination. See below:"
-            Cse.implementation_list impl_list in
-     let impl_list =
-       step "Sharing of zero-crossings. See below:"
-            Zopt.implementation_list impl_list in
-     let impl_list =
-       step "Actualize write variables in blocks. See below:"
-            Write.implementation_list impl_list in
-     let impl_list =
-       if not !no_opt && not !no_deadcode
-       then step "Deadcode removal. See below:"
-                 Zdeadcode.implementation_list impl_list
-       else impl_list in
-     let impl_list =
-       step "Static scheduling done. See below:"
-            Schedule.implementation_list impl_list in
-     let impl_list =
-       if not !no_opt && not !no_deadcode
-       then
-         let impl_list =
-           step "Removing of copy variables done. See below:"
-                Copy.implementation_list impl_list in
-         step "Deadcode removal. See below:"
-              Zdeadcode.implementation_list impl_list
-       else impl_list in
-     *)
