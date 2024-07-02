@@ -34,7 +34,7 @@ let empty_eq = eqmake Defnames.empty EQempty
 
 (* a structure to represent nested equations before they are turned into *)
 (* Zelus equations *)
-type 'a ctx =
+type 'a acc =
   { c_vardec: 'a exp vardec list State.t;
     c_eq: 'a eq State.t }
 
@@ -52,7 +52,7 @@ let add_par eq ({ c_eq } as ctx) =
 let add_vardec vardec_list ({ c_vardec } as ctx) =
   { ctx with c_vardec = State.Cons(vardec_list, c_vardec) }
 				   				      
-(* translate a context [ctx] into an environment and an equation *)
+(* translate a context [acc] into an environment and an equation *)
 let equations eqs =
   (* computes the set of sequential equations *)
   let rec seq eqs eq_list =
@@ -78,6 +78,12 @@ let equations eqs =
        par (par eq_list eqs1) eqs2 in
   par [] eqs
 
+(* build an equation [local vardec_list do eq done] from [acc] *)
+let local { c_vardec; c_eq } =
+  let vardec_list = State.fold (@) c_vardec [] in
+  let eq = equations c_eq in
+  eq_local (block_make vardec_list eq)     
+  
 (* Translation of expressions *)
 (* [expression funs { c_vardec; c_eq } e = [e', { c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq in e] and [local c_vardec' do c_eq' in e'] *)
@@ -106,7 +112,7 @@ and leq_t funs acc ({ l_eq } as leq) =
 
 (*
   let funexp funs acc f =
-  let { f_args; f_body; f_env } as f, acc = Mapfold.funexp funs acc f in
+  let { f_args; f_body; f_env } as f, acc = Mapfold.funexp funs empty f in
   { f with f_body = doin acc f_body }, empty
  *)
 
