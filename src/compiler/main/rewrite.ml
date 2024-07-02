@@ -96,7 +96,8 @@ let main ff modname filename source_name otc n_steps =
   let p = do_step "Scoping done. See below:" Debug.print_program
             Scoping.program p in
   (* Write defined variables for equations *)
-  let p = do_step "Write done. See below: " Debug.print_program Write.program p in
+  let p = do_step "Write done. See below: "
+      Debug.print_program Write.program p in
   (* Source-to-source transformations start here *)
   let p = transform_and_compare "Static reduction done. See below:"
             Static.program genv0 p in
@@ -104,10 +105,10 @@ let main ff modname filename source_name otc n_steps =
   let p = transform_and_compare
               "Remove handlers in definitions of derivatives. See below:"
               Der.program genv0 p in
-  (* let p =
+  let p =
     transform_and_compare
       "Add a copy for [last x] to remore false cycles. See below:"
-      Copylast.program genv0 p in *)
+      Copylast.program genv0 p in
   let p = transform_and_compare
             "Translation of automata. See below:" Automata.program genv0 p in
   let p = transform_and_compare

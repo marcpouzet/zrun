@@ -12,41 +12,69 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* add an equation [lx = last* x] for every variable declared in block *)
-(* of equations and replace [last x] by lx *)
-(* this step is necessary to make static scheduling possible. It may *)
-(* introduce useless copies. *)
+(* Add an equation [m = x] every time [last x] is used; replace [last x] *)
+(* by [last* m]. This step is necessary for static scheduling *)
 
 open Location
 open Zelus
 open Ident
 open Aux
 
-type acc = { renaming : Ident.t Env.t; (* associate names to names *) }
+type acc = Ident.t Env.t (* associate names to names *)
 
-(* Make an equation [lx = last x] *)
-let eq_last lx x = Aux.id_eq lx (Aux.last_star x)
+(* Make an equation [m = x] *)
+let eq_copy (x, m) = Aux.id_eq m (Aux.var x)
 
+(* [remove l_env acc = renaming, acc'] extract entries in [acc] from [l_env] *)
+let remove l_env acc =
+  Env.fold
+    (fun x _ (renaming_list, acc) ->
+       try
+         let m = Env.find x acc in
+         (x, m) :: renaming_list, Env.remove x acc
+       with Not_found -> renaming_list, acc)
+    l_env ([], acc)
+      
 (* replace occurrences of [last x] by [lx] *)
 let expression funs acc e =
   let { e_desc }, acc = Mapfold.expression funs acc e in
-  let e_desc = match e_desc with
+  let e_desc, acc = match e_desc with
     | Elast { copy; id } ->
        if copy then
-         try Evar(Env.find id acc.renaming) with Not_found -> e_desc
-       else e_desc
-    | Eleq(l, e) ->
-    | Elocal(b, e) ->
+         try (* if [id] is already in [acc] an associated to [m] *)
+           (* replace [last id] by [last*m] *)
+           let m = Env.find id acc in
+           Elast { copy = false; id = m }, acc
+         with Not_found ->
+           let m = fresh "m" in
+           Elast { copy = false; id = m },
+           Env.add id m acc
+       else e_desc, acc
     | _ -> raise Mapfold.Fallback in
-  { e with e_desc = e_desc }
-    
-(** Translation of equations. *)
-and equation funs acc eq =
+  { e with e_desc = e_desc }, acc
+
+let leq_t funs acc leq =
+  let { l_eq; l_env } as leq, acc = Mapfold.leq_t funs acc leq in
+  (* for every entry [x\m] in [l_acc] that appear in [l_env] *)
+  (* add an equation [m = x]; update [l_env] and [l_eq.eq_write] *)
+  let renaming_list, acc = remove l_env acc in
+  { leq with l_eq = Aux.par (l_eq :: List.map eq_copy renaming_list);
+             l_env = List.fold_left
+                 (fun acc (x, m) -> Env.add m Misc.no_info acc) l_env
+                 renaming_list }, acc
+  
+(* Translation of equations. *)
+let equation funs acc eq =
   let { eq_desc }, acc = Mapfold.equation funs acc eq in
-  match eq_desc with
-  | EQlocal(b) -> 
-  | EQlet(l, eq) ->
-  | _ -> raise Mapfold.Fallback  
+  let eq_desc, acc = match eq_desc with
+    | EQlocal(b) ->
+       let b, acc = block b acc in EQlocal(b), acc
+    | EQlet(l, eq) ->
+       let l, acc = leq_t l acc in
+       let e, acc = Mapfold.expression funs acc e in
+       EQlet(l, eq), acc
+    | _ -> raise Mapfold.Fallback in
+  { eq with eq_desc }, acc
 									  
 and equation_list subst eq_list = List.map (equation subst) eq_list
 						 
