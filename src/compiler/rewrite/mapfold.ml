@@ -414,9 +414,9 @@ and expression funs acc ({ e_desc; e_loc } as e) =
   | Evar(x) ->
      let x, acc = var_ident_it funs.global_funs acc x in
      { e with e_desc = Evar(x) }, acc
-  | Elast(x) ->
-     let x, acc = last_it funs acc x in
-     { e with e_desc = Elast(x) }, acc
+  | Elast({ id } as l) ->
+     let id, acc = last_it funs acc id in
+     { e with e_desc = Elast { l with id } }, acc
   | Etuple(e_list) ->
      let e_list, acc = Util.mapfold (expression_it funs) acc e_list in
      { e with e_desc = Etuple(e_list) }, acc

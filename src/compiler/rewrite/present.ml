@@ -69,7 +69,7 @@ let test e =
 let equal e1 e2 =
   match e1.e_desc, e2.e_desc with
     | Econst(i), Econst(j) when (i = j) -> true
-    | (Evar(i), Evar(j)) | (Elast(i), Elast(j)) -> true
+    | (Evar(i), Evar(j)) | (Elast { id = i }, Elast { id = j }) -> true
     | _ -> false
 
 (* the member function *)

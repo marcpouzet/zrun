@@ -203,9 +203,9 @@ let rec expression acc ({ e_desc; e_loc } as e) =
          (* otherwise, [x] is not static; it is renamed *)
          let x, acc = rename_t acc x in
          { e with e_desc = Evar(x) }, acc
-  | Elast(x) ->
-     let x, acc = rename_t acc x in
-     { e with e_desc = Elast(x) }, acc
+  | Elast({ id } as l) ->
+     let id, acc = rename_t acc id in
+     { e with e_desc = Elast({ l with id }) }, acc
   | Etuple(e_list) ->
      let e_list, acc = Util.mapfold expression acc e_list in
      { e with e_desc = Etuple(e_list) }, acc

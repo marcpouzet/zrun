@@ -98,6 +98,7 @@
     static ; static reduction
     inline ; inlining of function calls
     der ; remove the initialization and handler part of a derivative equation
+    ;copylast ; add copies [lx = last*x] for [last x]
     automata ; rewrite automata into match/reset
     present ; rewrite present into match
     pre ; rewrite fby/fby into (init/last)

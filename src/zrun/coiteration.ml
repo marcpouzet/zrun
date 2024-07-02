@@ -836,10 +836,10 @@ and sexp genv env { e_desc; e_loc } s =
        find_gvalue_opt lname genv |>
          Opt.to_result ~none:{ kind = Eunbound_lident(lname); loc = e_loc } in
      return (Value(v), s)
-  | Elast x, Sempty ->
+  | Elast { id }, Sempty ->
      let* v =
-       find_last_opt x env  |>
-         Opt.to_result ~none:{ kind = Eunbound_last_ident(x); loc = e_loc } in
+       find_last_opt id env  |>
+         Opt.to_result ~none:{ kind = Eunbound_last_ident(id); loc = e_loc } in
      return (v, s)
   | Eop(op, e_list), s ->
      begin match op, e_list, s with

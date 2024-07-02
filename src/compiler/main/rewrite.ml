@@ -104,6 +104,10 @@ let main ff modname filename source_name otc n_steps =
   let p = transform_and_compare
               "Remove handlers in definitions of derivatives. See below:"
               Der.program genv0 p in
+  (* let p =
+    transform_and_compare
+      "Add a copy for [last x] to remore false cycles. See below:"
+      Copylast.program genv0 p in *)
   let p = transform_and_compare
             "Translation of automata. See below:" Automata.program genv0 p in
   let p = transform_and_compare

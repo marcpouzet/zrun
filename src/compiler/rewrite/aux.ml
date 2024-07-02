@@ -193,7 +193,8 @@ let pair e1 e2 =  emake (Etuple([e1; e2]))
 let pairpat p1 p2 = pmake (Etuplepat([p1; p2]))
 
 let patalias p n = pmake (Ealiaspat(p, n))
-let last x = emake (Elast(x))
+let last id = emake (Elast { copy = true; id })
+let last_star id = emake (Elast { copy = false; id })
 let float v = emake (Econst(Efloat(v)))
 let bool v = emake (Econst(Ebool(v)))
 

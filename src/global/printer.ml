@@ -294,7 +294,8 @@ let rec expression ff e =
         fprintf ff "@[(";
         operator ff op e_list;
         fprintf ff ")@]"
-    | Elast x -> fprintf ff "last %a" name x
+    | Elast { copy; id } ->
+       fprintf ff "last%s %a" (if copy then "" else "*") name id
     | Econstr0 { lname } -> longname ff lname
     | Econst c -> immediate ff c
     | Eapp { is_inline; f; arg_list } ->

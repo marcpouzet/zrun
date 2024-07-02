@@ -20,7 +20,7 @@ let equal e1 e2 =
   match e1.e_desc, e2.e_desc with
     | Econst(i), Econst(j) when i = j -> true
     | Evar(i), Evar(j) when i = j -> true
-    | Elast(i), Elast(j) when i = j -> true
+    | Elast { id = i }, Elast { id = j } when i = j -> true
     | _ -> false
 
 let static_patterns h =

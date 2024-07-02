@@ -219,7 +219,7 @@ and 'info exp_desc =
   | Evar : Ident.t -> 'info exp_desc
   | Eglobal :
       { mutable lname : Lident.t } -> 'info exp_desc
-  | Elast : Ident.t -> 'info exp_desc
+  | Elast : { copy: bool; id: Ident.t } -> 'info exp_desc
   | Eop : operator * 'info exp list -> 'info exp_desc
   | Etuple : 'info exp list -> 'info exp_desc
   | Eapp : { is_inline: is_inline; f: 'info exp; arg_list: 'info exp list } -> 'info exp_desc
