@@ -66,20 +66,21 @@ let do_step comment output step input =
   output o;
   o
 
-    (* option to control source-to-source transformations *)
-    (* option -step +<flag> -step -<flag> *)
-    (* flag can be:
-       auto: remove automata statements;
-       present: remove present
-       reset
-       der
-       pre
-       copylast
-       complete
-       letin
-       schedule
-
-       with the partial order: letin < schedule, auto < present, reset *)
+(* option to control source-to-source transformations *)
+(* option -step +<flag> -step -<flag> *)
+(* flag can be:
+   static: static reduction
+   inline: inlining
+   der: normalize derivative
+   copylast: add copies for lasts
+   auto: remove automata statements
+   present: remove present statements
+   pre: remove pre/fby
+   reset: normalise resets; remove ->
+   complete: complete branches
+   encore: add an extra step when a zero-crossing change a state variable
+   letin: fuse blocks
+   schedule: static scheduling *)
 
 let default_rewrite_list =
   ["static", "Static reduction done. See below:",
