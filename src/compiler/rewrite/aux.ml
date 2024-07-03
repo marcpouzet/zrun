@@ -162,6 +162,12 @@ let eq_of_f_arg_arg_make f_arg arg =
 
 let eq_local b = eqmake b.b_write (EQlocal(b))
 
+let eq_local_vardec vardec_list eq_list =
+  match vardec_list, eq_list with
+  | _, [] -> eqmake Defnames.empty EQempty
+  | [], _ -> par eq_list
+  | _ -> eq_local (block_make vardec_list eq_list)
+
 let returns_of_vardec_make { var_name } = emake (Evar(var_name))
 
 let returns_of_vardec_list_make vardec_list =

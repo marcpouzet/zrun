@@ -80,9 +80,13 @@ let copy_pattern dv p e =
   let global_funs = { Mapfold.default_global_funs with var_ident } in
   let funs = { Mapfold.defaults with global_funs } in
   let p, (_, env) = Mapfold.pattern funs (dv, Env.empty) p in
-  let x_x_copy_list =
-    Env.fold (fun x x_copy acc -> Aux.id_eq x (Aux.var x_copy) :: acc) env [] in
-  Aux.par (Aux.eq_make p e :: x_x_copy_list)
+  let vardec_list, x_x_copy_list =
+    Env.fold
+      (fun x x_copy (vardec_list, x_x_copy_list) ->
+        Aux.vardec x_copy false None None :: vardec_list,
+        Aux.id_eq x (Aux.var x_copy) :: x_x_copy_list) env ([], []) in
+  Aux.eq_local_vardec
+    vardec_list (Aux.eq_make p e :: x_x_copy_list)
 
 (* [dv] is the set of names possibly written in [eq] which are shared, that is *)
 (* they appear on at least of branch of a conditional *)
