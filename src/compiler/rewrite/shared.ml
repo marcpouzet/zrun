@@ -67,50 +67,33 @@ let add_locals_for_copies n_list n_env copies =
   n_copy_list, n_env
  *)
 
-
 (* Makes a copy of a pattern if it contains a shared variable [x] *)
 (* introduce auxilary equations [x = x_copy] in [copies] for every name *)
 (* in [dv] *)
-let rec pattern dv copies ({ pat_desc } as pat) =
-  match pat_desc with
-  | Ewildpat | Econstpat _ | Econstr0pat _ -> pat, copies
-  | Etuplepat(p_list) ->
-      let p_list, copies = Util.mapfold (pattern dv) copies p_list in
-      { pat with pat_desc = Etuplepat(p_list) }, copies
-  | Econstr1pat(c, p_list) ->
-      let p_list, copies = Util.mapfold (pattern dv) copies p_list in
-      { pat with pat_desc = Econstr1pat(c, p_list) }, copies
-  | Evarpat(n) -> 
-      if S.mem n dv then
-        let ncopy = fresh () in
-        { pat with pat_desc = Evarpat(ncopy) },
-	Env.add n (ncopy, true) copies
-      else pat, copies
-  | Erecordpat(label_pat_list) ->
-      let label_pat_list, copies =
-        Util.mapfold
-	  (fun copies { label; arg } -> 
-                 let p, copies = pattern dv copies arg in
-                 { label; arg }, copies) copies label_pat_list in
-      { pat with pat_desc = Erecordpat(label_pat_list) }, copies
-  | Etypeconstraintpat(p, ty) ->
-      let p, copies = pattern dv copies p in
-      { pat with pat_desc = Etypeconstraintpat(p, ty) }, copies
-  | Ealiaspat(p, n) ->
-      let p, copies = pattern dv copies p in
-      let n, copies = 
-        if S.mem n dv then
-          let ncopy = fresh () in
-          ncopy, Env.add n (ncopy, true) copies
-        else n, copies in
-      { pat with pat_desc = Ealiaspat(p, n) }, copies
-  | Eorpat _ -> assert false
+let copy_pattern dv p =
+  let var_ident global_funs acc x =
+    if Env.mem x acc then Env.find x acc, acc
+    else x, acc in
+  let global_funs = { Mapfold.default_global_funs with var_ident } in
+  let funs = { Mapfold.defaults with global_funs } in
+  (* compute free variables from [p] *)
+  let s = Write.fv_pat S.empty p in
+  let s = S.diff s dv in
+  (* if some of the free variables of [p] appear in [dv] *)
+  (* rename them in [p] *)
+  if S.is_empty s then p, Env.empty
+  else
+    let acc = S.fold (fun x acc -> Env.add x (fresh ()) acc) s Env.empty in
+    let p, _ = Mapfold.pattern funs acc p in
+    p
 
 (* [dv] is the set of names possibly written in [eq] which are shared, that is *)
 (* they appear on at least of branch of a conditional *)
 let equation funs acc eq =
   let { eq_desc } as eq, acc = Mapfold.equation funs acc eq in
   match eq_desc with
+  | EQeq(p, e) ->
+     eq, acc
   | EQmatch({ handlers }) ->
      eq, acc
   | EQlet(leq, eq_let) ->
