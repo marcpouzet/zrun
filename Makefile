@@ -29,3 +29,4 @@ wc:
 	compiler/rewrite/*.ml \
 	compiler/main/*.ml)
 
+.PHONY: zrun.exe zwrite.exe zrun.exe.verbose tests debug clean wc
