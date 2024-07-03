@@ -68,9 +68,8 @@ let add_locals_for_copies n_list n_env copies =
  *)
 
 
-(* Makes a copy of a pattern if it contains a shared variable [x] *)
-(* introduce auxilary equations [x = x_copy] in [copies] for every name *)
-(* in [dv] *)
+(* Makes a copy of a pattern [p] when it contains a shared variable [x] *)
+(* introduce auxilary equations [x = x_copy] for every name in [dv] *)
 let copy_pattern dv p e =
   let var_ident global_funs ((dv, env) as acc) x =
     if S.mem x dv then if Env.mem x env then Env.find x env, acc

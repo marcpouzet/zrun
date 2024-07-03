@@ -168,9 +168,9 @@ let automaton acc is_weak handlers state_opt =
   let reset_name = Ident.fresh "r" in
 
   let state_var n = Aux.var n in
-  let bool_var n = Aux.var n in
-  let state_last n = Aux.last n in
-  let bool_last n = Aux.last n in
+  let reset_var n = Aux.var n in
+  let state_last n = Aux.last_star n in
+  let reset_last n = Aux.last_star n in
 
   (* Translation of an escape handler *)
   let escape 
@@ -189,9 +189,9 @@ let automaton acc is_weak handlers state_opt =
     let p_h_list = List.map escape s_trans in
     let handler_to_compute_current_state =
       eq_reset (eq_present p_h_list (id_eq reset_name efalse))
-        (bool_last reset_name) in
+        (reset_last reset_name) in
     let handler_for_current_active_state =
-      eq_reset (eq_local s_body) (bool_var reset_name) in
+      eq_reset (eq_local s_body) (reset_var reset_name) in
     (pat, handler_to_compute_current_state),
     (pat, handler_for_current_active_state) in
 
@@ -203,7 +203,7 @@ let automaton acc is_weak handlers state_opt =
     let eq_next_state =
       eq_present p_h_list (id_eq reset_name efalse) in
     let eq = Aux.eq_and eq_next_state (eq_local s_body) in
-    pat, eq_reset eq (bool_last reset_name) in
+    pat, eq_reset eq (reset_last reset_name) in
 
   (* the code generated for automata with strong transitions *)
   let strong_automaton handlers =
