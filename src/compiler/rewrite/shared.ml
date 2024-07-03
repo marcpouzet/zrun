@@ -30,43 +30,7 @@ open Mapfold
 
 let fresh () = Ident.fresh "copy"
 
-(*
-(* Computes the set of shared memories and state variables. *)
-(* add them to [dv] *)
-let shared dv l_env =
-  let add x sort acc =
-    match sort with | Sstatic | Sval -> acc | Svar _ | Smem _ -> S.add x acc in
-  Env.fold (fun x { t_sort = sort } acc -> add x sort acc) l_env dv
-    
-(* Remove the flag [is_copy] from a environment of copies *)
-let remove_is_copy copies =
-  Env.map (fun (x_copy, _, ty) -> (x_copy, false, ty)) copies
-
-(* Makes a list of copy equations [x = x_copy] for every entry in [env] *)
-(* when the [is_copy] flag is true *)
-let add_equations_for_copies eq_list copies =
-  (* makes a value for [x_copy] *)
-  Env.fold
-    (fun x (x_copy, is_copy, ty) acc ->
-     if is_copy then
-       (eqmake (EQeq(varpat x ty, var x_copy ty))) :: acc
-     else acc) copies eq_list
-
-(* Extends the local environment with definitions for the [x_copy] *)
-let add_locals_for_copies n_list n_env copies =
-  let value ty = { t_sort = Deftypes.value; t_typ = ty } in
-  let n_env =
-    Env.fold
-      (fun x (x_copy, _, ty) acc ->
-       Env.add x_copy (value ty) acc) copies n_env in
-  let n_copy_list =
-    Env.fold
-      (fun _ (x_copy, _, ty) acc ->
-       (Zaux.vardec_from_entry x_copy { t_sort = Sval; t_typ = ty }) :: acc)
-      copies n_list in
-  n_copy_list, n_env
- *)
-
+let empty = S.empty
 
 (* Makes a copy of a pattern [p] when it contains a shared variable [x] *)
 (* introduce auxilary equations [x = x_copy] for every name in [dv] *)
@@ -87,15 +51,23 @@ let copy_pattern dv p e =
   Aux.eq_local_vardec
     vardec_list (Aux.eq_make p e :: x_x_copy_list)
 
-(* [dv] is the set of names possibly written in [eq] which are shared, that is *)
-(* they appear on at least of branch of a conditional *)
+(* [dv] is the set of names possibly written in [eq] and shared, that is *)
+(* they appear on at least one branch of a conditional *)
 let equation funs acc eq =
-  let { eq_desc } as eq, acc = Mapfold.equation funs acc eq in
+  let { eq_desc; eq_write } as eq, acc = Mapfold.equation funs acc eq in
   match eq_desc with
   | EQeq(p, e) ->
      copy_pattern acc p e, acc
-  | EQmatch({ handlers }) ->
-     eq, acc
+  | EQmatch({ e; handlers } as m) ->
+     (* compute the set of shared variables; those that a written in one *)
+     (* branch *)
+     let body acc ({ m_body } as m_h) =
+       let m_body, acc = Mapfold.equation funs acc m_body in
+       { m_h with m_body }, acc in
+     let e, acc = Mapfold.expression funs acc e in
+     let handlers, acc =
+       Util.mapfold body eq_write.dv handlers in
+       { eq with eq_desc = EQmatch { m with e; handlers } }, acc
   | EQlet(leq, eq_let) ->
      eq, acc
   | _ -> raise Mapfold.Fallback
