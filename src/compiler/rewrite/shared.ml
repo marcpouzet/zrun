@@ -67,25 +67,22 @@ let add_locals_for_copies n_list n_env copies =
   n_copy_list, n_env
  *)
 
+
 (* Makes a copy of a pattern if it contains a shared variable [x] *)
 (* introduce auxilary equations [x = x_copy] in [copies] for every name *)
 (* in [dv] *)
-let copy_pattern dv p =
-  let var_ident global_funs acc x =
-    if Env.mem x acc then Env.find x acc, acc
+let copy_pattern dv p e =
+  let var_ident global_funs ((dv, env) as acc) x =
+    if S.mem x dv then if Env.mem x env then Env.find x env, acc
+                       else let x_copy = fresh () in
+                            x_copy, (dv, Env.add x x_copy env)
     else x, acc in
   let global_funs = { Mapfold.default_global_funs with var_ident } in
   let funs = { Mapfold.defaults with global_funs } in
-  (* compute free variables from [p] *)
-  let s = Write.fv_pat S.empty p in
-  let s = S.diff s dv in
-  (* if some of the free variables of [p] appear in [dv] *)
-  (* rename them in [p] *)
-  if S.is_empty s then p, Env.empty
-  else
-    let acc = S.fold (fun x acc -> Env.add x (fresh ()) acc) s Env.empty in
-    let p, _ = Mapfold.pattern funs acc p in
-    p
+  let p, (_, env) = Mapfold.pattern funs (dv, Env.empty) p in
+  let x_x_copy_list =
+    Env.fold (fun x x_copy acc -> Aux.id_eq x (Aux.var x_copy) :: acc) env [] in
+  Aux.par (Aux.eq_make p e :: x_x_copy_list)
 
 (* [dv] is the set of names possibly written in [eq] which are shared, that is *)
 (* they appear on at least of branch of a conditional *)
@@ -93,7 +90,7 @@ let equation funs acc eq =
   let { eq_desc } as eq, acc = Mapfold.equation funs acc eq in
   match eq_desc with
   | EQeq(p, e) ->
-     eq, acc
+     copy_pattern acc p e, acc
   | EQmatch({ handlers }) ->
      eq, acc
   | EQlet(leq, eq_let) ->
@@ -116,5 +113,5 @@ let program _ p =
   let funs =
     { Mapfold.defaults with equation; expression;
                             set_index; get_index; global_funs } in
-  let { p_impl_list } as p, _ = Mapfold.program_it funs () p in
+  let { p_impl_list } as p, _ = Mapfold.program_it funs S.empty p in
   { p with p_impl_list = p_impl_list }
