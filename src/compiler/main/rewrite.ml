@@ -98,19 +98,19 @@ let s_all = List.fold_left (fun acc (s, _, _) -> S.add s acc) S.empty default_li
 let s_set = ref s_all
 let step_list = ref s_all
 let set_steps w =
-  let pref = String.sub w 0 1 in
-  let suf = String.sub w 1 (String.length w-1) in
-  let p = match pref with
-    | "+" -> true | "-" -> false | s -> raise (Arg.Bad ("unknown prefix " ^ s)) in
-  s_set :=
-    match suf with
-    | "a" -> if p then s_all else S.empty
-    | _ -> let s = match suf with
-             | "static" | "inline" | "der" | "copylast"
-               | "auto" | "present" | "pre" | "reset"
-               | "complete" | "encore" | "letin" | "schedule" -> suf
-               | _ -> raise (Arg.Bad ("unknown pass " ^ suf)) in
-           if p then S.add s !s_set else S.remove s !s_set
+  let set p s =
+    match s with
+    | "a" -> s_set := if p then s_all else S.empty
+    | "static" | "inline" | "der" | "copylast" | "auto" | "present"
+    | "pre" | "reset" | "complete" | "encore" | "letin" | "schedule" ->
+       s_set := if p then S.add s !s_set else S.remove s !s_set
+    | "" -> ()
+    | _ -> raise (Arg.Bad ("unknown pass " ^ s)) in
+  let l = String.split_on_char '+' w in
+  let l_l = List.map (String.split_on_char '-') l in
+  List.iter
+    (fun l -> set true (List.hd l); List.iter (fun s -> set false s) (List.tl l))
+    l_l
 let rewrite_list () =
   List.filter (fun (w, _, _) -> S.mem w !s_set) default_list
 

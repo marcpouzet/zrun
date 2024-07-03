@@ -71,7 +71,7 @@ and doc_set_steps = "\t Option to control source-to-source rewriting steps\n\
     \t\t\t change a discrete-time state variable \n\
     \t\t letin: fuse blocks \n\
     \t\t schedule: static scheduling \n\
-    \t\t Example: -step -a -step +inline -step +static"
+    \t\t Example: -step -a+step+inline+static. Default is +a."
 let errmsg = "Options are:"
 
 
