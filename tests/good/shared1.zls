@@ -1,11 +1,6 @@
-let f x = x + 1
-
-let g x returns (y, z)
-  y, z = x, x
-
 let h x returns (y, z)
   match x with
-  | true -> do y, z = g(x) done
+  | true -> do y, z = true, true done
   | false -> do y, z = (false, false) done
   end
   

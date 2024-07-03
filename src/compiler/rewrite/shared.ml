@@ -55,21 +55,21 @@ let pattern funs acc p = p, acc
                          
 (* [dv] is the set of names possibly written in [eq] and shared, that is *)
 (* they appear on at least one branch of a conditional *)
-let equation funs acc eq =
+let rec equation funs acc eq =
   let { eq_desc; eq_write } as eq, acc = Mapfold.equation funs acc eq in
   match eq_desc with
   | EQeq(p, e) ->
      copy_pattern acc p e, acc
   | EQif { e; eq_true; eq_false } ->
-    let e, acc = Mapfold.expression funs acc e in
-    let eq_true, acc = equation funs eq_write.dv eq_true in
-    let eq_false, acc = equation funs eq_write.dv eq_false in
-    { eq with eq_desc = EQif {e; eq_true; eq_false } }, acc
+     let e, acc = Mapfold.expression funs acc e in
+     let eq_true, acc = equation funs eq_write.dv eq_true in
+     let eq_false, acc = equation funs eq_write.dv eq_false in
+     { eq with eq_desc = EQif {e; eq_true; eq_false } }, acc
   | EQmatch({ e; handlers } as m) ->
      (* compute the set of shared variables; those that a written in one *)
      (* branch *)
      let body acc ({ m_body } as m_h) =
-       let m_body, acc = Mapfold.equation funs acc m_body in
+       let m_body, acc = equation funs acc m_body in
        { m_h with m_body }, acc in
      let e, acc = Mapfold.expression funs acc e in
      let handlers, acc =
@@ -80,7 +80,7 @@ let equation funs acc eq =
   | _ -> eq, acc
 
 and block funs acc ({ b_body } as b) =
-  let b_body, acc = Mapfold.equation funs acc b_body in
+  let b_body, acc = equation funs acc b_body in
   { b with b_body }, acc
     
 let set_index funs acc n =
@@ -90,7 +90,7 @@ let get_index funs acc n = Ident.get (), acc
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
-    { Mapfold.defaults with equation; block;
+    { Mapfold.defaults with pattern; equation; block;
                             set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs S.empty p in
   { p with p_impl_list = p_impl_list }

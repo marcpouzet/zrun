@@ -121,6 +121,12 @@ type ('a, 'info1, 'info2) it_funs =
       ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 funexp -> 'info2 funexp * 'a;
     last :
       ('a, 'info1, 'info2) it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+    match_handler_eq :
+      ('a, 'info1, 'info2) it_funs -> 'a -> ('info1, 'info1 eq) match_handler
+        -> ('info1, 'info1 eq) match_handler * 'a; 
+    match_handler_e :
+      ('a, 'info1, 'info2) it_funs -> 'a -> ('info1, 'info1 exp) match_handler
+      -> ('info1, 'info1 exp) match_handler * 'a;
     implementation :
       ('a, 'info1, 'info2) it_funs -> 'a ->
       'info1 implementation -> 'info2 implementation * 'a;
@@ -470,14 +476,9 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      let default_opt, acc = default_t (expression_it funs) acc default_opt in
      { e with e_desc = Epresent { handlers; default_opt } }, acc 
   | Ematch({ e; handlers } as m) ->
-     let body acc ({ m_pat; m_body; m_env } as m_h) =
-       let m_env, acc = build_it funs.global_funs acc m_env in
-       let m_pat, acc = pattern_it funs acc m_pat in
-       let m_body, acc = expression_it funs acc m_body in
-       { m_h with m_pat; m_body; m_env }, acc in
      let e, acc = expression_it funs acc e in
      let handlers, acc =
-       Util.mapfold body acc handlers in
+       Util.mapfold (match_handler_e_it funs) acc handlers in
      { e with e_desc = Ematch { m with e; handlers } }, acc
   | Eassert e -> let e, acc = expression_it funs acc e in
                  { e with e_desc = Eassert(e) }, acc
@@ -523,6 +524,25 @@ and expression funs acc ({ e_desc; e_loc } as e) =
                   { f with for_size; for_kind; for_index; for_input;
                            for_body; for_env } }, acc
 
+(* match handler - equations and expressions *)
+and match_handler_eq_it funs acc m_handler =
+  match_handler_eq funs acc m_handler
+
+and match_handler_eq funs acc ({ m_pat; m_body; m_env } as m_h) =
+  let m_env, acc = build_it funs.global_funs acc m_env in
+  let m_pat, acc = pattern_it funs acc m_pat in
+  let m_body, acc = equation_it funs acc m_body in
+  { m_h with m_pat; m_body; m_env }, acc
+
+and match_handler_e_it funs acc m_handler =
+  match_handler_e funs acc m_handler
+
+and match_handler_e funs acc ({ m_pat; m_body; m_env } as m_h) =
+  let m_env, acc = build_it funs.global_funs acc m_env in
+  let m_pat, acc = pattern_it funs acc m_pat in
+  let m_body, acc = expression_it funs acc m_body in
+  { m_h with m_pat; m_body; m_env }, acc
+
 (** Equations **)
 and equation_it funs acc eq =
   try funs.equation funs acc eq
@@ -562,14 +582,9 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let eq_false, acc = equation_it funs acc eq_false in
        { eq with eq_desc = EQif { e; eq_true; eq_false } }, acc
     | EQmatch({ e; handlers } as m) ->
-       let body acc ({ m_pat; m_body; m_env } as m_h) =
-         let m_env, acc = build_it funs.global_funs acc m_env in
-         let m_pat, acc = pattern_it funs acc m_pat in
-         let m_body, acc = equation_it funs acc m_body in
-         { m_h with m_pat; m_body; m_env }, acc in
        let e, acc = expression_it funs acc e in
        let handlers, acc =
-         Util.mapfold body acc handlers in
+         Util.mapfold (match_handler_eq_it funs) acc handlers in
        { eq with eq_desc = EQmatch { m with e; handlers } }, acc
     | EQlocal(eq_b) ->
        let eq_b, acc = block_it funs acc eq_b in
@@ -774,6 +789,8 @@ let defaults =
     result;
     funexp;
     last;
+    match_handler_eq;
+    match_handler_e;
     implementation;
     program;
     get_index;
@@ -805,6 +822,8 @@ let defaults_stop =
     result = stop;
     funexp = stop;
     last = stop;
+    match_handler_eq = stop;
+    match_handler_e = stop;
     implementation = stop;
     program = stop;
     get_index = stop;
