@@ -51,6 +51,8 @@ let copy_pattern dv p e =
   Aux.eq_local_vardec
     vardec_list (Aux.eq_make p e :: x_x_copy_list)
 
+let pattern funs acc p = p, acc
+                         
 (* [dv] is the set of names possibly written in [eq] and shared, that is *)
 (* they appear on at least one branch of a conditional *)
 let equation funs acc eq =
@@ -58,6 +60,11 @@ let equation funs acc eq =
   match eq_desc with
   | EQeq(p, e) ->
      copy_pattern acc p e, acc
+  | EQif { e; eq_true; eq_false } ->
+    let e, acc = Mapfold.expression funs acc e in
+    let eq_true, acc = equation funs eq_write.dv eq_true in
+    let eq_false, acc = equation funs eq_write.dv eq_false in
+    { eq with eq_desc = EQif {e; eq_true; eq_false } }, acc
   | EQmatch({ e; handlers } as m) ->
      (* compute the set of shared variables; those that a written in one *)
      (* branch *)
@@ -70,7 +77,7 @@ let equation funs acc eq =
        { eq with eq_desc = EQmatch { m with e; handlers } }, acc
   | EQlet(leq, eq_let) ->
      eq, acc
-  | _ -> raise Mapfold.Fallback
+  | _ -> eq, acc
 
 and block funs acc ({ b_body } as b) =
   let b_body, acc = Mapfold.equation funs acc b_body in
