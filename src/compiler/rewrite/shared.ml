@@ -61,7 +61,6 @@ let rec equation funs acc eq =
   | EQeq(p, e) ->
      copy_pattern acc p e, acc
   | EQif { e; eq_true; eq_false } ->
-     let e, acc = Mapfold.expression funs acc e in
      let eq_true, acc = equation funs eq_write.dv eq_true in
      let eq_false, acc = equation funs eq_write.dv eq_false in
      { eq with eq_desc = EQif {e; eq_true; eq_false } }, acc
@@ -71,12 +70,9 @@ let rec equation funs acc eq =
      let body acc ({ m_body } as m_h) =
        let m_body, acc = equation funs acc m_body in
        { m_h with m_body }, acc in
-     let e, acc = Mapfold.expression funs acc e in
      let handlers, acc =
        Util.mapfold body eq_write.dv handlers in
        { eq with eq_desc = EQmatch { m with e; handlers } }, acc
-  | EQlet(leq, eq_let) ->
-     eq, acc
   | _ -> eq, acc
 
 and block funs acc ({ b_body } as b) =
