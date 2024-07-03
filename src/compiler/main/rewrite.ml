@@ -85,6 +85,8 @@ let default_list =
    Reset.program;
    "complete", "Complete equations with [der x = 0.0]. See below:",
    Complete.program;
+   "shared", "Normalise equations to shared variables in [x = ...]. See below:",
+   Shared.program;
    (* "encore", "Add an extra discrete step for weak transitions. See below:",
     Encore.program; *)
    "letin", "Un-nesting of let/in and blocks. See below:",
@@ -102,7 +104,7 @@ let set_steps w =
     match s with
     | "a" -> s_set := if p then s_all else S.empty
     | "static" | "inline" | "der" | "copylast" | "auto" | "present"
-    | "pre" | "reset" | "complete" | "encore" | "letin" | "schedule" ->
+    | "pre" | "reset" | "complete" | "shared" | "encore" | "letin" | "schedule" ->
        s_set := if p then S.add s !s_set else S.remove s !s_set
     | "" -> ()
     | _ -> raise (Arg.Bad ("unknown pass " ^ s)) in
