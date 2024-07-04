@@ -1,7 +1,13 @@
-let h x returns (y, z)
+let h1 x returns (y, z)
+  local m in
   match x with
-  | true -> do y, z = true, true done
+  | true -> do y, z = true, true and m = 2 done
   | false -> do y, z = (false, false) done
   end
+ 
+let h2 x =
+  let present x -> y, z = true, true
+      else local s do s = 2 and y, s = false, false done in
+  y + z
   
   

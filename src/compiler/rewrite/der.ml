@@ -37,7 +37,7 @@ let present id e0_opt handlers eq =
   | None -> eq | Some(e0) -> Aux.eq_and eq (Aux.eq_init id e0)
 
 let equation funs acc eq =
-  let { eq_desc }, acc = Mapfold.equation funs acc eq in
+  let { eq_desc } as eq, acc = Mapfold.equation funs acc eq in
   match eq_desc with
   | EQder { e_opt = None; handlers = [] } ->
      eq, acc

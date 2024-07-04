@@ -127,11 +127,20 @@ type ('a, 'info1, 'info2) it_funs =
     match_handler_e :
       ('a, 'info1, 'info2) it_funs -> 'a -> ('info1, 'info1 exp) match_handler
       -> ('info1, 'info1 exp) match_handler * 'a;
+    present_handler_eq :
+      ('a, 'info1, 'info2) it_funs -> 'a 
+      -> ('info1, 'info1 scondpat, 'info1 eq) present_handler 
+      -> ('info2, 'info2 scondpat, 'info2 eq) present_handler * 'a; 
+    present_handler_e :
+       ('a, 'info1, 'info2) it_funs -> 'a 
+      -> ('info1, 'info1 scondpat, 'info1 exp) present_handler 
+      -> ('info2, 'info2 scondpat, 'info2 exp) present_handler * 'a; 
     implementation :
       ('a, 'info1, 'info2) it_funs -> 'a ->
       'info1 implementation -> 'info2 implementation * 'a;
     program :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 program -> 'info2 program * 'a;
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 program 
+      -> 'info2 program * 'a;
     get_index :
      ('a, 'info1, 'info2) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
     set_index :
@@ -291,11 +300,11 @@ let default_t f acc d =
   | Else(e) -> let e, acc = f acc e in Else(e), acc
   | NoDefault -> NoDefault, acc
 
-let for_exit_t funs acc ({ for_exit } as fe) =
-  let for_exit, acc = funs.expression funs acc for_exit in
+let rec for_exit_t funs acc ({ for_exit } as fe) =
+  let for_exit, acc = expression_it funs acc for_exit in
   { fe with for_exit }, acc
 
-let for_kind_t funs acc for_kind =
+and for_kind_t funs acc for_kind =
   match for_kind with
   | Kforeach -> Kforeach, acc
   | Kforward(for_exit_opt) ->
@@ -303,23 +312,23 @@ let for_kind_t funs acc for_kind =
        Util.optional_with_map (for_exit_t funs) acc for_exit_opt in
      Kforward(for_exit_opt), acc
     
-let for_size_t funs acc e = funs.expression funs acc e
+and for_size_t funs acc e = expression_it funs acc e
 
-let for_input_t funs acc ({ desc } as fi) =
+and for_input_t funs acc ({ desc } as fi) =
   let desc, acc = match desc with
     | Einput {id; e; by } ->
-       let id, acc = funs.global_funs.var_ident funs.global_funs acc id in
-       let e, acc = funs.expression funs acc e in
-       let by, acc = Util.optional_with_map (funs.expression funs) acc by in
+       let id, acc = var_ident_it funs.global_funs acc id in
+       let e, acc = expression_it funs acc e in
+       let by, acc = Util.optional_with_map (expression_it funs) acc by in
        Einput { id; e; by }, acc
     | Eindex ({ id; e_left; e_right } as ind) ->
-       let id, acc = funs.global_funs.var_ident funs.global_funs acc id in
-       let e_left, acc = funs.expression funs acc e_left in
-       let e_right, acc = funs.expression funs acc e_right in
+       let id, acc = var_ident_it funs.global_funs acc id in
+       let e_left, acc = expression_it funs acc e_left in
+       let e_right, acc = expression_it funs acc e_right in
        Eindex { ind with id; e_left; e_right }, acc in
   { fi with desc }, acc
 
-let rec slet_it funs acc leq_list =
+and slet_it funs acc leq_list =
   Util.mapfold (leq_it funs) acc leq_list
 
 and leq_it funs acc leq =
@@ -487,7 +496,8 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      let e_c, acc = expression_it funs acc e_c in
      { e with e_desc = Ereset(e_body, e_c) }, acc
   | Esizeapp { f; size_list } -> 
-     let size_list, acc = Util.mapfold (size_it funs.global_funs) acc size_list in
+     let size_list, acc = 
+       Util.mapfold (size_it funs.global_funs) acc size_list in
      let v, acc = expression_it funs acc f in
      { e with e_desc = Esizeapp { f; size_list } }, acc
   | Efun f ->
@@ -543,6 +553,25 @@ and match_handler_e funs acc ({ m_pat; m_body; m_env } as m_h) =
   let m_body, acc = expression_it funs acc m_body in
   { m_h with m_pat; m_body; m_env }, acc
 
+and present_handler_eq_it funs acc p_handler =
+  present_handler_eq funs acc p_handler
+
+and present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_env, acc = build_it funs.global_funs acc p_env in
+  let p_cond, acc = scondpat_it funs acc p_cond in
+  let p_body, acc = equation_it funs acc p_body in
+  { p_b with p_cond; p_body }, acc
+
+and present_handler_e_it funs acc p_handler =
+  present_handler_e funs acc p_handler
+
+and present_handler_e funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_env, acc = build_it funs.global_funs acc p_env in
+  let p_cond, acc = scondpat_it funs acc p_cond in
+  let p_body, acc = expression_it funs acc p_body in
+  { p_b with p_cond; p_body }, acc
+       
+
 (** Equations **)
 and equation_it funs acc eq =
   try funs.equation funs acc eq
@@ -573,7 +602,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let id, acc = var_ident_it funs.global_funs acc id in
        let e, acc = expression_it funs acc e in
        let e_opt, acc =
-         Util.optional_with_map (funs.expression funs) acc e_opt in
+         Util.optional_with_map (expression_it funs) acc e_opt in
        let handlers, acc = Util.mapfold body acc handlers in
        { eq with eq_desc = EQder { id; e; e_opt; handlers } }, acc
     | EQif { e; eq_true; eq_false } ->
@@ -593,12 +622,8 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let eq_list, acc = Util.mapfold (equation_it funs) acc eq_list in
        { eq with eq_desc = EQand { a with eq_list } }, acc
     | EQpresent({ handlers; default_opt }) ->
-       let body acc ({ p_cond; p_body; p_env } as p_b) =
-         let p_env, acc = build_it funs.global_funs acc p_env in
-         let p_cond, acc = scondpat_it funs acc p_cond in
-         let p_body, acc = equation_it funs acc p_body in
-         { p_b with p_cond; p_body }, acc in
-       let handlers, acc = Util.mapfold body acc handlers in
+       let handlers, acc = 
+         Util.mapfold (present_handler_eq_it funs) acc handlers in
        let default_opt, acc = default_t (equation_it funs) acc default_opt in
        { eq with eq_desc = EQpresent { handlers; default_opt } }, acc
     | EQautomaton({ handlers; state_opt } as a) ->
@@ -791,6 +816,8 @@ let defaults =
     last;
     match_handler_eq;
     match_handler_e;
+    present_handler_eq;
+    present_handler_e;
     implementation;
     program;
     get_index;
@@ -824,6 +851,8 @@ let defaults_stop =
     last = stop;
     match_handler_eq = stop;
     match_handler_e = stop;
+    present_handler_eq = stop;
+    present_handler_e = stop;
     implementation = stop;
     program = stop;
     get_index = stop;
