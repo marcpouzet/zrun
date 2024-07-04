@@ -10,4 +10,9 @@ let h2 x =
       else local s do s = 2 and y, s = false, false done in
   y + z
   
-  
+let h3 x =
+  let automaton
+      | S1 -> local x do y, x = true, true until x then S2
+      | S2 -> local z do x, z = false, false untilz then S1
+      end in
+  y, z

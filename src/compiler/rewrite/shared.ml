@@ -72,18 +72,23 @@ let rec equation funs acc ({ eq_desc; eq_write } as eq) =
   | EQmatch({ e; handlers } as m) ->
      let e, acc = Mapfold.expression funs acc e in
      (* variables in [eq_write] are shared *)
-     (* let body acc ({ m_body } as m_h) =
-       let m_body, acc = equation funs acc m_body in
-       { m_h with m_body }, acc in *)
      let handlers, acc =
        Util.mapfold (Mapfold.match_handler_eq funs) eq_write.dv handlers in
        { eq with eq_desc = EQmatch { m with e; handlers } }, acc
   | EQpresent({ handlers; default_opt }) ->
-       let handlers, acc = 
-         Util.mapfold (Mapfold.present_handler_eq funs) eq_write.dv handlers in
-       let default_opt, acc = 
-         Mapfold.default_t (equation funs) acc default_opt in
-       { eq with eq_desc = EQpresent { handlers; default_opt } }, acc
+     (* variables in [eq_write] are shared *)
+     let handlers, acc = 
+       Util.mapfold (Mapfold.present_handler_eq funs) eq_write.dv handlers in
+     let default_opt, acc = 
+       Mapfold.default_t (equation funs) acc default_opt in
+     { eq with eq_desc = EQpresent { handlers; default_opt } }, acc
+  | EQautomaton({ handlers; state_opt } as a) ->
+     (* variables in [eq_write] are shared *)
+     let state_opt, acc = 
+       Util.optional_with_map (Mapfold.state funs) acc state_opt in
+     let handlers, acc = 
+       Util.mapfold (Mapfold.automaton_handler funs) eq_write.dv handlers in
+     { eq with eq_desc = EQautomaton({ a with handlers; state_opt }) }, acc
   | _ -> Mapfold.equation funs acc eq
 
 let set_index funs acc n =
