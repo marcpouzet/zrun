@@ -135,6 +135,10 @@ type ('a, 'info1, 'info2) it_funs =
        ('a, 'info1, 'info2) it_funs -> 'a 
       -> ('info1, 'info1 scondpat, 'info1 exp) present_handler 
       -> ('info2, 'info2 scondpat, 'info2 exp) present_handler * 'a; 
+    automaton_handler : 
+      ('a, 'info1, 'info2) it_funs -> 'a 
+      -> ('info1, ('info1, 'info1 exp, 'info1 eq) block) automaton_handler 
+      -> ('info2, ('info2, 'info2 exp, 'info2 eq) block) automaton_handler * 'a;
     implementation :
       ('a, 'info1, 'info2) it_funs -> 'a ->
       'info1 implementation -> 'info2 implementation * 'a;
@@ -627,49 +631,9 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let default_opt, acc = default_t (equation_it funs) acc default_opt in
        { eq with eq_desc = EQpresent { handlers; default_opt } }, acc
     | EQautomaton({ handlers; state_opt } as a) ->
-       let statepat acc ({ desc } as spat) =
-         let desc, acc = match desc with
-           | Estate0pat(id) ->
-              let id, acc = var_ident_it funs.global_funs acc id in
-            Estate0pat(id), acc
-         | Estate1pat(id, id_list) ->
-            let id, ac = var_ident_it funs.global_funs acc id in
-            let id_list, acc =
-              Util.mapfold (var_ident_it funs.global_funs)
-                acc id_list in
-            Estate1pat(id, id_list), acc in
-         { spat with desc }, acc in
-       let rec state acc ({ desc } as st) =
-         let desc, acc  = match desc with
-           | Estate0(id) ->
-              let id, acc = var_ident_it funs.global_funs acc id in
-              Estate0(id), acc
-           | Estate1(id, e_list) ->
-              let id, acc =  var_ident_it funs.global_funs acc id in
-              let e_list, acc =
-                Util.mapfold (expression_it funs) acc e_list in
-              Estate1(id, e_list), acc
-           | Estateif(e, st1, st2) ->
-              let e, acc = expression_it funs acc e in
-              let st1, acc = state acc st1 in
-              let st2, acc = state acc st2 in
-              Estateif(e, st1, st2), acc in
-         { st with desc }, acc in
-       let escape acc ({ e_cond; e_let; e_body; e_next_state; e_env } as esc) =
-         let e_env, acc = build_it funs.global_funs acc e_env in
-         let e_cond, acc = scondpat_it funs acc e_cond in
-         let e_let, acc = slet_it funs acc e_let in
-         let e_body, acc = block_it funs acc e_body in
-         let e_next_state, acc = state acc e_next_state in
-         { esc with e_cond; e_let; e_body; e_next_state; e_env }, acc in
-       let handler acc ({ s_state; s_let; s_body; s_trans } as h) =
-         let s_state, acc = statepat acc s_state in
-         let s_let, acc = slet_it funs acc s_let in
-         let s_body, acc = block_it funs acc s_body in
-         let s_trans, acc = Util.mapfold escape acc s_trans in
-         { h with s_state; s_let; s_body; s_trans }, acc in
-       let state_opt, acc = Util.optional_with_map state acc state_opt in
-       let handlers, acc = Util.mapfold handler acc handlers in
+       let state_opt, acc = Util.optional_with_map (state funs) acc state_opt in
+       let handlers, acc = 
+         Util.mapfold (automaton_handler_it funs) acc handlers in
        { eq with eq_desc = EQautomaton({ a with handlers; state_opt }) }, acc
     | EQempty -> eq, acc
     | EQassert(e) ->
@@ -724,6 +688,55 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
                    EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
        acc in
   { eq with eq_write }, acc
+
+(* automata *)
+and statepat funs acc ({ desc } as spat) =
+  let desc, acc = match desc with
+    | Estate0pat(id) ->
+       let id, acc = var_ident_it funs.global_funs acc id in
+       Estate0pat(id), acc
+    | Estate1pat(id, id_list) ->
+       let id, ac = var_ident_it funs.global_funs acc id in
+       let id_list, acc =
+         Util.mapfold (var_ident_it funs.global_funs)
+           acc id_list in
+       Estate1pat(id, id_list), acc in
+  { spat with desc }, acc
+    
+and state funs acc ({ desc } as st) =
+  let desc, acc  = match desc with
+    | Estate0(id) ->
+       let id, acc = var_ident_it funs.global_funs acc id in
+       Estate0(id), acc
+    | Estate1(id, e_list) ->
+       let id, acc =  var_ident_it funs.global_funs acc id in
+       let e_list, acc =
+         Util.mapfold (expression_it funs) acc e_list in
+       Estate1(id, e_list), acc
+    | Estateif(e, st1, st2) ->
+       let e, acc = expression_it funs acc e in
+       let st1, acc = state funs acc st1 in
+       let st2, acc = state funs acc st2 in
+       Estateif(e, st1, st2), acc in
+  { st with desc }, acc
+
+and escape funs acc ({ e_cond; e_let; e_body; e_next_state; e_env } as esc) =
+  let e_env, acc = build_it funs.global_funs acc e_env in
+  let e_cond, acc = scondpat_it funs acc e_cond in
+  let e_let, acc = slet_it funs acc e_let in
+  let e_body, acc = block_it funs acc e_body in
+  let e_next_state, acc = state funs acc e_next_state in
+  { esc with e_cond; e_let; e_body; e_next_state; e_env }, acc
+   
+and automaton_handler_it funs acc handler =
+  automaton_handler funs acc handler
+
+and automaton_handler funs acc ({ s_state; s_let; s_body; s_trans } as h) =
+  let s_state, acc = statepat funs acc s_state in
+  let s_let, acc = slet_it funs acc s_let in
+  let s_body, acc = block_it funs acc s_body in
+  let s_trans, acc = Util.mapfold (escape funs) acc s_trans in
+  { h with s_state; s_let; s_body; s_trans }, acc
 
 let rec typedecl_it funs acc ty_decl =
   try funs.typedecl funs acc ty_decl
@@ -816,6 +829,7 @@ let defaults =
     last;
     match_handler_eq;
     match_handler_e;
+    automaton_handler;
     present_handler_eq;
     present_handler_e;
     implementation;
@@ -851,6 +865,7 @@ let defaults_stop =
     last = stop;
     match_handler_eq = stop;
     match_handler_e = stop;
+    automaton_handler = stop;
     present_handler_eq = stop;
     present_handler_e = stop;
     implementation = stop;
