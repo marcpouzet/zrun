@@ -13,14 +13,16 @@
 (* *********************************************************************)
 
 (* Remove nested declaration of variables *)
-(* Preserves the sequential order defined by a let/in *)
-(* declaration such that side effects between them are preserved *)
+(* Preserves the sequential order defined by let/in *)
+(* declarations. If side-effects or unsafe functions appear, their *)
+(* order given by the let/in is preserved *)
 (* E.g., in [let x = e1 in e2], all side effects in [e1] are done before *)
 (* those of [e2] *)
-(* [let x = e1 in e2] has the behavior of [let x = e1 before y = e2 in y] *)
+(* [let x = e1 in e2] has the behavior of [let x = e1 andthen y = e2 in y] *)
 
 (* Invariant: an expression is normalized into a pair [(vardec, eq), e] *)
 (* whose meaning is [local vardec do eq in e] *)
+(* An equation is normalized into [local vardec do eq] *)
 
 open Misc
 open Location
@@ -31,6 +33,9 @@ open State
 open Mapfold
 
 let empty_eq = eqmake Defnames.empty EQempty
+let empty_block =
+  { b_vars = []; b_body = empty_eq; 
+    b_env = Env.empty; b_loc = no_location; b_write = Defnames.empty }
 
 (* a structure to represent nested equations before they are turned into *)
 (* Zelus equations *)
@@ -79,73 +84,65 @@ let equations eqs =
   par [] eqs
 
 (* build an equation [local vardec_list do eq done] from [acc] *)
-let local { c_vardec; c_eq } =
+let eq_local { c_vardec; c_eq } =
   let vardec_list = State.fold (@) c_vardec [] in
   let eq = equations c_eq in
-  eq_local (block_make vardec_list eq)     
+  Aux.eq_local (block_make vardec_list eq)     
+
+let e_local { c_vardec; c_eq } e =
+  let vardec_list = State.fold (@) c_vardec [] in
+  let eq = equations c_eq in
+  Aux.e_local (block_make vardec_list eq) e    
   
 (* Translation of expressions *)
 (* [expression funs { c_vardec; c_eq } e = [e', { c_vardec'; c_eq'}] *)
-(* such that [local c_vardec do c_eq in e] and [local c_vardec' do c_eq' in e'] *)
-(* are equivalent *)
-let expression funs acc e =
-  let { e_desc }, acc = Mapfold.expression funs acc e in
+(* such that [local c_vardec do c_eq in e] and *)
+(* [local c_vardec' do c_eq' in e'] are equivalent *)
+let rec expression funs acc ({ e_desc } as e) =
   match e_desc with
-  | Elet(l, e_let) ->
-     let l, acc = Mapfold.leq_t funs acc l in
-     let e_let, acc = Mapfold.expression funs acc e_let in
-     e_let, acc
-  | Elocal({ b_vars; b_body }, e) ->
-     let _, acc = Mapfold.equation funs acc b_body in
-     let e, acc = Mapfold.expression funs acc e in
-     e, add_vardec b_vars acc
   | Eop(Eseq, [e1; e2]) ->
      (* [e1; e2] is a short-cut for [let _ = e1 in e2] *)
-     let e1, acc = Mapfold.expression funs acc e1 in
-     let e2, acc = Mapfold.expression funs acc e2 in
+     let e1, acc = expression funs acc e1 in
+     let e2, acc = expression funs acc e2 in
      e2, add_seq (Aux.wildpat_eq e1) acc
-  | _ -> e, acc
+  | _ -> Mapfold.expression funs acc e
 
 and leq_t funs acc ({ l_eq } as leq) =
-  let l_eq, acc = Mapfold.equation funs acc l_eq in
+  let _, acc = equation funs acc l_eq in
   { leq with l_eq = empty_eq }, add_seq l_eq acc
 
-(*
-  let funexp funs acc f =
-  let { f_args; f_body; f_env } as f, acc = Mapfold.funexp funs empty f in
-  { f with f_body = doin acc f_body }, empty
- *)
+and block funs acc { b_vars; b_body } =
+  let _, acc = equation funs acc b_body in
+  empty_block, add_vardec b_vars (add_seq b_body acc)
+
+and match_handler_eq funs acc ({ m_body } as m_h) =
+  let _, acc_local = equation funs empty m_body in 
+  { m_h with m_body = eq_local acc_local }, acc
+
+and match_handler_e funs acc ({ m_body } as m_h) =
+  let e, acc_local = expression funs empty m_body in 
+  { m_h with m_body = e_local acc_local e }, acc
 
 (* Translate an equation. *)
 (* [equation funs { c_vardec; c_eq } eq = [eq', { c_vardec'; c_eq'}] *)
-(* such that [local c_vardec do c_eq and eq] and [local c_vardec' do c_eq' and e']*)
-(* are equivalent *)
-let rec equation funs acc eq =
-  let ({ eq_desc } as eq), acc = Mapfold.equation funs acc eq in
+(* such that [local c_vardec do c_eq and eq] and *)
+(* [local c_vardec' do c_eq' and eq'] are equivalent *)
+and equation funs acc ({ eq_desc } as eq) =
   match eq_desc with 
   | EQand { ordered; eq_list } ->
-     let _, acc = equation_list funs ordered acc eq_list in
-     eqmake Defnames.empty EQempty, acc
-  | EQlocal { b_vars; b_body } ->
-     let _, acc = Mapfold.equation funs acc b_body in
-     empty_eq, add_vardec b_vars acc
-  | EQlet(leq, eq) ->
-     let _, acc = Mapfold.leq_t funs acc leq in
-     let b, acc = Mapfold.equation funs acc eq in
+     let compose = if ordered then seq else par in
+     let acc = List.fold_left
+       (fun acc eq ->
+         let _, acc_eq = Mapfold.equation funs empty eq in
+         compose acc acc_eq) acc eq_list in
      empty_eq, acc
-  | _ -> empty_eq, add_seq eq acc
-
-and equation_list funs ordered acc eq_list =
-  let compose = if ordered then seq else par in
-  Util.mapfold
-    (fun acc eq ->
-      let _, acc_eq = Mapfold.equation funs empty eq in
-      empty_eq, compose acc acc_eq) acc eq_list
+  | _ -> Mapfold.equation funs acc eq
 
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
-    { Mapfold.defaults with expression; equation; leq_t; global_funs } in
+    { Mapfold.defaults with equation; leq_t; block; match_handler_eq;
+                            match_handler_e; global_funs } in
   let { p_impl_list } as p, _ =
     Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }

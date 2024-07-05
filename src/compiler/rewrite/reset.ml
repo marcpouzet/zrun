@@ -25,6 +25,8 @@ open Zelus
 open Mapfold
 
 (*
+  [e1 -> e2] is rewritten in [if last i then e1 else e2]
+
   [reset
    ... init x = e ... (* [e] is static *)
    every z]
@@ -38,8 +40,10 @@ open Mapfold
    is rewritten:
 
    reset
-   ... local i init and i = false and reset init x = e every last i
-   every z] is unchanged
+   ... local i init true and i = false and 
+       reset init x = e every last* i
+   ...
+   every z]
 
    match e with
    | P1 -> eq1 | ... | Pn -> eqn
@@ -52,6 +56,8 @@ open Mapfold
    | Pn -> local in init true and in = false and eqn
 *)
 
+let fresh () = Ident.fresh "i"
+
 (* Static expressions - simple sufficient condition for [e] to be static *)
 let rec static { e_desc = desc } =
   match desc with
@@ -62,61 +68,82 @@ let rec static { e_desc = desc } =
   | Erecord_access { arg } -> static arg
   | _ -> false
 
-type acc = { i: Ident.t; } (* the initialization variable *)
+type acc = { i: Ident.t; last: bool } 
+  (* the initialization variable; either on [last i] or [i] *)
+
+let last { i; last } = if last then Aux.last_star i else Aux.var i
 
 (* Surround an equation by a reset *)
-let reset_init i eq = Aux.eq_reset eq (Aux.last i)
+let reset_init acc eq = Aux.eq_reset eq (last acc)
 
-(* Introduce a block [local i init true do i = false and eq] *)
-let intro_init_eq_local i eq =
+(* Introduce initialization bits *)
+let intro_init_in_eq () = { i = fresh (); last = true }
+let intro_init_in_exp () = { i = fresh (); last = false }
+let dummy = intro_init_in_exp ()
+
+(* [local i init true in do i = false and eq done] *)
+let local_in_eq { i } eq =
   Aux.eq_local (Aux.block_make [Aux.vardec i false (Some(Aux.etrue)) None]
                   [Aux.eq_and (Aux.id_eq i Aux.efalse) eq])
 
-(* Introduce a block [local m, i init true do m = last i and i = false in e] *)
-let intro_init_e_local i e =
-  let m = fresh "m" in
-  Aux.e_local (Aux.block_make [Aux.vardec m false None None;
-                               Aux.vardec i false (Some(Aux.etrue)) None]
-                 [Aux.id_eq m (Aux.last i); Aux.id_eq i (Aux.efalse)]) e
+(* [local m init true, i do m = false and i = last* m in e] *)
+let local_in_exp { i } e =
+  let m = fresh () in
+  Aux.e_local (Aux.block_make [Aux.vardec m false (Some(Aux.etrue)) None;
+                               Aux.vardec i false None None]
+                 [Aux.id_eq i (Aux.last_star m); Aux.id_eq m (Aux.efalse)]) e
 
 (* Equations *)
-let equation funs acc eq =
-  let { eq_desc } as eq, acc = Mapfold.equation funs acc eq in
+let rec equation funs acc ({ eq_desc } as eq) =
   match eq_desc with
+  | EQinit(_, e) when static e -> eq, acc
+  | EQinit(x, e) ->
+     let e, acc = expression funs acc e in
+     reset_init acc { eq with eq_desc = EQinit(x, e) }, acc
   | EQmatch { e; handlers } ->
      let body acc ({ m_body } as m_h) =
        (* introduce one init per branch *)
-       let i = Ident.fresh "i" in
-       let m_body, _ = funs.equation funs { i } m_body in
-       { m_h with m_body = intro_init_eq_local i m_body }, acc in
-     let e, acc = funs.expression funs acc e in
+       let acc = intro_init_in_eq () in
+       let m_body, _ = equation funs acc m_body in
+       { m_h with m_body = local_in_eq acc m_body }, acc in
+     let e, acc = expression funs acc e in
      let handlers, acc =
        Util.mapfold body acc handlers in
        { eq with eq_desc = EQmatch { is_total = true; e; handlers } }, acc
-  | _ -> raise Mapfold.Fallback
+  | EQreset(eq, e) ->
+     let e, acc = expression funs acc e in
+     (* introduce one init per branch *)
+     let acc = intro_init_in_eq () in
+     let eq, acc = equation funs acc eq in
+     { eq with eq_desc = EQreset(local_in_eq acc eq, e) }, acc       
+  | _ -> Mapfold.equation funs acc eq
 
 (** Expressions. *)
-let expression funs acc e =
-  let ({ e_desc } as e), ({ i } as acc) = Mapfold.expression funs acc e in
-  let e_desc, acc = match e_desc with
+and expression funs acc ({ e_desc } as e) =
+  match e_desc with
   | Eop(Eminusgreater, [e1; e2]) ->
-     let e1, acc = funs.expression funs acc e1 in
-     let e2, acc = funs.expression funs acc e2 in
+     let e1, acc = expression funs acc e1 in
+     let e2, acc = expression funs acc e2 in
      (* [if last i then e1 else e2] *)
-     Eop(Eifthenelse, [Aux.last i; e1; e2]), acc
-    | Ematch({ e; handlers } as m) ->
-       let body acc ({ m_body } as m_h) =
+     { e with e_desc = Eop(Eifthenelse, [last acc; e1; e2]) }, acc
+  | Ematch({ e; handlers } as m) ->
+     let body acc ({ m_body } as m_h) =
        (* introduce one init per branch *)
-       let i = Ident.fresh "i" in
-       let m_body, _ = funs.expression funs { i } m_body in
-       { m_h with m_body = intro_init_e_local i m_body }, acc in
-     let e, acc = funs.expression funs acc e in
+       let acc = intro_init_in_exp () in
+       let m_body, _ = expression funs acc m_body in
+       { m_h with m_body = local_in_exp acc m_body }, acc in
+     let e, acc = expression funs acc e in
      let handlers, acc =
        Util.mapfold body acc handlers in
-     Ematch { m with e; handlers }, acc
-    | _ -> e_desc, acc in
-  { e with e_desc }, acc
- 
+     { e with e_desc = Ematch { m with e; handlers } }, acc
+  | Ereset(e, e_r) ->
+     let e_r, acc = expression funs acc e_r in
+     (* introduce one init per branch *)
+     let acc = intro_init_in_exp () in
+     let e, acc = expression funs acc e in
+     { e with e_desc = Ereset(local_in_exp acc e, e_r) }, acc       
+  | _ -> Mapfold.expression funs acc e
+
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
 let get_index funs acc n = Ident.get (), acc
@@ -126,6 +153,6 @@ let program _ p =
   let funs =
     { Mapfold.defaults with expression; set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ =
-    Mapfold.program_it funs { i = Ident.fresh "i" } p in
+    Mapfold.program_it funs dummy p in
   { p with p_impl_list = p_impl_list }
 

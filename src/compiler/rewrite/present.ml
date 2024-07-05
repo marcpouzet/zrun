@@ -38,15 +38,14 @@ open Mapfold
 (*     every handler is marked to be activated on an event              *)
 (*                                                                      *)
 (*   match x1, ... cond1, ..., condn with                               *)
-(*   | Present(p1), ..., true, ... -> (* zero = true *) ...             *)
-(*   | Present(p3), ..., _,  true -> (* zero = true *) ...              *)
+(*   | P(p1), ..., true, ... -> (* zero = true *) ...                   *)
+(*   | P(p3), ..., _,  true -> (* zero = true *) ...                    *)
 (*   end                                                                *)
 (* the bit [zero] indicates that the branch corresponds to a *)
 (* zero-crossing. It is set to [true] only when the context is continuous *)
 (*                                                                      *)
 (*                                                                      *)
-(* a signal x is represented by a pair (bit, value)                     *)
-
+(* a signal x is represented by a P(v) (present) or A (absent)          *)
 
 (** representation of signals *)
 (* a [signal] is represented as an optional value *)
@@ -64,7 +63,7 @@ let test e =
   Aux.e_match true e [match_handler (presentpat wildpat) etrue;
                       match_handler absentpat efalse]
     
-(* Equality between expressions. for efficiency purpose *)
+(* Equality between expressions. for efficiency reasons *)
 (* we restrict to simple cases *)
 let equal e1 e2 =
   match e1.e_desc, e2.e_desc with
@@ -79,16 +78,16 @@ let mem e exps = List.exists (equal e) exps
 let split spat =
   let rec split (se_list, pat_list, cond_list) spat =
     match spat.desc with
-      | Econdand(sp1, sp2) | Econdor(sp1, sp2) ->
-          split (split (se_list, pat_list, cond_list) sp2) sp1
-      | Econdexp(e) ->
-          se_list, pat_list, e :: cond_list
-      | Econdon(sp1, e) ->
-	  let se_list, pat_list, cond_list = 
-	    split (se_list, pat_list, cond_list) sp1 in
-	  se_list, pat_list, e :: cond_list
-      | Econdpat(e, pat) ->
-          e :: se_list, pat :: pat_list, cond_list in
+    | Econdand(sp1, sp2) | Econdor(sp1, sp2) ->
+       split (split (se_list, pat_list, cond_list) sp2) sp1
+    | Econdexp(e) ->
+       se_list, pat_list, e :: cond_list
+    | Econdon(sp1, e) ->
+       let se_list, pat_list, cond_list = 
+	 split (se_list, pat_list, cond_list) sp1 in
+       se_list, pat_list, e :: cond_list
+    | Econdpat(e, pat) ->
+       e :: se_list, pat :: pat_list, cond_list in
   split ([], [], []) spat
 
 (* compute the set of expressions from a signal pattern matching *)
@@ -154,7 +153,6 @@ let add_absent_vardec acc ({ var_name } as v) =
 (* Translating a present statement *)
 (* a present statement is translated into a pattern-matching *)
 let generic_present_handlers e_match handlers default_opt =
-  
   (* build the two association tables *)
   let exps = unique handlers in
   (* produces the expression to match *)

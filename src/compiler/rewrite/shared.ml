@@ -98,7 +98,7 @@ let get_index funs acc n = Ident.get (), acc
 let program _ p =
   let global_funs = { Mapfold.default_global_funs with build } in
   let funs =
-    { Mapfold.defaults with pattern; equation; (* block; *)
+    { Mapfold.defaults with pattern; equation;
                             set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs S.empty p in
   { p with p_impl_list = p_impl_list }

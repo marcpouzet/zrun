@@ -25,7 +25,7 @@ let p_handlers id handlers =
       { p_cond; p_zero; p_env; p_loc; p_body = Aux.id_eq id e })
   handlers
 
-let present id e0_opt handlers eq =
+let present_der id e0_opt handlers eq =
   let eq = match handlers with
     | [] -> eq
     | _ ->
@@ -42,7 +42,7 @@ let equation funs acc eq =
   | EQder { e_opt = None; handlers = [] } ->
      eq, acc
   | EQder { id; e; e_opt; handlers } -> 
-       let eq = present id e_opt handlers (Aux.eq_der id e) in
+     let eq = present_der id e_opt handlers (Aux.eq_der id e) in
        eq, acc
   | _ -> raise Mapfold.Fallback
 

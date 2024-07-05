@@ -1917,6 +1917,7 @@ and set_forexp_out env_eq { desc = { for_vardec = { var_name } }; loc } s =
 
 (* Evaluation of the result of a function *)
 and sresult genv env { r_desc; r_loc } s =
+  let l = Env.to_list env in
   match r_desc with
   | Exp(e) -> sexp genv env e s
   | Returns(b) ->
