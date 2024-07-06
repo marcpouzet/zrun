@@ -1051,7 +1051,6 @@ and sexp genv env { e_desc; e_loc } s =
      (* [size_list] is a list of size; it must be combinational *)
      let* fv, s = sexp genv env f s in
      let* v_list = map (size env) size_list in
-     let l = Env.to_list env in
      let* v = let+ fv = fv in sizeapply e_loc fv v_list in
      return (v, s)
   | Elet(l_eq, e), Slist [s_eq; s] ->
@@ -1920,7 +1919,6 @@ and set_forexp_out env_eq { desc = { for_vardec = { var_name } }; loc } s =
 
 (* Evaluation of the result of a function *)
 and sresult genv env { r_desc; r_loc } s =
-  let l = Env.to_list env in
   match r_desc with
   | Exp(e) -> sexp genv env e s
   | Returns(b) ->
@@ -2296,7 +2294,6 @@ and sizeapply loc fv v_list =
 
 
   let apply s_params s_body s_genv s_env =
-    let l = Env.to_list s_env in
     if List.length s_params <> List.length v_list
     then error { kind = Etype; loc }
     else
@@ -2312,7 +2309,6 @@ and sizeapply loc fv v_list =
      let { s_params; s_body; s_genv; s_env } = Env.find name defs in
      (* when the function is recursive, the actual value of the argument *)
      (* must be strictly less than the bound and greater or equal than zero *)
-     let l = Env.to_list s_env in
      let* _ =
        match bound with
        | None -> return ()
@@ -2330,7 +2326,6 @@ and sizeapply loc fv v_list =
               (Match.entry 
                  (Vsizefix { bound = Some(v_list); name = f; defs })) acc)
          defs s_env in
-     let l = Env.to_list s_env in
      apply s_params s_body s_genv s_env
   | _ -> error { kind = Etype; loc }
 

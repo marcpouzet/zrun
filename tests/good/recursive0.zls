@@ -1,5 +1,6 @@
 (* recursive functions *)
-let f1 = fun x returns o if true then o = 1 else o = 2
+let f1 = fun x returns o
+  if true then o = 1 else o = 2
 let main1 () = f1 ()
 
 let f3 =

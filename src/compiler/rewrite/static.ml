@@ -624,9 +624,10 @@ and value_t loc acc v =
          Eglobal { lname = Name(Ident.name m) },
          { acc with e_defs = impl name m (make (Efun(f))) :: acc_local.e_defs }
       | Vpresent _ | Vabsent | Vstate0 _ 
-        | Vstate1 _ | Vsizefun _ | Vsizefix _ ->
+        | Vstate1 _ ->
          (* none of these construct should appear *)
          catch (error { Error.kind = Etype; loc })
+      | Vsizefun _ | Vsizefix _ -> catch (error { Error.kind = Etype; loc })
       | Varray _ -> catch (error { Error.kind = Enot_implemented; loc })
       | Vfun _  -> catch (error { Error.kind = Enot_implemented; loc }) in
     make e_desc, acc in
@@ -667,8 +668,8 @@ let implementation acc ({ desc; loc } as impl) =
   | Eletdecl { d_names; d_leq } ->
     (* [d_leq] must be static *)
     let env = leq_e acc d_leq in
-    (* for every entry [m, id] in [d_name] *)
-    (* add the global declaration [m, e] is [id] is associated to [e] *)
+    (* for every entry [m, id] in [d_names] *)
+    (* add the global declaration [m, e] if [id] is associated to [e] *)
     letdecl_list loc { acc with e_values = Env.append env acc.e_values } d_names
   | Etypedecl _ -> { acc with e_defs = impl :: acc.e_defs }
 
