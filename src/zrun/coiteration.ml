@@ -306,8 +306,8 @@ let sizefun_defs_or_values genv env l_eq =
        if one_value then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
        else return (Env.add sf_id { s_params = sf_id_list; 
-                              s_body = sf_e; s_genv = genv; 
-                              s_env = env } acc,
+                                    s_body = sf_e; s_genv = genv; 
+                                    s_env = env } acc,
                  one_value)
     | EQand { eq_list } ->
        fold split (acc, one_value) eq_list
@@ -1051,6 +1051,7 @@ and sexp genv env { e_desc; e_loc } s =
      (* [size_list] is a list of size; it must be combinational *)
      let* fv, s = sexp genv env f s in
      let* v_list = map (size env) size_list in
+     let l = Env.to_list env in
      let* v = let+ fv = fv in sizeapply e_loc fv v_list in
      return (v, s)
   | Elet(l_eq, e), Slist [s_eq; s] ->
@@ -2295,6 +2296,7 @@ and sizeapply loc fv v_list =
 
 
   let apply s_params s_body s_genv s_env =
+    let l = Env.to_list s_env in
     if List.length s_params <> List.length v_list
     then error { kind = Etype; loc }
     else
@@ -2310,6 +2312,7 @@ and sizeapply loc fv v_list =
      let { s_params; s_body; s_genv; s_env } = Env.find name defs in
      (* when the function is recursive, the actual value of the argument *)
      (* must be strictly less than the bound and greater or equal than zero *)
+     let l = Env.to_list s_env in
      let* _ =
        match bound with
        | None -> return ()
@@ -2325,8 +2328,9 @@ and sizeapply loc fv v_list =
          (fun f e acc -> 
             Env.add f 
               (Match.entry 
-                 (Vsizefix { bound = Some(v_list); name; defs })) acc)
+                 (Vsizefix { bound = Some(v_list); name = f; defs })) acc)
          defs s_env in
+     let l = Env.to_list s_env in
      apply s_params s_body s_genv s_env
   | _ -> error { kind = Etype; loc }
 

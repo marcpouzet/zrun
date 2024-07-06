@@ -4,7 +4,7 @@ let rec f<<n>>(x) =
   else do o = g<<n-1>>(x+1) done in
   o
   
-and g<<n>> (x) = g<<n-1>> (x-1)
+and g<<n>> (x) = f<<n-1>> (x-1)
 
 let h = f
 
