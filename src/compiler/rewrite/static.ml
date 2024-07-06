@@ -579,7 +579,7 @@ and immediate { e_desc } =
   match e_desc with 
   | Econst _ | Econstr0 _ | Eglobal _ -> true | _ -> false
 
-(** translate a static value - introduce global definitions for functions *)
+(* translate a static value - introduce global definitions for functions *)
 and value_t loc acc v =
   let make e_desc = 
     { e_desc; e_loc = Location.no_location; e_info = no_info } in
