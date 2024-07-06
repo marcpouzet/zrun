@@ -28,11 +28,13 @@ let eq_copy (x, m) = Aux.id_eq m (Aux.var x)
 let eq_copy_names renaming_list = List.map eq_copy renaming_list
 
 let add_env l_env renaming_list =
-  List.fold_left (fun acc (x, m) -> Env.add m Misc.no_info acc) l_env renaming_list
+  List.fold_left 
+    (fun acc (x, m) -> Env.add m Misc.no_info acc) l_env renaming_list
 
 let add_vardec_list b_vars renaming_list =
   List.fold_left
-    (fun acc (_, m) -> Aux.vardec m false None None :: acc) b_vars renaming_list
+    (fun acc (_, m) -> Aux.vardec m false None None :: acc) 
+    b_vars renaming_list
 
 (* [remove l_env acc = renaming, acc'] extract entries in [acc] from [l_env] *)
 let remove l_env acc =
@@ -46,8 +48,7 @@ let remove l_env acc =
 
 
 (* replace occurrences of [last x] by [lx] *)
-let rec expression funs acc e =
-  let { e_desc } as e, acc = Mapfold.expression funs acc e in
+let rec expression funs acc ({ e_desc } as e) =
   let e_desc, acc = match e_desc with
     | Elast { copy; id } ->
        if copy then
@@ -59,12 +60,6 @@ let rec expression funs acc e =
            let m = fresh "m" in
            Elast { copy = false; id = m }, Env.add id m acc
        else e_desc, acc
-    | Efun(f) ->
-       let f, acc = funexp funs acc f in Efun(f), acc
-    | Elet(l, e_result) ->
-       let l, acc = leq_t funs acc l in
-       let e_result, acc = expression funs acc e_result in
-       Elet(l, e_result), acc
     | _ -> raise Mapfold.Fallback in
   { e with e_desc }, acc
 
@@ -77,16 +72,16 @@ and funexp funs acc ({ f_body = { r_desc } as r; f_env } as f) =
        let vardec_list = add_vardec_list [] renaming_list in
        Exp(Aux.e_local (Aux.block_make vardec_list
                           (eq_copy_names renaming_list)) e), acc
-  | Returns b ->
-     let b, acc = block funs acc b in
-     Returns b, acc in
+    | Returns b ->
+       let b, acc = block funs acc b in
+       Returns b, acc in
   { f with f_body = { r with r_desc } }, acc
 
-and leq_t funs acc leq =
-  let { l_eq; l_env } as leq, acc = Mapfold.leq_t funs acc leq in
+and leq_t funs acc ({ l_eq; l_env } as leq) =
   (* for every entry [x\m] in [acc] that appear in [l_env] *)
   (* add an equation [m = x]; update [l_env] and [l_eq.eq_write] *)
   (* returns the remaining [acc] *)
+  let l_eq, acc = Mapfold.equation funs acc l_eq in
   let renaming_list, acc = remove l_env acc in
   { leq with l_eq = Aux.par (l_eq :: eq_copy_names renaming_list);
              l_env = add_env l_env renaming_list }, acc
@@ -96,24 +91,14 @@ and block funs acc b =
   (* for every entry [x\m] in [acc] that appear in [b_env] *)
   (* add an equation [m = x]; update [b_env] and [b_write] *)
   (* returns the remaining [acc] *)
+  let b_vars, acc = 
+    Util.mapfold (Mapfold.vardec funs) acc b_vars in
+  let b_body, acc = Mapfold.equation funs acc b_body in
   let renaming_list, acc = remove b_env acc in
+  let b_body = Aux.par (b_body :: eq_copy_names renaming_list) in
   { b with b_vars = add_vardec_list b_vars renaming_list;
            b_env = add_env b.b_env renaming_list;
-           b_body = Aux.par (b_body :: eq_copy_names renaming_list) }, acc
-
-(* Translation of equations. *)
-and equation funs acc eq =
-  let { eq_desc }, acc = Mapfold.equation funs acc eq in
-  let eq_desc, acc = match eq_desc with
-    | EQlocal(b) ->
-       let b, acc = block funs acc b in
-       EQlocal(b), acc
-    | EQlet(l, eq) ->
-       let l, acc = leq_t funs acc l in
-       let eq, acc = equation funs acc eq in
-       EQlet(l, eq), acc
-    | _ -> raise Mapfold.Fallback in
-  { eq with eq_desc }, acc
+           b_body }, acc
 									  
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
@@ -122,7 +107,7 @@ let get_index funs acc n = Ident.get (), acc
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
-    { Mapfold.defaults with expression; leq_t; block; equation;
+    { Mapfold.defaults with expression; leq_t; block;
                             set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs Env.empty p in
   { p with p_impl_list = p_impl_list }

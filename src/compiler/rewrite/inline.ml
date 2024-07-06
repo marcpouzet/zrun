@@ -83,15 +83,15 @@ let local_in funs f_args arg_list acc { r_desc } =
 
 (** Expressions *)
 let expression funs ({ genv } as acc) e = 
-  let e, acc = Mapfold.expression funs acc e in
-  match e.e_desc with
+  let { e_desc } as e, acc = Mapfold.expression funs acc e in
+  match e_desc with
   | Eapp { is_inline = true;
            f = { e_desc = Eglobal { lname }; e_loc = f_loc }; arg_list } ->
     let { Genv.info } =
       try Genv.find_value lname genv with Not_found ->
-        Format.eprintf "Inline error: unbound global %s\n" (Lident.modname lname);
-        raise Error
-    in
+        Format.eprintf 
+          "Inline error: unbound global %s\n" (Lident.modname lname);
+        raise Error in
      begin match info with
      | Vclosure
        { c_funexp = { f_args; f_body }; c_genv } ->
@@ -120,14 +120,15 @@ let value ({ genv } as acc) name { e_desc } =
   | _ -> raise Fallback
 
 let implementation funs acc impl =
-  let impl, acc = Mapfold.implementation funs acc impl in
-  let acc = match impl.desc with
+  let { desc } as impl, acc = Mapfold.implementation funs acc impl in
+  let acc = match desc with
     (* the right-hand side of definitions that are inlined *)
     (* must be either lambdas or global names *)
-    | Eletdecl { d_names = [name, id];
-                 d_leq =
-                   { l_eq = { eq_desc = EQeq({ pat_desc = Evarpat(n) }, e ) } } }
-      when id = n -> value acc name e
+    | Eletdecl 
+      { d_names = [name, id];
+        d_leq =
+          { l_eq = { eq_desc = EQeq({ pat_desc = Evarpat(n) }, e ) } } }
+         when id = n -> value acc name e
     | _ -> raise Fallback in
   impl, acc
 
@@ -142,7 +143,8 @@ let program genv p =
   let global_funs = { Mapfold.default_global_funs with build; var_ident } in
   let funs =
     { Mapfold.defaults with
-      expression; global_funs; set_index; get_index; implementation; open_t } in
+      expression; global_funs; set_index; get_index; implementation; 
+      open_t } in
   let p, _ = Mapfold.program_it funs { empty with genv } p in
   p
 

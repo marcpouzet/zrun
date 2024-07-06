@@ -104,8 +104,8 @@ let set_steps w =
     match s with
     | "a" -> s_set := if p then s_all else S.empty
     | "static" | "inline" | "der" | "copylast" | "auto" | "present"
-    | "pre" | "reset" | "complete" | "shared" | "encore" | "letin" | "schedule" ->
-       s_set := if p then S.add s !s_set else S.remove s !s_set
+    | "pre" | "reset" | "complete" | "shared" | "encore" | "letin" 
+    | "schedule" -> s_set := if p then S.add s !s_set else S.remove s !s_set
     | "" -> ()
     | _ -> raise (Arg.Bad ("unknown pass " ^ s)) in
   let l = String.split_on_char '+' w in

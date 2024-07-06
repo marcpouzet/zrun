@@ -76,7 +76,8 @@ let schedule eq =
     Control.joinlist eq_list
   with
     Graph.Error(Cycle(n_list)) ->
-    Format.eprintf "Scheduling: unexpected cycle: equations cannot be scheduled";
+    Format.eprintf 
+      "Scheduling: unexpected cycle: equations cannot be scheduled";
     raise Misc.Error  
 
 let leq_t funs acc leq =
@@ -86,8 +87,8 @@ let leq_t funs acc leq =
 
 let block funs acc ({ b_vars; b_body } as b) =
   let b_vars, acc =
-    Util.mapfold (funs.vardec funs) acc b_vars in
-  let b_body, acc = funs.equation funs acc b_body in
+    Util.mapfold (Mapfold.vardec funs) acc b_vars in
+  let b_body, acc = Mapfold.equation funs acc b_body in
   let b_body = Aux.seq (schedule b_body) in
   { b with b_vars; b_body }, acc
 

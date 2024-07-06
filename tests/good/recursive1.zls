@@ -11,8 +11,10 @@ let ff () =
     and g<<n>>(x) = g<<n-1>>(x) in
     f<<4>>(0)
 
-
-let main1 () = f<<4>>(0)
-let main2 () = ff ()
+let node main1 () = 
+  let rec nat = 0 fby nat + 1 in
+  f<<4>>(0)
+let main2 () = 
+  ff ()
 
 
