@@ -21,24 +21,26 @@
    Univ. in June-July 2019 and the Master MPRI - M2, Fall 2019, 2020, 2021 *)
 (* The original version of this code is taken from the GitHub Zrun repo: *)
 (* https://github.com/marcpouzet/zrun *)
-(* zrun was programmed right after the COVID confinment, in Mai-June 2020 *)
+(* zrun was programmed right after the COVID confinment, in May-June 2020 *)
 (* This second version includes some of the Zelus constructs:
- *- ODEs and zero-crossing;
- *- higher order functions;
- *- the implem. was done in 2021 and updated in 2022;
- *- update during summer 2022 with array constructs inspired by that
- *- of the (beautiful!) SISAL language; they were implemented in Zelus
- *- v2 (2017).
- *- w.r.t SISAL, for loops can contain stateful (stream) functions;
- *- and two style of for loop constructs are provided:
- *- 1/ foreach loop : a parallel composition - every iteration has its
- *- own state;
- *- 2/ forward loop is an "hyper-serial" loop; iteration is done on the
- *- very same state. It is a form of bounded "clock domain" (PPDP'13) by
- *- Louis Mandel, Cedric Pasteur et Marc Pouzet.
+ *- ODEs and zero-crossing; higher order functions;
+ *- the implem. was done in 2021 and updated since then;
+ *- first update during summer 2022 with array constructs inspired by that
+ *- of the (beautiful) SISAL language; a restricted form was already
+ *- implemented in Zelus V2 in 2017.
+ *- w.r.t SISAL, for-loops can contain stateful (stream) functions;
+ *- two style of for loop constructs are provided:
+ *- 1/ the foreach loop iteration runs several instances of a stream
+ *- functions; in operational terms, every application has it own state;
+ *- 2/ the forward loop is an "hyper-serial" loop iteration. A single stream
+ *- function is applied to a stream of array, interpreting arrays as if they
+ *- were streams. It is similar to "clock domains" (PPDP'13) by
+ *- Louis Mandel, Cedric Pasteur et Marc Pouzet and is reminiscent of
+ *- temporal refinement by Caspi and Mikac.
  *- 3/ the size of arrays/number of iterations must be known statically.
- *- It is yet very experimental work. If you find it useful
- *- for your own work, please cite the [EMSOFT'2023] paper and send 
+ *-
+ *- This work is still very experimental. If you find it useful
+ *- for your research, please cite the [EMSOFT'2023] paper and send 
  *- a mail: [Marc.Pouzet@ens.fr] *)
 
 open Misc
