@@ -1,8 +1,13 @@
+let f() =
+  let m = (let z = 1 in z + 1)
+  in m
+	
+(*
 let f(x) =
   let m = (let z = 1 in z + 1)
   in let h = m + 1 in
      h + m
-	
+
 let g(x) returns (o)
    local y
    do
@@ -13,4 +18,4 @@ let g(x) returns (o)
         in let h = m + 1 in
            h + m
    done
-	
+*)	

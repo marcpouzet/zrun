@@ -94,6 +94,8 @@ let e_local { c_vardec; c_eq } e =
   let eq = equations c_eq in
   Aux.e_local (block_make vardec_list eq) e    
   
+let pattern funs acc p = p, acc
+
 (* Translation of expressions *)
 (* [expression funs { c_vardec; c_eq } e = [e', { c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq in e] and *)
@@ -106,6 +108,23 @@ let rec expression funs acc ({ e_desc } as e) =
      let e2, acc = expression funs acc e2 in
      e2, add_seq (Aux.wildpat_eq e1) acc
   | _ -> Mapfold.expression funs acc e
+
+(* Translate an equation. *)
+(* [equation funs { c_vardec; c_eq } eq = [eq', { c_vardec'; c_eq'}] *)
+(* such that [local c_vardec do c_eq and eq] and *)
+(* [local c_vardec' do c_eq' and eq'] are equivalent *)
+and equation funs acc ({ eq_desc } as eq) =
+  match eq_desc with 
+  | EQand { ordered; eq_list } ->
+     let compose = if ordered then seq else par in
+     let acc = List.fold_left
+       (fun acc eq ->
+         let _, acc_eq = Mapfold.equation funs empty eq in
+         compose acc acc_eq) acc eq_list in
+     empty_eq, acc
+  | _ ->
+     let eq, acc = Mapfold.equation funs acc eq in
+     empty_eq, add_seq eq acc
 
 and leq_t funs acc ({ l_eq } as leq) =
   let _, acc = equation funs acc l_eq in
@@ -133,26 +152,16 @@ and result funs acc ({ r_desc } as r) =
      Returns({ b with b_vars; b_body = eq_local acc_local }), acc in
   { r with r_desc }, acc
 
-(* Translate an equation. *)
-(* [equation funs { c_vardec; c_eq } eq = [eq', { c_vardec'; c_eq'}] *)
-(* such that [local c_vardec do c_eq and eq] and *)
-(* [local c_vardec' do c_eq' and eq'] are equivalent *)
-and equation funs acc ({ eq_desc } as eq) =
-  match eq_desc with 
-  | EQand { ordered; eq_list } ->
-     let compose = if ordered then seq else par in
-     let acc = List.fold_left
-       (fun acc eq ->
-         let _, acc_eq = Mapfold.equation funs empty eq in
-         compose acc acc_eq) acc eq_list in
-     empty_eq, acc
-  | _ -> Mapfold.equation funs acc eq
+and letdecl funs acc (d_names, leq) =
+  let _, acc_local = leq_t funs empty leq in
+  (d_names, { leq with l_eq = eq_local acc_local }), acc
 
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
-    { Mapfold.defaults with equation; leq_t; block; match_handler_eq;
-                            match_handler_e; result; global_funs } in
+    { Mapfold.defaults with pattern; expression; equation; leq_t; block;
+                            match_handler_eq; match_handler_e; result; letdecl;
+                            global_funs } in
   let { p_impl_list } as p, _ =
     Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }
