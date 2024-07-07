@@ -132,7 +132,7 @@ and equation funs acc ({ eq_desc } as eq) =
      let compose = if ordered then seq else par in
      let acc = List.fold_left
        (fun acc eq ->
-         let _, acc_eq = Mapfold.equation funs empty eq in
+         let _, acc_eq = equation funs empty eq in
          compose acc acc_eq) acc eq_list in
      empty_eq, acc
   | _ ->
