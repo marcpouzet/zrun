@@ -661,15 +661,21 @@ and gvalue_t loc acc ({ e_desc } as e) v =
   else value_t loc acc v
 
 let letdecl_list loc acc d_names =
+  let is_a_sizefun v =
+    match v with | Value.Vsizefix _ | Value.Vsizefun _ -> true | _ -> false in
   let letdecl acc (name, id) =
     let v = Env.find id acc.e_values in
     let acc = { acc with e_gvalues = Genv.add name v acc.e_gvalues } in
     if Env.mem id acc.e_exp then
       { acc with e_defs = impl name id (Env.find id acc.e_exp) :: acc.e_defs }
     else
-      let e, acc = value_t loc acc v in
-      { acc with e_exp = Env.add id e acc.e_exp;
-                 e_defs = impl name id e :: acc.e_defs } in
+      (* values that are parameterized by static ones like functions *)
+      (* sizes are not emitted *)
+      if is_a_sizefun v then acc
+      else
+        let e, acc = value_t loc acc v in
+        { acc with e_exp = Env.add id e acc.e_exp;
+                   e_defs = impl name id e :: acc.e_defs } in
   List.fold_left letdecl acc d_names
     
 (* The main function. Reduce every definition *)
