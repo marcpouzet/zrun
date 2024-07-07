@@ -5,7 +5,7 @@ let f() =
 let g(x) =
   let m = (let z = 1 in z + 1)
   in let h = m + 1 in
-     h + m
+     h + m; h - m; 1 + m; 42
 
 let h(x) returns (o)
    local y
@@ -14,8 +14,10 @@ let h(x) returns (o)
    and
     o = let m = (let z = 1 in
                  z + 1)
-        in let h = m + 1 in
-           h + m
+        in match x with
+           | true -> let h = m + 1 in
+                     h + m
+           | false -> (let r = m + 1 in r + 1) + (let g = m + 2 in g * g)	  
    done
 
 

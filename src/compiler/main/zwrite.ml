@@ -23,13 +23,8 @@ let main file =
   then 
     let filename = Filename.chop_extension file in
     let modname = String.capitalize_ascii (Filename.basename filename) in
-    let ff = Format.std_formatter in
-    (* output file in which values are stored *)
-    let obj_name = filename ^ ".zlo" in
-    let otc = open_out_bin obj_name in
-    let source_name = filename ^ ".zls" in
     let n_steps = !equivalence_checking in
-    Rewrite.main ff modname filename source_name otc n_steps 
+    Rewrite.main modname filename n_steps 
   else raise (Arg.Bad "Expected *.zls file.")
 
 let doc_main = "\tThe main node to evaluate"

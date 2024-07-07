@@ -123,7 +123,7 @@ let compare n_steps genv0 p p' =
     
 (* Apply a sequence of source-to-source transformation *)
 (* do equivalence checking for every step if the flag is turned on *)
-let main ff modname filename source_name otc n_steps =
+let main modname filename n_steps =
   let transform_and_compare comment transform genv p =
     let p' = transform genv p in
     Debug.print_message comment;
@@ -137,6 +137,12 @@ let main ff modname filename source_name otc n_steps =
        let p = transform_and_compare comment transform genv p in
        iter genv l p in
   
+  let _ = Format.std_formatter in
+  
+  (* output file in which values are stored *)
+  let obj_name = filename ^ ".zlo" in
+  let otc = open_out_bin obj_name in
+  let source_name = filename ^ ".zls" in
   (* set the current opened module *)
   Location.initialize source_name;
 
@@ -157,4 +163,5 @@ let main ff modname filename source_name otc n_steps =
       Debug.print_program Write.program p in
   (* Source-to-source transformations start here *)
   let _ = iter genv0 (rewrite_list ()) p in
-  ()
+
+  apply_with_close_out (fun _ -> ()) otc
