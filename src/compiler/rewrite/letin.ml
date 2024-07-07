@@ -106,38 +106,50 @@ let pattern funs acc p = p, acc
 (* [expression funs { c_vardec; c_eq } e = [e', { c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq in e] and *)
 (* [local c_vardec' do c_eq' in e'] are equivalent *)
-let rec expression funs acc e =
-  let ({ e_desc } as e), acc = Mapfold.expression funs acc e in
+let rec expression funs acc ({ e_desc } as e) =
   match e_desc with
   | Eop(Eseq, [e1; e2]) ->
+     (* the sequential order is preserved *)
      (* [e1; e2] is a short-cut for [let _ = e1 in e2] *)
-     let e1, acc = expression funs acc e1 in
-     let e2, acc = expression funs acc e2 in
-     e2, add_seq (Aux.wildpat_eq e1) acc
-  | Elet({ l_eq }, e) ->
-     assert (l_eq.eq_desc = EQempty);
-     e, acc
-  | Elocal({ b_body }, e) ->
-     assert (b_body.eq_desc = EQempty);
-     e, acc
-  | _ -> e, acc
+     let e1, acc_e1 = expression funs empty e1 in
+     let e2, acc_e2 = expression funs empty e2 in
+     e2, par acc (seq acc_e1 (add_seq (Aux.wildpat_eq e1) acc_e2))
+  | Elet(l, e) ->
+     (* the sequential order is preserved *)
+     let _, acc_l = leq_t funs empty l in
+     let e, acc_e = expression funs empty e in
+     e, par acc (seq acc_l acc_e)
+  | Elocal(b, e) ->
+     (* the sequential order is preserved *)
+     let _, acc_b = block funs empty b in
+     let e, acc_e = expression funs empty e in
+     e, par acc (seq acc_b acc_e)
+  | _ -> Mapfold.expression funs acc e
      
 (* Translate an equation. *)
-(* [equation funs { c_vardec; c_eq } eq = [eq', { c_vardec'; c_eq'}] *)
+(* [equation funs { c_vardec; c_eq } eq = empty_eq, [{ c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq and eq] and *)
-(* [local c_vardec' do c_eq' and eq'] are equivalent *)
+(* [local c_vardec' do c_eq'] are equivalent *)
 and equation funs acc ({ eq_desc } as eq) =
-  match eq_desc with 
-  | EQand { ordered; eq_list } ->
-     let compose = if ordered then seq else par in
-     let acc = List.fold_left
-       (fun acc eq ->
-         let _, acc_eq = equation funs empty eq in
-         compose acc acc_eq) acc eq_list in
-     empty_eq, acc
-  | _ ->
-     let eq, acc = Mapfold.equation funs acc eq in
-     empty_eq, add_par eq acc
+  let acc_eq = match eq_desc with 
+    | EQand { eq_list } ->
+       let _, acc = Util.mapfold (equation funs) empty eq_list in
+       acc
+    | EQinit(id, e_init) ->
+       let e_init, acc_init = expression funs empty e_init in
+       add_par { eq with eq_desc = EQinit(id, e_local acc_init e_init) } empty
+    | EQlet(l, eq) ->
+       (* the sequential order is preserved *)
+       let _, acc_l = leq_t funs empty l in
+       let eq, acc_eq = equation funs empty eq in
+       seq acc_l acc_eq
+    | EQlocal(b) ->
+       let _, acc_b = block funs empty b in
+       acc_b
+    | _ ->
+       let eq, acc = Mapfold.equation funs empty eq in
+       add_seq eq acc in
+  empty_eq, par acc_eq acc
 
 and leq_t funs acc { l_eq = { eq_write } as l_eq } =
   let _, acc = equation funs acc l_eq in
