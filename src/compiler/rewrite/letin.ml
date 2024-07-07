@@ -155,9 +155,19 @@ and leq_t funs acc { l_eq = { eq_write } as l_eq } =
   let _, acc = equation funs acc l_eq in
   empty_leq, add_names (Defnames.names S.empty eq_write) acc
 
+and move_init_into_equations acc ({ var_name; var_init } as v) =
+  match var_init with
+  | None -> v, acc
+  | Some(e) ->
+     { v with var_init = None }, add_seq (Aux.eq_init var_name e) acc
+     
 and block funs acc { b_vars; b_body } =
-  let _, acc = equation funs acc b_body in
-  empty_block, add_vardec b_vars acc
+  let b_vars, acc_b_vars =
+    Util.mapfold (Mapfold.vardec funs) empty b_vars in
+  let b_vars, acc_b_vars =
+    Util.mapfold move_init_into_equations acc_b_vars b_vars in
+  let _, acc_b_body = equation funs empty b_body in
+  empty_block, (add_vardec b_vars (par acc (seq acc_b_vars acc_b_body)))
 
 and match_handler_eq funs acc ({ m_body } as m_h) =
   let _, acc_local = equation funs empty m_body in 
@@ -173,8 +183,11 @@ and result funs acc ({ r_desc } as r) =
      let e, acc_local = expression funs empty e in
      Exp(e_local acc_local e), acc
   | Returns({ b_vars; b_body } as b) ->
+     let b_vars, acc_b_vars =
+       Util.mapfold (vardec funs) empty b_vars in
      let _, acc_local = equation funs empty b_body in
-     Returns({ b with b_vars; b_body = eq_local acc_local }), acc in
+     Returns({ b with b_vars; b_body = eq_local (seq acc_b_vars acc_local) }),
+     acc in
   { r with r_desc }, acc
 
 and letdecl funs acc (d_names, ({ l_eq } as leq)) =

@@ -21,7 +21,7 @@ let h(x) returns (o)
 
 let i(x) returns (o, y)
    do
-    local m do y = 2 done
+    local m init 42 do y = 2 done
    and
     o = 1 + 2
    done
