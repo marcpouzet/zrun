@@ -581,6 +581,11 @@ and immediate { e_desc } =
 
 (* translate a static value - introduce global definitions for functions *)
 and value_t loc acc v =
+  let unexpected_failure s =
+    catch (error { kind = Error.Eunexpected_failure
+                            { arg = s;
+                              print = fun ff s -> Format.fprintf ff "%s" s };
+                   loc = no_location }) in
   let make e_desc = 
     { e_desc; e_loc = Location.no_location; e_info = no_info } in
   let rec value_t acc v =
@@ -623,13 +628,22 @@ and value_t loc acc v =
          let name = Ident.name m in
          Eglobal { lname = Name(Ident.name m) },
          { acc with e_defs = impl name m (make (Efun(f))) :: acc_local.e_defs }
-      | Vpresent _ | Vabsent | Vstate0 _ 
-        | Vstate1 _ ->
-         (* none of these construct should appear *)
-         catch (error { Error.kind = Etype; loc })
-      | Vsizefun _ | Vsizefix _ -> catch (error { Error.kind = Etype; loc })
-      | Varray _ -> catch (error { Error.kind = Enot_implemented; loc })
-      | Vfun _  -> catch (error { Error.kind = Enot_implemented; loc }) in
+      | Varray(a) ->
+         let v = catch (Arrays.flat_of_map a) in
+         let v, acc = Util.mapfold value_t acc (Array.to_list v) in
+         Eop(Earray(Earray_list), v), acc
+      (* none of the value below should appear *)
+      | Vpresent _ ->
+         unexpected_failure "present"
+      | Vabsent ->
+         unexpected_failure "absent"
+      | Vstate0 _ | Vstate1 _ ->
+         unexpected_failure "state"
+      | Vsizefun _ ->
+         unexpected_failure "sizefun"
+      | Vsizefix _ ->
+         unexpected_failure "sizefix"
+      | Vfun _  -> unexpected_failure "vfun" in
     make e_desc, acc in
   let e, acc = value_t acc v in
   (* if [e] is not immediate, add a global definition to store it *)
