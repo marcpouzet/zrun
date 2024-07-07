@@ -92,13 +92,13 @@ let equations eqs =
 (* build an equation [local vardec_list do eq done] from [acc] *)
 let eq_local { c_vardec; c_eq } =
   let vardec_list = State.fold (@) c_vardec [] in
-  let eq = equations c_eq in
-  Aux.eq_local (block_make vardec_list eq)     
+  let eq_list = equations c_eq in
+  Aux.eq_local (block_make vardec_list eq_list)     
 
 let e_local { c_vardec; c_eq } e =
   let vardec_list = State.fold (@) c_vardec [] in
-  let eq = equations c_eq in
-  Aux.e_local (block_make vardec_list eq) e    
+  let eq_list = equations c_eq in
+  Aux.e_local (block_make vardec_list eq_list) e    
   
 let pattern funs acc p = p, acc
 
