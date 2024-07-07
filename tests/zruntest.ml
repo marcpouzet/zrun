@@ -63,3 +63,4 @@ let bad =
   
 (* Main test runner. *)
 let () = Alcotest.run  "zrun_tests" [("good", good); ("bad", bad)]
+
