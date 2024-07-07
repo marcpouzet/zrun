@@ -123,6 +123,16 @@ and match_handler_e funs acc ({ m_body } as m_h) =
   let e, acc_local = expression funs empty m_body in 
   { m_h with m_body = e_local acc_local e }, acc
 
+and result funs acc ({ r_desc } as r) =
+  let r_desc, acc = match r_desc with
+  | Exp(e) ->
+     let e, acc_local = expression funs empty e in
+     Exp(e_local acc_local e), acc
+  | Returns({ b_vars; b_body } as b) ->
+     let _, acc_local = equation funs empty b_body in
+     Returns({ b with b_vars; b_body = eq_local acc_local }), acc in
+  { r with r_desc }, acc
+
 (* Translate an equation. *)
 (* [equation funs { c_vardec; c_eq } eq = [eq', { c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq and eq] and *)
@@ -142,7 +152,7 @@ let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
     { Mapfold.defaults with equation; leq_t; block; match_handler_eq;
-                            match_handler_e; global_funs } in
+                            match_handler_e; result; global_funs } in
   let { p_impl_list } as p, _ =
     Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }
