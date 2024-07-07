@@ -33,6 +33,9 @@ open State
 open Mapfold
 
 let empty_eq = eqmake Defnames.empty EQempty
+let empty_leq =
+  { l_kind = Kstatic; l_rec = false; l_eq = empty_eq;
+    l_loc = no_location; l_env = Env.empty }
 let empty_block =
   { b_vars = []; b_body = empty_eq; 
     b_env = Env.empty; b_loc = no_location; b_write = Defnames.empty }
@@ -124,15 +127,15 @@ and equation funs acc ({ eq_desc } as eq) =
      empty_eq, acc
   | _ ->
      let eq, acc = Mapfold.equation funs acc eq in
-     empty_eq, add_seq eq acc
+     empty_eq, add_par eq acc
 
-and leq_t funs acc ({ l_eq } as leq) =
+and leq_t funs acc { l_eq } =
   let _, acc = equation funs acc l_eq in
-  { leq with l_eq = empty_eq }, add_seq l_eq acc
+  empty_leq, acc
 
 and block funs acc { b_vars; b_body } =
   let _, acc = equation funs acc b_body in
-  empty_block, add_vardec b_vars (add_seq b_body acc)
+  empty_block, add_vardec b_vars acc
 
 and match_handler_eq funs acc ({ m_body } as m_h) =
   let _, acc_local = equation funs empty m_body in 
