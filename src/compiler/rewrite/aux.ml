@@ -100,6 +100,8 @@ let vardec id var_is_last var_init var_default =
   { var_name = id; var_is_last; var_init; var_default; var_clock = false;
     var_typeconstraint = None; var_loc = no_location }
 
+let id_vardec id = vardec id false None None
+
 let block_make vardec_list eq_list =
   let b_body =
     match eq_list with

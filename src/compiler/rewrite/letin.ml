@@ -59,6 +59,9 @@ let add_par eq ({ c_eq } as ctx) =
   { ctx with c_eq = State.par (State.singleton eq) c_eq }
 let add_vardec vardec_list ({ c_vardec } as ctx) =
   { ctx with c_vardec = State.Cons(vardec_list, c_vardec) }
+let add_names n_names ctx =
+  let vardec_list = S.fold (fun id acc -> Aux.id_vardec id :: acc) n_names [] in
+  add_vardec vardec_list ctx
 				   				      
 (* translate a context [acc] into an environment and an equation *)
 let equations eqs =
@@ -103,15 +106,22 @@ let pattern funs acc p = p, acc
 (* [expression funs { c_vardec; c_eq } e = [e', { c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq in e] and *)
 (* [local c_vardec' do c_eq' in e'] are equivalent *)
-let rec expression funs acc ({ e_desc } as e) =
+let rec expression funs acc e =
+  let ({ e_desc } as e), acc = Mapfold.expression funs acc e in
   match e_desc with
   | Eop(Eseq, [e1; e2]) ->
      (* [e1; e2] is a short-cut for [let _ = e1 in e2] *)
      let e1, acc = expression funs acc e1 in
      let e2, acc = expression funs acc e2 in
      e2, add_seq (Aux.wildpat_eq e1) acc
-  | _ -> Mapfold.expression funs acc e
-
+  | Elet({ l_eq }, e) ->
+     assert (l_eq.eq_desc = EQempty);
+     e, acc
+  | Elocal({ b_body }, e) ->
+     assert (b_body.eq_desc = EQempty);
+     e, acc
+  | _ -> e, acc
+     
 (* Translate an equation. *)
 (* [equation funs { c_vardec; c_eq } eq = [eq', { c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq and eq] and *)
@@ -129,9 +139,9 @@ and equation funs acc ({ eq_desc } as eq) =
      let eq, acc = Mapfold.equation funs acc eq in
      empty_eq, add_par eq acc
 
-and leq_t funs acc { l_eq } =
+and leq_t funs acc { l_eq = { eq_write } as l_eq } =
   let _, acc = equation funs acc l_eq in
-  empty_leq, acc
+  empty_leq, add_names (Defnames.names S.empty eq_write) acc
 
 and block funs acc { b_vars; b_body } =
   let _, acc = equation funs acc b_body in
@@ -155,8 +165,8 @@ and result funs acc ({ r_desc } as r) =
      Returns({ b with b_vars; b_body = eq_local acc_local }), acc in
   { r with r_desc }, acc
 
-and letdecl funs acc (d_names, leq) =
-  let _, acc_local = leq_t funs empty leq in
+and letdecl funs acc (d_names, ({ l_eq } as leq)) =
+  let _, acc_local = equation funs empty l_eq in
   (d_names, { leq with l_eq = eq_local acc_local }), acc
 
 let program _ p =

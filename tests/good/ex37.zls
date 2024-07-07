@@ -2,13 +2,12 @@ let f() =
   let m = (let z = 1 in z + 1)
   in m
 	
-(*
-let f(x) =
+let g(x) =
   let m = (let z = 1 in z + 1)
   in let h = m + 1 in
      h + m
 
-let g(x) returns (o)
+let h(x) returns (o)
    local y
    do
     local m do y = 2 and m = y done
@@ -18,4 +17,3 @@ let g(x) returns (o)
         in let h = m + 1 in
            h + m
    done
-*)	
