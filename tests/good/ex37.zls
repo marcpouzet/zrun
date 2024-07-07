@@ -23,5 +23,5 @@ let i(x) returns (o, y)
    do
     local m init 42 do y = 2 done
    and
-    o = 1 + 2
+    o = local k init m do k = 1 + 2 in k
    done

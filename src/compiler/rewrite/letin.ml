@@ -148,8 +148,8 @@ and equation funs acc ({ eq_desc } as eq) =
        acc_b
     | _ ->
        let eq, acc = Mapfold.equation funs empty eq in
-       add_seq eq acc in
-  empty_eq, par acc_eq acc
+       seq acc (add_seq eq empty) in
+  empty_eq, par acc acc_eq
 
 and leq_t funs acc { l_eq = { eq_write } as l_eq } =
   let _, acc = equation funs acc l_eq in
@@ -159,7 +159,7 @@ and move_init_into_equations acc ({ var_name; var_init } as v) =
   match var_init with
   | None -> v, acc
   | Some(e) ->
-     { v with var_init = None }, add_seq (Aux.eq_init var_name e) acc
+     { v with var_init = None }, par acc (add_seq (Aux.eq_init var_name e) empty)
      
 and block funs acc { b_vars; b_body } =
   let b_vars, acc_b_vars =
@@ -185,6 +185,8 @@ and result funs acc ({ r_desc } as r) =
   | Returns({ b_vars; b_body } as b) ->
      let b_vars, acc_b_vars =
        Util.mapfold (vardec funs) empty b_vars in
+     let b_vars, acc_b_vars =
+       Util.mapfold move_init_into_equations acc_b_vars b_vars in
      let _, acc_local = equation funs empty b_body in
      Returns({ b with b_vars; b_body = eq_local (seq acc_b_vars acc_local) }),
      acc in
