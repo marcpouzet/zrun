@@ -33,7 +33,7 @@ let add_env l_env renaming_list =
 
 let add_vardec_list b_vars renaming_list =
   List.fold_left
-    (fun acc (_, m) -> Aux.vardec m false None None :: acc) 
+    (fun acc (_, m) -> Aux.vardec m true None None :: acc) 
     b_vars renaming_list
 
 (* [remove l_env acc = renaming, acc'] extract entries in [acc] from [l_env] *)

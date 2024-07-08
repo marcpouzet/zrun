@@ -33,7 +33,7 @@ let local_value e =
   let m = fresh "m" in
   Aux.e_local (Aux.block_make [Aux.vardec x false None None;
                                Aux.vardec m true None None]
-                 [Aux.id_eq m e; Aux.id_eq x (Aux.last m)]) (var m)
+                 [Aux.id_eq m e; Aux.id_eq x (Aux.last m)]) (var x)
 
 (* Defines a state variable with initialization *)
 let local_init_value e1 e2 =
@@ -41,7 +41,7 @@ let local_init_value e1 e2 =
   let m = fresh "m" in
   Aux.e_local (Aux.block_make [Aux.vardec x false None None;
                                Aux.vardec m false (Some(e1)) None]
-                 [Aux.id_eq m e2; Aux.id_eq x (Aux.last m)]) (var m)
+                 [Aux.id_eq m e2; Aux.id_eq x (Aux.last m)]) (var x)
 
 (* Translation of expressions. *)
 let expression funs acc e =
