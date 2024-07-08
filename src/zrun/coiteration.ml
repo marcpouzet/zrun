@@ -2480,6 +2480,7 @@ let eval_list ff n_steps genv l_names =
 let check n_steps
       { current = { values = g1 } } { current = { values = g2 } } =
   let check name v1 v2 =
+    Debug.print_message ("Checking node " ^ name);
     match v1, v2 with
     | Vclosure
       ({ c_funexp = { f_kind = k1; f_loc = loc1; f_args = [[]] } } as c1),

@@ -140,7 +140,9 @@ let message loc kind =
        "@[%aZrun: the recursive definition of a value is not allowed.@.@]"
        output_location loc
   | Enot_causal(bot_names) ->
-     let pnames ff names = Ident.S.iter (Ident.fprint_t ff) names in
+     let pnames ff names =
+       let l = Ident.S.to_list names in
+       Pp_tools.print_list_r Ident.fprint_t "{" "," "}" ff l in
      eprintf "@[%aZrun: the following variables are not causal:\n\
               %a@.@]"
        output_location loc

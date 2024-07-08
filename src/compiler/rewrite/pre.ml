@@ -40,7 +40,7 @@ let local_init_value e1 e2 =
   let x = fresh "x" in
   let m = fresh "m" in
   Aux.e_local (Aux.block_make [Aux.vardec x false None None;
-                               Aux.vardec m false (Some(e1)) None]
+                               Aux.vardec m true (Some(e1)) None]
                  [Aux.id_eq m e2; Aux.id_eq x (Aux.last m)]) (var m)
 
 (* Translation of expressions. *)

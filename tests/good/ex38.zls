@@ -1,0 +1,4 @@
+let node f13(x) = 0 fby x + 1
+
+let node g14() returns (y, z)
+  do y = run f13(z) and z = y done

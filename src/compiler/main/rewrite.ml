@@ -116,7 +116,10 @@ let set_steps w =
 let rewrite_list () =
   List.filter (fun (w, _, _) -> S.mem w !s_set) default_list
 
-let compare n_steps genv0 p p' =
+let compare name n_steps genv0 p p' =
+  Debug.print_message
+    ("Checks the pass " ^ name ^
+     " for " ^ (string_of_int n_steps) ^" steps\n");
   let genv = Coiteration.program genv0 p in
   let genv' = Coiteration.program genv0 p' in
   Coiteration.check n_steps genv genv'; p'
@@ -124,17 +127,17 @@ let compare n_steps genv0 p p' =
 (* Apply a sequence of source-to-source transformation *)
 (* do equivalence checking for every step if the flag is turned on *)
 let main modname filename n_steps =
-  let transform_and_compare comment transform genv p =
+  let transform_and_compare (name, comment, transform) genv p =
     let p' = transform genv p in
     Debug.print_message comment;
     Debug.print_program p';
-    if n_steps = 0 then p' else compare n_steps genv p p' in
+    if n_steps = 0 then p' else compare name n_steps genv p p' in
     
   let rec iter genv l p =
     match l with
     | [] -> p
-    | (_, comment, transform) :: l ->
-       let p = transform_and_compare comment transform genv p in
+    | (name, comment, transform) :: l ->
+       let p = transform_and_compare (name, comment, transform) genv p in
        iter genv l p in
   
   let _ = Format.std_formatter in

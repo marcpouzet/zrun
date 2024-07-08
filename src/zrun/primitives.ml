@@ -181,6 +181,14 @@ let length_op v =
   | Varray(a) -> return (Vint(length a))
   | _ -> none
 
+let rec compare_list compare p_list1 p_list2 =
+  match p_list1, p_list2 with
+  | [], [] -> return 0
+  | p1 :: p_list1, p2 :: p_list2 ->
+     let* v = compare p1 p2 in
+     if v = 0 then compare_list compare p_list1 p_list2 else return v
+  | _ -> none
+    
 let rec compare_pvalue v1 v2 =
   match v1, v2 with
   | Vint i1, Vint i2 -> return (compare i1 i2)
@@ -205,17 +213,10 @@ let rec compare_pvalue v1 v2 =
   | Varray(v1), Varray(v2) -> 
      if length v1 = length v2 then compare_array compare_pvalue v1 v2 else none
   | Vrecord _, Vrecord _ -> none
-  | Vtuple _, Vtuple _ -> none
+  | Vtuple(v_list1), Vtuple(v_list2) ->
+     compare_list compare_value v_list1 v_list2
   | Vfun _, Vfun _ -> none
   | Vclosure _, Vclosure _ -> none
-  | _ -> none
-
-and compare_list compare p_list1 p_list2 =
-  match p_list1, p_list2 with
-  | [], [] -> return 0
-  | p1 :: p_list1, p2 :: p_list2 ->
-     let* v = compare p1 p2 in
-     if v = 0 then compare_list compare p_list1 p_list2 else return v
   | _ -> none
 
 and compare_array compare a1 a2 =
@@ -242,6 +243,11 @@ and compare_array compare a1 a2 =
   | Vmap({ m_u = a1 }), Vmap({ m_u = a2 }) -> 
     compare_array_n n (get_i, a1) (get_i, a2)
 
+and compare_value v1 v2 =
+  match v1, v2 with
+  | (Vbot, _) | (_, Vbot) | (Vnil, _) | (_, Vnil) -> none
+  | (Value(v1), Value(v2)) -> compare_pvalue v1 v2
+                                
 let eq_op v1 v2 =
   let* v = compare_pvalue v1 v2 in
   return (Vbool(v = 0))
