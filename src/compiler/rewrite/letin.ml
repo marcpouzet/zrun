@@ -177,6 +177,16 @@ and match_handler_e funs acc ({ m_body } as m_h) =
   let e, acc_local = expression funs empty m_body in 
   { m_h with m_body = e_local acc_local e }, acc
 
+and present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_cond, acc = Mapfold.scondpat funs acc p_cond in
+  let _, acc_local = equation funs empty p_body in
+  { p_b with p_cond; p_body = eq_local acc_local }, acc
+
+and present_handler_e funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_cond, acc = Mapfold.scondpat funs acc p_cond in
+  let p_body, acc_local = expression funs empty p_body in
+  { p_b with p_cond; p_body = e_local acc_local p_body }, acc
+
 and result funs acc ({ r_desc } as r) =
   let r_desc, acc = match r_desc with
   | Exp(e) ->
@@ -200,8 +210,9 @@ let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
     { Mapfold.defaults with pattern; expression; equation; leq_t; block;
-                            match_handler_eq; match_handler_e; result; letdecl;
-                            global_funs } in
+                            match_handler_eq; match_handler_e;
+                            present_handler_eq; present_handler_e;
+                            result; letdecl; global_funs } in
   let { p_impl_list } as p, _ =
     Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }
