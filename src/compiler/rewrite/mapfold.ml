@@ -757,7 +757,7 @@ and implementation funs acc ({ desc } as impl) =
        let name, acc = open_it funs acc name in
        Eopen(name), acc
     | Eletdecl { d_names; d_leq } ->
-       let (dnames, d_leq), acc = letdecl_it funs acc (d_names, d_leq) in
+       let (d_names, d_leq), acc = letdecl_it funs acc (d_names, d_leq) in
        Eletdecl { d_names; d_leq }, acc
     | Etypedecl { name; ty_params; size_params; ty_decl } ->
        let (name, ty_params, size_params, ty_decl), acc =
