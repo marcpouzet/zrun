@@ -14,6 +14,8 @@
 
 (* Add an equation [m = x] every time [last x] is used; replace [last x] *)
 (* by [last* m]. This step is necessary for static scheduling *)
+(* if [x] is initialized, that is, either with an equation [init x = e] *)
+(* or at the declaration [local ... x init e] rename [x] in [m] *)
 
 open Location
 open Zelus
