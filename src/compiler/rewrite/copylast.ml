@@ -13,16 +13,27 @@
 (* *********************************************************************)
 
 (* Add an equation [m = x] every time [last x] is used; replace [last x] *)
-(* by [last* m]. This step is necessary for static scheduling *)
-(* if [x] is initialized, that is, either with an equation [init x = e] *)
-(* or at the declaration [local ... x init e] rename [x] in [m] *)
+(* by [last*m] and rename [init x = e] in [init m = e] *)
+(* This step is necessary for static scheduling. *)
 
 (*
   Example:
 
+  fun x -> last x + 1
+
+  is rewritten:
+
+  fun x -> local (last m) do m = x and y = last*m + 1 in y
+
+  fun x returns (o, y) ... last y ...
+
+  is rewritten:
+
+  fun x returns (o, y) ... last* m ... and m = y
+
   local x, y do init x = v0 and init y = v1 and y = last x + 1 and x = last y + 1
 
-  can be rewritten in:
+  is rewritten:
 
   local x, y, lx, ly do
   init x = v0 and init y = v1
@@ -31,7 +42,7 @@
   y = lx + 1
   x = ly + 1
 
-  or:
+  An alternative would be:
 
   local x, y, mx, my do
   init mx = v0 and init my = v1
@@ -39,6 +50,9 @@
   x = last* my + 1
   mx = x
   my = y
+
+  The gain from one w.r.t the other is not clear; it depends on how CSE/Tomato
+  is done afterward.
 *)
 
 open Location
@@ -49,7 +63,7 @@ open Aux
 type acc = Ident.t Env.t (* associate names to names *)
 
 (* Make an equation [m = x] *)
-let eq_copy (x, m) = Aux.id_eq m (Aux.var x)
+let eq_copy (x, mlx) = Aux.id_eq m (Aux.last_star x)
 
 let eq_copy_names renaming_list = List.map eq_copy renaming_list
 
