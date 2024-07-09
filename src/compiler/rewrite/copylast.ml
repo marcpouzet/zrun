@@ -51,10 +51,10 @@
   y = lx + 1
   x = ly + 1
 
-  The gain in efficiency off one w.r.t the other is unclear; the first ensures
+  The gain in efficiency off one w.r.t the other is not clear; the efficiency
+  depends on how CSE/Tomato is done afterward. The first ensures
   that the kind of variables is unchanged. In particular, it can be applied
-  to variables that are input and outputs of functions. The efficiency
-  depends on how CSE/Tomato is done afterward.
+  to variables that are input and outputs of functions. 
 *)
 
 open Location
@@ -65,7 +65,7 @@ open Aux
 type acc = Ident.t Env.t (* associate names to names *)
 
 (* Make an equation [m = x] *)
-let eq_copy (x, mlx) = Aux.id_eq m (Aux.last_star x)
+let eq_copy (x, m) = Aux.id_eq m (Aux.var x)
 
 let eq_copy_names renaming_list = List.map eq_copy renaming_list
 
@@ -88,7 +88,8 @@ let remove l_env acc =
        with Not_found -> renaming_list, acc)
     l_env ([], acc)
 
-(* replace occurrences of [last x] by [lx] *)
+    (*
+      (* replace occurrences of [last x] by [lx] *)
 let rec expression funs acc ({ e_desc } as e) =
   let e_desc, acc = match e_desc with
     | Elast { copy; id } ->
@@ -103,7 +104,7 @@ let rec expression funs acc ({ e_desc } as e) =
        else e_desc, acc
     | _ -> raise Mapfold.Fallback in
   { e with e_desc }, acc
-
+     *)
 let intro acc id =
   try
     let m = Env.find id acc in
@@ -113,22 +114,12 @@ let intro acc id =
      let m = fresh "m" in m, Env.add id m acc
 
 (* replace [last id] by [last*m] *)
-let last_ident funs acc ({ copy; id } as l) =
+let last_ident _ acc { copy; id } =
   let m, acc = intro acc id in
   { copy = false; id = m }, acc
 
-                              if copy then
-    try (* if [id] is already in [acc] and associated to [m] *)
-      (* replace [last id] by [last*m] *)
-      let m = Env.find id acc in
-      { copy = false; id = m }, acc
-    with
-    | Not_found ->
-       let m = fresh "m" in
-       { copy = false; id = m }, Env.add id m acc
-  else l, acc
-
-let init_ident funs acc id = intro acc id
+(* replace [init id = e] by [init m = e] *)
+let init_ident _ acc id = intro acc id
 
 let rec funexp funs acc ({ f_body = { r_desc } as r; f_env } as f) =
   let r_desc, acc =
@@ -172,9 +163,25 @@ let set_index funs acc n =
 let get_index funs acc n = Ident.get (), acc
 
 let program _ p =
-  let global_funs = Mapfold.default_global_funs in
+  let global_funs =
+    { Mapfold.default_global_funs with last_ident; init_ident } in
   let funs =
-    { Mapfold.defaults with last_ident; leq_t; block;
-                            set_index; get_index; global_funs } in
+    { Mapfold.defaults with leq_t; block; set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs Env.empty p in
   { p with p_impl_list = p_impl_list }
+
+(*
+
+
+                              if copy then
+    try (* if [id] is already in [acc] and associated to [m] *)
+      (* replace [last id] by [last*m] *)
+      let m = Env.find id acc in
+      { copy = false; id = m }, acc
+    with
+    | Not_found ->
+       let m = fresh "m" in
+       { copy = false; id = m }, Env.add id m acc
+  else l, acc *)
+
+
