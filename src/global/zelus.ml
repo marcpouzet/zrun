@@ -58,6 +58,12 @@ and size_desc =
   | Sminus : size * size -> size_desc
   | Smult : size * size -> size_desc
 
+(* the two forms of [last]; [last x] and [last* x] *)
+type last =
+  { copy: bool; (* [copy = false] (that is, [last* x] *)
+    id: Ident.t; (* means that [x] and [last* x] share the same location *)
+    }
+
 (* constants *)
 type immediate =
 | Eint : int -> immediate
@@ -219,7 +225,7 @@ and 'info exp_desc =
   | Evar : Ident.t -> 'info exp_desc
   | Eglobal :
       { mutable lname : Lident.t } -> 'info exp_desc
-  | Elast : { copy: bool; id: Ident.t } -> 'info exp_desc
+  | Elast : last -> 'info exp_desc
   | Eop : operator * 'info exp list -> 'info exp_desc
   | Etuple : 'info exp list -> 'info exp_desc
   | Eapp : { is_inline: is_inline; f: 'info exp; arg_list: 'info exp list } -> 'info exp_desc

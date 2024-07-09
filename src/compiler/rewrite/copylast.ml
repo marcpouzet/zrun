@@ -17,6 +17,30 @@
 (* if [x] is initialized, that is, either with an equation [init x = e] *)
 (* or at the declaration [local ... x init e] rename [x] in [m] *)
 
+(*
+  Example:
+
+  local x, y do init x = v0 and init y = v1 and y = last x + 1 and x = last y + 1
+
+  can be rewritten in:
+
+  local x, y, lx, ly do
+  init x = v0 and init y = v1
+  ly = last* y
+  lx = last* x
+  y = lx + 1
+  x = ly + 1
+
+  or:
+
+  local x, y, mx, my do
+  init mx = v0 and init my = v1
+  y = last* mx + 1
+  x = last* my + 1
+  mx = x
+  my = y
+*)
+
 open Location
 open Zelus
 open Ident
@@ -48,7 +72,6 @@ let remove l_env acc =
        with Not_found -> renaming_list, acc)
     l_env ([], acc)
 
-
 (* replace occurrences of [last x] by [lx] *)
 let rec expression funs acc ({ e_desc } as e) =
   let e_desc, acc = match e_desc with
@@ -65,11 +88,37 @@ let rec expression funs acc ({ e_desc } as e) =
     | _ -> raise Mapfold.Fallback in
   { e with e_desc }, acc
 
-and funexp funs acc ({ f_body = { r_desc } as r; f_env } as f) =
+let intro acc id =
+  try
+    let m = Env.find id acc in
+    m, acc
+  with
+  | Not_found ->
+     let m = fresh "m" in m, Env.add id m acc
+
+(* replace [last id] by [last*m] *)
+let last_ident funs acc ({ copy; id } as l) =
+  let m, acc = intro acc id in
+  { copy = false; id = m }, acc
+
+                              if copy then
+    try (* if [id] is already in [acc] and associated to [m] *)
+      (* replace [last id] by [last*m] *)
+      let m = Env.find id acc in
+      { copy = false; id = m }, acc
+    with
+    | Not_found ->
+       let m = fresh "m" in
+       { copy = false; id = m }, Env.add id m acc
+  else l, acc
+
+let init_ident funs acc id = intro acc id
+
+let rec funexp funs acc ({ f_body = { r_desc } as r; f_env } as f) =
   let r_desc, acc =
     match r_desc with
     | Exp(e) ->
-       let e, acc = expression funs acc e in
+       let e, acc = Mapfold.expression funs acc e in
        let renaming_list, acc = remove f_env acc in
        let vardec_list = add_vardec_list [] renaming_list in
        Exp(Aux.e_local (Aux.block_make vardec_list
@@ -109,7 +158,7 @@ let get_index funs acc n = Ident.get (), acc
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
-    { Mapfold.defaults with expression; leq_t; block;
+    { Mapfold.defaults with last_ident; leq_t; block;
                             set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs Env.empty p in
   { p with p_impl_list = p_impl_list }

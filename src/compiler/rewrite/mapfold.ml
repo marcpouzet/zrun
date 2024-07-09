@@ -74,6 +74,12 @@ type ('a, 'info1, 'info2) global_it_funs =
             'info1 Ident.Env.t -> 'info2 Ident.Env.t * 'a;
     var_ident :
       ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+    last_ident :
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> last -> last * 'a;
+    init_ident :
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+    emit_ident :
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
     typevar :
       ('a, 'info1, 'info2) global_it_funs -> 'a -> name -> name * 'a;
     typeconstr :
@@ -119,14 +125,12 @@ type ('a, 'info1, 'info2) it_funs =
       ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 result -> 'info2 result * 'a;
     funexp :
       ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 funexp -> 'info2 funexp * 'a;
-    last :
-      ('a, 'info1, 'info2) it_funs -> 'a -> Ident.t -> Ident.t * 'a;
     match_handler_eq :
       ('a, 'info1, 'info2) it_funs -> 'a -> ('info1, 'info1 eq) match_handler
-        -> ('info1, 'info1 eq) match_handler * 'a; 
+        -> ('info2, 'info2 eq) match_handler * 'a; 
     match_handler_e :
       ('a, 'info1, 'info2) it_funs -> 'a -> ('info1, 'info1 exp) match_handler
-      -> ('info1, 'info1 exp) match_handler * 'a;
+      -> ('info2, 'info2 exp) match_handler * 'a;
     present_handler_eq :
       ('a, 'info1, 'info2) it_funs -> 'a 
       -> ('info1, 'info1 scondpat, 'info1 eq) present_handler 
@@ -157,18 +161,23 @@ type ('a, 'info1, 'info2) it_funs =
   }
 
 (** Build from an environment *)
-let rec build_it funs acc env =
-  try funs.build funs acc env
-  with Fallback -> build funs acc env
+let build_it funs acc env = funs.build funs acc env
 
 and build funs acc env = env, acc
 
-let rec last_it funs acc l =
-  try funs.last funs acc l
-  with Fallback -> last funs acc l
+and last_ident_it funs acc l = funs.last_ident funs acc l
 
-and last funs acc l =
-  funs.global_funs.var_ident funs.global_funs acc l
+and last_ident global_funs acc { copy; id } =
+  let id, acc = global_funs.var_ident global_funs acc id in
+  { copy; id }, acc
+
+and init_ident_it global_funs acc l = global_funs.init_ident global_funs acc l
+
+and init_ident global_funs acc id = global_funs.var_ident global_funs acc id
+
+and emit_ident_it global_funs acc l = global_funs.emit_ident global_funs acc l
+
+and emit_ident global_funs acc id = global_funs.emit_ident global_funs acc id
 
 let rec pattern_it funs acc pat =
   try funs.pattern funs acc pat
@@ -422,9 +431,9 @@ and expression funs acc ({ e_desc; e_loc } as e) =
   | Evar(x) ->
      let x, acc = var_ident_it funs.global_funs acc x in
      { e with e_desc = Evar(x) }, acc
-  | Elast({ id } as l) ->
-     let id, acc = last_it funs acc id in
-     { e with e_desc = Elast { l with id } }, acc
+  | Elast(l) ->
+     let l, acc = last_ident_it funs.global_funs acc l in
+     { e with e_desc = Elast(l) }, acc
   | Etuple(e_list) ->
      let e_list, acc = Util.mapfold (expression_it funs) acc e_list in
      { e with e_desc = Etuple(e_list) }, acc
@@ -570,18 +579,17 @@ and equation_it funs acc eq =
   with Fallback -> equation funs acc eq
 
 and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) = 
-  let eq_write, acc = write_t funs acc eq_write in
   let eq, acc = match eq_desc with
     | EQeq(p, e) ->
        let p, acc = pattern_it funs acc p in
        let e, acc = expression_it funs acc e in
        { eq with eq_desc = EQeq(p, e) }, acc
     | EQinit(x, e) ->
-       let x, acc = var_ident_it funs.global_funs acc x in
+       let x, acc = init_ident_it funs.global_funs acc x in
        let e, acc = expression_it funs acc e in
        { eq with eq_desc = EQinit(x, e) }, acc
     | EQemit(x, e_opt) ->
-       let x, acc = var_ident_it funs.global_funs acc x in
+       let x, acc = emit_ident_it funs.global_funs acc x in
        let e_opt, acc =
          Util.optional_with_map (expression_it funs) acc e_opt in
        { eq with eq_desc = EQemit(x, e_opt) }, acc
@@ -675,6 +683,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        { eq with eq_desc =
                    EQsizefun { sf with sf_id; sf_id_list; sf_e; sf_env } },
        acc in
+  let eq_write, acc = write_t funs acc eq_write in
   { eq with eq_write }, acc
 
 (* automata *)
@@ -791,6 +800,9 @@ and interface global_funs acc interf = interf, acc
 let default_global_funs =
   { build;
     var_ident;
+    last_ident;
+    init_ident;
+    emit_ident;
     typevar;
     typeconstr;
     kind;
@@ -812,7 +824,6 @@ let defaults =
     block;
     result;
     funexp;
-    last;
     match_handler_eq;
     match_handler_e;
     automaton_handler;
@@ -829,6 +840,9 @@ let defaults =
 let default_global_stop =
   { build = stop;
     var_ident = stop;
+    last_ident = stop;
+    init_ident = stop;
+    emit_ident = stop;
     typevar = stop;
     typeconstr = stop;
     kind = stop;
@@ -849,7 +863,6 @@ let defaults_stop =
     block = stop;
     result = stop;
     funexp = stop;
-    last = stop;
     match_handler_eq = stop;
     match_handler_e = stop;
     automaton_handler = stop;
