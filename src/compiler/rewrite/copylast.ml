@@ -35,15 +35,6 @@
 
   is rewritten:
 
-  local x, y, lx, ly do
-  init x = v0 and init y = v1
-  ly = last* y
-  lx = last* x
-  y = lx + 1
-  x = ly + 1
-
-  An alternative would be:
-
   local x, y, mx, my do
   init mx = v0 and init my = v1
   y = last* mx + 1
@@ -51,8 +42,19 @@
   mx = x
   my = y
 
-  The gain from one w.r.t the other is not clear; it depends on how CSE/Tomato
-  is done afterward.
+  An alternative would be:
+
+  local x, y, lx, ly do
+  init x = v0 and init y = v1
+  ly = last* y
+  lx = last* x
+  y = lx + 1
+  x = ly + 1
+
+  The gain in efficiency off one w.r.t the other is unclear; the first ensures
+  that the kind of variables is unchanged. In particular, it can be applied
+  to variables that are input and outputs of functions. The efficiency
+  depends on how CSE/Tomato is done afterward.
 *)
 
 open Location
