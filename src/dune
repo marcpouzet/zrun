@@ -98,8 +98,8 @@
     static ; static reduction
     inline ; inlining of function calls
     der ; remove the initialization and handler part of a derivative equation
-    lastinout ; all variables in patterns must be value (remove last)
     copylast ; add copies [lx = last*x] for [last x]
+    lastinout ; all variables in patterns must be value (remove last)
     automata ; rewrite automata into match/reset
     present ; rewrite present into match
     pre ; rewrite fby/fby into (init/last)
@@ -116,6 +116,18 @@
     rewrite ; compose rewriting steps
   )
   (libraries zrun.global_lib zrun.typdefs_lib zrun.zrun_lib)
+)
+
+;sequential code generation
+ (library
+  (name seqcode_lib)
+  (public_name zrun.seqcode_lib)
+  (wrapped false)
+  (modules
+    obc; the AST for representing Mealy machines
+    oprinter; the printer
+  )
+  (libraries zrun.global_lib)
 )
 
 (executable
