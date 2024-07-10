@@ -97,14 +97,14 @@ let expression funs acc ({ e_desc } as e) =
 
 (* add extra equations [lx = last* x] *)
 let leq_t funs ({ locals } as acc) ({ l_eq; l_env } as leq) =
-  let l_eq, ({ renaming } as acc) =
+  let l_eq, { renaming } =
     Mapfold.equation
       funs { acc with locals = Env.append l_env locals } l_eq in
   (* add an equation [lx = last* x] for every [x\lx] in [renaming inter l_env] *)
   let l_renaming, renaming = split l_env renaming in
   { leq with l_eq = Aux.par (l_eq :: add_eq_copy l_renaming);
              l_env = update_env l_env l_renaming; l_rec = true },
-  { acc with renaming }
+  { locals; renaming }
 
 (* add extra equations [lx = last* x] *)
 let block funs acc ({ b_vars; b_body; b_env } as b) =
@@ -116,7 +116,7 @@ let block funs acc ({ b_vars; b_body; b_env } as b) =
   let b_body = Aux.par (b_body :: add_eq_copy l_renaming) in
   { b with b_vars = update_vardec_list b_vars l_renaming;
            b_env = update_env b_env l_renaming;
-           b_body }, { acc with renaming }
+           b_body }, { locals; renaming }
 
 (* the inputs/outputs must be unchanged *)
 let funexp funs acc ({ f_body = { r_desc } as r } as f) =
