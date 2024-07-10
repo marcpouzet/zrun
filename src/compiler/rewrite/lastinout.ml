@@ -75,7 +75,7 @@ let intro ({ inout; renaming } as acc) id =
     else id, acc
 
 (* add entries in the environment *)
-let build funs ({ inout } as acc) env = env, { acc with inout = env }
+let build global_funs ({ inout } as acc) env = env, { acc with inout = env }
 
 (* replace [last id] by [last*m] *)
 let last_ident _ acc { copy; id } =
@@ -94,14 +94,14 @@ let funexp funs ({ inout } as acc) ({ f_body = { r_desc } as r; f_env } as f) =
         (Aux.block_make
            (Aux.vardec r false None None :: vardec_list l_renaming [])
            (add_eq_copy l_renaming [Aux.id_eq r e])) (var r) in
-  match r_desc with
+  let r_desc, acc = match r_desc with
     | Exp(e) ->
       let e, ({ renaming } as acc) =
         Mapfold.expression funs { acc with inout = Env.append f_env inout } e in
        let l_renaming, renaming = split f_env renaming in
        Exp(e_local l_renaming e), { acc with renaming }
     | Returns({ b_vars; b_body; b_env } as b) ->
-      (* the interface must not be changed *)
+      (* the interface must not change *)
       let b_vars, ({ inout } as acc) =
         Util.mapfold (Mapfold.vardec funs) acc b_vars in
       let b_body, ({ renaming } as acc) =
@@ -112,58 +112,21 @@ let funexp funs ({ inout } as acc) ({ f_body = { r_desc } as r; f_env } as f) =
       let b_body =
         Aux.eq_local_vardec
           (vardec_list b_renaming (vardec_list f_renaming []))
-          (add_eq_copy b_renaming (add_eq_copy l_renaming [b_body])) in
-      Returns { b with b_vars; b_body = b; b_env },
-      { acc in
+          (add_eq_copy b_renaming (add_eq_copy f_renaming [b_body])) in
+      Returns { b with b_vars; b_body },
+      { inout; renaming } in
   { f with f_body = { r with r_desc } }, acc
 
-and leq_t funs acc ({ l_eq; l_env } as leq) =
-  (* for every entry [x\m] in [acc] that appear in [l_env] *)
-  (* add an equation [m = x]; update [l_env] and [l_eq.eq_write] *)
-  (* returns the remaining [acc] *)
-  let l_eq, acc = Mapfold.equation funs acc l_eq in
-  let renaming_list, acc = remove l_env acc in
-  { leq with l_eq = Aux.par (l_eq :: eq_copy_names renaming_list);
-             l_env = update_env l_env renaming_list }, acc
-
-and block funs acc b =
-  let { b_vars; b_body; b_env; b_write } as b, acc = Mapfold.block funs acc b in
-  (* for every entry [x\m] in [acc] that appear in [b_env] *)
-  (* add an equation [m = x]; update [b_env] and [b_write] *)
-  (* returns the remaining [acc] *)
-  let b_vars, acc = 
-    Util.mapfold (Mapfold.vardec funs) acc b_vars in
-  let b_body, acc = Mapfold.equation funs acc b_body in
-  let renaming_list, acc = remove b_env acc in
-  let b_body = Aux.par (b_body :: eq_copy_names renaming_list) in
-  { b with b_vars = update_vardec_list b_vars renaming_list;
-           b_env = update_env b.b_env renaming_list;
-           b_body }, acc
-									  
+let pattern funs acc p = p, acc
+                         
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
 let get_index funs acc n = Ident.get (), acc
 
 let program _ p =
   let global_funs =
-    { Mapfold.default_global_funs with last_ident; init_ident } in
+    { Mapfold.default_global_funs with build; last_ident; init_ident } in
   let funs =
-    { Mapfold.defaults with leq_t; block; set_index; get_index; global_funs } in
-  let { p_impl_list } as p, _ = Mapfold.program_it funs Env.empty p in
+    { Mapfold.defaults with pattern; funexp; set_index; get_index; global_funs } in
+  let { p_impl_list } as p, _ = Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }
-
-(*
-
-
-                              if copy then
-    try (* if [id] is already in [acc] and associated to [m] *)
-      (* replace [last id] by [last*m] *)
-      let m = Env.find id acc in
-      { copy = false; id = m }, acc
-    with
-    | Not_found ->
-       let m = fresh "m" in
-       { copy = false; id = m }, Env.add id m acc
-  else l, acc *)
-
-
