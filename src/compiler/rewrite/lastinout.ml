@@ -12,93 +12,66 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* Add an equation [m = x] every time [last x] is used; replace [last x] *)
-(* by [last*m] and rename [init x = e] in [init m = e] *)
-(* This step is necessary for static scheduling. *)
+(* All variables in patterns must be values only                           *)
+(* e.g., variables in function parameters, variables in patterns, etc.     *)
+(* Any expression [last x] where [x] is expected to be a value             *)
+(* is rewritten [last* m and m = x] are introduced *)
 
-(*
-  Example:
-
-  fun x -> last x + 1
-
-  is rewritten:
-
-  fun x -> local (last m) do m = x and y = last*m + 1 in y
-
-  fun x returns (o, y) ... last y ...
-
-  is rewritten:
-
-  fun x returns (o, y) local m ... last* m ... and m = y
-
-  local x, y, z init e
-  do init x = v0 and init y = v1 and y = last x + 1 and x = last y + 1 and ... z ...
-
-  is rewritten:
-
-  local x, y, mx, my, z init e do
-  init mx = v0 and init my = v1
-  y = last* mx + 1
-  x = last* my + 1
-  mx = x
-  my = y and ...
-
-  An alternative would be:
-
-  local (last x), (last y), lx, ly do
-  init x = v0 and init y = v1
-  ly = last* y
-  lx = last* x
-  y = lx + 1
-  x = ly + 1
-
-  The difference in efficiency between the two is not clear; it depdends
-  on how CSE/Tomato steps are done after. The first ensures
-  that the kind of variables is unchanged. In particular, it can be applied
-  to variables that are input and outputs of functions. After this step, they
-  are not required to be state variables. 
-*)
+(* Example:
+ *- [let node f(x) = ... last x...] is rewritten
+ *- [let node f(x) = let rec m = x and r = ... last* m in r]
+ *- [let node f(x) returns (...y...) ...last x... last y ...] is rewritten
+ *- [let node f(x) returns (...y...) ... last* m ... last* my ... m = x ... my = y]
+ *- [match e with P(...x...) -> ...last x...] is rewritten
+ *- [match e with P(...x...) -> local (last m) ...last* m... and m = x] is rewritten
+ *- [present e(...x...) -> ... last x ...] is rewritten
+ *- [present e(...x...) -> ... last x ...] is rewritten
+ *- [present e(...x...) -> local (last m) ... last* m and m = x]
+ *)
 
 open Location
 open Zelus
 open Ident
 open Aux
 
-type acc = Ident.t Env.t (* associate names to names *)
+(* renaming(x) = m for [x] in [in/out names] *)
+type acc =
+  { inout: Misc.no_info Env.t; (* names in inputs/outputs *)
+    renaming: Ident.t Env.t; (* for some of these names, associate [m] to [x] *)
+  }
 
-(* Make an equation [m = x] *)
-let eq_copy (x, m) = Aux.id_eq m (Aux.var x)
+let empty = { inout = Env.empty; renaming = Env.empty }
 
-let eq_copy_names renaming_list = List.map eq_copy renaming_list
+(* Make an equation [lx = last* x] *)
+let add_eq_copy l_renaming =
+  let copy m x = Aux.id_eq m (Aux.var x) in
+  Env.fold (fun x m acc -> copy m x :: acc) l_renaming []
 
-let update_env l_env renaming_list =
-  List.fold_left 
-    (fun acc (x, m) -> Env.add m Misc.no_info acc) l_env renaming_list
+let update_env l_env l_renaming =
+  Env.fold (fun x m acc -> Env.add m Misc.no_info acc) l_renaming l_env
 
-(* an entry [local x [init e] [default v]] becomes [local m [init e] [default v] *)
-(* and an extra entry [local x] is added *)
-let update_vardec_list b_vars ming_list =
-  List.fold_left
-    (fun v_list ({ var_name } as v) ->
-       try Aux.vardec x false None None;(_, m) -> Aux.vardec m true None None :: acc) 
-    b_vars renaming_list
+(* add extra local declarations *)
+let vardec_list l_renaming =
+  Env.fold (fun x m acc -> Aux.vardec m true None None :: acc) l_renaming []
 
-(* [remove l_env acc = renaming, acc'] extract entries in [acc] from [l_env] *)
-let remove l_env acc =
+(* split [renaming] in two according to [l_env]. Returns [l_renaming] *)
+(* and [r_renaming] such that [renaming = l_renaming + r_renaming] *)
+(* and [Names(l_renaming) subset Names(l_env)] *)
+let split l_env renaming =
   Env.fold
-    (fun x _ (renaming_list, acc) ->
-       try
-         let m = Env.find x acc in
-         (x, m) :: renaming_list, Env.remove x acc
-       with Not_found -> renaming_list, acc)
-    l_env ([], acc)
-
-(* introduce a fresh copy [m] for [id] *)
-let intro acc id =
+    (fun x lx (l_renaming, r_renaming) ->
+       if Env.mem x l_env then Env.add x lx l_renaming, r_renaming
+       else l_renaming, Env.add x lx r_renaming)
+    renaming (Env.empty, Env.empty)
+ 
+let intro ({ inout; renaming } as acc) id =
   try
-    let m = Env.find id acc in m, acc
+    let lx = Env.find id renaming in lx, acc
   with
-  | Not_found -> let m = fresh "m" in m, Env.add id m acc
+  | Not_found ->
+    if Env.mem id inout then
+      let lx = fresh "lx" in lx, { acc with renaming = Env.add id lx renaming }
+    else id, acc
 
 (* replace [last id] by [last*m] *)
 let last_ident _ acc { copy; id } =
