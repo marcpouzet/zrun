@@ -41,21 +41,6 @@ let immediate ff = function
 		    
 let default_list_of_methods = [Oaux.step; Oaux.reset]
 
-(*
-let constructor_for_kind = function
-  | Deftypes.Tcont
-  | Deftypes.Tdiscrete(true)
-  | Deftypes.Tproba -> if !Zmisc.with_copy then "Cnode" else "Node"
-  | _ -> assert false
-let extra_methods m_list =
-  if !Zmisc.with_copy then Eaux.copy :: m_list else m_list
-let expected_list_of_methods = function
-  | Deftypes.Tcont
-  | Deftypes.Tdiscrete(true)
-  | Deftypes.Tproba -> extra_methods default_list_of_methods
-  | _ -> assert false
-   *)
-
 let print_concrete_type ff ty =
   let priority =
     function | Etypevar _ | Etypeconstr _ | Etypevec _ | Etypesize _ -> 2
@@ -262,20 +247,20 @@ and exp_with_typ ff (e, ty) =
 and match_handler ff { m_pat; m_body } =
   fprintf ff "@[<hov 4>| %a ->@ %a@]" pattern m_pat (exp 0) m_body
 
-let print_memory ff { m_name; m_value; m_typ; m_kind; m_size } =
-  let mem = function
-    | None -> ""
-    | Some(k) -> (Printer.kind k) ^ " " in
-  match e_opt with
-  | None -> fprintf ff "%s%a%a : %a"
-		    (mem k_opt) name n
-		    (print_list_no_space (print_with_braces (exp 0)
-							    "[" "]") "" "" "")
-		    m_size ptype ty
-  | Some(e) ->
-     fprintf ff "%s%a%a : %a = %a" (mem k_opt) name n
-	     (print_list_no_space (print_with_braces (exp 0) "[" "]") "" "" "")
-	     m_size ptype ty (exp 0) e
+(*
+let constructor_for_kind = function
+  | Deftypes.Tcont
+  | Deftypes.Tdiscrete(true)
+  | Deftypes.Tproba -> if !Zmisc.with_copy then "Cnode" else "Node"
+  | _ -> assert false
+let extra_methods m_list =
+  if !Zmisc.with_copy then Eaux.copy :: m_list else m_list
+let expected_list_of_methods = function
+  | Deftypes.Tcont
+  | Deftypes.Tdiscrete(true)
+  | Deftypes.Tproba -> extra_methods default_list_of_methods
+  | _ -> assert false
+   *)
 
 (* Define the data-type for the internal state of a machine *)
 (* A prefix "_" is added to the name of the machine to avoid *)
@@ -286,12 +271,12 @@ let def_type_for_a_machine ff f memories instances =
   let i, params, entries =
     List.fold_right
       (fun { m_name = n } (i, params, entries) ->
-        let m = Zmisc.int_to_alpha i in (i+1, m :: params, (n, m) :: entries))
+        let m = Misc.int_to_alpha i in (i+1, m :: params, (n, m) :: entries))
       memories (0, [], []) in
   let i, params, entries =
     List.fold_right
       (fun { i_name = n } (i, params, entries) ->
-        let m = Zmisc.int_to_alpha i in (i+1, m :: params, (n, m) :: entries))
+        let m = Misc.int_to_alpha i in (i+1, m :: params, (n, m) :: entries))
       instances (i, params, entries) in
   (* if the state is empty, produce the dummy state type [unit] *)
   if entries = []
@@ -348,7 +333,7 @@ let palloc f i_opt memories ff instances =
 	 match e_opt with
          | None ->
 	    fprintf ff "@[%a = %a@]" name n
-		    (array_make (fun ff _ -> fprintf ff "(Ebj.magic (): %a)"
+		    (array_make (fun ff _ -> fprintf ff "(Obj.magic (): %a)"
 						     ptype ty) ())
 		    m_size
          | Some(e) ->
@@ -393,75 +378,6 @@ let palloc f i_opt memories ff instances =
             print_initialize i_opt
             (print_list_r print_memory """;"";") memories
             (print_list_r print_instance """;""") instances
-
-(* A copy method that recursively copy an internal state. *)
-(* This solution does not work at the moment when the program has *)
-(* forall loops. *)
-(* [copy source dest] recursively copies the containt of [source] into [dest] *)
-let pcopy f memories ff instances =
-  (* copy a memory [n] which is an array t[s1]...[sn] *)
-  let array_copy print ff ie_size =
-    let rec array_rec print ff = function
-      | [] -> print ff ()
-      | _ :: ie_size ->
-	 fprintf ff "@[<hov>Array.map (fun xi -> %a) %a@]"
-		 (array_rec (fun ff _ -> fprintf ff "xi")) ie_size print () in
-    match ie_size with
-    | [] -> print ff ()
-    | _ -> array_rec print ff ie_size in
-  
-  let copy_memory ff
-		  { m_name = n; m_kind = k_opt; m_typ = ty; m_size = m_size } =
-    match k_opt with
-    | None ->
-       (* discrete state variable *)
-       fprintf ff "@[dest.%a <- %a@]" name n
-	       (array_copy (fun ff _ -> fprintf ff "source.%a" name n)) m_size
-    | Some(m) ->
-       match m with
-       | Deftypes.Zero ->
-	  fprintf ff "@[<hov0>dest.%a.zin <- %a;@,dest.%a.zout <- %a @]"
-		  name n
-		  (array_copy (fun ff _ -> fprintf ff "source.%a.zin" name n))
-		  m_size
-		  name n
-		  (array_copy (fun ff _ -> fprintf ff "source.%a.zout" name n))
-		  m_size
-       | Deftypes.Cont ->
-	  fprintf ff "@[<hov0>dest.%a.pos <- %a;@,dest.%a.der <- %a @]"
-		  name n
-		  (array_copy (fun ff _ -> fprintf ff "source.%a.pos" name n))
-		  m_size
-		  name n
-		  (array_copy (fun ff _ -> fprintf ff "source.%a.der" name n))
-		  m_size
-       | Deftypes.Horizon | Deftypes.Period
-       | Deftypes.Encore | Deftypes.Major ->
-	  fprintf ff "@[dest.%a <- source.%a@]" name n name n in
-  let copy_instance ff { i_name = n; i_machine = ei;
-			  i_kind = k; i_params = e_list; i_size = ie_size } =
-    fprintf ff "@[%a (* %s *)@]"
-	    (array_make
-	       (fun ff n ->
-		fprintf ff "@[%a_copy source.%a dest.%a@]" name n name n name n)
-	       n)
-	    ie_size (kind k)  in
-  if memories = []
-  then if instances = []
-       then fprintf ff "@[let %s_copy source dest = () in@]" f
-       else
-         fprintf ff "@[<v 2>let %s_copy source dest =@ @[%a@] in@]"
-                 f (print_list_r copy_instance "" ";" "") instances
-  else if instances = []
-  then
-    fprintf ff "@[<v 2>let %s_copy source dest =@ @[%a@] in@]"
-            f (print_list_r copy_memory "" ";" "") memories
-  else
-    fprintf ff "@[<v 2>let %s_copy source dest =@ @[%a@,%a@] in@]"
-            f
-            (print_list_r copy_memory "" ";" ";") memories
-            (print_list_r copy_instance "" ";" "") instances
-
 	    
 (* print an entry [let n_alloc, n_step, n_reset, ... = f ... in] *)
 (* for every instance *)
