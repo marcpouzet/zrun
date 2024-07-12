@@ -22,7 +22,9 @@ open Format
 open Pp_tools
 open Printer
        
-(** Priorities *)
+let kind k = match k with | Fun -> "fun" | Node -> "node" | Hybrid -> "hybrid"
+
+(* Priorities *)
 let priority_exp = function
   | Econst _ | Econstr0 _| Eglobal _ | Evar _ 
     | Estate_access _ | Eget _ | Eupdate _ | Eslice _
@@ -32,13 +34,6 @@ let priority_exp = function
   | Eassign _ | Eassign_state _  -> 1
   | Eifthenelse _  | Ematch _ | Elet _ | Eletvar _ | Esequence _ -> 0
   | Efun _ | Emachine _ -> 0
-
-let funkind = function
-  | Deftypes.Tfun(k) ->
-     (match k with
-      | Deftypes.Tconst -> "const" | Tstatic -> "static" | Tany -> "any")
-  | Deftypes.Tnode(k) ->
-     (match k with | Tdiscrete -> "discrete" | Thybrid -> "continuous")
 
 let rec psize prio ff si =
   let operator =
@@ -68,7 +63,7 @@ let print_concrete_type ff ty =
     begin match ty with
     | Etypevar(s) -> fprintf ff "'%s" s
     | Etypefun(k, ty_arg, ty_res) ->
-       let k = match k with Ekind_fun -> "->" | Ekind_node -> "=>" in
+       let k = match k with Fun -> "->" | Node -> "-N->" | Hybrid -> "-H->" in
        fprintf ff "@[<hov2>%a %s@ %a@]"
          (ptype (prio_ty + 1)) ty_arg k (ptype prio_ty) ty
     | Etypetuple(ty_list) ->
@@ -188,7 +183,7 @@ and assign_state ff left e =
 
 and state_primitive_access a =
   match a with
-    | Ederivative -> ".der" | Econtinuous -> ".pos"
+    | Ederivative -> ".der" | Epos -> ".pos"
     | Ezout -> ".zout"  | Ezin -> ".zin" | Ediscrete -> ""
 
 and var ff n = name ff n
@@ -222,15 +217,15 @@ and exp prio ff e =
              arg_list
   | Emethodcall m -> method_call ff m
   | Erecord(label_e_list) ->
-          print_list_r
+     print_list_r
        (print_record longname (exp 0) "" " =" "") "{" ";" "}" ff label_e_list
   | Erecord_access { label; arg } ->
      fprintf ff "%a.%a" (exp prio_e) arg longname label
-  | Erecord_with(e_record, r) ->
+  | Erecord_with(e_record, label_e_list) ->
      fprintf ff "@[{ %a with %a }@]"
-	     (exp prio_e) e_record
-	     (print_list_r
-		(print_couple longname (exp prio_e) """ =""") "" ";" "") r
+       (exp prio_e) e_record
+       (print_list_r
+          (print_record longname (exp 0) "" " =" "") "{" ";" "}") label_e_list
   | Etypeconstraint(e, ty_e) ->
      fprintf ff "@[(%a : %a)@]" (exp prio_e) e print_concrete_type ty_e
   | Eifthenelse(e, e1, e2) ->
@@ -286,21 +281,27 @@ and expression ff e = exp 0 ff e
 
 and match_handler ff { m_pat = pat; m_body = b } =
   fprintf ff "@[<hov 4>| %a ->@ %a@]" pattern pat (exp 0) b
-          
-and memory ff { m_name; m_value; m_typ; m_kind; m_size } =
-  fprintf ff "%a %a%a : %a = %a" (pkind m_kind) name m_name
+
+and mkind mk =
+  match mk with
+  | Ederivative | Epos -> "cont "
+  | Ezout | Ezin -> "zero "
+  | Ediscrete -> ""
+
+and memory ff { m_name; m_value; m_typ; m_kind = k; m_size } =
+  fprintf ff "%s%a%a : %a = %a" (mkind k) name m_name
 	     (print_list_no_space (print_with_braces (exp 0) "[" "]") "" "" "")
-	     m_size concrete_type m_typ (print_opt (exp 0)) m_value
+	     m_size print_concrete_type m_typ (print_opt (exp 0)) m_value
              
-and instance ff { i_name = n; i_machine = ei; i_kind = k;
-		  i_params = e_list; i_size = i_size } =
-  fprintf ff "@[%a : %s(%a)%a%a@]" name n (kind k) (exp 0) ei
+and instance ff { i_name; i_machine; i_kind;
+		  i_params; i_sizes } =
+  fprintf ff "@[%a : %s(%a)%a%a@]" name i_name (kind i_kind) (exp 0) i_machine
 	  (print_list_no_space
 	     (print_with_braces (exp 0) "(" ")") "" "" "")
-	  e_list
+	  i_params
 	  (print_list_no_space
 	     (print_with_braces (exp 0) "[" "]") "" "" "")
-	  i_size
+	  i_sizes
           
 and pmethod ff { me_name; me_params; me_body; me_typ } =
   fprintf ff "@[<hov 2>method %s %a@ =@ (%a:%a)@]"
@@ -310,7 +311,7 @@ and pinitialize ff i_opt =
   match i_opt with
   | None -> ()
   | Some(e) -> fprintf ff "@[<hov2>initialize@;%a@]" (exp 0) e
-		       
+
 (** Print a machine *)
 and machine ff { ma_kind; ma_params; ma_initialize;
 		 ma_memories; ma_instances; ma_methods } =
@@ -342,7 +343,7 @@ and constr_decl ff = function
 
 let implementation ff impl = match impl with
   | Eletdef(n, e) ->
-     fprintf ff "@[<v 2>let %a = %a@.@.@]" shortname n (exp 0) i
+     fprintf ff "@[<v 2>let %a = %a@.@.@]" shortname n (exp 0) e
   | Eopen(s) ->
      fprintf ff "@[open %s@.@]" s
   | Etypedecl(l) ->
@@ -356,6 +357,6 @@ let implementation ff impl = match impl with
         l
 
 let implementation_list ff impl_list =
-  fprintf ff "@[(* %s *)@.@]" header_in_file;
+  fprintf ff "@[(* %s *)@.@]" Misc.header_in_file;
   fprintf ff "@[open Ztypes@.@]";
   List.iter (implementation ff) impl_list

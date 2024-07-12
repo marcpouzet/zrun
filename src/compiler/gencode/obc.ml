@@ -119,7 +119,7 @@ and primitive_access =
 
 (* Definition of a sequential machine *)
 and machine =
-  { ma_kind: Deftypes.kind;
+  { ma_kind: kind;
     (* combinatorial, continuous-time or discrete-time *)
     ma_initialize: exp option;
     ma_params: pattern list; (* list of static parameters *)
@@ -139,9 +139,9 @@ and mentry =
 and ientry =
   { i_name: Ident.t; (* its name *)
     i_machine: exp;  (* the machine it belongs to *)
-    i_kind: Deftypes.kind; (* the kind of the machine *)
+    i_kind: kind;  (* the kind of the machine *)
     i_params: exp path; (* static parameters used at instance creation *)
-    i_size: exp list; (* it is possibly an array of instances *)
+    i_sizes: exp list; (* it is possibly an array of instances *)
   }
     
 and method_desc =
@@ -164,10 +164,10 @@ and method_name = name
 
 (* The different kinds of state variables *)
 and mkind =
-  | Ederivative (* x.der <- ... *)
-  | Econtinuous (* x.pos <- ... *)
-  | Ezout (* x.zout <-... *)
-  | Ezin (* ... x.zin ... *)
+  | Ederivative (* x.der <- ... and x.pos <- ... *)
+  | Epos 
+  | Ezout (* x.zout <-... and ...x.zin...*)
+  | Ezin 
   | Ediscrete (* x <- *)
         
 and 'a path = 'a list
@@ -188,7 +188,7 @@ and type_expression =
   | Etypevec of type_expression * size
   | Etypesize of is_singleton * size
 
-and kind = Ekind_fun | Ekind_node 
+and kind = Fun | Node | Hybrid
 
 and type_decl =
   | Eabstract_type

@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -15,6 +15,10 @@
 (* *********************************************************************)
 
 (* useful stuff *)
+
+let header_in_file =
+  let open Config in
+  "The Zelus compiler, version " ^ version ^ "-" ^subversion ^ "\n\  (" ^ date ^ ")"
 
 (* error during the whole process *)
 exception Error
