@@ -14,13 +14,9 @@
 
 (* abstract syntax tree of the object code *)
 
-open Location
-open Misc
-open Ident
-
 type name = string
 
-type 'a record = { mutable label: Lident.t; arg: 'a }
+type 'a record = { label: Lident.t; arg: 'a }
 
 type ('pattern, 'body) match_handler =
   { m_pat : 'pattern;
@@ -40,13 +36,13 @@ type immediate =
 type pattern = 
   | Ewildpat
   | Etuplepat of pattern list
-  | Evarpat of Ident.t
+  | Evarpat of { id: Ident.t; ty: type_expression }
   | Econstpat of immediate
   | Ealiaspat of pattern * Ident.t
   | Econstr0pat of Lident.t
   | Econstr1pat of Lident.t * pattern list
   | Eorpat of pattern * pattern
-  | Erecordpat of (Lident.t * pattern) list
+  | Erecordpat of pattern record list
   | Etypeconstraintpat of pattern * type_expression
 
 (* a continuous state variable [x] is a pair *)
@@ -58,42 +54,43 @@ type pattern =
 
 (* expressions are expected to be safe; unsafe ones must be put *)
 (* into instructions *)
-type exp = 
-  | Econst: immediate -> exp (* immediate constant *)
-  | Econstr0: Lident.t -> exp (* 0-ary and 1-ary constructor *)
-  | Econstr1: Lident.t * exp list -> exp
-  | Eglobal: Lident.t -> exp (* global variable *)
-  | Elocal: Ident.t -> exp (* read of local value *)
-  | Evar : { is_mutable: is_mutable; name: Ident.t } -> exp
-  (* read of local variable *)
-  | Estate_access : left_state_value -> exp (* read of a state variable *)
-  | Eaccess : exp * exp -> exp  (* access in an array *)
-  | Eupdate : size * exp * exp * exp -> exp
+and exp = 
+  | Econst of immediate (* immediate constant *)
+  | Econstr0 of { lname: Lident.t } (* 0-ary and 1-ary constructor *)
+  | Econstr1 of { lname : Lident.t; arg_list : exp list }
+  | Eglobal of { lname : Lident.t } (* global variable *)
+  | Evar of { is_mutable: is_mutable; id : Ident.t }
+  (* read of local value - shared (reference) or not *)
+  | Estate_access of left_state_value (* read of a state variable *)
+  | Etuple of exp list
+  | Erecord of exp record list
+  | Erecord_access of exp record
+  | Erecord_with of exp * exp record list
+  | Eifthenelse of exp * exp * exp
+  | Ematch of exp * (pattern, exp) match_handler list
+  | Elet of pattern * exp * exp
+  | Eletvar of { id: Ident.t; is_mutable: is_mutable;
+                ty: type_expression; e_opt: exp option; e : exp }
+  | Eassign of left_value * exp (* [x.v <- ...] *)
+  | Eassign_state of left_state_value * exp (* [x.v <- ...] *)
+  | Esequence of exp list
+  | Eapp of { f: exp; arg_list: exp list }
+  | Emethodcall of methodcall
+  | Etypeconstraint of exp * type_expression
+  | Efor of { index: Ident.t; left: exp; right: exp; e: exp }
+  | Ewhile of { cond: exp; e: exp }
+  | Emachine of machine
+  | Efun of { pat_list: pattern list; e: exp }
+  (* array operations *)
+  | Eget of { e: exp; size: size } (* access in an array *)
+  | Eupdate of { e: exp; size: size; index: size; arg: exp }
   (* update of an array of size [s1] *)
-  | Eslice : exp * size * size -> exp  (* e{s1..s2} *)
-  | Econcat : exp * size * exp * size -> exp  (* { e1 | e2 } *)
-  | Evec : exp * size -> exp
+  | Eslice of { e: exp; left: size; right: size } (* e{s1..s2} *)
+  | Econcat of { left: exp; left_size: size; right: exp; right_size: size }
+  (* { e1 | e2 } *)
+  | Emake of { e: exp; size: size }
   (* e1[e2] build an array of size [s2] with value [e1] *)
-  | Etuple: exp list -> exp
-  | Erecord: exp record list -> exp
-  | Erecord_access: exp record -> exp
-  | Erecord_with: exp * exp record list -> exp
-  | Eifthenelse: exp * exp * exp -> exp
-  | Ematch: exp * (pattern, exp) match_handler list -> exp
-  | Elet: pattern * exp * exp -> exp
-  | Eletvar : { id: Ident.t; is_mutable: is_mutable;
-                ty: Deftypes.typ; e_opt: exp option; e : exp } -> exp
-  | Eassign: left_value * exp -> exp (* [x.v <- ...] *)
-  | Eassign_state: left_state_value * exp -> exp (* [x.v <- ...] *)
-  | Esequence: exp list -> exp
-  | Eapp: exp * exp list -> exp
-  | Emethodcall: methodcall -> exp
-  | Etypeconstraint: exp * type_expression -> exp
-  | Efor: Ident.t * exp * exp * exp -> exp
-  | Ewhile: exp * exp -> exp
-  | Emachine: pattern list * machine -> exp
-  | Efun: pattern list * exp -> exp
-                    
+               
 (* when [is_mutable = true] a variable [x] is mutable which means that *)
  (* x <- ... and ...x... are valid expression; otherwise a ref will be *)
  (* added when translated into OCaml **)
@@ -113,27 +110,12 @@ and left_state_value =
   | Eleft_state_index of left_state_value * exp
   | Eleft_state_primitive_access of left_state_value * mkind
 
-
-and left_value = 
-  | Oleft_name of Ident.t
-  | Oleft_record_access of left_value * Lident.t
-  | Oleft_index of left_value * exp
-  
-and left_state_value =
-  | Oself
-  | Oleft_state_global of Lident.t 
-  | Oleft_instance_name of Ident.t
-  | Oleft_state_name of Ident.t
-  | Oleft_state_record_access of left_state_value * Lident.t
-  | Oleft_state_index of left_state_value * exp
-  | Oleft_state_primitive_access of left_state_value * primitive_access
-
 (* a machine provides certain fields for reading/writting state variables *)
 and primitive_access =
-  | Oder (* x.der.(i) <- ... *)
-  | Ocont (* x.pos.(i) <- ... *)
-  | Ozero_out (* x.zero_out.(i) <-... *)
-  | Ozero_in (* ... x.zero_in.(i) ... *)
+  | Eder (* x.der.(i) <- ... *)
+  | Econt (* x.pos.(i) <- ... *)
+  | Ezero_out (* x.zero_out.(i) <-... *)
+  | Ezero_in (* ... x.zero_in.(i) ... *)
 
 (* Definition of a sequential machine *)
 and machine =
@@ -181,8 +163,8 @@ and method_name = name
 
 (* The different kinds of state variables *)
 and mkind =
-  | Eder (* x.der <- ... *)
-  | Econt (* x.pos <- ... *)
+  | Ederivative (* x.der <- ... *)
+  | Econtinuous (* x.pos <- ... *)
   | Ezout (* x.zout <-... *)
   | Ezin (* ... x.zin ... *)
   | Ediscrete (* x <- *)
@@ -195,8 +177,6 @@ and implementation =
   | Eletdef of name * exp
   | Eopen of string
   | Etypedecl of (string * string list * type_decl) list
-
-and info = type_expression
 
 (* type declaration *)
 and type_expression = 
@@ -224,6 +204,7 @@ and is_singleton = bool
 and size =
   | Sconst of int
   | Svar of Ident.t
-  | Splus of size * size
-  | Sminus of size * size
+  | Sop of op * size * size
   | Sdiv of { num: size; denom: int }
+
+and op = Splus | Sminus | Smult

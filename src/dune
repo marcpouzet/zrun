@@ -127,7 +127,7 @@
     obc; the AST for representing Mealy machines
     oprinter; the printer
   )
-  (libraries zrun.global_lib)
+  (libraries zrun.global_lib typdefs_lib)
 )
 
 (executable
