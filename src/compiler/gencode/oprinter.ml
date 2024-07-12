@@ -15,13 +15,11 @@
 (* print object code *)
 
 open Misc
-open Location
-open Ident
 open Obc
 open Format
 open Pp_tools
 open Printer
-       
+    
 let kind k = match k with | Fun -> "fun" | Node -> "node" | Hybrid -> "hybrid"
 
 (* Priorities *)
@@ -82,8 +80,6 @@ let print_concrete_type ff ty =
     if prio_ty < prio then fprintf ff ")" in
   ptype 0 ff ty
 
-let ptype ff ty = Ptypes.output ff ty
-      
 let immediate ff = function
   | Eint i ->
      if i < 0 then fprintf ff "(%a)" pp_print_int i else pp_print_int ff i
@@ -305,7 +301,8 @@ and instance ff { i_name; i_machine; i_kind;
           
 and pmethod ff { me_name; me_params; me_body; me_typ } =
   fprintf ff "@[<hov 2>method %s %a@ =@ (%a:%a)@]"
-          (method_name me_name) pattern_list me_params (exp 2) me_body ptype me_typ
+    (method_name me_name) pattern_list me_params (exp 2) me_body
+    print_concrete_type me_typ
           
 and pinitialize ff i_opt =
   match i_opt with

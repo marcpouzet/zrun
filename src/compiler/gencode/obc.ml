@@ -85,15 +85,15 @@ and exp =
   | Eget of { e: exp; size: size } (* access in an array *)
   | Eupdate of { e: exp; size: size; index: size; arg: exp }
   (* update of an array of size [s1] *)
-  | Eslice of { e: exp; left: size; right: size } (* e{s1..s2} *)
+  | Eslice of { e: exp; left: size; right: size; length: size } (* e{s1..s2} *)
   | Econcat of { left: exp; left_size: size; right: exp; right_size: size }
   (* { e1 | e2 } *)
   | Emake of { e: exp; size: size }
   (* e1[e2] build an array of size [s2] with value [e1] *)
                
 (* when [is_mutable = true] a variable [x] is mutable which means that *)
- (* x <- ... and ...x... are valid expression; otherwise a ref will be *)
- (* added when translated into OCaml **)
+(* x <- ... and ...x... are valid expression; otherwise a ref will be *)
+(* added when translated into OCaml **)
 and is_mutable = bool
 
 and left_value = 
@@ -148,7 +148,7 @@ and method_desc =
   { me_name: method_name; (* name of the method *)
     me_params: pattern list; (* list of input arguments *)
     me_body: exp; (* its result *)
-    me_typ: Deftypes.typ; (* type of the result *)
+    me_typ: type_expression; (* type of the result *)
   }
 
 and methodcall =
