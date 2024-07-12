@@ -83,8 +83,8 @@ type exp =
   | Elet: pattern * exp * exp -> exp
   | Eletvar : { id: Ident.t; is_mutable: is_mutable;
                 ty: Deftypes.typ; e_opt: exp option; e : exp } -> exp
-  | Eassign: left_value * exp -> exp(* [x.v <- ...] *)
-  | Eassign_state: left_state_value * exp -> exp(* [x.v <- ...] *)
+  | Eassign: left_value * exp -> exp (* [x.v <- ...] *)
+  | Eassign_state: left_state_value * exp -> exp (* [x.v <- ...] *)
   | Esequence: exp list -> exp
   | Eapp: exp * exp list -> exp
   | Emethodcall: methodcall -> exp
