@@ -121,6 +121,7 @@ and primitive_access =
 and machine =
   { ma_kind: Deftypes.kind;
     (* combinatorial, continuous-time or discrete-time *)
+    ma_initialize: exp option;
     ma_params: pattern list; (* list of static parameters *)
     ma_memories: mentry list;(* its memories *)
     ma_instances: ientry list; (* its node instances *)
@@ -130,7 +131,7 @@ and machine =
 and mentry =
   { m_name: Ident.t; (* its name *)
     m_value: exp option; (* its initial value *)
-    m_typ: Deftypes.typ; (* its type *)
+    m_typ: type_expression; (* its type *)
     m_kind: mkind; (* the kind of the memory *)
     m_size: exp path; (* it may be an array *)
   }

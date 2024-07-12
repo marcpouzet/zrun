@@ -33,7 +33,7 @@ let priority_exp = function
   | Eifthenelse _  | Ematch _ | Elet _ | Eletvar _ | Esequence _ -> 0
   | Efun _ | Emachine _ -> 0
 
-let kind = function
+let funkind = function
   | Deftypes.Tfun(k) ->
      (match k with
       | Deftypes.Tconst -> "const" | Tstatic -> "static" | Tany -> "any")
@@ -287,21 +287,10 @@ and expression ff e = exp 0 ff e
 and match_handler ff { m_pat = pat; m_body = b } =
   fprintf ff "@[<hov 4>| %a ->@ %a@]" pattern pat (exp 0) b
           
-and memory ff { m_name = n; m_value = e_opt; m_typ = ty;
-		m_kind = k_opt; m_size = m_size } =
-  let mem = function
-    | None -> ""
-    | Some(k) -> (Printer.kind k) ^ " " in
-  match e_opt with
-  | None -> fprintf ff "%s%a%a : %a"
-		    (mem k_opt) name n
-		    (print_list_no_space (print_with_braces (exp 0)
-							    "[" "]") "" "" "")
-		    m_size ptype ty
-  | Some(e) ->
-     fprintf ff "%s%a%a : %a = %a" (mem k_opt) name n
+and memory ff { m_name; m_value; m_typ; m_kind; m_size } =
+  fprintf ff "%a %a%a : %a = %a" (pkind m_kind) name m_name
 	     (print_list_no_space (print_with_braces (exp 0) "[" "]") "" "" "")
-	     m_size ptype ty (exp 0) e
+	     m_size concrete_type m_typ (print_opt (exp 0)) m_value
              
 and instance ff { i_name = n; i_machine = ei; i_kind = k;
 		  i_params = e_list; i_size = i_size } =
@@ -313,30 +302,27 @@ and instance ff { i_name = n; i_machine = ei; i_kind = k;
 	     (print_with_braces (exp 0) "[" "]") "" "" "")
 	  i_size
           
-and pmethod ff
-            { me_name = m_name; me_params = p_list; me_body = i; me_typ = ty } =
+and pmethod ff { me_name; me_params; me_body; me_typ } =
   fprintf ff "@[<hov 2>method %s %a@ =@ (%a:%a)@]"
-          (method_name m_name) pattern_list p_list (inst 2) i ptype ty
+          (method_name me_name) pattern_list me_params (exp 2) me_body ptype me_typ
           
 and pinitialize ff i_opt =
   match i_opt with
   | None -> ()
-  | Some(e) -> fprintf ff "@[<hov2>initialize@;%a@]" (inst 0) e
+  | Some(e) -> fprintf ff "@[<hov2>initialize@;%a@]" (exp 0) e
 		       
 (** Print a machine *)
-and machine ff { ma_kind = k; ma_params = pat_list; ma_initialize = i_opt;
-		 ma_memories = memories; ma_instances = instances;
-                 ma_methods = m_list } =
+and machine ff { ma_kind; ma_params; ma_initialize;
+		 ma_memories; ma_instances; ma_methods } =
   fprintf ff
-   "@[<hov 2>let %s = machine(%s)%a@ \
+   "@[<hov 2>machine(%s)%a@ \
    {@, %a@,@[<v2>memories@ @[%a@]@]@;@[<v 2>instances@ @[%a@]@]@;@[%a@]@]]}@.@]"
-   f
-   (kind k)
-   pattern_list pat_list
-   pinitialize i_opt
-   (print_list_r_empty memory """;""") memories
-   (print_list_r_empty instance """;""") instances
-   (print_list_r pmethod """""") m_list
+   (kind ma_kind)
+   pattern_list ma_params
+   pinitialize ma_initialize
+   (print_list_r_empty memory """;""") ma_memories
+   (print_list_r_empty instance """;""") ma_instances
+   (print_list_r pmethod """""") ma_methods
 
 (** The main entry functions for expressions and instructions *)
 let rec type_decl ff = function
@@ -349,18 +335,14 @@ let rec type_decl ff = function
        (print_couple pp_print_string print_concrete_type "" " :" "")
        "" "|" "" ff s_ty_list
 
-let constr_decl ff = function
+and constr_decl ff = function
   | Econstr0decl(s) -> fprintf ff "%s" s
   | Econstr1decl(s, ty_list) ->
      fprintf ff "%s of %a" s (print_list_l print_concrete_type """ *""") ty_list
 
 let implementation ff impl = match impl with
-  | Eletvalue(n, i) ->
-     fprintf ff "@[<v 2>let %a = %a@.@.@]" shortname n (inst 0) i
-  | Eletfun(n, pat_list, i) ->
-     fprintf ff "@[<v 2>let %a %a =@ %a@.@.@]"
-             shortname n pattern_list pat_list (inst 0) i
-  | Eletmachine(n, m) -> machine n ff m
+  | Eletdef(n, e) ->
+     fprintf ff "@[<v 2>let %a = %a@.@.@]" shortname n (exp 0) i
   | Eopen(s) ->
      fprintf ff "@[open %s@.@]" s
   | Etypedecl(l) ->
