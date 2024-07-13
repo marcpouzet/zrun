@@ -27,6 +27,9 @@ wc:
 	zrun/*.ml \
 	compiler/tydefs/*.ml \
 	compiler/rewrite/*.ml \
+	compiler/typing/*.ml \
+	compiler/analysis/*.ml \
+	compiler/gencode/*.ml \
 	compiler/main/*.ml)
 
 .PHONY: zrun.exe zwrite.exe zrun.exe.verbose tests debug clean wc

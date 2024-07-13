@@ -179,8 +179,8 @@ and assign_state ff left e =
 
 and state_primitive_access a =
   match a with
-    | Ederivative -> ".der" | Epos -> ".pos"
-    | Ezout -> ".zout"  | Ezin -> ".zin" | Ediscrete -> ""
+    | Eder -> ".der" | Epos -> ".pos"
+    | Ezero_out -> ".zout"  | Ezero_in -> ".zin" 
 
 and var ff n = name ff n
 
@@ -280,9 +280,11 @@ and match_handler ff { m_pat = pat; m_body = b } =
 
 and mkind mk =
   match mk with
-  | Ederivative | Epos -> "cont "
-  | Ezout | Ezin -> "zero "
+  | Econt -> "cont "
+  | Ezero -> "zero "
   | Ediscrete -> ""
+  | Ehorizon -> "horizon "
+  | Emajor -> "major "
 
 and memory ff { m_name; m_value; m_typ; m_kind = k; m_size } =
   fprintf ff "%s%a%a : %a = %a" (mkind k) name m_name

@@ -106,7 +106,7 @@
     reset ; rewrite -> and resets
     complete ; complete equations with [der x = 0.0]
     shared ; normalise equations to shared variables into [x = ...]
-    ;encore ; add horizons [horizon h = 0.0] for zero-crossings
+    ; encore ; add horizons [horizon h = 0.0] for zero-crossings
     letin ; un-nesting of let/in and blocks
     graph ; representation of acyclic graphs
     vars ; read variables

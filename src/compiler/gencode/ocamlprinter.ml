@@ -74,6 +74,8 @@ let print_concrete_type ff ty =
     if prio_ty < prio then fprintf ff ")" in
   ptype 0 ff ty
 
+let ptype ff ty = print_concrete_type ff ty
+
 (* Print the call to a method *)
 and method_call ff { met_name; met_instance; met_args } =
   let m = method_name met_name in
@@ -131,7 +133,7 @@ and letvar ff n is_mutable ty e_opt e =
   let s = if is_mutable then "" else "ref " in
   match e_opt with
   | None ->
-     fprintf ff "@[<v 0>let %a = %s(Ebj.magic (): %a) in@ %a@]"
+     fprintf ff "@[<v 0>let %a = %s(Obj.magic (): %a) in@ %a@]"
 	     name n s ptype ty (exp 0) e
   | Some(e0) ->
      fprintf ff "@[<v 0>let %a = %s(%a:%a) in@ %a@]"
@@ -241,26 +243,8 @@ and exp prio ff e =
 and pat_exp ff (p, e) =
   fprintf ff "@[@[%a@] =@ @[%a@]@]" pattern p (exp 0) e
 
-and exp_with_typ ff (e, ty) =
-  fprintf ff "(%a:%a)" (exp 2) e ptype ty
-
 and match_handler ff { m_pat; m_body } =
   fprintf ff "@[<hov 4>| %a ->@ %a@]" pattern m_pat (exp 0) m_body
-
-(*
-let constructor_for_kind = function
-  | Deftypes.Tcont
-  | Deftypes.Tdiscrete(true)
-  | Deftypes.Tproba -> if !Zmisc.with_copy then "Cnode" else "Node"
-  | _ -> assert false
-let extra_methods m_list =
-  if !Zmisc.with_copy then Eaux.copy :: m_list else m_list
-let expected_list_of_methods = function
-  | Deftypes.Tcont
-  | Deftypes.Tdiscrete(true)
-  | Deftypes.Tproba -> extra_methods default_list_of_methods
-  | _ -> assert false
-   *)
 
 (* Define the data-type for the internal state of a machine *)
 (* A prefix "_" is added to the name of the machine to avoid *)
@@ -271,26 +255,27 @@ let def_type_for_a_machine ff f memories instances =
   let i, params, entries =
     List.fold_right
       (fun { m_name = n } (i, params, entries) ->
-        let m = Misc.int_to_alpha i in (i+1, m :: params, (n, m) :: entries))
+        let m = Genames.int_to_alpha i in (i+1, m :: params, (n, m) :: entries))
       memories (0, [], []) in
   let i, params, entries =
     List.fold_right
       (fun { i_name = n } (i, params, entries) ->
-        let m = Misc.int_to_alpha i in (i+1, m :: params, (n, m) :: entries))
+        let m = Genames.int_to_alpha i in (i+1, m :: params, (n, m) :: entries))
       instances (i, params, entries) in
   (* if the state is empty, produce the dummy state type [unit] *)
   if entries = []
   then fprintf ff "@[type _%s = unit@.@.@]" f
   else
     fprintf ff "@[<v 2>type @[%a@] _%s =@ { @[%a@] }@.@.@]"
-            (print_list_r (fun ff s -> fprintf ff "'%s" s) "("","")") params
-            f
-            (print_list_r one_entry """;""") entries
+      (Pp_tools.print_list_r (fun ff s -> fprintf ff "'%s" s)
+         "("","")") params
+      f
+      (Pp_tools.print_list_r one_entry """;""") entries
 
+let exp_with_typ ff (e, ty) = fprintf ff "(%a:%a)" (exp 2) e ptype ty
 
 (* Print the method as a function *)
-let pmethod f ff { me_name; me_params;
-                   me_body; me_typ } =
+let pmethod f ff { me_name; me_params; me_body; me_typ } =
   fprintf ff "@[<v 2>let %s_%s self %a =@ (%a:%a) in@]"
     f (method_name me_name) pattern_list me_params (exp 2) me_body
     print_concrete_type me_typ
@@ -308,7 +293,7 @@ let rec array_of e_opt ty ff ie_size =
   let exp_of ff (e_opt, ty) =
     match e_opt, ty with
     | Some(e), _ -> exp 2 ff e
-    | _ -> fprintf ff "(Ebj.magic (): %a)" ptype ty in
+    | _ -> fprintf ff "(Obj.magic (): %a)" ptype ty in
   match ie_size with
   | [] -> exp_of ff (e_opt, ty)
   | [ie] -> fprintf ff "Array.make %a %a" (exp 3) ie exp_of (e_opt, ty)
@@ -317,72 +302,74 @@ let rec array_of e_opt ty ff ie_size =
 	     "@[<hov 2>Array.init %a@ (fun _ -> %a)@]" (exp 3) ie
 	     (array_of e_opt ty) ie_list
 
+let constructor_for_kind = function
+  | Node | Hybrid -> "Node"
+  | Fun -> assert false
+
+let expected_list_of_methods = default_list_of_methods
+
 (* Print initialization code *)
 let print_initialize ff e_opt =
   match e_opt with
-  | None -> fprintf ff "()" | Some(i) -> fprintf ff "%a" (exp 0) e
+  | None -> fprintf ff "()" | Some(e) -> fprintf ff "%a" (exp 0) e
 
 (* Print the allocation function *)
 let palloc f i_opt memories ff instances =
-  let print_memory ff { m_name = n; m_value = e_opt;
-			m_typ = ty; m_kind = k_opt; m_size = m_size } =
-    match k_opt with
-    | None ->
+  let typ_bool = Etypeconstr(Lident.Modname (Initial.bool_ident), []) in
+  let typ_float = Etypeconstr(Lident.Modname (Initial.float_ident), []) in
+  let print_memory ff { m_name; m_value; m_typ; m_kind; m_size } =
+    match m_kind with
+    | Ediscrete ->
        (* discrete state variable *)
        begin
-	 match e_opt with
+	 match m_value with
          | None ->
-	    fprintf ff "@[%a = %a@]" name n
-		    (array_make (fun ff _ -> fprintf ff "(Obj.magic (): %a)"
-						     ptype ty) ())
-		    m_size
+	    fprintf ff "@[%a = %a@]" name m_name
+	      (array_make (fun ff _ -> fprintf ff "(Obj.magic (): %a)"
+					 ptype m_typ) ())
+	      m_size
          | Some(e) ->
-	    fprintf ff "@[%a = %a@]" name n
-		    (array_make exp_with_typ (e, ty)) m_size
+	    fprintf ff "@[%a = %a@]" name m_name
+	      (array_make exp_with_typ (e, m_typ)) m_size
        end
-    | Some(m) ->
-       match m with
-       | Deftypes.Zero ->
-	  fprintf ff "@[%a = @[<hov 2>{ zin = %a;@ zout = %a }@]@]"
-		  name n (array_of e_opt Initial.typ_bool) m_size
-		  (array_of (Some(Econst(Efloat(1.0)))) Initial.typ_float)
-		  m_size
-       | Deftypes.Cont ->
-	  fprintf ff "@[%a = @[<hov 2>{ pos = %a; der = %a }@]@]"
-		  name n (array_of e_opt ty) m_size
-		  (* the default value of a derivative must be zero *)
-		  (array_of (Some(Econst(Efloat(0.0)))) ty) m_size
-       | Deftypes.Horizon | Deftypes.Period
-       | Deftypes.Encore | Deftypes.Major ->
-	  fprintf ff "%a = %a" name n (array_of e_opt ty) m_size in
-
-  let print_instance ff { i_name = n; i_machine = ei;
-			  i_kind = k; i_params = e_list; i_size = ie_size } =
-    fprintf ff "@[%a = %a (* %s *)@ @]" name n
-	    (array_make (fun ff n -> fprintf ff "%a_alloc ()" name n) n)
-	    ie_size (kind k)  in
+    | Ezero ->
+       fprintf ff "@[%a = @[<hov 2>{ zin = %a;@ zout = %a }@]@]"
+	 name m_name (array_of m_value typ_bool) m_size
+	 (array_of (Some(Econst(Efloat(1.0)))) typ_float)
+	 m_size
+    | Econt ->
+       fprintf ff "@[%a = @[<hov 2>{ pos = %a; der = %a }@]@]"
+	 name m_name (array_of m_value m_typ) m_size
+	 (* the default value of a derivative must be zero *)
+	 (array_of (Some(Econst(Efloat(0.0)))) m_typ) m_size
+    | Ehorizon | Emajor ->
+       fprintf ff "%a = %a" name m_name (array_of m_value m_typ) m_size in
+  
+  let print_instance ff { i_name; i_machine; i_kind; i_params; i_sizes } =
+    fprintf ff "@[%a = %a (* %s *)@ @]" name i_name
+      (array_make (fun ff n -> fprintf ff "%a_alloc ()" name n) i_name)
+      i_sizes (kind i_kind)  in
   if memories = []
   then if instances = []
        then fprintf ff "@[let %s_alloc _ = %a in@]" f print_initialize i_opt
        else
          fprintf ff "@[<v 2>let %s_alloc _ =@ @[%a;@,%a@] in@]"
-                 f print_initialize i_opt
-                 (print_record print_instance) instances
+           f print_initialize i_opt
+           (Pp_tools.print_record print_instance) instances
   else if instances = []
   then
     fprintf ff "@[<v 2>let %s_alloc _ =@ @[%a;@,%a@] in@]"
-            f print_initialize i_opt (print_record print_memory) memories
+      f print_initialize i_opt (Pp_tools.print_record print_memory) memories
   else
     fprintf ff "@[<v 2>let %s_alloc _ =@ @[%a;@,{ @[%a@,%a@] }@] in@]"
-            f
-            print_initialize i_opt
-            (print_list_r print_memory """;"";") memories
-            (print_list_r print_instance """;""") instances
-	    
+      f
+      print_initialize i_opt
+      (print_list_r print_memory """;"";") memories
+      (print_list_r print_instance """;""") instances
+
 (* print an entry [let n_alloc, n_step, n_reset, ... = f ... in] *)
 (* for every instance *)
-let def_instance_function ff { i_name; i_machine; i_kind;
-			       i_params; i_sizes } =
+let def_instance_function ff { i_name; i_machine; i_kind; i_params; i_sizes } =
   (* Define the method *)
   let method_name ff me_name =
     let m = method_name me_name in
@@ -390,14 +377,15 @@ let def_instance_function ff { i_name; i_machine; i_kind;
 
   let list_of_methods ff m_list =  print_list_r method_name """;""" ff m_list in
 
-  match k with
-  | Deftypes.Tstatic _ | Deftypes.Tany | Deftypes.Tdiscrete(false) -> ()
-  | _ -> let m_name_list = expected_list_of_methods k in
-	 let k = constructor_for_kind k in
-	 fprintf ff
-		 "@[let %s { alloc = %a_alloc; %a } = %a %a in@]"
-		 k name n list_of_methods m_name_list
-		 (exp 0) ei (print_list_r (exp 1) "" " " "") e_list
+  match i_kind with
+  | Fun -> ()
+  | Node | Hybrid ->
+     let m_name_list = expected_list_of_methods in
+     let k = constructor_for_kind i_kind in
+     fprintf ff
+       "@[let %s { alloc = %a_alloc; %a } = %a %a in@]"
+       k name i_name list_of_methods m_name_list
+       (exp 0) i_machine (print_list_r (exp 1) "" " " "") i_sizes
 
 (* Print a machine as pieces with a type definition for the state *)
 (* and a collection of functions *)
@@ -411,51 +399,33 @@ let def_instance_function ff { i_name; i_machine; i_kind;
  *   let f_step y = ... in
  *   let f_reset = ... in
  *   { alloc = f_alloc; step = f_step; reset = f_reset, ... } *)
-let machine f ff { ma_kind = k;
-                   ma_params = pat_list;
-		   ma_initialize = i_opt;
-		   ma_memories = memories;
-                   ma_instances = instances;
-                   ma_methods = m_list } =
+let machine f ff { ma_kind; ma_params; ma_initialize; ma_memories;
+                   ma_instances; ma_methods } =
   (* print either [(f)] *)
   (* or [k { alloc = f_alloc; m1 = f_m1; ...; mn = f_mn }] *)
   let tuple_of_methods ff m_name_list =
-    match k with
-    | Deftypes.Tstatic _ | Deftypes.Tany -> fprintf ff "%s" f
-    | Deftypes.Tdiscrete _
-    | Deftypes.Tcont 
-    | Deftypes.Tproba ->
+    match ma_kind with
+    | Fun -> fprintf ff "%s" f
+    | Node | Hybrid ->
        let method_name ff me_name =
 	 let m = method_name me_name in
 	 fprintf ff "@[%s = %s_%s@]" m f m in
-       let k = constructor_for_kind k in
+       let k = constructor_for_kind ma_kind in
        let m_name_list =
-	 List.map (fun { me_name = me_name } -> me_name) m_list in
-       let m_name_list = extra_methods m_name_list in
+	 List.map (fun { me_name } -> me_name) ma_methods in
        fprintf ff "@[%s { alloc = %s_alloc; %a }@]"
 	       k f (print_list_r method_name "" ";" "") m_name_list in
 
   (* print the type for [f] *)
-  def_type_for_a_machine ff f memories instances;
+  def_type_for_a_machine ff f ma_memories ma_instances;
   (* print the code for [f] *)
-  if !Zmisc.with_copy then
-    fprintf ff
-	    "@[<hov 2>let %s %a = @ @[@[%a@]@ @[%a@]@ @[%a@]@ @[%a@]@ %a@]@.@]"
+  fprintf ff "@[<hov 2>let %s %a = @ @[@[%a@]@ @[%a@]@ @[%a@]@ %a@]@.@]"
 	  f
-	  pattern_list pat_list
-	  (print_list_r def_instance_function "" "" "") instances
-	  (palloc f i_opt memories) instances
-	  (pcopy f memories) instances
-	  (print_list_r (pmethod f) """""") m_list
-	  tuple_of_methods m_list
-  else
-    fprintf ff "@[<hov 2>let %s %a = @ @[@[%a@]@ @[%a@]@ @[%a@]@ %a@]@.@]"
-	  f
-	  pattern_list pat_list
-	  (print_list_r def_instance_function "" "" "") instances
-	  (palloc f i_opt memories) instances
-	  (print_list_r (pmethod f) """""") m_list
-	  tuple_of_methods m_list
+	  pattern_list ma_params
+	  (print_list_r def_instance_function "" "" "") ma_instances
+	  (palloc f ma_initialize ma_memories) ma_instances
+	  (print_list_r (pmethod f) """""") ma_methods
+	  tuple_of_methods ma_methods
 
 let implementation ff impl = match impl with
   | Eletdef(n, e) ->

@@ -108,12 +108,12 @@ and left_state_value =
   | Eleft_state_name of Ident.t
   | Eleft_state_record_access of left_state_value * Lident.t
   | Eleft_state_index of left_state_value * exp
-  | Eleft_state_primitive_access of left_state_value * mkind
+  | Eleft_state_primitive_access of left_state_value * primitive_access
 
 (* a machine provides certain fields for reading/writting state variables *)
 and primitive_access =
   | Eder (* x.der.(i) <- ... *)
-  | Econt (* x.pos.(i) <- ... *)
+  | Epos (* x.pos.(i) <- ... *)
   | Ezero_out (* x.zero_out.(i) <-... *)
   | Ezero_in (* ... x.zero_in.(i) ... *)
 
@@ -164,11 +164,12 @@ and method_name = name
 
 (* The different kinds of state variables *)
 and mkind =
-  | Ederivative (* x.der <- ... and x.pos <- ... *)
-  | Epos 
-  | Ezout (* x.zout <-... and ...x.zin...*)
-  | Ezin 
-  | Ediscrete (* x <- *)
+  | Econt (* continuous state variable *)
+  | Ezero (* zero-crossing *)
+  | Ehorizon (* horizon *)
+  | Emajor (* major step *)
+  | Ediscrete (* discrete state variable *)
+
         
 and 'a path = 'a list
 
