@@ -95,15 +95,18 @@ let expression funs acc ({ e_desc } as e) =
     else e, acc
   | _ -> raise Mapfold.Fallback
 
-(* add extra equations [lx = last* x] *)
-let leq_t funs ({ locals } as acc) ({ l_eq; l_env } as leq) =
+(* add extra equations [lx = last* x]. *)
+let leq_t funs ({ locals } as acc) ({ l_eq; l_env; l_rec } as leq) =
   let l_eq, { renaming } =
     Mapfold.equation
       funs { acc with locals = Env.append l_env locals } l_eq in
   (* add an equation [lx = last* x] for every [x\lx] in [renaming inter l_env] *)
   let l_renaming, renaming = split l_env renaming in
+  (* the resulting equations are recursive if [l_rec] or *)
+  (* at least one copy is added *)
+  let l_rec = l_rec || not (Env.is_empty l_renaming) in
   { leq with l_eq = Aux.par (l_eq :: add_eq_copy l_renaming);
-             l_env = update_env l_env l_renaming; l_rec = true },
+             l_env = update_env l_env l_renaming; l_rec },
   { locals; renaming }
 
 (* add extra equations [lx = last* x] *)
