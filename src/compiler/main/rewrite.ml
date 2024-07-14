@@ -94,7 +94,7 @@ let default_list =
    "letin", "Un-nesting of let/in and blocks. See below:",
    Letin.program;
    "schedule", "Static scheduling. See below:",
-   Schedule.program]
+   Schedule.program ]
 
 (* select the rewritting steps *)
 module S = Set.Make (String)

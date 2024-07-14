@@ -97,7 +97,7 @@ let merge loc env1 env2 =
   let s = Env.to_seq env1 in
   seqfold
     (fun acc (x, entry) ->
-      if Env.mem x env2 then error { kind = Emerge_env; loc = loc }
+      if Env.mem x env2 then error { kind = Emerge_env(x); loc = loc }
       else return (Env.add x entry acc))
     env2 s
 
@@ -2433,10 +2433,10 @@ let eval_two_nodes loc output n_steps
       { init = init1; step = step1 } { init = init2; step = step2 } v =
   let step (s1, s2) v =
     Debug.print_state "State before (first node):" s1;
-    let v1, s1 = catch (runstep loc s1 step1 v) in
+    let* v1, s1 = runstep loc s1 step1 v in
     Debug.print_state "State after (first node):" s1;
     Debug.print_state "State before (second node):" s2;
-    let v2, s2 = catch (runstep loc s2 step2 v) in
+    let* v2, s2 = runstep loc s2 step2 v in
     Debug.print_state "State after (second node):" s2;
     let* v = check_equality loc v1 v2 in
     if v then return (s1, s2) else

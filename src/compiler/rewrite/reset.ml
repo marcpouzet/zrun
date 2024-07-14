@@ -144,6 +144,19 @@ and expression funs acc ({ e_desc } as e) =
      { e with e_desc = Ereset(local_in_exp acc e, e_r) }, acc       
   | _ -> Mapfold.expression funs acc e
 
+let result funs acc ({ r_desc } as r) =
+  let r_desc, acc = match r_desc with
+  | Exp(e) ->
+     (* introduce one init per branch *)
+     let acc = intro_init_in_exp () in
+     let e, _ = expression funs acc e in
+     Exp(local_in_exp acc e), acc
+  | Returns({ b_vars; b_body } as b) ->
+     let acc = intro_init_in_eq () in
+     let b_body, acc = equation funs acc b_body in
+     Returns { b with b_vars; b_body = local_in_eq acc b_body }, acc in
+  { r with r_desc }, acc
+  
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
 let get_index funs acc n = Ident.get (), acc
@@ -151,7 +164,8 @@ let get_index funs acc n = Ident.get (), acc
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
-    { Mapfold.defaults with expression; set_index; get_index; global_funs } in
+    { Mapfold.defaults with expression; equation; result;
+                            set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ =
     Mapfold.program_it funs dummy p in
   { p with p_impl_list = p_impl_list }

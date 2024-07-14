@@ -39,7 +39,7 @@ type kind =
   | Ebot : kind (* value is bottom *)
   | Eequal : kind (* values that are expected to be equal are not *)
   | Eassert_failure : kind (* assertion is not true *)
-  | Emerge_env : kind (* two equations have names in common *)
+  | Emerge_env : Ident.t -> kind (* two equations define a common name *)
   | Erecursive_value : kind (* recursive value definition *)
   | Enot_causal : Ident.S.t -> kind (* a set of variables whose value is bot *)
   | Earray_size : { size : int; index : int } -> kind
@@ -132,9 +132,9 @@ let message loc kind =
      eprintf "@[%aZrun: expressions expected to be equal are not.@.@]" output_location loc
   | Eassert_failure ->
      eprintf "@[%aZrun: assertion is not true.@.@]" output_location loc
-  | Emerge_env ->
-     eprintf "@[%aZrun: the two equations have defined names in common.@.@]"
-       output_location loc
+  | Emerge_env(name) ->
+     eprintf "@[%aZrun: two parallel equations define the same name %s.@.@]"
+       output_location loc (Ident.source name)
   | Erecursive_value ->
      eprintf
        "@[%aZrun: the recursive definition of a value is not allowed.@.@]"
