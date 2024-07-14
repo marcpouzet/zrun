@@ -26,6 +26,7 @@ open Mapfold
 
 (*
   [e1 -> e2] is rewritten in [if last i then e1 else e2]
+  adding a declaration [local i init true do i = false and ...] around
 
   [reset
    ... init x = e ... (* [e] is static *)
