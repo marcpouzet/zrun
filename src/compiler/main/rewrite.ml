@@ -75,6 +75,8 @@ let default_list =
    Der.program;
    "copylast", "Add a copy for [last x] to remore false cycles. See below:",
    Copylast.program;
+   "copyinout", "Remove last (all variables in patterns must be values. See below:",
+   Lastinout.program;
    "auto", "Translation of automata. See below:",
    Automata.program;
    "present", "Translation of present. See below:",

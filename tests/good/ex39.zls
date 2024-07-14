@@ -1,0 +1,14 @@
+let node f() returns (o)
+  local m do
+  o = pre o + 1
+  and m = 1 fby m + o
+  done
+  
+(* let node main__() returns (o init 42)
+  o = last o + 1
+
+let node main___() returns (o)
+  local last_o do o = last_o + 1 and last_o = 42 fby o done
+
+let node test() = main__() = main___()
+*)
