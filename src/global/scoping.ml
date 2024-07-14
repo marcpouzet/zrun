@@ -731,10 +731,10 @@ and expression env { desc; loc } =
     | Econstr1(f, e_list) ->
        Ast.Econstr1
          { lname = longname f; arg_list = List.map (expression env) e_list }
-    | Elast(x) ->
+    | Elast(copy, x) ->
        let id = try Env.find x env
                with | Not_found -> Error.error loc (Error.Evar(x)) in
-       Ast.Elast { copy = true; id }
+       Ast.Elast { copy; id }
     | Eop(op, e_list) ->
        let e_list = List.map (expression env) e_list in
        Ast.Eop(operator op, e_list)

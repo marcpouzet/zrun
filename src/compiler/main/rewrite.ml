@@ -73,10 +73,10 @@ let default_list =
    Inline.program;
    "der", "Remove handlers in definitions of derivatives. See below:",
    Der.program;
-   "copylast", "Add a copy for [last x] to remore false cycles. See below:",
+   "copylast", "Add a copy for [last x] to remore false cycles when \
+                [x] is a local variable. \nRemove [last x] when [x] in \
+                an input or output. See below:",
    Copylast.program;
-   "copyinout", "Remove last (all variables in patterns must be values. See below:",
-   Lastinout.program;
    "auto", "Translation of automata. See below:",
    Automata.program;
    "present", "Translation of present. See below:",

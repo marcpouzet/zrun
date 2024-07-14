@@ -186,7 +186,7 @@ and exp_desc =
   | Econstr0 : longname -> exp_desc
   | Econstr1 : longname * exp list -> exp_desc
   | Evar : longname -> exp_desc
-  | Elast : name -> exp_desc
+  | Elast : is_copy * name -> exp_desc
   | Eop : operator * exp list -> exp_desc
   | Etuple : exp list -> exp_desc
   | Eapp : is_inline * exp *  exp list -> exp_desc
@@ -204,6 +204,7 @@ and exp_desc =
   | Eassert : exp -> exp_desc
   | Eforloop : for_exp forloop -> exp_desc
 
+and is_copy = bool
 
 and is_rec = bool
 
