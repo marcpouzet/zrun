@@ -14,7 +14,7 @@ let node main5() returns ()
       assert o
   done
  
-(* let node main5() returns ()
+let node main6() returns ()
   local m1 default 0, m2, half, o
   do
     if half then do done
@@ -28,5 +28,5 @@ let node main5() returns ()
       o = m1 = m2
   and
       assert o
-  done *)
+  done
  
