@@ -38,9 +38,9 @@
 let node p13(i) returns (o1 default false, o2 default false)
   do
   if i then
-    do if o2 then o1 = true done
+    if o2 then o1 = true
   else
-    do if o1 then o2 = true done
+    if o1 then o2 = true
   done
 
 (* This may appear complicated to explain that p13 is indeed causal but the
