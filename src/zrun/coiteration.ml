@@ -77,6 +77,15 @@ let (let*+) v f =
   let+ v = v in
   f v
 
+let (let*+) e f =
+  match e with
+  | Error(v) -> Error(v)
+  | Ok(v, s) ->
+     match v with
+     | Vbot -> return (Vbot, s) | Vnil -> return (Vnil, s)
+     | Value(v) -> (* return (Vbot, s) *) f v s
+(* let* v = f v in return (v, s) *)
+
 (* check that a value is neither bot nor nil *)
 let no_bot_no_nil loc v =
   match v with
@@ -1797,7 +1806,9 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        | None -> return (Value(Vpresent(Vvoid)), s)
        | Some(e) ->
           let* v, s = sexp genv env e s in
-          return (v, s) (* (let+ v in return (Value(Vpresent(v)))), s) *) in
+          return (v, s) in
+            (* Value(Vpresent(v)), s)
+            return (v, s) (let+ v in return (Value(Vpresent(v)))), s) *)
      let* entry =
        Env.find_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
