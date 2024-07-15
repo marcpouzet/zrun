@@ -1795,7 +1795,9 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* cur, s =
        match e_opt with
        | None -> return (Value(Vpresent(Vvoid)), s)
-       | Some(e) -> sexp genv env e s in
+       | Some(e) ->
+          let* v, s = sexp genv env e s in
+          return (v, s) (* (let+ v in return (Value(Vpresent(v)))), s) *) in
      let* entry =
        Env.find_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
