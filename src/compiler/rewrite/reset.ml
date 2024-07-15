@@ -109,63 +109,68 @@ let local_in_exp { init } e =
                         Aux.vardec id false None None]
           [Aux.id_eq id (Aux.last_star m); Aux.id_eq m (Aux.efalse)]) e
 
+let reset_eq funs acc eq =
+  let eq, acc_local = Mapfold.equation_it funs empty eq in
+  local_in_eq acc_local eq, acc
+
+let reset_e funs acc e =
+  let e, acc_local = Mapfold.expression_it funs empty e in
+  local_in_exp acc_local e, acc
+
+let match_handler_eq funs acc ({ m_body } as m_h) =
+  let m_body, acc = reset_eq funs acc m_body in 
+  { m_h with m_body }, acc
+
+and match_handler_e funs acc ({ m_body } as m_h) =
+  let e, acc = reset_e funs empty m_body in 
+  { m_h with m_body }, acc
+
+and present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_cond, acc = Mapfold.scondpat_it funs acc p_cond in
+  let p_body, acc = reset_eq funs acc p_body in
+  { p_b with p_cond; p_body }, acc
+
+and present_handler_e funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_cond, acc = Mapfold.scondpat_it funs acc p_cond in
+  let p_body, acc = reset_e funs acc p_body in
+  { p_b with p_cond; p_body }, acc
+
+and if_eq funs acc (eq_true, eq_false) =
+  let eq_true, acc = reset_eq funs acc eq_true in
+  let eq_false, acc = reset_eq funs acc eq_false in
+  (eq_true, eq_false), acc
+
 (* Equations *)
-let rec equation funs acc ({ eq_desc } as eq) =
+let equation funs acc ({ eq_desc } as eq) =
   match eq_desc with
   | EQinit(_, e) when static e -> eq, acc
   | EQinit(x, e) ->
-     let e, acc = expression funs acc e in
+     let e, acc = Mapfold.expression_it funs acc e in
      reset_init acc { eq with eq_desc = EQinit(x, e) }
-  | EQmatch { e; handlers } ->
-     let body acc ({ m_body } as m_h) =
-       (* introduce one init per branch *)
-       let m_body, _ = equation funs empty m_body in
-       { m_h with m_body = local_in_eq acc m_body }, acc in
-     let e, acc = expression funs acc e in
-     let handlers, acc =
-       Util.mapfold body acc handlers in
-       { eq with eq_desc = EQmatch { is_total = true; e; handlers } }, acc
-  | EQreset(eq, e) ->
-     let e, acc = expression funs acc e in
-     (* introduce one init per branch *)
-     let eq, acc = equation funs empty eq in
-     { eq with eq_desc = EQreset(local_in_eq acc eq, e) }, acc       
-  | _ -> Mapfold.equation funs acc eq
+  | _ -> raise Mapfold.Fallback
 
 (** Expressions. *)
-and expression funs acc ({ e_desc } as e) =
+let expression funs acc { e_desc } =
   match e_desc with
   | Eop(Eminusgreater, [e1; e2]) ->
-     let e1, acc = expression funs acc e1 in
-     let e2, acc = expression funs acc e2 in
+     let e1, acc = Mapfold.expression_it funs acc e1 in
+     let e2, acc = Mapfold.expression_it funs acc e2 in
      (* [if last i then e1 else e2] *)
      ifthenelse acc e1 e2
      (* [if last i then e1 else e2] *)
-  | Ematch({ e; handlers } as m) ->
-     let body acc ({ m_body } as m_h) =
-       (* introduce one init per branch *)
-       let m_body, _ = expression funs empty m_body in
-       { m_h with m_body = local_in_exp acc m_body }, acc in
-     let e, acc = expression funs acc e in
-     let handlers, acc =
-       Util.mapfold body acc handlers in
-     { e with e_desc = Ematch { m with e; handlers } }, acc
-  | Ereset(e, e_r) ->
-     let e_r, acc = expression funs acc e_r in
-     (* introduce one init per branch *)
-     let e, acc = expression funs empty e in
-     { e with e_desc = Ereset(local_in_exp acc e, e_r) }, acc       
-  | _ -> Mapfold.expression funs acc e
+  | _ -> raise Mapfold.Fallback
 
 let result funs acc ({ r_desc } as r) =
   (* introduce one init per branch *)
   let r_desc, acc = match r_desc with
-  | Exp(e) ->
-     let e, _ = expression funs empty e in
-     Exp(local_in_exp acc e), acc
+    | Exp(e) ->
+       let e, acc = reset_e funs acc e in
+       Exp(e), acc
   | Returns({ b_vars; b_body } as b) ->
-     let b_body, acc = equation funs empty b_body in
-     Returns { b with b_vars; b_body = local_in_eq acc b_body }, acc in
+     let b_vars, acc =
+       Util.mapfold (Mapfold.vardec_it funs) acc b_vars in
+     let b_body, acc = reset_eq funs acc b_body in
+     Returns { b with b_vars; b_body }, acc in
   { r with r_desc }, acc
   
 let set_index funs acc n =
@@ -176,6 +181,9 @@ let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
     { Mapfold.defaults with expression; equation; result;
+                            reset_e; reset_eq; match_handler_eq;
+                            match_handler_e; present_handler_eq;
+                            present_handler_e; if_eq;
                             set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ =
     Mapfold.program_it funs empty p in

@@ -134,6 +134,10 @@ type ('a, 'info1, 'info2) it_funs =
     if_eq :
       ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 eq * 'info1 eq
         -> ('info2 eq * 'info2 eq) * 'a; 
+    reset_eq :
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 eq -> 'info2 eq * 'a; 
+    reset_e :
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 exp -> 'info2 exp * 'a; 
     present_handler_eq :
       ('a, 'info1, 'info2) it_funs -> 'a 
       -> ('info1, 'info1 scondpat, 'info1 eq) present_handler 
@@ -497,7 +501,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
   | Eassert e -> let e, acc = expression_it funs acc e in
                  { e with e_desc = Eassert(e) }, acc
   | Ereset(e_body, e_c) ->
-     let e_body, acc = expression_it funs acc e_body in
+     let e_body, acc = reset_e_it funs acc e_body in
      let e_c, acc = expression_it funs acc e_c in
      { e with e_desc = Ereset(e_body, e_c) }, acc
   | Esizeapp { f; size_list } -> 
@@ -556,6 +560,14 @@ and if_eq funs acc (eq_true, eq_false) =
   let eq_true, acc = equation_it funs acc eq_true in
   let eq_false, acc = equation_it funs acc eq_false in
   (eq_true, eq_false), acc
+
+and reset_eq_it funs acc eq = funs.reset_eq funs acc eq
+
+and reset_eq funs acc eq = equation_it funs acc eq
+
+and reset_e_it funs acc eq = funs.reset_e funs acc eq
+
+and reset_e funs acc e = expression_it funs acc e
 
 and match_handler_e_it funs acc m_handler =
   funs.match_handler_e funs acc m_handler
@@ -678,7 +690,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
                      { f with for_size; for_kind; for_index; for_input;
                               for_body; for_env } }, acc
     | EQreset(eq, e_c) ->
-       let eq, acc = equation_it funs acc eq in
+       let eq, acc = reset_eq_it funs acc eq in
        let e_c, acc = expression_it funs acc e_c in
        { eq with eq_desc = EQreset(eq, e_c) }, acc
     | EQlet(leq, eq) ->
@@ -838,6 +850,8 @@ let defaults =
     match_handler_eq;
     match_handler_e;
     if_eq;
+    reset_eq;
+    reset_e;
     automaton_handler;
     present_handler_eq;
     present_handler_e;
@@ -878,6 +892,8 @@ let defaults_stop =
     match_handler_eq = stop;
     match_handler_e = stop;
     if_eq = stop;
+    reset_eq = stop;
+    reset_e = stop;
     automaton_handler = stop;
     present_handler_eq = stop;
     present_handler_e = stop;
