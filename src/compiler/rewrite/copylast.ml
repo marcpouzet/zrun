@@ -121,20 +121,12 @@ let intro ({ locals; renaming } as acc) id =
 (* replace it by [last* lx]; an equation [x = lx] will be added *)
 let expression funs ({ locals } as acc) ({ e_desc } as e) =
   match e_desc with
-  | Elast { id } ->
+  | Elast { copy; id } ->
      let lx, acc = intro acc id in
-     if Env.mem id locals then
+     if copy && Env.mem id locals then
        (* turn [last x] into [lx] *)
        var lx, acc
      else { e with e_desc = Elast { copy = false; id = lx } }, acc
-  | _ -> raise Mapfold.Fallback
-
-(* an equation [y = last* x] where [x] is local is left unchanged *)
-let equation funs ({ locals } as acc) ({ eq_desc } as eq) =
-  match eq_desc with
-  | EQeq({ pat_desc = Evarpat _ },
-         { e_desc = Elast { copy = false; id } }) when Env.mem id locals ->
-     eq, acc
   | _ -> raise Mapfold.Fallback
 
 (* add extra equations [lx = last* x]. *)
@@ -218,7 +210,7 @@ let get_index funs acc n = Ident.get (), acc
 let program _ p =
   let global_funs = { Mapfold.default_global_funs with init_ident } in
   let funs =
-    { Mapfold.defaults with pattern; expression; equation; leq_t; block;
+    { Mapfold.defaults with pattern; expression; leq_t; block;
                             funexp; set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }

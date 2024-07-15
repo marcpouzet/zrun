@@ -60,8 +60,8 @@ open Mapfold
 let fresh () = Ident.fresh "i"
 
 (* Static expressions - simple sufficient condition for [e] to be static *)
-let rec static { e_desc = desc } =
-  match desc with
+let rec static { e_desc } =
+  match e_desc with
   | Econst _ | Econstr0 _ | Eglobal _ -> true
   | Etuple(e_list) -> List.for_all static e_list
   | Erecord(qual_e_list) ->
