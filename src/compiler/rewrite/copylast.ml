@@ -122,11 +122,14 @@ let intro ({ locals; renaming } as acc) id =
 let expression funs ({ locals } as acc) ({ e_desc } as e) =
   match e_desc with
   | Elast { copy; id } ->
-     let lx, acc = intro acc id in
-     if copy && Env.mem id locals then
-       (* turn [last x] into [lx] *)
-       var lx, acc
-     else { e with e_desc = Elast { copy = false; id = lx } }, acc
+     if Env.mem id locals then
+       if copy then
+         let lx, acc = intro acc id in
+         (* turn [last x] into [lx] *)
+         var lx, acc
+       else { e with e_desc = Elast { copy = false; id } }, acc
+     else let lx, acc = intro acc id in
+          { e with e_desc = Elast { copy = false; id = lx} }, acc
   | _ -> raise Mapfold.Fallback
 
 (* add extra equations [lx = last* x]. *)

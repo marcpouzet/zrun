@@ -44,8 +44,7 @@ let local_init_value e1 e2 =
                  [Aux.id_eq m e2; Aux.id_eq x (Aux.last m)]) (var x)
 
 (* Translation of expressions. *)
-let expression funs acc e =
-  let { e_desc }, acc = Mapfold.expression funs acc e in
+let expression funs acc { e_desc } =
   match e_desc with
   | Eop(Efby, [e1; e2]) ->
      (* translate into [local x, m init e1 do m = e2 and x = last m in x] *)

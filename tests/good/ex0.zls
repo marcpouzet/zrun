@@ -59,6 +59,7 @@ let main___ () =
   done
  *)
 
+  
 let node main22() returns (x)
   do x = 0 -> pre x + 1
   done
@@ -153,7 +154,8 @@ let node main1() returns (m)
 
 let node main2() returns (m)
     m = g12(1, 2)
-
+    
+  
 let node f13(x) = 0 fby x + 1
 
 let node g13() = 1, 2
