@@ -22,7 +22,7 @@ let f33 =
                   (sum_<<n/2>>(x.(n/2 .. n-1))) done in
   sum_
 
-let main3 () = f33 <<4>> [|1; 2; 3; 4 |]
+let main3 () = (f33 <<4>>) [|1; 2; 3; 4 |]
 
 let main4 () = let f<<n>>() = n + 1 in f<<4>>
 

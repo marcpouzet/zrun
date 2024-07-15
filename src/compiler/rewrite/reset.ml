@@ -27,7 +27,7 @@ open Zelus
 open Mapfold
 
 (*
-  [e1 -> e2] is rewritten in [if last i then e1 else e2]
+  [e1 -> e2] is rewritten in [if last* i then e1 else e2]
   adding a declaration [local i init true do i = false and ...] around
 
   [reset
@@ -104,9 +104,10 @@ let local_in_exp { init } e =
   | None -> e
   | Some(id) ->
      let m = fresh () in
-     Aux.e_local (Aux.block_make [Aux.vardec m false (Some(Aux.etrue)) None;
-                                  Aux.vardec id false None None]
-                    [Aux.id_eq id (Aux.last_star m); Aux.id_eq m (Aux.efalse)]) e
+     Aux.e_local
+       (Aux.block_make [Aux.vardec m false (Some(Aux.etrue)) None;
+                        Aux.vardec id false None None]
+          [Aux.id_eq id (Aux.last_star m); Aux.id_eq m (Aux.efalse)]) e
 
 (* Equations *)
 let rec equation funs acc ({ eq_desc } as eq) =
