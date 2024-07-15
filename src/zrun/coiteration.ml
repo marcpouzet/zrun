@@ -71,15 +71,6 @@ let (and+) v1 v2 =
   | (Vnil, _) | (_, Vnil) -> Vnil
   | Value(v1), Value(v2) -> Value(v1, v2)
 
-(* [let*+ x = e in e'] composes [let*] and [let+] *)
-let (let*+) e f =
-  match e with
-  | Error(v) -> Error(v)
-  | Ok(v, s) ->
-     match v with
-     | Vbot -> return (Vbot, s) | Vnil -> return (Vnil, s)
-     | Value(v) -> f (v, s)
-
 (* check that a value is neither bot nor nil *)
 let no_bot_no_nil loc v =
   match v with
@@ -1799,8 +1790,11 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        match e_opt with
        | None -> return (Value(Vpresent(Vvoid)), s)
        | Some(e) ->
-          let*+ v, s = sexp genv env e s in
-          return (Value(Vpresent(v)), s) in
+          let* v, s = sexp genv env e s in
+          let* v =
+            let+ v = v in
+            return (Value(Vpresent(v))) in
+          return (v, s) in
      let* entry =
        Env.find_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
