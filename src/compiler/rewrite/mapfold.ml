@@ -131,6 +131,9 @@ type ('a, 'info1, 'info2) it_funs =
     match_handler_e :
       ('a, 'info1, 'info2) it_funs -> 'a -> ('info1, 'info1 exp) match_handler
       -> ('info2, 'info2 exp) match_handler * 'a;
+    if_eq :
+      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 eq * 'info1 eq
+        -> ('info2 eq * 'info2 eq) * 'a; 
     present_handler_eq :
       ('a, 'info1, 'info2) it_funs -> 'a 
       -> ('info1, 'info1 scondpat, 'info1 eq) present_handler 
@@ -546,6 +549,14 @@ and match_handler_eq funs acc ({ m_pat; m_body; m_env } as m_h) =
   let m_body, acc = equation_it funs acc m_body in
   { m_h with m_pat; m_body; m_env }, acc
 
+and if_eq_it funs acc (eq_true, eq_false) =
+  funs.if_eq funs acc (eq_true, eq_false)
+
+and if_eq funs acc (eq_true, eq_false) =
+  let eq_true, acc = equation_it funs acc eq_true in
+  let eq_false, acc = equation_it funs acc eq_false in
+  (eq_true, eq_false), acc
+
 and match_handler_e_it funs acc m_handler =
   funs.match_handler_e funs acc m_handler
 
@@ -606,9 +617,9 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let handlers, acc = Util.mapfold body acc handlers in
        { eq with eq_desc = EQder { id; e; e_opt; handlers } }, acc
     | EQif { e; eq_true; eq_false } ->
-       let e, ac = expression_it funs acc e in
-       let eq_true, acc = equation_it funs acc eq_true in
-       let eq_false, acc = equation_it funs acc eq_false in
+       let e, acc = expression_it funs acc e in
+       let (eq_true, eq_false), acc =
+         if_eq_it funs acc (eq_true, eq_false) in
        { eq with eq_desc = EQif { e; eq_true; eq_false } }, acc
     | EQmatch({ e; handlers } as m) ->
        let e, acc = expression_it funs acc e in
@@ -826,6 +837,7 @@ let defaults =
     funexp;
     match_handler_eq;
     match_handler_e;
+    if_eq;
     automaton_handler;
     present_handler_eq;
     present_handler_e;
@@ -865,6 +877,7 @@ let defaults_stop =
     funexp = stop;
     match_handler_eq = stop;
     match_handler_e = stop;
+    if_eq = stop;
     automaton_handler = stop;
     present_handler_eq = stop;
     present_handler_e = stop;

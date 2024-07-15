@@ -169,6 +169,11 @@ and block funs acc { b_vars; b_body } =
   let _, acc_b_body = equation funs empty b_body in
   empty_block, (add_vardec b_vars (par acc (seq acc_b_vars acc_b_body)))
 
+and if_eq funs acc (eq_true, eq_false) =
+  let _, acc_true = equation funs empty eq_true in
+  let _, acc_false = equation funs empty eq_false in
+  (eq_local acc_true, eq_local acc_false), acc
+
 and match_handler_eq funs acc ({ m_body } as m_h) =
   let _, acc_local = equation funs empty m_body in 
   { m_h with m_body = eq_local acc_local }, acc
@@ -210,7 +215,7 @@ let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
     { Mapfold.defaults with pattern; expression; equation; leq_t; block;
-                            match_handler_eq; match_handler_e;
+                            if_eq; match_handler_eq; match_handler_e;
                             present_handler_eq; present_handler_e;
                             result; letdecl; global_funs } in
   let { p_impl_list } as p, _ =

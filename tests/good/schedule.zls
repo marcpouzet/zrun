@@ -2,6 +2,22 @@ let node main5() returns ()
   local m1 default 0, m2, half, o
   do
     if half then do done
+    else do m1 = 42 fby m1 + 1 done
+  and
+    if half then do m2 = 0 done
+    else do m2 = 43 fby m2 + 1 done
+  and
+      half = true fby not (pre half)
+  and
+      o = m1 = m2
+  and
+      assert o
+  done
+ 
+(* let node main5() returns ()
+  local m1 default 0, m2, half, o
+  do
+    if half then do done
     else do m1 = 42 -> pre m1 + 1 done
   and
     if half then do m2 = 0 done
@@ -12,5 +28,5 @@ let node main5() returns ()
       o = m1 = m2
   and
       assert o
-  done
+  done *)
  
