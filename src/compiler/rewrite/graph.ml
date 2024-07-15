@@ -148,6 +148,6 @@ let print p ff { nodes; succ; outputs; containt } =
       Format.fprintf ff "%d: %a before %a"
       n p v (Pp_tools.print_list_r Format.pp_print_int "" "," "") n_list in
   Format.fprintf ff
-    "@[<0>@[<v2>dependences:@ @,%a@]@ @,@[<v2>outputs:@ @,%a@.@]"
+    "@[<0>@[<v2>Dependences:@ @[%a@]@]@ @[<v2>Outputs:@ @[%a@]@]@]@.@]"
     (Pp_tools.print_list_l one "" "" "") l
     (Pp_tools.print_list_r Format.pp_print_int "" "," "") o_list

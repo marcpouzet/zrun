@@ -79,6 +79,9 @@ let schedule eq =
     Format.eprintf 
       "@[Scheduling: unexpected cycle (equations cannot be scheduled)@]@.";
     Format.eprintf "@[%a@]" Dependences.print g;
+    Format.eprintf "@[Cycle: %a@.@]"
+      (Pp_tools.print_list_r
+         (fun ff index -> Format.fprintf ff "%d" index) "{" "," "}") n_list;
     raise Misc.Error  
 
 let leq_t funs acc leq =
