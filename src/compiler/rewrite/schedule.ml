@@ -77,7 +77,8 @@ let schedule eq =
   with
     Graph.Error(Cycle(n_list)) ->
     Format.eprintf 
-      "Scheduling: unexpected cycle: equations cannot be scheduled\n";
+      "@[Scheduling: unexpected cycle (equations cannot be scheduled)@]@.";
+    Format.eprintf "@[%a@]" Dependences.print g;
     raise Misc.Error  
 
 let leq_t funs acc leq =

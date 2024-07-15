@@ -143,9 +143,11 @@ let print p ff { nodes; succ; outputs; containt } =
          Not_found -> acc)
       nodes [] in
   let one ff (n, v, n_list) =
-    Format.fprintf ff "%d: %a before %a"
+    if n_list = [] then Format.fprintf ff "%d: %a" n p v
+    else
+      Format.fprintf ff "%d: %a before %a"
       n p v (Pp_tools.print_list_r Format.pp_print_int "" "," "") n_list in
   Format.fprintf ff
-    "@[<0>@[<v2>dependences:@,%a@]@,@[<v2>outputs:@,%a@.@]"
+    "@[<0>@[<v2>dependences:@ @,%a@]@ @,@[<v2>outputs:@ @,%a@.@]"
     (Pp_tools.print_list_l one "" "" "") l
     (Pp_tools.print_list_r Format.pp_print_int "" "," "") o_list
