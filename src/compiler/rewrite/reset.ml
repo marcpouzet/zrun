@@ -14,9 +14,11 @@
 
 (* removes the initialization operator [e1 -> e2] *)
 (* This operator is equivalent to [if (true fby false) then e1 else e2] *)
-(* that is [if last i then e1 else e2] with [init i = true and i = false] *)
+(* that is [if last* i then e1 else e2] with [init i = true and i = false] *)
 (* An initialization register [i] with [init i = true and i = false] *)
 (* is introduced for every control block *)
+(* every initialisation [init x = e] where [e] is not static is reseted *)
+(* on an initialization bit; it is rewritten [reset init x = e every last* i] *)
 
 open Misc
 open Location
