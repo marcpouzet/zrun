@@ -171,13 +171,13 @@ and last_ident global_funs acc { copy; id } =
   let id, acc = global_funs.var_ident global_funs acc id in
   { copy; id }, acc
 
-and init_ident_it global_funs acc l = global_funs.init_ident global_funs acc l
+and init_ident_it global_funs acc id = global_funs.init_ident global_funs acc id
 
-and init_ident global_funs acc id = global_funs.var_ident global_funs acc id
+and init_ident global_funs acc id = id, acc
 
-and emit_ident_it global_funs acc l = global_funs.emit_ident global_funs acc l
+and emit_ident_it global_funs acc id = global_funs.emit_ident global_funs acc id
 
-and emit_ident global_funs acc id = global_funs.emit_ident global_funs acc id
+and emit_ident global_funs acc id = id, acc
 
 let rec pattern_it funs acc pat =
   try funs.pattern funs acc pat
