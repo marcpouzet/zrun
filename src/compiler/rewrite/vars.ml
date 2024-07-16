@@ -12,7 +12,9 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* free variables, defined variables. Writes and env. domains must be correct *)
+(* free variables, defined variables. Writes and env. must be correct *)
+(* The definition below considers that [x] and [y] are free in *)
+(* equation [...x... = ... y...]. *)
 
 open Ident
 open Zelus
@@ -23,26 +25,25 @@ type acc = { bounded: S.t; current: S.t; last: S.t }
 let empty = { bounded = S.empty; current = S.empty; last = S.empty }
 
 let build global_funs ({ bounded } as acc) p_env =
-    p_env,
-    { acc with bounded =
-                 Env.fold (fun x _ acc -> S.add x acc) p_env bounded }
+  p_env,
+  { acc with bounded = Env.fold (fun x _ acc -> S.add x acc) p_env bounded }
 
 let var_ident global_funs ({ bounded; current; last } as acc) x =
-  let current =
-    if S.mem x bounded || S.mem x current
-    then current else S.add x current in
+  let current = if S.mem x bounded || S.mem x current
+                then current else S.add x current in
   x, { acc with current }
 
-let last_ident global_funs ({ bounded; last } as acc) x =
-  let last =
-    if S.mem x bounded || S.mem x last
-    then last else S.add x last in
-  x, { acc with last }
+let last_ident global_funs ({ bounded; last } as acc) ({ id } as l) =
+  let last = if S.mem id bounded || S.mem id last
+             then last else S.add id last in
+  l, { acc with last }
+
+let pattern funs acc pat = pat, acc
 
 let funs =
   let global_funs =
-    { Mapfold.default_global_funs with var_ident } in
-  { Mapfold.defaults with global_funs }
+    { Mapfold.default_global_funs with build; var_ident; last_ident } in
+  { Mapfold.defaults with pattern; global_funs }
 
 type t =
   { lv: S.t; (* last variables *)

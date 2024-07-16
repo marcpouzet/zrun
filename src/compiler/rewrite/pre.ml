@@ -47,7 +47,8 @@ let local_init_value e1 e2 =
                  [Aux.id_eq m e2; Aux.id_eq x (Aux.last_star m)]) (var x)
 
 (* Translation of expressions. *)
-let expression funs acc { e_desc } =
+let expression funs acc e =
+  let ({ e_desc } as e), acc = Mapfold.expression funs acc e in
   match e_desc with
   | Eop(Efby, [e1; e2]) ->
      (* translate into [local x, m init e1 do m = e2 and x = last* m in x] *)
@@ -55,7 +56,7 @@ let expression funs acc { e_desc } =
   | Eop(Eunarypre, [e1]) ->
      (* translate into [local x, (last m) do m = e and x = last* m in x] *)
      local_value e1, acc
-  | _ -> raise Mapfold.Fallback
+  | _ -> e, acc
 
 let set_index funs acc n =
   let _ = Ident.set n in n, acc

@@ -112,6 +112,8 @@ let vardec id var_is_last var_init var_default =
 
 let id_vardec id = vardec id false None None
 
+let env_of s = S.fold (fun n acc -> Env.add n no_info acc) s Env.empty
+  
 let block_make vardec_list eq_list =
   let b_body =
     match eq_list with
@@ -124,7 +126,8 @@ let block_make vardec_list eq_list =
   let def = List.fold_left
               (fun acc { var_name } -> S.add var_name acc) S.empty vardec_list in
   let w = Defnames.diff w def in
-{ b with b_write = w }
+  let b_env = env_of (Defnames.names S.empty w) in
+  { b with b_write = w; b_env }
 
 let eq_reset eq e = eqmake eq.eq_write (EQreset(eq, e))
 let eq_match is_total e handlers =
@@ -142,7 +145,7 @@ let eq_present handlers default_opt =
   eqmake w (EQpresent { handlers; default_opt })
     
 let match_handler p b =
-  { m_pat = p; m_body = b; m_env = Env.empty;
+  { m_pat = p; m_body = b; m_env = env_of (Write.fv_pat S.empty p);
     m_reset = false; m_zero = false; m_loc = no_location }
 
 let eq_ifthenelse e eq_true eq_false =

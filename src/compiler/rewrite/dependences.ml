@@ -27,7 +27,7 @@ type 'a collection =
 let fv_eq eq = Vars.equation eq
 let fv { lv; v } e = Vars.expression { lv; v } e
 
-(** Read/writes of an equation. *)
+(* Read/writes of an equation. *)
 (* Control structures are treated as atomic blocks. Their set of write *)
 (* variables is removed from the set of read variables *)
 let read ({ eq_write; eq_desc } as eq) =
@@ -149,6 +149,17 @@ let make_unsafes xtable itable g eqs =
   let g, _ = unsafes (g, S.empty) eqs in
   g
 
+(* for debug purposes *)
+let dump ff eq_info_list =
+  Pp_tools.print_list_r
+    (fun ff (index, eq, w, v, lv) ->
+      Format.fprintf ff "@[%d: %a (w: %a; v: %a; lv: %a)@]"
+        index Printer.equation eq
+        Ident.S.fprint_t w
+        Ident.S.fprint_t v
+        Ident.S.fprint_t lv)
+    "" "" "" ff eq_info_list
+
 (* The main entry function. Build the dependence graph from a *)
 (* set of equations *)
 let make eqs =
@@ -157,6 +168,7 @@ let make eqs =
     name_to_index (Env.empty, Env.empty, []) eqs in
   let g = make_read_write xtable itable eq_info_list in
   let g = make_unsafes xtable itable g eqs in
+  if !Misc.debug then Format.eprintf "@[%a@.@]" dump eq_info_list;
   Graph.outputs g
 
 (* Print a graph of equations *)

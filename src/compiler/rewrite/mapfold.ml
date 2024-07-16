@@ -80,6 +80,8 @@ type ('a, 'info1, 'info2) global_it_funs =
       ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
     emit_ident :
       ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+    der_ident :
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
     typevar :
       ('a, 'info1, 'info2) global_it_funs -> 'a -> name -> name * 'a;
     typeconstr :
@@ -185,6 +187,10 @@ and init_ident global_funs acc id = id, acc
 and emit_ident_it global_funs acc id = global_funs.emit_ident global_funs acc id
 
 and emit_ident global_funs acc id = id, acc
+
+and der_ident_it global_funs acc id = global_funs.der_ident global_funs acc id
+
+and der_ident global_funs acc id = id, acc
 
 let rec pattern_it funs acc pat =
   try funs.pattern funs acc pat
@@ -622,7 +628,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
          let p_cond, acc = scondpat_it funs acc p_cond in
          let p_body, acc = expression_it funs acc p_body in
          { p_b with p_cond; p_body }, acc in
-       let id, acc = var_ident_it funs.global_funs acc id in
+       let id, acc = der_ident_it funs.global_funs acc id in
        let e, acc = expression_it funs acc e in
        let e_opt, acc =
          Util.optional_with_map (expression_it funs) acc e_opt in
@@ -826,6 +832,7 @@ let default_global_funs =
     last_ident;
     init_ident;
     emit_ident;
+    der_ident;
     typevar;
     typeconstr;
     kind;
@@ -869,6 +876,7 @@ let default_global_stop =
     last_ident = stop;
     init_ident = stop;
     emit_ident = stop;
+    der_ident = stop;
     typevar = stop;
     typeconstr = stop;
     kind = stop;
