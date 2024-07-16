@@ -126,7 +126,7 @@ let block_make vardec_list eq_list =
   let def = List.fold_left
               (fun acc { var_name } -> S.add var_name acc) S.empty vardec_list in
   let w = Defnames.diff w def in
-  let b_env = env_of (Defnames.names S.empty w) in
+  let b_env = env_of def in
   { b with b_write = w; b_env }
 
 let eq_reset eq e = eqmake eq.eq_write (EQreset(eq, e))
