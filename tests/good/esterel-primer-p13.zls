@@ -36,13 +36,11 @@
 (* This program is said to be constructive causal *)
 
 let node p13(i) returns (o1 default false, o2 default false)
-  do
   if i then
-    if o2 then o1 = true
+    do if o2 then o1 = true done
   else
-    if o1 then o2 = true
-  done
-
+    do if o1 then o2 = true done
+  
 (* This may appear complicated to explain that p13 is indeed causal but the
  *- explanation is in fact purely syntactic, hence very simple.
  *- the declaration of o1 with a default value means that a control structure

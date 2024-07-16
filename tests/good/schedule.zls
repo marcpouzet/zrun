@@ -1,6 +1,5 @@
-(*
 let node main() returns ()
- local m, half,z do
+ local m default 0, half, z do
  if half then do done
  else
    local r do r = 42 and m = z done
@@ -9,7 +8,6 @@ let node main() returns ()
  and
    z = false
  done
-*)
 
 let node main5() returns ()
   local m1 default 0, m2, half, o
@@ -27,7 +25,6 @@ let node main5() returns ()
       assert o
   done
 
-(*
 let node main6() returns ()
   local m1 default 0, m2, half, o
   do
@@ -43,5 +40,4 @@ let node main6() returns ()
   and
       assert o
   done
-  *)
  

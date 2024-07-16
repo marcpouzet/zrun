@@ -34,7 +34,7 @@ let read ({ eq_write; eq_desc } as eq) =
   let open Ident in
   let { lv; v } = fv_eq eq in
   match eq_desc with
-  | EQmatch { e } | EQreset(_, e) ->
+  | EQmatch { e } | EQif { e } | EQreset(_, e) ->
       let w = Defnames.names S.empty eq_write in
       let lv = S.diff lv w in
       let v = S.diff v w in
