@@ -61,6 +61,11 @@ open Mapfold
 
 let fresh () = Ident.fresh "i"
 
+(* the initialization variable *)
+type acc = { init : Ident.t option }
+
+let empty = { init = None }
+
 (* Static expressions - simple sufficient condition for [e] to be static *)
 let rec static { e_desc } =
   match e_desc with
@@ -70,11 +75,6 @@ let rec static { e_desc } =
      List.for_all (fun { arg } -> static arg) qual_e_list
   | Erecord_access { arg } -> static arg
   | _ -> false
-
-(* the initialization variable *)
-type acc = { init : Ident.t option }
-
-let empty = { init = None }
 
 let intro { init } =
   let id = match init with | None -> fresh () | Some(id) -> id in

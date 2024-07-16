@@ -23,6 +23,16 @@ open Lident
 open Initial
 open Deftypes
 
+(* Static expressions - simple sufficient condition for [e] to be static *)
+let rec static { e_desc } =
+  match e_desc with
+  | Econst _ | Econstr0 _ | Eglobal _ -> true
+  | Etuple(e_list) -> List.for_all static e_list
+  | Erecord(qual_e_list) ->
+     List.for_all (fun { arg } -> static arg) qual_e_list
+  | Erecord_access { arg } -> static arg
+  | _ -> false
+
 let defnames eq_list =
   List.fold_left (fun acc { eq_write } -> Defnames.union eq_write acc)
     Defnames.empty eq_list

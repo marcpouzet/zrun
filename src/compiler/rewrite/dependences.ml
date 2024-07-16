@@ -25,21 +25,21 @@ type 'a collection =
   | Leaf of 'a
 
 let fv_eq eq = Vars.equation eq
-let fv (last_acc, acc) e = Vars.expression (last_acc, acc) e
+let fv { lv; v } e = Vars.expression { lv; v } e
 
 (** Read/writes of an equation. *)
 (* Control structures are treated as atomic blocks. Their set of write *)
 (* variables is removed from the set of read variables *)
 let read ({ eq_write; eq_desc } as eq) =
   let open Ident in
-  let last_acc, acc = fv_eq eq in
+  let { lv; v } = fv_eq eq in
   match eq_desc with
   | EQmatch { e } | EQreset(_, e) ->
       let w = Defnames.names S.empty eq_write in
-      let last_acc = S.diff last_acc w in
-      let acc = S.diff acc w in
-      fv (last_acc, acc) e
-  | _ -> last_acc, acc
+      let lv = S.diff lv w in
+      let v = S.diff v w in
+      fv { lv; v } e
+  | _ -> { lv; v }
        
 let def { eq_write = { dv; di } } =
   (* derivatives are not taken into account *)
@@ -81,7 +81,7 @@ let rec name_to_index (xtable, itable, eq_info_list) eqs =
   | Leaf(eq) ->
       let i = index eq in
       let w = def eq in
-      let lv, v = read eq in
+      let { lv; v } = read eq in
       let eq_info_list = (i, eq, w, v, lv) :: eq_info_list in
       if nodep eq then xtable, itable, eq_info_list
       else

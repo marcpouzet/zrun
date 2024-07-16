@@ -27,18 +27,21 @@ open Zelus
 open Aux
 open Mapfold
 
-(* Defines a value [local x, (last m) do m = e and x = last m in x] *)
+let fresh_x () = fresh "x"
+let fresh_m () = fresh "m"
+
+(* Defines a value [local x, (last m) do m = e and x = last* m in x] *)
 let local_value e =
-  let x = fresh "x" in
-  let m = fresh "m" in
+  let x = fresh_x () in
+  let m = fresh_m () in
   Aux.e_local (Aux.block_make [Aux.vardec x false None None;
                                Aux.vardec m true None None]
                  [Aux.id_eq m e; Aux.id_eq x (Aux.last_star m)]) (var x)
 
 (* Defines a state variable with initialization *)
 let local_init_value e1 e2 =
-  let x = fresh "x" in
-  let m = fresh "m" in
+  let x = fresh_x () in
+  let m = fresh_m () in
   Aux.e_local (Aux.block_make [Aux.vardec x false None None;
                                Aux.vardec m false (Some(e1)) None]
                  [Aux.id_eq m e2; Aux.id_eq x (Aux.last_star m)]) (var x)
@@ -47,10 +50,10 @@ let local_init_value e1 e2 =
 let expression funs acc { e_desc } =
   match e_desc with
   | Eop(Efby, [e1; e2]) ->
-     (* translate into [local x, m init e1 do m = e2 and x = last m in x] *)
+     (* translate into [local x, m init e1 do m = e2 and x = last* m in x] *)
      local_init_value e1 e2, acc
   | Eop(Eunarypre, [e1]) ->
-     (* translate into [local x, (last m) do m = e and x = last m in x] *)
+     (* translate into [local x, (last m) do m = e and x = last* m in x] *)
      local_value e1, acc
   | _ -> raise Mapfold.Fallback
 
