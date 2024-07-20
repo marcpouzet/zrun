@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -52,7 +52,7 @@ module Env =
     
     let fprint_t fprint_v ff env =
       Format.fprintf ff "@[<hov 2>{@ ";
-      iter (fun k v -> Format.fprintf ff "@[%a: %a@]@ " M.fprint k fprint_v v) 
+      iter (fun k v -> Format.fprintf ff "@[%a: %a,@]@ " M.fprint k fprint_v v) 
         env;
       Format.fprintf ff "}@]"
   end
@@ -61,7 +61,7 @@ module S = struct
   include (Set.Make(M))
   let fprint_t ff s =
     Format.fprintf ff "@[<hov>{@ ";
-    iter (fun e -> Format.fprintf ff "%a@ " M.fprint e) s;
+    iter (fun e -> Format.fprintf ff "%a,@ " M.fprint e) s;
     Format.fprintf ff "}@]"
 
   let fresh s ss =

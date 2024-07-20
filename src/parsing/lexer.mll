@@ -49,7 +49,6 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
   "end", END;
   "every", EVERY;
   "exception", EXCEPTION;
-  "exception", EXCEPTION;
   "external", EXTERNAL;
   "false", BOOL(false); 
   "fby", FBY;
@@ -190,6 +189,7 @@ rule main = parse
   | "<"  { LESSER }
   | "<<"  { LLESSER }
   | ">>"  { GGREATER }
+  | "last*" { LAST_STAR }
   | (['A'-'Z']('_' ? ['A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 
       {CONSTRUCTOR id}
   | (['A'-'Z' 'a'-'z'](['_' 'A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 

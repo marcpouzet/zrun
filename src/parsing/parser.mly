@@ -186,6 +186,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token INIT           /* "init" */
 %token INLINE         /* "inline" */
 %token LAST           /* "last" */
+%token LAST_STAR      /* "last*" */
 %token LBRACE         /* "{" */
 %token LESSER         /* "<" */
 %token LLESSER        /* "<<" */
@@ -953,7 +954,9 @@ simple_expression_desc:
   | LBRACKET l = list_of(SEMI, expression) RBRACKET
       { cons_list_desc l ($startpos($1)) ($endpos($3)) }
   | LAST i = ide
-      { Elast(i) }
+      { Elast(true, i) }
+  | LAST_STAR i = ide
+      { Elast(false, i) }
   | a = atomic_constant
       { Econst a }
   | LPAREN RPAREN

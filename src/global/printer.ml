@@ -62,6 +62,29 @@ let immediate ff = function
   | Echar c -> fprintf ff "'%c'" c
   | Evoid -> fprintf ff "()"
 
+(* size expressions *)
+let size ff e =
+  let rec size prio ff { desc } =
+    match desc with
+    | Sint(i) -> fprintf ff "%d" i
+    | Sfrac { num; denom } -> 
+       if prio >= 2 then fprintf ff "(";
+       fprintf ff "(%a/%d)" (size 1) num denom;
+       if prio >= 2 then fprintf ff ")"
+    | Sident(n) -> name ff n
+    | Splus(s1, s2) -> 
+      (* if the surrending operator has a greater priority *)
+      if prio >= 1 then fprintf ff "(";
+      fprintf ff "@[%a + %a@]" (size 0) s1 (size 0) s2;
+      if prio >= 1 then fprintf ff ")"
+    | Sminus(s1, s2) -> 
+      (* if the surrending operator has a greater priority *)
+      if prio >= 1 then fprintf ff "(";
+      fprintf ff "@[%a - %a@]" (size 1) s1 (size 1) s2;
+      if prio >= 1 then fprintf ff ")"
+    | Smult(s1, s2) -> fprintf ff "@[%a * %a@]" (size 2) s1 (size 2) s2 in
+  size 0 ff e
+
 let rec ptype ff { desc } =
   match desc with
   | Etypevar(s) -> fprintf ff "'%s" s
@@ -80,7 +103,11 @@ let rec ptype ff { desc } =
           (match k with
            | Kdiscrete -> "-D->" | Khybrid -> "-C->") in
      fprintf ff "@[<hov2>%a %s %a@]" ptype ty_arg s ptype ty_res
-
+  | Esize(is_singleton, s) ->
+     if is_singleton then fprintf ff "@[<%a>@]" size s
+     else fprintf ff "@[[%a]@]" size s
+  | Evec(ty, s) -> fprintf ff "@[[%a]]%a@]" size s ptype ty
+                     
 let print_type_params ff pl =
   print_list_r_empty (fun ff s -> fprintf ff "'%s" s) "("","") " ff pl
 
@@ -170,7 +197,7 @@ let block exp body ff { b_vars; b_body; b_write; b_env } =
        body b_body
 
 let match_handler body ff { m_pat; m_body; m_reset; m_zero; m_env } =
-  fprintf ff "@[<hov 4>| %a@ %a -> %s%s@,%a@]"
+  fprintf ff "@[<hov 4>| %a@ %a -> %s%s@ %a@]"
     pattern m_pat
     print_env_names m_env
     (if m_reset then "(* reset *)" else "")
@@ -258,29 +285,6 @@ let automaton_handler_list
 	 automaton_handler_list s_h_list
 	 (print_opt (print_with_braces state " init" "")) e_opt
 
-(* size expressions *)
-let size ff e =
-  let rec size prio ff { desc } =
-    match desc with
-    | Sint(i) -> fprintf ff "%d" i
-    | Sfrac { num; denom } -> 
-       if prio >= 2 then fprintf ff "(";
-       fprintf ff "(%a/%d)" (size 1) num denom;
-       if prio >= 2 then fprintf ff ")"
-    | Sident(n) -> name ff n
-    | Splus(s1, s2) -> 
-      (* if the surrending operator has a greater priority *)
-      if prio >= 1 then fprintf ff "(";
-      fprintf ff "@[%a + %a@]" (size 0) s1 (size 0) s2;
-      if prio >= 1 then fprintf ff ")"
-    | Sminus(s1, s2) -> 
-      (* if the surrending operator has a greater priority *)
-      if prio >= 1 then fprintf ff "(";
-      fprintf ff "@[%a - %a@]" (size 1) s1 (size 1) s2;
-      if prio >= 1 then fprintf ff ")"
-    | Smult(s1, s2) -> fprintf ff "@[%a * %a@]" (size 2) s1 (size 2) s2 in
-  size 0 ff e
-
 let rec expression ff e =
   let exp ff { e_desc } =
     match e_desc with
@@ -290,7 +294,8 @@ let rec expression ff e =
         fprintf ff "@[(";
         operator ff op e_list;
         fprintf ff ")@]"
-    | Elast x -> fprintf ff "last %a" name x
+    | Elast { copy; id } ->
+       fprintf ff "last%s %a" (if copy then "" else "*") name id
     | Econstr0 { lname } -> longname ff lname
     | Econst c -> immediate ff c
     | Eapp { is_inline; f; arg_list } ->
@@ -483,7 +488,7 @@ and equation ff ({ eq_desc = desc } as eq) =
      fprintf ff "@[<hov0>if %a@ then %a@ else %a@]"
        expression e equation eq_true equation eq_false
   | EQpresent { handlers; default_opt } ->
-     fprintf ff "@[<hov0>present@ @[%a@]@%a]"
+     fprintf ff "@[<hov0>present@ @[%a@]@ %a@]"
        (print_list_l
 	  (present_handler (scondpat expression) equation) """""") handlers
        (with_default equation) default_opt
@@ -493,8 +498,9 @@ and equation ff ({ eq_desc = desc } as eq) =
   | EQlet(l_eq, eq) ->
      fprintf ff "@[<hov0>%a@,in@ %a@]" leq l_eq equation eq
   | EQlocal(b_eq) -> block_of_equation ff b_eq
-  | EQand(and_eq_list) ->
-     print_list_l equation "do " "and " " done" ff and_eq_list
+  | EQand { ordered; eq_list } ->
+     let a = if ordered then "then " else "and " in
+     print_list_l equation "do " a " done" ff eq_list
   | EQempty -> fprintf ff "()"
   | EQassert(e) ->
      fprintf ff "@[<hov2>assert %a@]" expression e

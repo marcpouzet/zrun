@@ -154,26 +154,25 @@ let rec update_list loc v i_list w =
      update loc v i w
 
 (* conversion between a flat array and a map *)
-let map_o_flat loc v =
+let map_of_flat v =
   match v with
   | Vflat(f) ->
-     return
-       (Vmap { m_length = Array.length f; m_u = fun i -> return (f.(i)) })
-  | Vmap _ -> return v
-let flat_of_map_array loc v =
+     return { m_length = Array.length f; m_u = fun i -> return (f.(i)) }
+  | Vmap(v) -> return v
+let flat_of_map v =
   let fill length a m_u =
     let rec fillrec length =
       if length = 0 then return a
       else let* v = m_u length in a.(length) <- v; fillrec (length - 1) in
     fillrec length in
   match v with
-    | Vflat _ -> return v
+    | Vflat(f) -> return f
     | Vmap { m_length; m_u } ->
-       if m_length = 0 then return (Vflat([||]))
+       if m_length = 0 then return ([||])
        else let* v = m_u 0 in
             let a = Array.make m_length v in
             let* v = fill m_length a m_u in
-            return (Vflat v)
+            return (v)
 
 let dim loc v =
   match v with

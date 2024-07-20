@@ -23,18 +23,20 @@ type 'a info = { qualid : Lident.qualident; info : 'a }
 module E = Map.Make (struct type t = string let compare = compare end)
 
 exception Cannot_find_file of string
+    
+exception Already_defined of string
 
 (* The current global environment *)
-type 'a env =
+type 'v env =
   { name: string; (* the name of the module *)
-    values: 'a E.t; (* the symbol table [name, entry] *)
+    values: 'v E.t; (* the symbol table [name, entry] - values *)
   }
       
 (* The current global environment and list of already opened modules *)
-type 'a genv =
-    { current: 'a env;      (* associated symbol table *)
-      opened: 'a env list;  (* opened tables *)
-      modules: 'a env E.t;  (* tables loaded in memory *)
+type 'v genv =
+    { current: 'v env;      (* associated symbol table *)
+      opened: 'v env list;  (* opened tables *)
+      modules: 'v env E.t;  (* tables loaded in memory *)
     }
 
 let findfile filename =
@@ -81,7 +83,7 @@ let find_module modname genv =
             
 (* Find the associated value of [qualname] in the list of currently *)
 (* opened modules *)
-let find qualname ({ current; opened } as genv) =
+let find where qualname ({ current; opened } as genv) =
   let rec findrec ident = function
     | [] -> raise Not_found
     | { name; values } :: l ->
@@ -93,7 +95,7 @@ let find qualname ({ current; opened } as genv) =
   | Modname({ qual; id } as q) -> 
      let current, genv =
        if current.name = qual then current, genv else find_module qual genv in
-     let info = E.find id current.values in
+     let info = where id current in
      { qualid = q; info = info }, genv
   | Name(ident) -> findrec ident (current :: opened)
             
@@ -116,21 +118,15 @@ let add f pvalue ({ current } as genv) =
     { current with values = E.add f pvalue current.values } in
   { genv with current = current }
 
-let add_list f_pvalue_list ({ current } as genv) =
-  let values =
-    List.fold_left (fun acc (f, pvalue) -> E.add f pvalue acc)
-      current.values f_pvalue_list in
-  let current = { current with values } in
-  { genv with current = current }
+let find_value qualname genv =
+  let v, _ = find (fun ident m -> E.find ident m.values) qualname genv in v
 
-let find qualname genv =
-  let v, _ = find qualname genv in
-  v
-  
 let write { current } oc = Marshal.to_channel oc current [Marshal.Closures]
-
+    
 let current { current } = current
 
-let empty = 
-  let current = { name = ""; values = E.empty } in
-  { current; opened = []; modules = E.empty }
+let shortname { id = n } = n
+
+let empty =
+  let c_empty = { name = ""; values = E.empty } in
+  { current = c_empty; opened = []; modules = E.empty }

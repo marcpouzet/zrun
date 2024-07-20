@@ -1,0 +1,5 @@
+let f x = x + 1
+
+let g y = f y + 1
+
+let main () = g(f(0))

@@ -34,7 +34,7 @@ let doc_verbose = "\tVerbose mode"
 let doc_vverbose = "\t Set even more verbose mode"
 let doc_debug = "\t Set debug mode"
 let doc_no_assert = "\tNo check of assertions"
-let doc_nocausality = "\tTurn off the check that are variables are non bottom"
+let doc_nocausality = "\tTurn off the check that all variables are non bottom"
 let doc_print_values = "\tPrint values"
 let doc_number_of_fixpoint_iterations =
   "\tPrint the number of steps for fixpoints"
@@ -71,10 +71,6 @@ let main () =
            doc_number_of_fixpoint_iterations;
            "-esterel", Arg.Set Misc.esterel, doc_esterel;
            "-lustre", Arg.Set Misc.lustre, doc_lustre;
-           "-static", Arg.Set Misc.static_reduction, doc_static_reduction;
-           "-check", Arg.Set Misc.equivalence_checking, doc_check;
-           "-inline", Arg.Int Misc.set_inlining_level, doc_inlining_level;
-          "-inlineall", Arg.Set inline_all, doc_inline_all;
       ])
       main
       errmsg

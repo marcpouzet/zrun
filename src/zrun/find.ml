@@ -33,7 +33,7 @@ let find_default_opt x env =
 
 let find_gvalue_opt x env =
   try
-    let { Genv.info } = Genv.find x env in
+    let { Genv.info } = Genv.find_value x env in
     return info
   with
   | Not_found -> none

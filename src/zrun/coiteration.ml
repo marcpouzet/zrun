@@ -21,24 +21,26 @@
    Univ. in June-July 2019 and the Master MPRI - M2, Fall 2019, 2020, 2021 *)
 (* The original version of this code is taken from the GitHub Zrun repo: *)
 (* https://github.com/marcpouzet/zrun *)
-(* zrun was programmed right after the COVID confinment, in Mai-June 2020 *)
+(* zrun was programmed right after the COVID confinment, in May-June 2020 *)
 (* This second version includes some of the Zelus constructs:
- *- ODEs and zero-crossing;
- *- higher order functions;
- *- the implem. was done in 2021 and updated in 2022;
- *- update during summer 2022 with array constructs inspired by that
- *- of the (beautiful!) SISAL language; they were implemented in Zelus
- *- v2 (2017).
- *- w.r.t SISAL, for loops can contain stateful (stream) functions;
- *- and two style of for loop constructs are provided:
- *- 1/ foreach loop : a parallel composition - every iteration has its
- *- own state;
- *- 2/ forward loop is an "hyper-serial" loop; iteration is done on the
- *- very same state. It is a form of bounded "clock domain" (PPDP'13) by
- *- Louis Mandel, Cedric Pasteur et Marc Pouzet.
+ *- ODEs and zero-crossing; higher order functions;
+ *- the implem. was done in 2021 and updated since then;
+ *- first update during summer 2022 with array constructs inspired by that
+ *- of the (beautiful) SISAL language; a restricted form was already
+ *- implemented in Zelus V2 in 2017.
+ *- w.r.t SISAL, for-loops can contain stateful (stream) functions;
+ *- two style of for loop constructs are provided:
+ *- 1/ the foreach loop iteration runs several instances of a stream
+ *- functions; in operational terms, every application has it own state;
+ *- 2/ the forward loop is an "hyper-serial" loop iteration. A single stream
+ *- function is applied to a stream of array, interpreting arrays as if they
+ *- were streams. It is similar to "clock domains" (PPDP'13) by
+ *- Louis Mandel, Cedric Pasteur et Marc Pouzet and is reminiscent of
+ *- temporal refinement by Caspi and Mikac.
  *- 3/ the size of arrays/number of iterations must be known statically.
- *- It is yet very experimental work. If you find it useful
- *- for your own work, please cite the [EMSOFT'2023] paper and send 
+ *-
+ *- This work is still very experimental. If you find it useful
+ *- for your research, please cite the [EMSOFT'2023] paper and send 
  *- a mail: [Marc.Pouzet@ens.fr] *)
 
 open Misc
@@ -69,12 +71,6 @@ let (and+) v1 v2 =
   | (Vnil, _) | (_, Vnil) -> Vnil
   | Value(v1), Value(v2) -> Value(v1, v2)
 
-(* [let*+ x = e in e'] composes [let*] and [let+] *)
-let (let*+) v f =
-  let* v = v in
-  let+ v = v in
-  f v
-
 (* check that a value is neither bot nor nil *)
 let no_bot_no_nil loc v =
   match v with
@@ -89,13 +85,12 @@ let no_bot_no_nil_env loc env =
       let* v = no_bot_no_nil loc cur in
       return (Env.add f v acc)) Env.empty seq_env
 
-(* evaluation functions *)
 (* merge two environments provided they do not overlap *)
 let merge loc env1 env2 =
   let s = Env.to_seq env1 in
   seqfold
     (fun acc (x, entry) ->
-      if Env.mem x env2 then error { kind = Emerge_env; loc = loc }
+      if Env.mem x env2 then error { kind = Emerge_env(x); loc = loc }
       else return (Env.add x entry acc))
     env2 s
 
@@ -304,10 +299,10 @@ let sizefun_defs_or_values genv env l_eq =
        if one_value then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
        else return (Env.add sf_id { s_params = sf_id_list; 
-                              s_body = sf_e; s_genv = genv; 
-                              s_env = env } acc,
+                                    s_body = sf_e; s_genv = genv; 
+                                    s_env = env } acc,
                  one_value)
-    | EQand(eq_list) ->
+    | EQand { eq_list } ->
        fold split (acc, one_value) eq_list
     | EQempty -> 
        return (acc, one_value)
@@ -637,7 +632,7 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
           else let* seq_false = ieq is_fun genv env eq_false in
           return (Slist [Sstatic(Vbool(false)); Sempty; seq_false]) in
      return s
-  | EQand(eq_list) ->
+  | EQand { eq_list } ->
      let* seq_list = map (ieq is_fun genv env) eq_list in
      return (Slist seq_list)
   | EQlocal(b_eq) ->
@@ -836,10 +831,10 @@ and sexp genv env { e_desc; e_loc } s =
        find_gvalue_opt lname genv |>
          Opt.to_result ~none:{ kind = Eunbound_lident(lname); loc = e_loc } in
      return (Value(v), s)
-  | Elast x, Sempty ->
+  | Elast { id }, Sempty ->
      let* v =
-       find_last_opt x env  |>
-         Opt.to_result ~none:{ kind = Eunbound_last_ident(x); loc = e_loc } in
+       find_last_opt id env  |>
+         Opt.to_result ~none:{ kind = Eunbound_last_ident(id); loc = e_loc } in
      return (v, s)
   | Eop(op, e_list), s ->
      begin match op, e_list, s with
@@ -1631,7 +1626,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
                Fix.by eq_loc env env_false (names eq_write) in
              return (env_false, [s_eq_true; s_eq_false]) in
       return (env_eq, Slist (se :: s_list))
-  | EQand(eq_list), Slist(s_list) ->
+  | EQand { eq_list }, Slist(s_list) ->
      let seq genv env acc eq s =
        let* env_eq, s = seq genv env eq s in
        let* acc = merge eq_loc env_eq acc in
@@ -1793,7 +1788,12 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* cur, s =
        match e_opt with
        | None -> return (Value(Vpresent(Vvoid)), s)
-       | Some(e) -> sexp genv env e s in
+       | Some(e) ->
+          let* v, s = sexp genv env e s in
+          let* v =
+            let+ v = v in
+            return (Value(Vpresent(v))) in
+          return (v, s) in
      let* entry =
        Env.find_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
@@ -2159,8 +2159,7 @@ and sescape_list loc genv env escape_list s_list ps pr =
   | _ ->
      error { kind = Estate; loc = loc }
 
-and sscondpat
-  (genv : 'a genv) (env : 'a star ientry Env.t ) { desc; loc } s =
+and sscondpat genv env { desc; loc } s =
   match desc, s with
   | Econdand(sc1, sc2), Slist [s1; s2] ->
      let* (v1, env_sc1), s1 = sscondpat genv env sc1 s1 in
@@ -2323,7 +2322,7 @@ and sizeapply loc fv v_list =
          (fun f e acc -> 
             Env.add f 
               (Match.entry 
-                 (Vsizefix { bound = Some(v_list); name; defs })) acc)
+                 (Vsizefix { bound = Some(v_list); name = f; defs })) acc)
          defs s_env in
      apply s_params s_body s_genv s_env
   | _ -> error { kind = Etype; loc }
@@ -2359,8 +2358,12 @@ let implementation genv { desc; loc } =
   | Eletdecl { d_names; d_leq } -> 
      (* evaluate the set of equations *)
      let* env = vleq genv Env.empty d_leq in
-     let f_pvalue_list =
-       List.map (fun (n, id) -> (n, Env.find id env)) d_names in
+     let* f_pvalue_list =
+       map
+         (fun (n, id) ->
+           let* v = Env.find_opt id env |>
+                      Opt.to_result ~none:{ kind = Eunbound_ident(id); loc = loc }
+           in return (n, v)) d_names in
      (* debug info (a bit of imperative code here!) *)
      if !print_values then Output.letdecl Format.std_formatter f_pvalue_list;
      (* add all entries in the current global environment *)
@@ -2428,10 +2431,10 @@ let eval_two_nodes loc output n_steps
       { init = init1; step = step1 } { init = init2; step = step2 } v =
   let step (s1, s2) v =
     Debug.print_state "State before (first node):" s1;
-    let v1, s1 = catch (runstep loc s1 step1 v) in
+    let* v1, s1 = runstep loc s1 step1 v in
     Debug.print_state "State after (first node):" s1;
     Debug.print_state "State before (second node):" s2;
-    let v2, s2 = catch (runstep loc s2 step2 v) in
+    let* v2, s2 = runstep loc s2 step2 v in
     Debug.print_state "State after (second node):" s2;
     let* v = check_equality loc v1 v2 in
     if v then return (s1, s2) else
@@ -2472,8 +2475,10 @@ let eval_list ff n_steps genv l_names =
   List.iter eval l_names
 
 (* check that all [for all n in Dom(g1), value(n) = value(g2(n))] *)
-let check ff n_steps { values = g1 } { values = g2 } =
+let check n_steps
+      { current = { values = g1 } } { current = { values = g2 } } =
   let check name v1 v2 =
+    Debug.print_message ("Checking node " ^ name);
     match v1, v2 with
     | Vclosure
       ({ c_funexp = { f_kind = k1; f_loc = loc1; f_args = [[]] } } as c1),

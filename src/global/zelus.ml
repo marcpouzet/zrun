@@ -39,6 +39,30 @@ and type_expression_desc =
   | Etypeconstr : Lident.t * type_expression list -> type_expression_desc
   | Etypetuple : type_expression list -> type_expression_desc
   | Etypefun : kind * type_expression * type_expression -> type_expression_desc
+  (* refinement types for integers and arrays *)
+  (* possibly a singleton; or interval [0..s]; if s < 0, interval is empty *)
+  | Esize : is_singleton * size -> type_expression_desc
+  | Evec : type_expression * size -> type_expression_desc
+  (* [size]t *)
+
+and is_singleton = bool
+
+(* sizes for arrays and bounded recursions - only multivariate polynomials *)
+and size = size_desc localized
+
+and size_desc =
+  | Sint : int -> size_desc
+  | Sident : Ident.t -> size_desc
+  | Sfrac : { num: size; denom: int } -> size_desc
+  | Splus : size * size -> size_desc
+  | Sminus : size * size -> size_desc
+  | Smult : size * size -> size_desc
+
+(* the two forms of [last]; [last x] and [last* x] *)
+type last =
+  { copy: bool; (* [copy = false] (that is, [last* x] *)
+    id: Ident.t; (* means that [x] and [last* x] share the same location *)
+    }
 
 (* constants *)
 type immediate =
@@ -181,22 +205,12 @@ type ('info, 'scondpat, 'exp, 'leq, 'body) escape =
     e_body: 'body;
     e_next_state: 'exp state;
     e_loc: Location.t;
+    e_zero: bool;
     e_env: 'info Ident.Env.t;
   }
 
 type is_weak = bool
 
-(* sizes for arrays and bounded recursions - only multivariate polynomials *)
-type size = size_desc localized
-
-and size_desc =
-  | Sint : int -> size_desc
-  | Sfrac : { num: size; denom: int } -> size_desc
-  | Sident : Ident.t -> size_desc
-  | Splus: size * size -> size_desc
-  | Sminus : size * size -> size_desc
-  | Smult: size * size -> size_desc
-  
 type 'info exp =
   { e_desc: 'info exp_desc; (* descriptor *)
     e_loc: Location.t; (* location *)
@@ -211,7 +225,7 @@ and 'info exp_desc =
   | Evar : Ident.t -> 'info exp_desc
   | Eglobal :
       { mutable lname : Lident.t } -> 'info exp_desc
-  | Elast : Ident.t -> 'info exp_desc
+  | Elast : last -> 'info exp_desc
   | Eop : operator * 'info exp list -> 'info exp_desc
   | Etuple : 'info exp list -> 'info exp_desc
   | Eapp : { is_inline: is_inline; f: 'info exp; arg_list: 'info exp list } -> 'info exp_desc
@@ -272,6 +286,8 @@ and 'info leq =
 and 'info eq =
   { eq_desc: 'info eq_desc; (* descriptor *)
     mutable eq_write: Defnames.defnames; (* set of defined variables *)
+    eq_index: int; (* a unique index; used to build a partial order between eqs *)
+    eq_safe: bool; (* the equation calls a possibly unsafe computation *)
     eq_loc: Location.t; (* its location *)
   }
 
@@ -288,7 +304,9 @@ and 'info eq_desc =
   (* [if e then eq1 else eq2] *)
   | EQif : { e: 'info exp; eq_true: 'info eq; eq_false: 'info eq } -> 
       'info eq_desc 
-  | EQand : 'info eq list -> 'info eq_desc (* [eq1 and...and eqn] *)
+  | EQand : { ordered: bool; eq_list: 'info eq list } -> 'info eq_desc
+  (* [eq1 and...and eqn] when [ordered], side effects must be done *)
+  (* in order, from left to right *)
   | EQlocal : ('info, 'info exp, 'info eq) block -> 
       'info eq_desc (* local x [...] do eq done *)
   | EQlet : 'info leq * 'info eq -> 'info eq_desc (* let eq in eq *)

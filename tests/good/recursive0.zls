@@ -1,14 +1,16 @@
 (* recursive functions *)
-let f1 = fun x returns o if true then o = 1 else o = 2
+let f1 = fun x returns o
+  if true then o = 1 else o = 2
 let main1 () = f1 ()
 
 let f3 =
-  let rec xor_<<n>> = fun (x) returns (o)
+  let rec or_<<n>> = fun (x) returns (o)
     if n = 0 then
-      do o = false done
-    else do o = xor_<<n/2>>(x.(0 .. n/2-1)) || xor_<<n/2>>(x.(n/2 .. n-1)) 
-         done in
-  xor_
+      o = false
+    else if n = 1 then o = x.(0)
+    else do o = or_<<n/2>>(x.(0 .. n/2-1)) || or_<<n/2>>(x.(n/2 .. n-1)) done
+         in
+  or_
 
 let main2 () = f3 <<4>> [|true; false; false; false |]
 
@@ -20,7 +22,7 @@ let f33 =
                   (sum_<<n/2>>(x.(n/2 .. n-1))) done in
   sum_
 
-let main3 () = f33 <<4>> [|1; 2; 3; 4 |]
+let main3 () = (f33 <<4>>) [|1; 2; 3; 4 |]
 
 let main4 () = let f<<n>>() = n + 1 in f<<4>>
 

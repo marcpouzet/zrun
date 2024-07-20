@@ -406,9 +406,9 @@ let rec equation env_pat env { desc; loc } =
        let eq = equation env_pat env eq in
        let e = expression env e in
        Ast.EQreset(eq, e)
-    | EQand(and_eq_list) ->
-       let and_eq_list = List.map (equation env_pat env) and_eq_list in
-       Ast.EQand(and_eq_list)
+    | EQand(eq_list) ->
+       let eq_list = List.map (equation env_pat env) eq_list in
+       Ast.EQand { ordered = false; eq_list }
     | EQlocal(v_list, eq) ->
        let v_list, env_v_list = vardec_list env v_list in
        let env_pat = Env.append env_v_list env_pat in
@@ -466,7 +466,8 @@ let rec equation env_pat env { desc; loc } =
        Ast.EQforloop(forloop_eq env_pat env f)
   in
   (* set the names defined in the equation *)
-  { Ast.eq_desc = eq_desc; Ast.eq_write = Defnames.empty; Ast.eq_loc = loc }
+  { Ast.eq_desc = eq_desc; Ast.eq_write = Defnames.empty; Ast.eq_loc = loc;
+  Ast.eq_safe = true; Ast.eq_index = -1 }
 
 and trans_for_input env acc i_list =
   let input acc { desc; loc } =
@@ -664,7 +665,7 @@ and escape env_for_states env_pat env
   let e_next_state = state env_for_states env e_next_state in
   { Ast.e_reset; Ast.e_cond = e_cond; Ast.e_let = e_let;
     Ast.e_body = e_body; Ast.e_next_state = e_next_state;
-    Ast.e_loc = loc; Ast.e_env = Ident.Env.empty }
+    Ast.e_loc = loc; Ast.e_env = Ident.Env.empty; e_zero = false; }
   
 and scondpat env scpat =
   (* first build the set of names *)
@@ -730,10 +731,10 @@ and expression env { desc; loc } =
     | Econstr1(f, e_list) ->
        Ast.Econstr1
          { lname = longname f; arg_list = List.map (expression env) e_list }
-    | Elast(x) ->
-       let x = try Env.find x env
+    | Elast(copy, x) ->
+       let id = try Env.find x env
                with | Not_found -> Error.error loc (Error.Evar(x)) in
-       Ast.Elast(x)
+       Ast.Elast { copy; id }
     | Eop(op, e_list) ->
        let e_list = List.map (expression env) e_list in
        Ast.Eop(operator op, e_list)

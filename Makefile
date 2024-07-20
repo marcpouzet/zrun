@@ -1,9 +1,12 @@
-all: build tests
+all: zrun.exe zwrite.exe
 
-build:
+zrun.exe:
 	(cd src; dune build -- zrun.exe)
 
-buildv:
+zwrite.exe:
+	(cd src; dune build -- zwrite.exe)
+
+zrun.exe.verbose:
 	(cd src; dune build --verbose -- zrun.exe)
 
 tests:
@@ -11,6 +14,7 @@ tests:
 
 debug:
 	(cd src; dune build --debug-backtraces --debug-dependency-path -- zrun.bc)
+	(cd src; dune build --debug-backtraces --debug-dependency-path -- zwrite.bc)
 
 clean:
 	dune clean;
@@ -20,5 +24,12 @@ clean:
 wc:
 	(cd src; wc global/*.ml \
 	parsing/parsetree.ml parsing/*.mll \
-	zrun/*.ml)
+	zrun/*.ml \
+	compiler/tydefs/*.ml \
+	compiler/rewrite/*.ml \
+	compiler/typing/*.ml \
+	compiler/analysis/*.ml \
+	compiler/gencode/*.ml \
+	compiler/main/*.ml)
 
+.PHONY: zrun.exe zwrite.exe zrun.exe.verbose tests debug clean wc
