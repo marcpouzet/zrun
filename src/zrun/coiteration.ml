@@ -85,7 +85,6 @@ let no_bot_no_nil_env loc env =
       let* v = no_bot_no_nil loc cur in
       return (Env.add f v acc)) Env.empty seq_env
 
-(* evaluation functions *)
 (* merge two environments provided they do not overlap *)
 let merge loc env1 env2 =
   let s = Env.to_seq env1 in
