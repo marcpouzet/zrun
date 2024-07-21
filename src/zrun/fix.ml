@@ -37,11 +37,12 @@ open Error
 let causal loc
       (env: 'a star ientry Env.t) (env_out: 'a star ientry Env.t ) names =
   let bot v = match v with | Vbot -> true | _ -> false in
+  let bot_option v = match v with | None -> false | Some(v) -> bot v in
   let bot_name n =
     let r = find_value_opt n env_out in
     match r with | None -> false | Some(v) -> bot v in
   let bot_names =
-    if Env.for_all (fun _ { cur } -> not (bot cur)) env
+    if Env.for_all (fun _ { cur } -> not (bot_option cur)) env
     then S.filter bot_name names else S.empty in
   if !no_causality then return ()
   else 
@@ -52,7 +53,9 @@ let causal loc
 (* number of variables defined by an equation *)
 (* it determines the number of iterations for the computation *)
 (* of the least fixpoint *)
-let size { eq_write } = S.cardinal (Defnames.names S.empty eq_write)
+let size { eq_write = { Defnames.dv; Defnames.di } } =
+  (* [der] names do not matter because their value is computed by the solver *)
+  S.cardinal dv + S.cardinal di
 
 (* return a default value. If [default] field is present, returns it *)
 (* otherwise, returns the [last] field *)
@@ -86,12 +89,12 @@ let by loc env env_handler write =
         let* v =
           default_value last default |>
             Opt.to_result ~none:{ kind = Eno_default(x); loc = loc } in
-        return (Env.add x { entry with cur = v } acc))
+        return (Env.add x { entry with cur = Some(v) } acc))
     write (return env_handler) 
        
-(* complete [env_handler] with inputs from [write] *)
+(* initialize [env_handler] with inputs from [write] *)
 (* pre-condition: [Dom(env_handler) subseteq write] *)
-let complete env env_handler write =
+let initialize env env_handler write =
   S.fold
     (fun x acc ->
       match Env.find_opt x env_handler with
@@ -106,11 +109,12 @@ let complete env env_handler write =
 (* returns [x1 \ { cur1; default x env },..., xn \ { curn; default x env }] *)
 let complete_with_default env env_handler =
   Env.fold
-    (fun x ({ cur } as entry) acc ->
+    (fun x ({ cur; last; eq } as entry) acc ->
       match Env.find_opt x env with
       | None -> Env.add x entry acc
-      | Some { last; default } ->
-         Env.add x { entry with last = last; default = default } acc)
+      | Some { default; last = last_in_env } ->
+         let last = if eq then last else last_in_env in
+         Env.add x { entry with default = default; last } acc)
     env_handler Env.empty
 
 (* equality of values in the fixpoint iteration. Because of monotonicity *)
@@ -122,10 +126,10 @@ let equal_values v1 v2 =
 
 (* bounded fixpoint combinator *)
 (* computes a pre fixpoint f^n(bot) <= fix(f) *)
-let fixpoint n stop f s bot =
+let fixpoint loc n stop f s bot =
   let rec fixpoint n v =
     if n <= 0 then (* this case should not happen *)
-      return (0, v, s)
+      error { kind = Efixpoint_limit; loc }
     else
       (* compute a fixpoint for the value [v] keeping the current state *)
       let* v', s' = f s v in
@@ -138,8 +142,14 @@ let fixpoint n stop f s bot =
 (* which is fully defined *)
 (* stop the fixpoint when two successive environments are equal *)
 let equal_env env1 env2 =
+  let equal v1 v2 =
+    match v1, v2 with
+    | None, None -> true | Some(v1), Some(v2) -> equal_values v1 v2
+    | _ -> false in
   Env.equal
-    (fun { cur = cur1} { cur = cur2 } -> equal_values cur1 cur2)
+    (fun { cur = cur1; last = last1; eq = eq1 }
+         { cur = cur2; last = last2; eq = eq2 } ->
+      (equal cur1 cur2) && (if eq1 || eq2 then equal last1 last2 else true))
     env1 env2
 
 (* bounded fixpoint [n] for a set of mutually recursive equations *)
@@ -151,7 +161,7 @@ let eq genv env sem eq n s_eq bot =
     Debug.print_ienv "After step" env_out;
     let env_out = complete_with_default env env_out in
     return (env_out, s_eq) in
-  let* m, env_out, s_eq = fixpoint n equal_env sem s_eq bot in
+  let* m, env_out, s_eq = fixpoint eq.eq_loc n equal_env sem s_eq bot in
   return (env_out, s_eq)
 
 (* fixpoint for mutually recursive definitions of size parameterized functions *)

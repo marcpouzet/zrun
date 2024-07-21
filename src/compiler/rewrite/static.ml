@@ -83,6 +83,7 @@ let catch v = match v with | Ok(v) -> v | Error(v) -> error v
 
 let pvalue loc c_env =
   let add acc (x, { Value.cur = v }) =
+    let* v = v |> Opt.to_result ~none: { Error.kind = Eunbound_ident(x); loc } in
     let* v = Primitives.pvalue v |>
                Opt.to_result ~none: { Error.kind = Etype; loc } in
     return (Env.add x v acc) in

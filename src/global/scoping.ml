@@ -569,7 +569,8 @@ and vardec env
     Ast.var_default = var_default;
     Ast.var_typeconstraint = var_typeconstraint;
     Ast.var_clock = var_clock; Ast.var_loc = loc;
-    Ast.var_is_last = var_is_last }
+    Ast.var_is_last = var_is_last;
+    Ast.var_init_in_eq = false }
 
 (* treat a list of variable declarations *)
 (*- computes the list of names;

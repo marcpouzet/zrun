@@ -1,2 +1,7 @@
+let node ff() returns (o init 0)
+  do o = last o + 1 done
+  
 let node f() returns (o init 42)
-  do init o = 0 and o = last o + 1 done
+  do init o = 0 and o = last o + 1 and o = 4 done
+
+

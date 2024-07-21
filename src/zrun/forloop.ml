@@ -66,7 +66,7 @@ let geti loc v i =
 
 let geti_env loc i_env i =
   let s_env = Env.to_seq i_env in
-  let entry v = { cur = v; last = None; default = None } in
+  let entry v = { empty with cur = Some(v) } in
   Result.seqfold
     (fun acc (x, v) ->
       match v with
@@ -90,7 +90,7 @@ let x_to_lastx local_env acc_env =
     Env.mapi
     (fun x entry ->
       let v = Find.find_value_opt x local_env in
-      { entry with cur = Vbot; last = v })
+      { entry with cur = Some(Vbot); last = v })
     acc_env in
   Debug.print_ienv "x_to_last_x (after): acc_env" acc_env; acc_env
 
@@ -99,7 +99,7 @@ let lastx_to_x acc_env =
   Env.mapi
     (fun x ({ last } as entry) -> 
        let v = match last with | None -> Vbot | Some(v) -> v in
-       { entry with last = None; cur = v }) acc_env
+       { entry with last = None; cur = Some(v) }) acc_env
 
 (* given [x] and [env_list], returns array [v] st [v.(i) = env_list.(i).(x)] *)
 (* when [missing <> 0] complete with a default element *)

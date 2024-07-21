@@ -127,6 +127,11 @@ type pateq = pateq_desc localized
 
 and pateq_desc = Ident.t list
 
+type 'a init =
+  | Init : 'a -> 'a init (* the variable is declared with an initial value *)
+  | InitEq : 'a init (* the initialization is deferred to the body *)
+  | Last : 'a init (* [last x] is allowed but not initialization is given *)
+
 type 'exp vardec =
   { var_name: Ident.t; (* its name *)
     var_default: 'exp option; (* possible default value *)
@@ -135,6 +140,7 @@ type 'exp vardec =
     var_loc: Location.t;
     var_typeconstraint: type_expression option;
     var_is_last: bool; (* is-there an access to [last x] ? *)
+    var_init_in_eq: bool; (* the initialization is later in the body *)
   }
 
 type 'a record = { mutable label: Lident.t; arg: 'a }

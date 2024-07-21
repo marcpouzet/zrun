@@ -180,15 +180,17 @@ and leq ({ l_eq } as l) =
  *- [def] the defined variables in [eq] that are not local;
  *- [dv_b] the defined local variables *)
 and block ({ b_vars; b_body } as b) =
-  let b_vars, dv_b = Util.mapfold vardec S.empty b_vars in
   let b_body, def_body = equation b_body in
+  let b_vars, dv_b = Util.mapfold (vardec def_body) S.empty b_vars in
   let def = Defnames.diff def_body dv_b in
   let b_env = build_from_names dv_b in
   { b with b_vars; b_body; b_write = def; b_env }, def, dv_b
 
-and vardec acc ({ var_name; var_default; var_init } as v) =
+(* [di] are the names for which an equation [init x = ...] appears in the body *)
+and vardec { di } acc ({ var_name; var_default; var_init } as v) =
   { v with var_default = Util.optional_map expression var_default;
-           var_init = Util.optional_map expression var_init },
+           var_init = Util.optional_map expression var_init;
+           var_init_in_eq = S.mem var_name di },
   S.add var_name acc
 
 and state ({ desc } as se) =
@@ -313,15 +315,15 @@ and expression ({ e_desc } as e) =
             Forexp { exp = expression exp;
                      default = Util.optional_map expression default }
          | Forreturns { returns; body } ->
+            let body, _, _ = block body in
             let returns, dv = Util.mapfold for_vardec S.empty returns in
             let r_env = build_from_names dv in
-            let body, _, _ = block body in
             Forreturns({ returns; body; r_env }) in
        Eforloop({ f with for_size; for_kind; for_input; for_body }) in
   { e with e_desc = desc }
 
 and for_vardec acc ({ desc = ({ for_vardec } as v) } as fv) =
-  let for_vardec, acc = vardec acc for_vardec in
+  let for_vardec, acc = vardec Defnames.empty acc for_vardec in
   { fv with desc = { v with for_vardec } }, acc
 
 and for_input_w acc for_input_list =
@@ -339,7 +341,7 @@ and for_input_w acc for_input_list =
 and exit_expression ({ for_exit } as e) =
   { e with for_exit = expression for_exit }
 
-and arg acc v_list = Util.mapfold vardec acc v_list
+and arg acc v_list = Util.mapfold (vardec Defnames.empty) acc v_list
 
 and funexp ({ f_args; f_body } as fd) =
   let f_args, dv_args = Util.mapfold arg S.empty f_args in

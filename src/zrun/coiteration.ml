@@ -82,17 +82,28 @@ let no_bot_no_nil_env loc env =
   let seq_env = Env.to_seq env in
   seqfold 
     (fun acc (f, { cur }) -> 
-      let* v = no_bot_no_nil loc cur in
-      return (Env.add f v acc)) Env.empty seq_env
+      match cur with
+      | None -> return acc
+      | Some(v) -> let* v = no_bot_no_nil loc v in return (Env.add f v acc))
+    Env.empty seq_env
 
 (* merge two environments provided they do not overlap *)
 let merge loc env1 env2 =
-  let s = Env.to_seq env1 in
-  seqfold
-    (fun acc (x, entry) ->
-      if Env.mem x env2 then error { kind = Emerge_env(x); loc = loc }
-      else return (Env.add x entry acc))
-    env2 s
+  let merge x v1 v2 = match v1, v2 with
+    | Some _, Some _ -> error { kind = Emerge_env(x); loc }
+    | Some _, _ -> return v1
+    | None, _ -> return v2 in
+  let s1 = Env.to_seq env1 in
+  let env2_in_1, env2 = Env.partition (fun x _ -> Env.mem x env1) env2 in
+  if Env.is_empty env2_in_1 then
+    return (Env.append env1 env2)
+  else seqfold
+         (fun acc (x, { cur = cur1; last = last1; eq = eq1 }) ->
+           let { cur = cur2; last = last2; eq = eq2 } = Env.find x env2_in_1 in
+           let* cur = merge x cur1 cur2 in
+           let* last = merge x last1 last2 in
+           return (Env.add x { empty with cur; last; eq = eq1 || eq2 } acc))
+         env2 s1
 
 (* check assertion *)
 let check_assertion loc ve ret =
@@ -247,11 +258,11 @@ let for_env_out missing env_list acc_env loc for_out =
          let* v =
            Find.find_last_opt for_name acc_env |>
              Opt.to_result ~none:{ kind = Eunbound_last_ident(for_name); loc } in
-         return (Env.add for_name { cur = v; last = None; default = None } acc)
+         return (Env.add for_name { empty with cur = Some v } acc)
       | Some(x) ->
          let* v = Forloop.array_of missing loc
                     (for_name, for_init, for_default) acc_env env_list in
-         return (Env.add x { cur = v; last = None; default = None } acc))
+         return (Env.add x { empty with cur = Some v } acc))
     Env.empty for_out
 
 (* value of an immediate constant *)
@@ -1366,7 +1377,7 @@ and sfor_out genv env acc_env
      let* last, s_init = sexp_init_opt loc genv env for_init s_init in
      let* default, s_default = sexp_opt genv env for_default s_default in
      return
-       (Env.add for_name { cur = Vbot; last; default } acc_env,
+       (Env.add for_name { empty with cur = Some Vbot; last; default } acc_env,
         Slist [s_init; s_default])
   | _ -> error { kind = Estate; loc}
 
@@ -1583,22 +1594,22 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        | Some(cx) ->
           (* otherwise the value returned by the handler *)
           cx in
-     return (Env.singleton id { entry with cur },
+     return (Env.singleton id { entry with cur = Some(cur) },
              Slist (Scstate({ sc with der }) :: Sopt(x0_opt) :: s0 :: s_list))
   | EQinit(x, e), Slist [Sopt(None); se] ->
      (* first step *)
      let* v, se = sexp genv env e se in
-     let* ({ cur } as entry) =
-       Env.find_opt x env |>
+     let* cur =
+       find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
-     return (Env.singleton x { entry with last = Some(v) },
+     return (Env.singleton x { empty with last = Some(v); eq = true },
              Slist [Sopt(Some(cur)); se])
   | EQinit(x, e), Slist [Sopt(Some(v)); se] ->
      (* remaining steps *)
-     let* ({ cur } as entry) =
-       Env.find_opt x env |>
+     let* cur =
+       find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
-     return (Env.singleton x { entry with last = Some(v) },
+     return (Env.singleton x { empty with last = Some(v); eq = true },
              Slist [Sopt(Some(cur)); se])
   | EQif { e; eq_true; eq_false }, Slist [se; s_eq_true; s_eq_false] ->
       let* v, se = sexp genv env e se in
@@ -1785,7 +1796,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
     return (r, Slist (Sopt(s_size) :: Slist(s_for_block :: so_list) ::
                         si :: si_list))
   | EQemit(x, e_opt), s ->
-     let* cur, s =
+     let* v, s =
        match e_opt with
        | None -> return (Value(Vpresent(Vvoid)), s)
        | Some(e) ->
@@ -1794,10 +1805,10 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
             let+ v = v in
             return (Value(Vpresent(v))) in
           return (v, s) in
-     let* entry =
+     let* _ =
        Env.find_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
-     return (Env.singleton x { entry with cur }, s)
+     return (Env.singleton x { empty with cur = Some(v) }, s)
   | _ -> error { kind = Estate; loc = eq_loc }
 
 (* how the size must be kept or not from one reaction to the other *)
@@ -1934,7 +1945,7 @@ and sblock genv env { b_vars; b_body = ({ eq_write } as eq); b_loc } s_b =
      let* env_v, s_list =
        mapfold3 { kind = Estate; loc = b_loc }
          (svardec genv env) Env.empty b_vars s_list (bot_list b_vars) in
-     let bot = Fix.complete env env_v (names eq_write) in
+     let bot = Fix.initialize env env_v (names eq_write) in
      let n = (Fix.size eq) + 1 in
      let* env_eq, s_eq = Fix.eq genv env seq eq n s_eq bot in
      (* a dynamic check of causality: all locally defined names *)
@@ -1966,19 +1977,23 @@ and sblock_with_reset genv env b_eq s_eq r =
 
 (* [v] is the returned value for [var_name] *)
 and svardec genv env acc
-  { var_name; var_init; var_default; var_loc; var_is_last } s v =
+  { var_name; var_init; var_default; var_loc; var_is_last; var_init_in_eq } s v =
   match s with
   | Slist [s_init;s_default] ->
      let* default, s_default = sexp_opt genv env var_default s_default in
      let* last, s_init =
-       match var_init, s_init with
-       | None, Sval(v) ->
-         if var_is_last then
-         (* [x] is a state variable but it is not initialized *)
-         return (Some(v), s_init) (* this value is nil at the first instant *)
-         else error { kind = Estate; loc = var_loc }
-       | _ -> sexp_init_opt var_loc genv env var_init s_init in
-     let entry = { cur = v; last = last; default = default } in
+       if var_init_in_eq then
+         (* the value of [last x] is defined by the block of equations *)
+         return (Some(Vbot), s_init)
+       else
+         match var_init, s_init with
+         | None, Sval(v) ->
+            if var_is_last then
+              (* [x] is a state variable but it is not initialized *)
+              return (Some(v), s_init) (* this value is nil at the first instant *)
+            else error { kind = Estate; loc = var_loc }
+         | _ -> sexp_init_opt var_loc genv env var_init s_init in
+     let entry = { empty with cur = Some(v); last = last; default = default } in
      return (Env.add var_name entry acc, Slist [s_init; s_default])
   | _ ->
      error { kind = Estate; loc = var_loc }
