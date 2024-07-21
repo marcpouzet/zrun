@@ -135,6 +135,7 @@ type 'exp vardec =
     var_loc: Location.t;
     var_typeconstraint: type_expression option;
     var_is_last: bool; (* is-there an access to [last x] ? *)
+    var_init_in_eq: bool; (* the initialization is later in the body *)
   }
 
 type 'a record = { mutable label: Lident.t; arg: 'a }

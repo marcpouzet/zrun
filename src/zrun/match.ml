@@ -21,9 +21,10 @@ open Opt
 open Ident
 
 (* auxiliary functions for environments *)
-let entry v = { cur = Value(v); last = None; default = None }
+let empty = { cur = None; last = None; default = None; eq = false }
+let entry v = { empty with cur = Some(Value(v)) }
 let lift f env =
-  Env.map (fun v -> { cur = f v; last = None; default = None }) env
+  Env.map (fun v -> { empty with cur = Some (f v) }) env
 let liftid env = lift (fun x -> x) env
 let liftv env = lift (fun v -> Value(v)) env
 let unlift env = Env.map (fun { cur } -> cur) env
@@ -139,13 +140,13 @@ let matchstate (ps : pvalue) ({ desc; loc } : statepat) : (pvalue Env.t) Opt.t =
 (* the bottom environment *)
 let bot_env (eq_write: Defnames.defnames) : 'a star ientry Env.t =
   S.fold
-    (fun x acc -> Env.add x { cur = Vbot; last = None; default = None } acc)
+    (fun x acc -> Env.add x { empty with cur = Some(Vbot) } acc)
     (names eq_write) Env.empty
 
 (* the nil environment *)
 let nil_env (eq_write: Defnames.defnames) : 'a star ientry Env.t =
   S.fold
-    (fun x acc -> Env.add x { cur = Vnil; last = None; default = None } acc)
+    (fun x acc -> Env.add x { empty with cur = Some(Vnil) } acc)
     (names eq_write) Env.empty
 
 (* a bot/nil value lifted to lists *)
@@ -207,7 +208,7 @@ let matching_arg_in loc env arg v =
   let open Result in
   let open Error in
   let match_in acc { var_name } v =
-    return (Env.add var_name { cur = v; last = None; default = None } acc) in
+    return (Env.add var_name { empty with cur = Some(v) } acc) in
   match arg, v with
   | l, Vbot ->
      fold2 { kind = Epattern_matching_failure; loc = loc }

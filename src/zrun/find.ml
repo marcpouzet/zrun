@@ -21,7 +21,7 @@ open Value
 (* access function to the symbol table *)
 let find_value_opt x env =
   let* { cur } = Env.find_opt x env in
-  return cur
+  let* cur = cur in return cur
 
 let find_last_opt x env =
   let* { last } = Env.find_opt x env in

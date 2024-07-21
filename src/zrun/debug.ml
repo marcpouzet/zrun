@@ -23,7 +23,7 @@ let fprint_ientry ff { cur; last; default } =
     match v with
     | None -> Format.fprintf ff "none" | Some(v) -> Output.value ff v in
   Format.fprintf ff "@[{ cur = %a;@ last = %a;@ default = %a }@]@,"
-    Output.value cur value last value default
+    value cur value last value default
 
 let print_number comment n =
   if !debug then Format.eprintf "@[%s %d@]@\n" comment n

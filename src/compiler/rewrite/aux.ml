@@ -108,7 +108,7 @@ let par eq_list = par false eq_list
 
 let vardec id var_is_last var_init var_default =
   { var_name = id; var_is_last; var_init; var_default; var_clock = false;
-    var_typeconstraint = None; var_loc = no_location }
+    var_typeconstraint = None; var_loc = no_location; var_init_in_eq = false }
 
 let id_vardec id = vardec id false None None
 
