@@ -89,8 +89,8 @@ let no_bot_no_nil_env loc env =
 
 (* merge two environments provided they do not overlap *)
 let merge loc env1 env2 =
-  let merge x v1 v2 = match v1, v2 with
-    | Some _, Some _ -> error { kind = Emerge_env(x); loc }
+  let merge init x v1 v2 = match v1, v2 with
+    | Some _, Some _ -> error { kind = Emerge_env { init; id = x }; loc }
     | Some _, _ -> return v1
     | None, _ -> return v2 in
   let s1 = Env.to_seq env1 in
@@ -100,8 +100,8 @@ let merge loc env1 env2 =
   else seqfold
          (fun acc (x, { cur = cur1; last = last1; eq = eq1 }) ->
            let { cur = cur2; last = last2; eq = eq2 } = Env.find x env2_in_1 in
-           let* cur = merge x cur1 cur2 in
-           let* last = merge x last1 last2 in
+           let* cur = merge false x cur1 cur2 in
+           let* last = merge true x last1 last2 in
            return (Env.add x { empty with cur; last; eq = eq1 || eq2 } acc))
          env2 s1
 
@@ -711,8 +711,8 @@ and ivardec is_fun is_resume genv env
     match var_init with
     | None -> 
        (* [last x] is only allowed *)
-      (* when [is_fun = false] or [is_resume = false] *)
-      if var_is_last then
+       (* when [is_fun = false] or [is_resume = false] *)
+       if var_is_last then
          if is_fun && is_resume then 
            error { kind = Eshould_be_combinatorial; loc = var_loc }
          else return (Sval(Vnil)) else return Sempty
@@ -1990,7 +1990,8 @@ and svardec genv env acc
          | None, Sval(v) ->
             if var_is_last then
               (* [x] is a state variable but it is not initialized *)
-              return (Some(v), s_init) (* this value is nil at the first instant *)
+              (* this value is nil at the first instant *)
+              return (Some(v), s_init)
             else error { kind = Estate; loc = var_loc }
          | _ -> sexp_init_opt var_loc genv env var_init s_init in
      let entry = { empty with cur = Some(v); last = last; default = default } in
@@ -2001,14 +2002,18 @@ and svardec genv env acc
 (* store the next value for [last x] in the state of [vardec] declarations *)
 (* the state is organised in [s_init; s_default] *)
 and set_vardec env_eq { var_name; var_loc } s =
-  let* v =
-    find_value_opt var_name env_eq |>
+  let* v, eq =
+    find_value_i_opt var_name env_eq |>
       Opt.to_result ~none:{ kind = Eundefined_ident(var_name); loc = var_loc } in
   match s with
   | Slist [Sempty; _] -> return s
   | Slist [Slist [Sopt _; s_init]; s_default] ->
      (* store the current value of [var_name] into the state *)
-     return (Slist [Slist [Sopt(Some(v)); s_init]; s_default])
+     (* when [eq = true], this means that the value of [last x] is *)
+     (* defined by an equation [init x = ...] *)
+     if eq then
+       error { kind = Emerge_env { init = true; id = var_name }; loc = var_loc }
+     else return (Slist [Slist [Sopt(Some(v)); s_init]; s_default])
   | Slist [_; s_default] ->
      (* store the current value of [var_name] into the state *)
      return (Slist [Sval(v); s_default])
@@ -2325,11 +2330,12 @@ and sizeapply loc fv v_list =
      let* _ =
        match bound with
        | None -> return ()
-       | Some(exp_v_list) ->
-         if lt v_list exp_v_list && not (negative v_list) then return ()
+       | Some(e_v_list) ->
+         if lt v_list e_v_list && not (negative v_list) then return ()
          else
            error 
-             { kind = Esize_in_a_recursive_call(v_list, exp_v_list); loc } in
+             { kind = Esize_in_a_recursive_call
+                        { actual = v_list; expected = e_v_list }; loc } in
      (* the body of [name] is evaluated in its closure environment *)
      (* extended with all entries in [defs] *)
      let s_env = 

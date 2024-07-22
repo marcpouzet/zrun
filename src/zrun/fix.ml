@@ -108,13 +108,19 @@ let initialize env env_handler write =
 (* given [env] and [env_handler = [x1 \ { cur1 },..., xn \ { curn }] *)
 (* returns [x1 \ { cur1; default x env },..., xn \ { curn; default x env }] *)
 let complete_with_default env env_handler =
+  let complete v v_in_env =
+    match v, v_in_env with
+    | None, _ -> v_in_env
+    | Some _, _ -> v in
   Env.fold
     (fun x ({ cur; last; eq } as entry) acc ->
       match Env.find_opt x env with
       | None -> Env.add x entry acc
-      | Some { default; last = last_in_env } ->
-         let last = if eq then last else last_in_env in
-         Env.add x { entry with default = default; last } acc)
+      | Some { cur = cur_in_env; default; last = last_in_env } ->
+         let cur = complete cur cur_in_env in
+         let last = complete last last_in_env in
+         (* let last = if eq then last else last_in_env in *)
+         Env.add x { entry with cur; last; default } acc)
     env_handler Env.empty
 
 (* equality of values in the fixpoint iteration. Because of monotonicity *)
@@ -158,8 +164,10 @@ let eq genv env sem eq n s_eq bot =
     Debug.print_ienv "Before step" env_in;
     let env = Env.append env_in env in
     let* env_out, s_eq = sem genv env eq s_eq in
+    let l = Env.to_list env_out in
     Debug.print_ienv "After step" env_out;
     let env_out = complete_with_default env env_out in
+    let l = Env.to_list env_out in
     return (env_out, s_eq) in
   let* m, env_out, s_eq = fixpoint eq.eq_loc n equal_env sem s_eq bot in
   return (env_out, s_eq)

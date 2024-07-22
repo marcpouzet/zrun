@@ -39,7 +39,8 @@ type kind =
   | Ebot : kind (* value is bottom *)
   | Eequal : kind (* values that are expected to be equal are not *)
   | Eassert_failure : kind (* assertion is not true *)
-  | Emerge_env : Ident.t -> kind (* two equations define a common name *)
+  | Emerge_env : { init: bool; id: Ident.t } -> kind
+  (* two equations define a common name *)
   | Erecursive_value : kind (* recursive value definition *)
   | Enot_causal : Ident.S.t -> kind (* a set of variables whose value is bot *)
   | Earray_size : { size : int; index : int } -> kind
@@ -48,7 +49,7 @@ type kind =
   (* the loop has [size] iterations but the index is of a different size *)
   | Eloop_no_iteration : kind
   (* the size must decrease at every recursive call *)
-  | Esize_in_a_recursive_call : int list * int list -> kind
+  | Esize_in_a_recursive_call : { actual: int list; expected: int list } -> kind
   (* recursive definitions must be either sets of functions parameterized *)
   (* by a size or do not contain such functions *)
   | Esizefun_def_recursive : kind
@@ -132,9 +133,10 @@ let message loc kind =
      eprintf "@[%aZrun: expressions expected to be equal are not.@.@]" output_location loc
   | Eassert_failure ->
      eprintf "@[%aZrun: assertion is not true.@.@]" output_location loc
-  | Emerge_env(name) ->
-     eprintf "@[%aZrun: two parallel equations define the same name %s.@.@]"
-       output_location loc (Ident.source name)
+  | Emerge_env { init; id } ->
+     eprintf "@[%aZrun: two parallel equations are given for %s%s.@.@]"
+       output_location loc (if init then "the initial value of " else "")
+       (Ident.source id)
   | Erecursive_value ->
      eprintf
        "@[%aZrun: the recursive definition of a value is not allowed.@.@]"
@@ -159,14 +161,14 @@ let message loc kind =
        "@[%aZrun: the loop has no iteration. Either give a default value\
         or ensure there is at least one iteration.@.@]"
        output_location loc
-  | Esize_in_a_recursive_call(actual_v_list, expected_v_list) ->
+  | Esize_in_a_recursive_call { actual; expected } ->
      let print_v_list ff v_list =
        Pp_tools.print_list_l
          (fun ff i -> Format.fprintf ff "%d" i) "(" "," ")" ff v_list in
      eprintf
        "@[%aZrun: the actual value of the size parameter is %a \n\
         whereas it should be strictly less than %a and non negative.@.@]"
-       output_location loc print_v_list actual_v_list print_v_list expected_v_list
+       output_location loc print_v_list actual print_v_list expected
   | Esizefun_def_recursive ->
      eprintf
        "@[%aZrun: values defined recursively can only be\n\
