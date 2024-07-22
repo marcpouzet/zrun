@@ -32,8 +32,8 @@ let find_default_opt x env =
   default
 
 let find_value_i_opt x env =
-  let* { cur; eq } = Env.find_opt x env in
-  let* cur = cur in return (cur, eq)
+  let* { cur; reinit } = Env.find_opt x env in
+  let* cur = cur in return (cur, reinit)
 
 let find_gvalue_opt x env =
   try

@@ -57,6 +57,12 @@ open Mapfold
    | P1 -> local i1 init true and i1 = false and eq1
    | ...
    | Pn -> local in init true and in = false and eqn
+
+   local ... x init e [default e0] ...
+
+   is rewritten:
+
+   local x [default e0] ... init x = e ...
 *)
 
 let fresh () = Ident.fresh "i"
@@ -172,7 +178,22 @@ let result funs acc ({ r_desc } as r) =
      let b_body, acc = reset_eq funs acc b_body in
      Returns { b with b_vars; b_body }, acc in
   { r with r_desc }, acc
-  
+
+let block funs acc ({ b_vars; b_body } as b) =
+  (* move the initialization part into the body *)
+  let b_vars, i_list =
+    Util.mapfold
+      (fun i_list ({ var_name; var_init } as v) ->
+        match var_init with
+        | None -> v, i_list
+        | Some(e) -> { v with var_init = None; var_init_in_eq = true },
+                     Aux.eq_init var_name e :: i_list)
+      [] b_vars in
+  (* add the resulting equations into the body *)
+  let b_body = Aux.par (b_body :: i_list) in
+  (* then rewrite *)
+  Mapfold.block_it funs acc { b with b_vars; b_body }
+
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
 let get_index funs acc n = Ident.get (), acc
@@ -180,7 +201,7 @@ let get_index funs acc n = Ident.get (), acc
 let program _ p =
   let global_funs = Mapfold.default_global_funs in
   let funs =
-    { Mapfold.defaults with expression; equation; result;
+    { Mapfold.defaults with expression; equation; result; block;
                             reset_e; reset_eq; match_handler_eq;
                             match_handler_e; present_handler_eq;
                             present_handler_e; if_eq;

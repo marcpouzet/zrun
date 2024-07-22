@@ -271,7 +271,7 @@ let forward_i_with_until_condition loc n write f exit_condition acc_env0 s =
       (* local values *)
       (* if [acc_env(last x) = v], add it to [f_env] *)
       let* v = 
-        let local_env = Fix.complete_with_default acc_env f_env in
+        let local_env = Fix.complete acc_env f_env in
         exit_condition i local_env in
       match v with
       | Vbot ->

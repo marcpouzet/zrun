@@ -22,7 +22,7 @@ type 'a ientry =
   { cur: 'a option; (* the current value of [x] *)
     last : 'a option; (* the value of [last x] *)
     default : 'a option; (* the default value of [x] *)
-    eq : bool; (* [last x] is defined by an equation [init x = ...] *)
+    reinit : bool; (* [last x] is defined by an equation [init x = ...] *)
   }
 
 type 'a result = ('a, Error.error) Result.t

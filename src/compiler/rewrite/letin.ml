@@ -159,7 +159,7 @@ and move_init_into_equations acc ({ var_name; var_init } as v) =
   match var_init with
   | None -> v, acc
   | Some(e) ->
-     { v with var_init = None; var_is_last = true },
+     { v with var_init = None; var_init_in_eq = true },
      par acc (add_seq (Aux.eq_init var_name e) empty)
      
 and block funs acc { b_vars; b_body } =

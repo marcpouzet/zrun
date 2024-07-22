@@ -104,13 +104,12 @@
              ; all variables in patterns must be value (remove last)
     automata ; rewrite automata into match/reset
     present ; rewrite present into match
+    encore ; add horizons [horizon h = 0.0] for zero-crossings
+    ; disc ; compile the operation disc with an horizon
     pre ; rewrite fby/fby into (init/last)
     reset ; rewrite -> and resets
     complete ; complete equations with [der x = 0.0]
     shared ; normalise equations to shared variables into [x = ...]
-    encore ; add horizons [horizon h = 0.0] for zero-crossings
-    ; horizon ; fuse the different horizon of a function
-    ; disc ; compile the operation disc with an horizon
     letin ; un-nesting of let/in and blocks
     ; deadcode ; deadcode removal
     graph ; representation of acyclic graphs

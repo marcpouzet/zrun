@@ -21,7 +21,7 @@ open Opt
 open Ident
 
 (* auxiliary functions for environments *)
-let empty = { cur = None; last = None; default = None; eq = false }
+let empty = { cur = None; last = None; default = None; reinit = false }
 let entry v = { empty with cur = Some(Value(v)) }
 let lift f env =
   Env.map (fun v -> { empty with cur = Some (f v) }) env

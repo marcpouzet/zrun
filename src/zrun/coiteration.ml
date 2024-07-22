@@ -98,11 +98,12 @@ let merge loc env1 env2 =
   if Env.is_empty env2_in_1 then
     return (Env.append env1 env2)
   else seqfold
-         (fun acc (x, { cur = cur1; last = last1; eq = eq1 }) ->
-           let { cur = cur2; last = last2; eq = eq2 } = Env.find x env2_in_1 in
+         (fun acc (x, { cur = cur1; last = last1; reinit = r1 }) ->
+           let { cur = cur2; last = last2; reinit = r2 } =
+             Env.find x env2_in_1 in
            let* cur = merge false x cur1 cur2 in
            let* last = merge true x last1 last2 in
-           return (Env.add x { empty with cur; last; eq = eq1 || eq2 } acc))
+           return (Env.add x { empty with cur; last; reinit = r1 || r2 } acc))
          env2 s1
 
 (* check assertion *)
@@ -1602,14 +1603,14 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* cur =
        find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
-     return (Env.singleton x { empty with last = Some(v); eq = true },
+     return (Env.singleton x { empty with last = Some(v); reinit = true },
              Slist [Sopt(Some(cur)); se])
   | EQinit(x, e), Slist [Sopt(Some(v)); se] ->
      (* remaining steps *)
      let* cur =
        find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
-     return (Env.singleton x { empty with last = Some(v); eq = true },
+     return (Env.singleton x { empty with last = Some(v); reinit = true },
              Slist [Sopt(Some(cur)); se])
   | EQif { e; eq_true; eq_false }, Slist [se; s_eq_true; s_eq_false] ->
       let* v, se = sexp genv env e se in
