@@ -94,7 +94,6 @@
   (modules
     state ; the data structure to represent a state
     cost ; a cost function used to decide which function call to inline
-    ; unsafe ; a function to decide wheither an expression is safe or not
     mapfold ; generic mapfold
     aux ; auxiliary functions for building terms
     static ; static reduction

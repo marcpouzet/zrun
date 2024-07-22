@@ -77,9 +77,9 @@ let intro { time } =
 
 (* The translation function for periods *)
 let period major time phase period =
-  (* local h init time + phase, z *)
-  (* do h = horizon (if z then last h + period else last h) *)
-  (* and z = major && (time >= last h) in z *)
+  (* [local h init time + phase, z *)
+  (*  do h = horizon (if z then last h + period else last h) *)
+  (*  and z = major && (time >= last h) in z] *)
   let h = Ident.fresh "h" in
   let z = Ident.fresh "z" in
   Aux.e_local (Aux.block_make [Aux.vardec h false
