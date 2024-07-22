@@ -3,7 +3,7 @@
 (*                                                                     *)
 (*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
-(*  (c) 2020 Inria Paris (see the AUTHORS file)                        *)
+(*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -14,7 +14,7 @@
 
 (* elimation of periods. *)
 
-(* For every function, an extra input [time] is added. Every period *)
+(* For every function, an extra input [time] is added. A period (v1|v2) *)
 (* is translated into the computation of an horizon *)
 
 (* [period(v1(v2))] is translated into *)
@@ -33,7 +33,7 @@
 
 (* An other possible interpretation is to consider that periods and timers *)
 (* and taken on absolute time. This is not what is implemented currently. *)
-(* The implementation becomes: *)
+(* The implementation would be: *)
 
 (* [period(v1(v2))] is translated into: *)
 (* [local [horizon] h, cpt, z *)
@@ -61,188 +61,73 @@
         and z = up(if time > last ztime then x else 1.0) in
     z *)
 
-open Zmisc
-open Zlocation
-open Zident
-open Lident
-open Initial
-open Deftypes
+open Ident
 open Zelus
-open Zaux
+open Mapfold
 
+let fresh () = Ident.fresh "time"
 
-let new_time () = Zident.fresh "time"
+type acc = { time: Ident.t option }
 
-(* The main translation function for periods *)
-let period major time { p_phase = p1_opt; p_period = p2 } =
-  (* let rec [horizon] h = if z then last h + v2 else last h *)
-  (*     and init h = time + p1 and z = major && (time >= last h) in z *)
-  let horizon = Deftypes.horizon Deftypes.imem in
-  let h = Zident.fresh "h" in
-  let z = Zident.fresh "z" in
-  let p1 = match p1_opt with | None -> Zaux.zero | Some(p1) -> p1 in
-  let env =
-    Env.add h (Deftypes.entry horizon Initial.typ_float)
-	    (Env.add z { t_sort = Deftypes.value;
-			 t_typ = Initial.typ_bool } Env.empty) in
-  let eq_list = 
-    [eq_make h (ifthenelse (bool_var z) (plus (float_last h) p2)
-			   (float_last h));
-     eq_init h (plus (float_var time) p1);
-     eq_make z (and_op major
-		       (greater_or_equal (float_var time) (float_last h)))] in
-  make_let env eq_list (bool_var z)
+let empty = { time = None }
 
-(* Ensure that a zero-crossing cannot be done *)
-(* twice without time passing *)
-let up major time e =
-  let z = Zident.fresh "z" in
-  let ztime = Zident.fresh "ztime" in
-  let env =
-    Env.add ztime (Deftypes.entry imemory Initial.typ_float)
-	    (Env.add z (Deftypes.entry Sval Initial.typ_float)
-		     Env.empty) in
-  let eq_list =
-    [eq_init ztime minus_one;
-     eq_make ztime
-	     (ifthenelse (float_var z) (float_var time) (float_last ztime));
-     eq_make z
-	     (Zaux.up (ifthenelse (greater (float_var time) (float_last ztime))
-				e one))] in
-  make_let env eq_list (float_var z)
+let intro { time } =
+  let t = match time with | None -> fresh () | Some(t) -> t in
+  t, { time = Some t }
 
-let up major time e = e
+(* The translation function for periods *)
+let period major time phase period =
+  (* local h init time + phase, z *)
+  (* do h = horizon (if z then last h + period else last h) *)
+  (* and z = major && (time >= last h) in z *)
+  let h = Ident.fresh "h" in
+  let z = Ident.fresh "z" in
+  Aux.e_local (Aux.block_make [Aux.vardec h false
+                                 (Some(Aux.plus (Aux.var time) phase)) None;
+                               Aux.vardec z false None None]
+                 [Aux.eq_and
+                    (Aux.id_eq h (Aux.horizon
+                                    (Aux.ifthenelse (Aux.var z)
+                                        (Aux.plus (Aux.last_star h) period)
+                                        (Aux.last_star h))))
+                       (Aux.id_eq z (Aux.and_op major
+                                       (Aux.greater_or_equal (Aux.var time)
+                                          (Aux.last_star z))))])
+    (Aux.var z)
 
 (* Add the extra input parameter "time" for hybrid nodes *)
-let extra_input time env pat = 
-  Env.add time { t_sort = Deftypes.value; t_typ = Initial.typ_float } env,
-  Zaux.pairpat (float_varpat time) pat
+let funexp funs acc ({ f_kind } as f) =
+  match f_kind with
+  | Knode(Khybrid) ->
+     let { f_args; f_env } as f, acc_local = Mapfold.funexp funs empty f in
+     let t, _ = intro acc_local in
+     { f with f_args = [Aux.vardec t false None None] :: f_args;
+              f_env = Env.add t Misc.no_info f_env }, acc
+  | _ -> raise Mapfold.Fallback
 
-(** Translation of expressions. *)
-let rec expression major time ({ e_desc = e_desc } as e) =
+(* add the extra time argument for the application of hybrid nodes *)
+let expression funs acc ({ e_desc } as e) =
   match e_desc with
-  | Eperiod({ p_phase = opt_p1; p_period = p2 }) ->
-     period major time
-	    { p_phase = Zmisc.optional_map (expression major time) opt_p1;
-	      p_period = expression major time p2 }
-  | Eop(Eup, [e_arg]) ->
-     { e with e_desc = Eop(Eup, [expression major time e_arg]) }
-  | Eop(op, e_list) ->
-     { e with e_desc = Eop(op, List.map (expression major time) e_list) }
-  | Eapp(app, op, e_list) ->
-     (* for hybrid nodes, add the extra input [time] *)
-     let op = expression major time op in
-     let e_list = List.map (expression major time) e_list in
-     let e_list =
-       if Ztypes.is_hybrid (List.length e_list - 1) op.e_typ then
-         let head, tail = Zmisc.firsts e_list in
-         head @ [Zaux.pair (float_var time) tail]
-       else e_list in
-     { e with e_desc = Eapp(app, op, e_list) }
-  | Etuple(e_list) ->
-     { e with e_desc = Etuple(List.map (expression major time) e_list) }
-  | Econstr1(c, e_list) ->
-     { e with e_desc = Econstr1(c, List.map (expression major time) e_list) }
-  | Erecord_access(e_record, x) ->
-     { e with e_desc = Erecord_access(expression major time e_record, x) }
-  | Erecord(l_e_list) ->
-     let l_e_list =
-       List.map (fun (l, e) -> (l, expression major time e)) l_e_list in
-     { e with e_desc = Erecord(l_e_list) }
-  | Erecord_with(e_record, l_e_list) ->
-     let l_e_list =
-       List.map (fun (l, e) -> (l, expression major time e)) l_e_list in
-     { e with e_desc = Erecord_with(expression major time e_record, l_e_list) }
-  | Etypeconstraint(e, ty) ->
-     { e with e_desc = Etypeconstraint(expression major time e, ty) }
-  | Elet(l, e) ->
-     { e with e_desc = Elet(local major time l, expression major time e) }
-  | Eblock(b, e) ->
-     { e with e_desc = Eblock(block major time b, expression major time e) }
-  | Eseq(e1, e2) ->
-     { e with e_desc =
-		Eseq(expression major time e1, expression major time e2) }
-  | Elocal _ | Eglobal _ | Econst _ | Econstr0 _ | Elast _ -> e
-  | Epresent _ | Ematch _ -> assert false
+  | Eapp({ f; arg_list } as app) ->
+     (* we need to know if [f] is hybrid or not *)
+     (* for the moment, we suppose it is; this means that this rewriting *)
+     (* step must be done after type inference *)
+     let f, acc = Mapfold.expression_it funs acc f in
+     let arg_list, acc =
+       Util.mapfold (Mapfold.expression_it funs) acc arg_list in
+     let t, acc = intro acc in
+     { e with e_desc = Eapp({ app with f; arg_list = (Aux.var t) :: arg_list }) },
+     acc
+  | _ -> raise Mapfold.Fallback
 
-(* Translation of equations *)
-(* [time] is the current time. [eq_list] is a list of equations and *)
-(* [env] the current environment *)
-and equation major time ({ eq_desc = desc } as eq) =
-  match desc with 
-  | EQeq(p, e) -> { eq with eq_desc = EQeq(p, expression major time e) }
-  | EQpluseq(x, e) -> { eq with eq_desc = EQpluseq(x, expression major time e) }
-  | EQmatch(total, e, m_h_list) ->
-     let m_h_list =
-       List.map
-         (fun ({ m_body = b } as m_h) ->
-	  { m_h with m_body = block major time b })
-	 m_h_list in
-     { eq with eq_desc = EQmatch(total, expression major time e, m_h_list) }
-  | EQreset(res_eq_list, e) ->
-     let e = expression major time e in
-     let res_eq_list = equation_list major time res_eq_list in
-     { eq with eq_desc = EQreset(res_eq_list, e) }
-  | EQand(and_eq_list) ->
-     { eq with eq_desc = EQand(equation_list major time and_eq_list) }
-  | EQbefore(before_eq_list) ->
-     { eq with eq_desc = EQbefore(equation_list major time before_eq_list) }
-  | EQinit(x, e) ->
-     { eq with eq_desc = EQinit(x, expression major time e) }
-  | EQder(x, e, None, []) -> 
-     { eq with eq_desc = EQder(x, expression major time e, None, []) }
-  | EQnext(x, e, e_opt) ->
-     let e_opt = Zmisc.optional_map (expression major time) e_opt in
-     { eq with eq_desc = EQnext(x, expression major time e, e_opt) }
-  | EQblock(b) -> { eq with eq_desc = EQblock(block major time b) }
-  | EQforall ({ for_index = i_list; for_init = init_list;
-		for_body = b_eq_list } as body) ->
-     let index ({ desc = desc } as ind) =
-       let desc = match desc with
-       | Einput(x, e) -> Einput(x, expression major time e)
-       | Eoutput _ -> desc
-       | Eindex(x, e1, e2) ->
-	  Eindex(x, expression major time e1, expression major time e2) in
-       { ind with desc = desc } in
-     let init ({ desc = desc } as ini) =
-       let desc = match desc with
-	 | Einit_last(x, e) -> Einit_last(x, expression major time e) in
-       { ini with desc = desc } in
-     let i_list = List.map index i_list in
-     let init_list = List.map init init_list in
-     let b_eq_list = block major time b_eq_list in
-     { eq with eq_desc = EQforall { body with for_index = i_list;
-					      for_init = init_list;
-					      for_body = b_eq_list } }
-  | EQautomaton _ | EQpresent _ | EQemit _
-  | EQder _ -> assert false
-		      
-and equation_list major time eq_list = List.map (equation major time) eq_list
-					  
-(** Translate a block *)
-and block major time ({ b_locals = l_list; b_body = eq_list } as b) =
-  let l_list = List.map (local major time) l_list in
-  let eq_list = equation_list major time eq_list in
-  { b with b_locals = l_list; b_body = eq_list }
+let set_index funs acc n =
+  let _ = Ident.set n in n, acc
+let get_index funs acc n = Ident.get (), acc
 
-and local major time ({ l_eq = eq_list } as l) =
-  { l with l_eq = equation_list major time eq_list }
-
-let implementation impl =
-  match impl.desc with
-  | Eopen _ | Etypedecl _ | Econstdecl _  
-  | Efundecl(_, { f_kind = (S | AS | A | AD | D | P) }) -> impl
-  | Efundecl(n, ({ f_kind = C; f_args = pat_list;
-		   f_body = e; f_env = f_env } as body)) ->
-     let time = new_time () in
-     let f_env, major = Zaux.major f_env in
-     let e = expression major time e in
-     let head, tail = Zmisc.firsts pat_list in
-     let f_env, tail = extra_input time f_env tail in
-     { impl with desc = 
-		   Efundecl(n, { body with f_args = head @ [tail]; 
-					   f_body = e; f_env = f_env }) }
-       
-let implementation_list impl_list = Zmisc.iter implementation impl_list
-
-
+let program _ p =
+  let global_funs = Mapfold.default_global_funs in
+  let funs =
+    { Mapfold.defaults with expression; funexp; set_index; get_index;
+                            global_funs } in
+  let { p_impl_list } as p, _ = Mapfold.program_it funs empty p in
+  { p with p_impl_list = p_impl_list }

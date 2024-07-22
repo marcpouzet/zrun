@@ -76,27 +76,27 @@ type immediate =
 (* synchronous operators *)
 type operator =
   | Efby : operator
-  (* unit delay *)
+  (* unit delay - arity = 2 *)
   | Eunarypre : operator
-  (* unit delay *)
+  (* unit delay - arity = 1 *)
   | Eifthenelse : operator
   (* mux *)
   | Eminusgreater : operator
-  (* initialization *)
+  (* initialization - arity = 2 *)
   | Eseq : operator
-  (* sequence *)
+  (* sequence - arity = n *)
   | Erun : is_inline -> operator
-  (* application of a statefull function *)
+  (* application of a statefull function - arity = 1 *)
   | Eatomic : operator
-  (* the argument is atomic *)
+  (* the argument is atomic - arity = 1 *)
   | Etest : operator
-  (* testing the presence of a signal *)
+  (* testing the presence of a signal - arity = 1 *)
   | Eup : operator
-  (* zero-crossing detection *)
+  (* zero-crossing detection - arity = 1 *)
   | Eperiod : operator
-  (* period *)
+  (* period - arity = 2 *)
   | Ehorizon : operator
-  (* generate an event at a given horizon *)
+  (* generate an event at a given horizon - arity = 1 *)
   | Edisc : operator
   (* generate an event whenever x <> last x outside of integration *)
   | Earray : array_operator -> operator

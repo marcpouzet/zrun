@@ -243,6 +243,8 @@ let minusgreater e1 e2 = emake (Eop(Eminusgreater, [e1;e2]))
 let fby e1 e2 = emake (Eop(Efby, [e1;e2]))
 let ifthenelse e1 e2 e3 =
   emake (Eop(Eifthenelse, [e1;e2;e3]))
+let horizon e = emake (Eop(Ehorizon, [e]))
+
 let sgn e =
   ifthenelse (greater e zero) one minus_one
 let record_access arg label = emake (Erecord_access { arg; label })

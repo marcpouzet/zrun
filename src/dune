@@ -93,7 +93,7 @@
   (wrapped false)
   (modules
     state ; the data structure to represent a state
-    ; cost ; a cost function used to decide which function call to inline
+    cost ; a cost function used to decide which function call to inline
     ; unsafe ; a function to decide wheither an expression is safe or not
     mapfold ; generic mapfold
     aux ; auxiliary functions for building terms
@@ -104,9 +104,10 @@
              ; all variables in patterns must be value (remove last)
     automata ; rewrite automata into match/reset
     present ; rewrite present into match
-    encore ; add horizons [horizon h = 0.0] for zero-crossings
-    ; disc ; compile the operation disc with an horizon
     pre ; rewrite fby/fby into (init/last)
+    period ; translate periods into horizons
+    encore ; add horizons [horizon h = 0.0] for zero-crossings
+    disc ; compile the operation disc with an horizon
     reset ; rewrite -> and resets
     complete ; complete equations with [der x = 0.0]
     shared ; normalise equations to shared variables into [x = ...]
