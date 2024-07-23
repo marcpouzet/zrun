@@ -3,7 +3,7 @@
 (*                                                                     *)
 (*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
-(*  (c) 2020 Inria Paris (see the AUTHORS file)                        *)
+(*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -15,29 +15,26 @@
 (* dead-code removal. *)
 (* this is applied to normalized code *)
 
-open Zmisc
-open Zident
-open Vars
+open Ident
 open Zelus
-open Deftypes
 
-(** Dead-code removal. First build a table [yn -> {x1,...,xk}] wich associate *)
-(** the list of read variables used to produce yn *)
-(** then recursively mark all useful variable according to *)
-(** read-in dependences *)
-(** An equation [eq] is marked useful when it may be unsafe, that *)
-(** is, it has side effets and/or is non total *)
-(** For the moment, only combinatorial functions *)
-(** are considered safe. *)
-(** finally, only keep equations and name defs. for useful variables *)
-(** horizons are considered to be useful *)
+(* Dead-code removal. First build a table [yn -> {x1,...,xk}] wich associate *)
+(* the list of read variables used to produce yn *)
+(* then recursively mark all useful variable according to *)
+(* read-in dependences *)
+(* An equation [eq] is marked useful when it may be unsafe, that *)
+(* is, it has side effets and/or is non total *)
+(* For the moment, only combinatorial functions *)
+(* are considered safe. *)
+(* finally, only keep equations and name defs. for useful variables *)
+(* horizons are considered to be useful *)
 type table = cont Env.t
  and cont = 
    { mutable c_vars: S.t; (* set of variables *)
      mutable c_useful: bool; (* is-it a useful variable? *)
      mutable c_visited: bool; (* has it been visited already? *) }
      
-(** Useful function. For debugging purpose. *)
+(* Useful function. For debugging purpose. *)
 let print ff table =
   let names ff l =
     Pp_tools.print_list_r Printer.name "{" "," "}" ff (S.elements l) in
@@ -81,16 +78,15 @@ let add is_useful w r table =
   let table = if is_useful then mark_useful r table else table in
   (* add dependences *)
   S.fold add w table
-
 	 
-(** Extend [table] where every entry [y -> {x1,...,xn}] *)
-(** is marked to also depend on names in [names] *)
+(* Extend [table] where every entry [y -> {x1,...,xn}] *)
+(* is marked to also depend on names in [names] *)
 let extend table names =
   Env.map 
     (fun ({ c_vars = l } as cont) -> { cont with c_vars = S.union l names })
     table
 
-(** Fusion of two tables *)
+(* Fusion of two tables *)
 let merge table1 table2 =
   let add x ({ c_vars = l1; c_useful = u1 } as cont1) table =
     try
@@ -101,8 +97,8 @@ let merge table1 table2 =
     | Not_found -> Env.add x cont1 table in
   Env.fold add table2 table1
 
-(** Build the association table [yk -> { x1,..., xn}] *)     
-let rec build_equation table { eq_desc = desc } =
+(* Build the association table [yk -> { x1,..., xn}] *)     
+let equation table { eq_desc = desc } =
   match desc with
   | EQeq(p, e) ->
      let w = fv_pat S.empty S.empty p in
@@ -159,9 +155,9 @@ and build_local table { l_eq = eq_list } = build_equation_list table eq_list
 and build_equation_list table eq_list =
   List.fold_left build_equation table eq_list
 
-(** Visit the table: recursively mark all useful variables *)
-(** returns the set of useful variables *)
-(** [read] is a set of variables *)
+(* Visit the table: recursively mark all useful variables *)
+(* returns the set of useful variables *)
+(* [read] is a set of variables *)
 let visit read table =
   let useful = ref S.empty in
   (* recursively mark visited nodes which are useful *)
@@ -188,11 +184,11 @@ let visit read table =
   Env.iter visit_table table;
   !useful
 
-(** Empty block *)
+(* Empty block *)
 let is_empty_block { b_locals = l; b_body = eq_list } =
   (l = []) && (eq_list = [])
 
-(** remove useless names in write names *)
+(* remove useless names in write names *)
 let writes useful { dv = dv; di = di; der = der; nv = nv; mv = mv } =
   let filter set = S.filter (fun x -> S.mem x useful) set in
   { dv = filter dv; di = filter di; der = filter der;
@@ -221,7 +217,7 @@ let rec pattern useful ({ p_desc = desc } as p) =
      let p = pattern useful p in
      { p with p_desc = Etypeconstraintpat(p, ty_exp) }
 
-(** Remove useless equations. [useful] is the set of useful names *)
+(* Remove useless equations. [useful] is the set of useful names *)
 let rec remove_equation useful
 			({ eq_desc = desc; eq_write = w } as eq) eq_list =
   match desc with
@@ -313,14 +309,14 @@ and remove_local useful ({ l_eq = eq_list; l_env = l_env } as l) =
   let l_env = Env.filter (fun x entry -> S.mem x useful) l_env in
   { l with l_eq = eq_list; l_env = l_env }
 
-(** Compute the set of horizons *)
+(* Compute the set of horizons *)
 let horizon read { l_env = l_env } =
   let take h { t_sort = sort } acc =
     match sort with
     | Smem { m_kind = Some(Horizon) } -> S.add h acc | _ -> acc in
   Env.fold take l_env read
     
-(** the main entry for expressions. Warning: [e] must be in normal form *)
+(* the main entry for expressions. Warning: [e] must be in normal form *)
 let exp ({ e_desc = desc } as e) =
   match desc with
   | Elet(l, e_let) ->
