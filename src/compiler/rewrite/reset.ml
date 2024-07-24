@@ -128,7 +128,7 @@ let match_handler_eq funs acc ({ m_body } as m_h) =
   { m_h with m_body }, acc
 
 and match_handler_e funs acc ({ m_body } as m_h) =
-  let e, acc = reset_e funs empty m_body in 
+  let m_body, acc = reset_e funs empty m_body in 
   { m_h with m_body }, acc
 
 and present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
@@ -155,7 +155,7 @@ let equation funs acc ({ eq_desc } as eq) =
      reset_init acc { eq with eq_desc = EQinit(x, e) }
   | _ -> raise Mapfold.Fallback
 
-(** Expressions. *)
+(* Expressions. *)
 let expression funs acc { e_desc } =
   match e_desc with
   | Eop(Eminusgreater, [e1; e2]) ->
@@ -179,20 +179,19 @@ let result funs acc ({ r_desc } as r) =
      Returns { b with b_vars; b_body }, acc in
   { r with r_desc }, acc
 
+(* move the initialization part of the declaration [local x init e,... do eq] *)
+(* into the body [eq] then translate *)
 let block funs acc ({ b_vars; b_body } as b) =
-  (* move the initialization part into the body *)
-  let b_vars, i_list =
-    Util.mapfold
-      (fun i_list ({ var_name; var_init } as v) ->
-        match var_init with
-        | None -> v, i_list
-        | Some(e) -> { v with var_init = None; var_init_in_eq = true },
-                     Aux.eq_init var_name e :: i_list)
-      [] b_vars in
+  let init_eq_of_vardec init_list ({ var_name; var_init } as v) =
+    match var_init with
+    | None -> v, init_list
+    | Some(e) -> { v with var_init = None; var_init_in_eq = true },
+                 Aux.eq_init var_name e :: init_list in
+  let b_vars, init_list = Util.mapfold init_eq_of_vardec [] b_vars in
   (* add the resulting equations into the body *)
-  let b_body = Aux.par (b_body :: i_list) in
+  let b_body = Aux.par (b_body :: init_list) in
   (* then rewrite *)
-  Mapfold.block_it funs acc { b with b_vars; b_body }
+  Mapfold.block funs acc { b with b_vars; b_body }
 
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
