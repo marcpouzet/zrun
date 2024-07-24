@@ -125,7 +125,7 @@ let rec pattern ff { pat_desc } =
   | Econstr0pat(ln) -> longname ff ln
   | Econstr1pat(ln, pat_list) ->
      fprintf ff "@[%a%a@]" longname ln (pattern_list "(" "," ")") pat_list
-  | Etuplepat(pat_list) -> pattern_list "(" "," ")" ff pat_list
+  | Etuplepat(pat_list) -> pattern_list "(tuple " "" ")" ff pat_list
   | Etypeconstraintpat(p, ty_exp) ->
      fprintf ff "@[(%a:%a)@]" pattern p ptype ty_exp
   | Erecordpat(n_pat_list) ->
@@ -190,7 +190,7 @@ let block exp body ff { b_vars; b_body; b_write; b_env } =
   match b_vars with
   | [] -> fprintf ff "@[<hov 0>%a@ %a@]" body b_body print_env_names b_env
   | _ ->
-     fprintf ff "@[<hov 0>local@ %a@ %ado@ %a%a@]"
+     fprintf ff "@[<hov 0>(local@ %a@ %ado@ %a%a)@]"
        (vardec_list exp) b_vars
        print_env_names b_env
        print_writes b_write       
@@ -311,7 +311,7 @@ let rec expression ff e =
        fprintf ff "@[(%a%a)@]"
          longname lname (print_list_r expression "(" "," ")") arg_list
     | Etuple(e_list) ->
-       fprintf ff "@[%a@]" (print_list_r expression "(" "," ")") e_list
+       fprintf ff "@[%a@]" (print_list_r expression "(tuple " "" ")") e_list
     | Erecord_access { label; arg } ->
        fprintf ff "@[%a.%a@]" expression arg longname label
     | Erecord(ln_e_list) ->
@@ -324,9 +324,9 @@ let rec expression ff e =
 	    (print_record longname expression """ =""") "" ";" "")
          ln_e_list
     | Elet(l, e) ->
-       fprintf ff "@[<v0>%ain @,%a@]" leq l expression e
+       fprintf ff "@[<v0>(%ain @,%a)@]" leq l expression e
     | Elocal(b_eq, e) ->
-        fprintf ff "@[<v0>%a in @,%a@]"
+        fprintf ff "@[<v0>(%a in @,%a)@]"
           block_of_equation b_eq expression e
     | Etypeconstraint(e, typ) ->
        fprintf ff "@[(%a: %a)@]" expression e ptype typ
@@ -393,31 +393,31 @@ and arg ff a = fprintf ff "(%a)" (vardec_list expression) a
     
 and operator ff op e_list =
   match op, e_list with
-  | Eunarypre, [e] -> fprintf ff "pre %a" expression e
+  | Eunarypre, [e] -> fprintf ff "@[<hov2>pre@ %a@]" expression e
   | Efby, [e1;e2] ->
-     fprintf ff "%a fby %a" expression e1 expression e2
+     fprintf ff "@[<hov2>%a@ fby@ %a@]" expression e1 expression e2
   | Eminusgreater, [e1;e2] ->
-     fprintf ff "%a -> %a" expression e1 expression e2
+     fprintf ff "@[<hov2>%a@ ->@ %a@]" expression e1 expression e2
   | Eifthenelse,[e1;e2;e3] ->
-     fprintf ff "@[(if %a then %a@ else %a)@]"
+     fprintf ff "@[<hov2>(if@ %a then@ %a@ else@ %a)@]"
        expression e1 expression e2 expression e3
   | Eup, [e] ->
-     fprintf ff "up %a" expression e
+     fprintf ff "@[up %a@]" expression e
   | Etest, [e] ->
-     fprintf ff "? %a" expression e
+     fprintf ff "@[? %a@]" expression e
   | Eatomic, [e] ->
-     fprintf ff "atomic %a" expression e
+     fprintf ff "@[<hov2>atomic@ %a@]" expression e
   | Eperiod, [e1; e2] ->
-     fprintf ff "period %a(%a)" expression e1 expression e2
+     fprintf ff "@[<hov2>period@ %a(%a)@]" expression e1 expression e2
   | Eseq, [e1; e2] ->
-     fprintf ff "@[%a;@,%a@]" expression e1 expression e2
+     fprintf ff "@[<hov0>%a;@,%a@]" expression e1 expression e2
   | Erun(is_inline), [e1; e2] ->
-     fprintf ff "@[%srun@ %a@ %a@]"
+     fprintf ff "@[<hov2>%srun@ %a@ %a@]"
        (if is_inline then "inline " else "") expression e1 expression e2
   | Ehorizon, [e] ->
-     fprintf ff "horizon %a" expression e
+     fprintf ff "@[<hov2>horizon@ %a@]" expression e
   | Edisc, [e] ->
-     fprintf ff "disc %a" expression e
+     fprintf ff "@[<hov2>disc@ %a@]" expression e
   | Earray(op), l ->
      array_operator ff op l
   | _ -> assert false
@@ -427,23 +427,25 @@ and array_operator ff op l =
   | Earray_list, l ->
      Pp_tools.print_list_l expression "[|" ";" "|]" ff l
   | Econcat, [e1; e2] ->
-     fprintf ff "@<hov0>%a ++ @,%a@" expression e1 expression e2
+     fprintf ff "[@<hov0>%a ++ @,%a@]" expression e1 expression e2
   | Eget, [e1; e2] ->
-     fprintf ff "%a.(%a)" expression e1 expression e2
+     fprintf ff "@[%a.(%a)@]" expression e1 expression e2
   | Eget_with_default, [e1; e2; e3] ->
-     fprintf ff "%a.(%a) default %a" expression e1 expression e2 expression e3
+     fprintf ff "@[<hov2>%a.(%a)@ default@ %a@]" 
+       expression e1 expression e2 expression e3
   | Eslice, [e1; e2; e3] ->
-     fprintf ff "%a.(%a .. %a)" expression e1 expression e2 expression e3
+     fprintf ff "@[<hov2>%a.@,(%a@ ..@ %a)@]" 
+       expression e1 expression e2 expression e3
   | Eupdate, (e1 :: e2 :: i_list) ->
      (* [| e1 with i_list <- e2 |] *)
      fprintf ff "@[<hov 2>[|%a with@, %a <- %a|]@]"
        expression e1 (print_list_r expression "(" "," ")") i_list expression e2
   | Etranspose, [e] ->
-     fprintf ff "@[<hov 2>transpose@ %a@]" expression e
+     fprintf ff "@[%a.T@]" expression e
   | Ereverse, [e] ->
-     fprintf ff "@[<hov 2>reverse@ %a@]" expression e
+     fprintf ff "@[%a.R@]" expression e
   | Eflatten, [e] ->
-     fprintf ff "@[<hov 2>flatten@ %a@]" expression e
+     fprintf ff "@[%a.F@]" expression e
   | _ -> assert false
 
 and equation ff ({ eq_desc = desc } as eq) =
@@ -496,7 +498,7 @@ and equation ff ({ eq_desc = desc } as eq) =
      fprintf ff "@[<hov2>reset@ @[%a@]@ @[<hov 2>every@ %a@]@]"
        equation eq expression e
   | EQlet(l_eq, eq) ->
-     fprintf ff "@[<hov0>%a@,in@ %a@]" leq l_eq equation eq
+     fprintf ff "@[<hov0>(%a@,in@ %a)@]" leq l_eq equation eq
   | EQlocal(b_eq) -> block_of_equation ff b_eq
   | EQand { ordered; eq_list } ->
      let a = if ordered then "then " else "and " in

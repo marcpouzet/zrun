@@ -60,7 +60,7 @@ let empty =
     e_exp = Ident.Env.empty;
   }
 
-let fresh () = Ident.fresh "reduce"
+let fresh () = Ident.fresh "r"
 
 let update acc genv env =
   { acc with e_renaming = Ident.Env.empty; e_values = env; e_gvalues = genv }

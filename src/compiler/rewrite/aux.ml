@@ -169,8 +169,8 @@ let pat_of_vardec_make { var_name } = pat_make var_name
 let pat_of_vardec_list_make vardec_list =
   match vardec_list with
   | [] -> pmake Ewildpat
+  | [v] -> pat_of_vardec_make v
   | _ -> pmake (Etuplepat(List.map pat_of_vardec_make vardec_list))
-
 let eq_of_f_arg_arg_make f_arg arg =
   let p = pat_of_vardec_list_make f_arg in
   eq_make p arg

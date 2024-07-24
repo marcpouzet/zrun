@@ -45,7 +45,7 @@ let def { eq_write = { dv; di } } =
   (* derivatives are not taken into account *)
   Ident.S.union dv di
 
-(** Initialization equations [init x = e] and *)
+(* Initialization equations [init x = e] and *)
 (* reset [init x = e]... every ...] *)
 let rec init { eq_desc } =
   match eq_desc with
