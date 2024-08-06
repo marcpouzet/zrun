@@ -1,0 +1,12 @@
+(library
+ (name seqcode_lib)
+ (public_name zrun.seqcode_lib)
+ (wrapped false)
+ (modules
+  obc ; the AST for representing Mealy machines
+  oaux ; auxiliary functions for building terms
+  oprinter ; the printer
+  ocamlprinter ; print OCaml code
+  )
+ (libraries zrun.global_lib typdefs_lib)
+ (flags (:standard -open Global_lib)))

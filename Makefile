@@ -1,20 +1,20 @@
 all: zrun.exe zwrite.exe
 
 zrun.exe:
-	(cd src; dune build -- zrun.exe)
+	(cd src/zrun; dune build -- zrun.exe)
 
 zwrite.exe:
-	(cd src; dune build -- zwrite.exe)
+	(cd src/compiler; dune build -- zwrite.exe)
 
 zrun.exe.verbose:
-	(cd src; dune build --verbose -- zrun.exe)
+	(cd src/compiler; dune build --verbose -- zrun.exe)
 
 tests:
 	(cd tests; dune test)
 
 debug:
-	(cd src; dune build --debug-backtraces --debug-dependency-path -- zrun.bc)
-	(cd src; dune build --debug-backtraces --debug-dependency-path -- zwrite.bc)
+	(cd src/compiler; dune build --debug-backtraces --debug-dependency-path -- zrun.bc)
+	(cd src/compiler; dune build --debug-backtraces --debug-dependency-path -- zwrite.bc)
 
 clean:
 	dune clean;

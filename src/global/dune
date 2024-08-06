@@ -1,0 +1,9 @@
+(rule
+ (copy %{project_root}/config.ml config.ml))
+
+(library
+ (name global_lib)
+ (public_name zrun.global_lib)
+ (libraries zrun.parse_lib)
+ (flags
+  (:standard -open Parse_lib)))

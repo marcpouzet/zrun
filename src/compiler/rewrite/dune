@@ -1,0 +1,34 @@
+(library
+ (name rewrite_lib)
+ (public_name zrun.rewrite_lib)
+ (wrapped false)
+ (modules
+  state ; the data structure to represent a state
+  cost ; a cost function used to decide which function call to inline
+  mapfold ; generic mapfold
+  aux ; auxiliary functions for building terms
+  static ; static reduction
+  inline ; inlining of function calls
+  der ; remove the initialization and handler part of a derivative equation
+  copylast ; add copies [lx = last*x] for [last x] when [x] is local
+           ; all variables in patterns must be value (remove last)
+  automata ; rewrite automata into match/reset
+  present ; rewrite present into match
+  pre ; rewrite fby/fby into (init/last)
+  period ; translate periods into horizons
+  encore ; add horizons [horizon h = 0.0] for zero-crossings
+  disc ; compile the operation disc with an horizon
+  reset ; rewrite -> and resets
+  complete ; complete equations with [der x = 0.0]
+  shared ; normalise equations to shared variables into [x = ...]
+  letin ; un-nesting of let/in and blocks
+        ; deadcode ; deadcode removal
+  graph ; representation of acyclic graphs
+  vars ; read variables
+  dependences ; data-dependences between equations
+  control ; fusion of control dependences
+  schedule ; static scheduling
+  rewrite ; compose rewriting steps
+  )
+ (libraries zrun.parse_lib zrun.global_lib zrun.typdefs_lib zrun.zrun_lib)
+ (flags (:standard -open Parse_lib -open Global_lib)))

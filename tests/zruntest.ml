@@ -13,7 +13,7 @@
 
 (* Initial idea and code from Guillaume Baudart from the Zelus source code *)
 
-open Misc
+open Global_lib.Misc
 
 (* List file names that match a given extension [ext] in the directory [dir]. *)
 let files dir ext =

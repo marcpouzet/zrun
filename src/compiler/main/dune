@@ -1,0 +1,9 @@
+(executable
+ (name zwrite)
+ (modes
+  (byte exe))
+ (modules zwrite)
+ (libraries zrun.parse_lib zrun.global_lib zrun.zrun_lib zrun.rewrite_lib)
+ (promote
+  (until-clean)
+  (into ..)))

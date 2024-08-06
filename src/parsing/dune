@@ -1,0 +1,12 @@
+(library
+ (name parse_lib)
+ (public_name zrun.parse_lib)
+ (libraries menhirLib))
+
+(ocamllex
+ (modules lexer))
+
+(menhir
+ (modules parser)
+ (infer true)
+ (flags --table))

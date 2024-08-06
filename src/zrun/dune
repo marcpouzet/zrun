@@ -1,0 +1,42 @@
+(library
+ (name zrun_lib)
+ (public_name zrun.zrun_lib)
+ (wrapped false)
+ (modules
+  error ; error messages
+  value ; the type of values
+  genv ; the type of a global environment
+  debug ; all the information for debuging
+  primitives ; the value of primitives
+  find ; find the current value and the last value of a variable
+  match ; the evaluation of pattern matching
+  arrays ; representing an array value
+  records ; reprenting a record
+  fix ; a bounded fix-point
+  monad ; useful monad to deal with errors
+  coiteration ; the main execution loop
+  output ; printing
+  forloop ; evaluation functions for for loops
+  eval ; evaluation of an expression
+  )
+ (libraries zrun.parse_lib zrun.global_lib)
+ (flags
+  (:standard -open Parse_lib -open Global_lib)))
+
+(executable
+ (name zrun)
+ (modes
+  (byte exe))
+ (modules
+  zrun ; the main function
+  )
+ (libraries zrun.zrun_lib)
+ (promote
+  (until-clean)
+  (into ..)))
+
+(install
+ (package zrun)
+ (section bin)
+ (files
+  (zrun.exe as zrun)))
