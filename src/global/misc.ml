@@ -81,7 +81,8 @@ let number_of_fixpoint_iterations = ref 0
 let print_number_of_fixpoint_iterations = ref false
 let incr_number_of_fixpoint_iterations n =
   number_of_fixpoint_iterations := !number_of_fixpoint_iterations + n
-let reset_number_of_fixpoint_iterations () = number_of_fixpoint_iterations := 0
+let reset_number_of_fixpoint_iterations () = 
+  number_of_fixpoint_iterations := 0
                     
 (* remove the check of assertions during evaluation *)
 let no_assert = ref false

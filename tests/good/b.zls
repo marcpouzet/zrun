@@ -1,0 +1,33 @@
+(*
+let iterate1() returns (o)
+  forward(45)[i] returns (o init 0) (* , index init 0) *)
+    do o = last o + 1
+    unless last o > 3 done
+
+let iterate() returns (o)
+  o = forward(45)[i] returns (o2 init 0)
+    do o2 = last o2 + 1
+    unless last o2 > 3 done
+
+let iterate2() returns (o)
+  o = forward(45)[i] returns (o2 init 0)
+    do o2 = last o2 + 1
+    while last o2 <= 3 done
+
+
+let find_33() returns (o, index)
+ let t = iota(10) in
+ forward[i](ti in t) returns (o init 0, index)
+   do index = i and o = ti while (last o <= 4) done
+*)
+
+let iota(n) returns (o)
+  forward(n)[i] returns (oi out o)
+    do oi = i done
+
+let iota2(n) =
+  forward(n)[i] returns ([|oi|])
+    do oi = i done
+
+let f = iota2(10)
+

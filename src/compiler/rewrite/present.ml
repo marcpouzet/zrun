@@ -47,8 +47,7 @@ open Mapfold
 (*                                                                      *)
 (* a signal x is represented by a P(v) (present) or A (absent)          *)
 
-(** representation of signals *)
-(* a [signal] is represented as an optional value *)
+(* representation of signals. A [signal] is represented as an optional value *)
 let present_name = Lident.Modname(Initial.stdlib_name "P")
 let absent_name = Lident.Modname(Initial.stdlib_name "A")
 let emit e = Aux.constr1 present_name [e]

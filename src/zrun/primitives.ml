@@ -189,6 +189,10 @@ let rec compare_list compare p_list1 p_list2 =
      if v = 0 then compare_list compare p_list1 p_list2 else return v
   | _ -> none
     
+let stdlib_name id = { qual = name_of_stdlib_module; id }
+let present_name = Lident.Modname(stdlib_name "P")
+let absent_name = Lident.Modname(stdlib_name "A")
+
 let rec compare_pvalue v1 v2 =
   match v1, v2 with
   | Vint i1, Vint i2 -> return (compare i1 i2)
@@ -204,6 +208,9 @@ let rec compare_pvalue v1 v2 =
        compare_list compare_pvalue p_list1 p_list2 else return v
   | Vpresent(v1), Vpresent(v2) -> compare_pvalue v1 v2
   | Vabsent, Vabsent -> return 0
+  (* or one is the lower-level internal representation of the other *)
+  | (Vpresent(v1), v2) | (v2, Vpresent(v1)) -> compare_present v1 v2
+  | (Vabsent, v) | (v, Vabsent) when is_absent v -> return 0
   | Vstuple(p_list1), Vstuple(p_list2) -> 
      compare_list compare_pvalue p_list1 p_list2
   | Vstate0(id1), Vstate0(id2) -> return (Ident.compare id1 id2)
@@ -218,6 +225,16 @@ let rec compare_pvalue v1 v2 =
   | Vfun _, Vfun _ -> none
   | Vclosure _, Vclosure _ -> none
   | _ -> none
+
+(* comparison of present/absent with one the representation of the other *)
+and compare_present v1 v2 =
+  match v2 with
+  | Vconstr1(ln, [v2]) when ln = present_name -> compare_pvalue v1 v2
+  | _ -> none
+
+and is_absent v = 
+  match v with 
+  | Vconstr0(ln) when ln = absent_name -> true | _ -> false
 
 and compare_array compare a1 a2 =
   (* compare the elements of two arrays, from left to right *)
@@ -245,8 +262,9 @@ and compare_array compare a1 a2 =
 
 and compare_value v1 v2 =
   match v1, v2 with
-  | (Vbot, _) | (_, Vbot) | (Vnil, _) | (_, Vnil) -> none
+  | (Vbot, Vbot) | (Vnil, Vnil) -> return 0
   | (Value(v1), Value(v2)) -> compare_pvalue v1 v2
+  | _ -> none
                                 
 let eq_op v1 v2 =
   let* v = compare_pvalue v1 v2 in

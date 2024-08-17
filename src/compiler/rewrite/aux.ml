@@ -106,9 +106,12 @@ let par ordered eq_list =
 let seq eq_list = par true eq_list
 let par eq_list = par false eq_list
 
-let vardec id var_is_last var_init var_default =
+let init_vardec id var_is_last var_init var_default var_init_in_eq = 
   { var_name = id; var_is_last; var_init; var_default; var_clock = false;
-    var_typeconstraint = None; var_loc = no_location; var_init_in_eq = false }
+    var_typeconstraint = None; var_loc = no_location; var_init_in_eq }
+
+let vardec id var_is_last var_init var_default =
+  init_vardec id var_is_last var_init var_default false
 
 let id_vardec id = vardec id false None None
 
@@ -171,6 +174,7 @@ let pat_of_vardec_list_make vardec_list =
   | [] -> pmake Ewildpat
   | [v] -> pat_of_vardec_make v
   | _ -> pmake (Etuplepat(List.map pat_of_vardec_make vardec_list))
+
 let eq_of_f_arg_arg_make f_arg arg =
   let p = pat_of_vardec_list_make f_arg in
   eq_make p arg
@@ -196,6 +200,11 @@ let e_match is_total e handlers =
   emake (Ematch { is_total; e; handlers })
 
 let e_local b e = emake (Elocal(b, e))
+
+let e_local_vardec vardec_list eq_list e =
+  match vardec_list, eq_list with
+  | ([], _) | (_, []) -> e
+  | _ -> e_local (block_make vardec_list eq_list) e
 
 let eq_ifthen e eq_true =
   let eq_empty = eqmake Defnames.empty EQempty in

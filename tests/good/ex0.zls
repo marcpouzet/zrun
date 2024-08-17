@@ -1,3 +1,6 @@
+let node f1() returns (o init 42)
+  o = last o + 1
+
 let f () = (fun x y -> if x then 1 else 2) true 1
 
 let main_2 () = (fun x f -> f(x))(3)(fun x -> x + 1)
@@ -69,13 +72,6 @@ let node ffff() returns (o)
   do  o = if c then y else 2
   and y = if c then 1 else o
   and c = true fby not c
-  done
-
-let node f422(last a) returns (o)
-    o = 42 -> (last a)
-
-let node main_422() returns (o, r)
-  do r = 0 -> pre r + 1 and o = f422(r)
   done
 
 let node incr(x) returns (o)

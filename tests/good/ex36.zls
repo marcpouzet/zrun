@@ -1,4 +1,4 @@
-(*let f x y = x + y
+let f x y = x + y
 
 let ff x = (x, x)
 
@@ -13,13 +13,13 @@ let node main5 () =
 
 let node main6 () =
   let static x = (1, 2) in
-  x, x*)
+  x, x
 
 let static r_15 = (fun  (x_13) (y_14)  -> ((+) x_13 y_14)) 
 let r_15 = r_15
 let static f_1 = r_15 
 let f = f_1
-let static r_17 = (fun  (x_16)  -> (tuple x_16 x_16)) 
+let static r_17 = (fun  (x_16)  -> (x_16, x_16)) 
 let r_17 = r_17
 let static ff_4 = r_17 
 let ff = ff_4
@@ -36,13 +36,13 @@ let static
     (node  ()  ->
        ((inline r_21 ((+) 42 1)), r_22))
 
-(* let r_23 = r_23
+let r_23 = r_23
 let static main5_8 = r_23 
 let main5 = main5_8
-let static r_24 = (tuple 1 2) 
+let static r_24 = (1, 2) 
 let r_24 = r_24
 let static r_25 = (node  ()  -> (r_24, r_24))
 let r_25 = r_25
 let static main6_11 = r_25 
-let main6 = main6_11 *)
+let main6 = main6_11
 

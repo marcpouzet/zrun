@@ -80,19 +80,17 @@ let geti_env loc i_env i =
          return (Env.add x (entry vi) acc))
     Env.empty s_env
 
-(* [x_to_last_x local_env acc_env] returns [acc_env'] where *)
+(* [x_to_last_x acc_env local_env] returns [acc_env'] where *)
 (* [Dom(acc_env) = Dom(acc_env')] and *)
 (* [acc_env'(x) = { cur = bot; last = v }] if [local_env(x) = v] *)
-let x_to_lastx local_env acc_env =
-  Debug.print_ienv "x_to_last_x: local_env:" local_env;
-  Debug.print_ienv "x_to_last_x (before): acc_env:" acc_env;
+let x_to_lastx acc_env local_env =
   let acc_env =
     Env.mapi
     (fun x entry ->
       let v = Find.find_value_opt x local_env in
       { entry with cur = Some(Vbot); last = v })
     acc_env in
-  Debug.print_ienv "x_to_last_x (after): acc_env" acc_env; acc_env
+  acc_env
 
 (* copy [last x] into [x] *)
 let lastx_to_x acc_env =
@@ -154,11 +152,10 @@ let index loc ve_left ve_right dir =
      return (Value(actual_size, Vindex { ve_left; ve_right; dir }))
   | _ -> error { kind = Etype; loc }
 
+
 (* loop iteration *)
 (* parallel for loops; take a list of states *)
-let foreach_i : (int -> 's -> ('r * 's, 'error) Result.t) -> 's list
-                -> ('r list * 's list, 'error) Result.t =
-  fun f s_list ->
+let foreach_i f s_list =
   let rec for_rec i s_list =
     match s_list with
     | [] -> return ([], [])
@@ -168,18 +165,6 @@ let foreach_i : (int -> 's -> ('r * 's, 'error) Result.t) -> 's list
        return (x :: x_list, s :: s_list) in
   for_rec 0 s_list
 
-(* the same parallel loop except that [f] takes also an accumulator *)
-(* that is passed from iteration [i] to iteration [i+1] *)
-let foreach_with_accumulation_i f acc_env0 s_list =
-  let rec for_rec i acc_env s_list =
-    match s_list with
-    | [] -> return ([], acc_env, [])
-    | s :: s_list ->
-       let* f_env, acc_env, s = f i acc_env s in
-       let* f_env_list, acc_env, s_list = for_rec (i+1) acc_env s_list in
-       return (f_env :: f_env_list, acc_env, s :: s_list) in
-  for_rec 0 acc_env0 s_list
-
 (* instantaneous for loop; take a single state and iterate on it *)
 let forward_i n default f s =
   let rec for_rec default i s =
@@ -188,107 +173,6 @@ let forward_i n default f s =
       let* v, s = f i s in
       for_rec v (i+1) s in
   for_rec default 0 s
-
-let forward_i_without_exit_condition:
-      int -> (int -> ('c star ientry Env.t as 'a) -> 'b state ->
-              ('a * 'a * 'b state, 'e) Result.t) -> 'a -> 'b state ->
-      ('a list * 'a * 'b state, 'e) Result.t =
-  fun n f acc_env0 s ->
-  let rec for_rec i acc_env s =
-    Debug.print_ienv "Debut iteration" acc_env;
-    if i = n then return ([], acc_env, s)
-    else
-      let* f_env, acc_env, s = f i acc_env s in
-      Debug.print_ienv "Env iteration" f_env;
-      let* env_list, acc_env, s = for_rec (i+1) acc_env s in
-      return (f_env :: env_list, acc_env, s) in
-  for_rec 0 acc_env0 s
-
-(* instantaneous for loops with an exit condition [cond] *)
-(* this condition must be combinational *)
-let forward_i_with_while_condition loc n write f exit_condition acc_env0 s =
-  let rec for_rec : int -> ('c star ientry Env.t as 'a) -> 'b state ->
-                    ('a list * 'a * 'b state, 'e) Result.t =
-    fun i acc_env s ->
-    if i = n then return ([], acc_env, s)
-    else
-      (* the unless condition only sees global values, input values and *)
-      (* accumulated values *)
-      let* v = exit_condition i acc_env in
-      match v with
-      | Vbot ->
-         let f_env = bot_env write in return (Util.list_of n f_env, acc_env, s)
-      | Vnil ->
-         let f_env = nil_env write in return (Util.list_of n f_env, acc_env, s)
-      | Value(v) ->
-           let* b =
-             Opt.to_result ~none:{ kind = Etype; loc = loc } (is_bool v) in
-           if b then
-             let* f_env, acc_env, s = f i acc_env s in
-             let* env_list, acc_env, s = for_rec (i+1) acc_env s in
-             return (f_env :: env_list, acc_env, s)
-           else return ([], acc_env, s) in
-  for_rec 0 acc_env0 s
-
-(* instantaneous for loops with an exit condition [cond] *)
-(* this condition must be combinational *)
-let forward_i_with_unless_condition loc n write f cond acc_env0 s =
-  forward_i_with_while_condition loc n write f 
-    (fun i env -> (cond i env)) acc_env0 s
-
-let forward_i_with_unless_condition loc n write f exit_condition acc_env0 s =
-  let rec for_rec : int -> ('c star ientry Env.t as 'a) -> 'b state ->
-                    ('a list * 'a * 'b state, 'e) Result.t =
-    fun i acc_env s ->
-    if i = n then return ([], acc_env, s)
-    else
-      (* the unless condition only sees global values, input values and *)
-      (* accumulated values *)
-      let* v = exit_condition i acc_env in
-      match v with
-      | Vbot ->
-         let f_env = bot_env write in return (Util.list_of n f_env, acc_env, s)
-      | Vnil ->
-         let f_env = nil_env write in return (Util.list_of n f_env, acc_env, s)
-      | Value(v) ->
-           let* b =
-             Opt.to_result ~none:{ kind = Etype; loc = loc } (is_bool v) in
-           if Stdlib.not b then
-             let* f_env, acc_env, s = f i acc_env s in
-             let* env_list, acc_env, s = for_rec (i+1) acc_env s in
-             return (f_env :: env_list, acc_env, s)
-           else return ([], acc_env, s) in
-  for_rec 0 acc_env0 s
-
-let forward_i_with_until_condition loc n write f exit_condition acc_env0 s =
-  let rec for_rec : int -> ('c star ientry Env.t as 'a) -> 'b state ->
-                    ('a list * 'a * 'b state, 'e) Result.t =
-    fun i acc_env s ->
-    if i = n then return ([], acc_env, s)
-    else
-      let* f_env, next_acc_env, s = f i acc_env s in
-      (* the until condition only sees global values, input values and *)
-      (* local values *)
-      (* if [acc_env(last x) = v], add it to [f_env] *)
-      let* v = 
-        let local_env = Fix.complete acc_env f_env in
-        exit_condition i local_env in
-      match v with
-      | Vbot ->
-         let f_env = bot_env write in 
-         return (Util.list_of n f_env, next_acc_env, s)
-      | Vnil ->
-         let f_env = nil_env write in 
-         return (Util.list_of n f_env, next_acc_env, s)
-      | Value(v) ->
-           let* b =
-             Opt.to_result ~none:{ kind = Etype; loc = loc } (is_bool v) in
-           if b then
-            return ([], next_acc_env, s)
-           else  
-             let* env_list, acc_env, s = for_rec (i+1) next_acc_env s in
-             return (f_env :: env_list, acc_env, s) in
-  for_rec 0 acc_env0 s
 
 (* main entry functions *)
 
@@ -305,27 +189,6 @@ let foreach loc sbody env i_env s_list =
   return
     (Primitives.lift (fun v -> Varray(Vflat(Array.of_list v))) ve_list, s_list)
 
-
-(* One step of the evaluation of the body of a loop *)
-let step loc sbody env i_env i acc_env s =
-  Debug.print_ienv "Forward: Env:" env;
-  Debug.print_ienv "Forward: Env acc (before):" acc_env;
-  let* env_0 = geti_env loc i_env i in
-  let env = Env.append env_0 (Env.append acc_env env) in
-  let* local_env, s = sbody env s in
-  (* every entry [x\v] from [acc_env] becomes [x \ { cur = bot; last = v }] *)
-  let acc_env = x_to_lastx local_env acc_env in
-  Debug.print_ienv "Forward: Env acc (after):" acc_env;
-  return (local_env, acc_env, s)
-
-(* Parallel loop with accumulation *)
-(* every step computes an environment. The output [v/x] at iteration [i] *)
-(* becomes an input [v/last x] for iteration [i+1] *)
-let foreach_with_accumulation_i loc sbody env i_env acc_env0 s_list =
-  let* env_list, acc_env, s_list =
-    foreach_with_accumulation_i (step loc sbody env i_env) acc_env0 s_list in
-  return (env_list, acc_env0, s_list)
-
 (* hyperserial loop: the step function is iterated on the very same state;
  *- output is the last value *)
 let forward loc sbody env i_env n default s =
@@ -335,34 +198,62 @@ let forward loc sbody env i_env n default s =
         let env = Env.append env_0 env in
         sbody env se) s
 
-let exit_condition loc cond i_env env i local_env =
+(* One step of the evaluation of the body of a loop *)
+let step loc sbody env i_env i acc_env s =
+  Debug.print_state "For loop: state before step = " s;
   let* env_0 = geti_env loc i_env i in
-  let env = Env.append env_0 (Env.append local_env env) in
-  cond env
-  
-(* [i_env] is the environment for indexes; [acc_env_0] is the environment *)
-(* for accumulated variables; [env] is the current environment *)
-let forward_i_without_exit_condition loc sbody env i_env acc_env0 n s =
-  forward_i_without_exit_condition n (step loc sbody env i_env) acc_env0 s
+  let env = Env.append env_0 env in
+  let l1 = Env.to_list env in
+  Debug.print_ienv "For loop: acc_env = " acc_env;
+  let* is_exit, local_env, s = sbody env acc_env s in
+  (* every entry [x\v] from [acc_env] becomes [x \ { cur = bot; last = v }] *)
+  let l2 = Env.to_list local_env in
+  let acc_env = x_to_lastx acc_env local_env in
+  let l3 = Env.to_list acc_env in
+  Debug.print_ienv "For loop: local_env = " local_env;
+  Debug.print_ienv "For loop: acc_env = " acc_env;
+  Debug.print_state "For loop: state after step = " s;
+  return (is_exit, local_env, acc_env, s)
 
-let forward_i_with_while_condition loc write sbody cond env i_env acc_env0 n s =
-  (* the condition cannot depend on the current values defined *)
-  (* the body of the loop; it can only depend on accumulated values *)
-  forward_i_with_while_condition loc n write
-    (step loc sbody env i_env)
-    (exit_condition loc cond i_env env)
-    acc_env0 s
+(* The parallel for loop: it takes a list of [n] independent states, *)
+(* a step function, an accumulated environment; returns both a list of *)
+(* environments and a new accumulated environment. *)
+(* The [foreach] corresponds to the mapfold with [n] distinct states *)
+let foreach_eq f acc_env0 s_list = 
+  let rec for_rec i acc_env s_list =
+    match s_list with
+    | [] -> return ([], acc_env, [])
+    | s :: s_list ->
+       let* f_env, acc_env, s = f i acc_env s in
+       let* f_env_list, acc_env, s_list = for_rec (i+1) acc_env s_list in
+       return (f_env :: f_env_list, acc_env, s :: s_list) in
+  for_rec 0 acc_env0 s_list
 
-let forward_i_with_unless_condition loc write sbody cond env i_env acc_env0 n s =
-  forward_i_with_unless_condition loc n write
-    (step loc sbody env i_env)
-    (exit_condition loc cond i_env env)
-    acc_env0 s
+(* The hyper-serial forward loop: it takes a state, a step function, *)
+(* an accumulated environment; returns a list of *)
+(* environments, a new accumulated environment and new state. *)
+(* The [forward] corresponds to a mapfold with a single state *)
+let forward_eq n f acc_env0 s =
+  let rec for_rec i acc_env s =
+    if i = n then return ([], acc_env, s)
+    else begin
+      let* is_exit, f_env, acc_env, s = f i acc_env s in
+      if is_exit then
+        return ([f_env], acc_env, s)
+      else
+        let* env_list, acc_env, s = for_rec (i+1) acc_env s in
+        return (f_env :: env_list, acc_env, s)
+      end in
+  for_rec 0 acc_env0 s
 
-let forward_i_with_until_condition loc write sbody cond env i_env acc_env0 n s =
-  (* the condition can depend on the current values defined *)
-  (* the body of the loop *)
-  forward_i_with_until_condition loc n write
-    (step loc sbody env i_env)
-    (exit_condition loc cond i_env env)
-    acc_env0 s
+(* The main entries *)
+let foreach_eq loc sbody env i_env acc_env0 s_list =
+  let f i acc_env s =
+    let* _, local_env, acc_env, s = step loc sbody env i_env i acc_env s in
+    return (local_env, acc_env, s) in
+  foreach_eq f acc_env0 s_list
+
+let forward_eq loc sbody env i_env acc_env0 n s =
+  let f = step loc sbody env i_env in
+  forward_eq n f acc_env0 s
+

@@ -38,11 +38,16 @@ let last_ident global_funs ({ bounded; last } as acc) ({ id } as l) =
              then last else S.add id last in
   l, { acc with last }
 
+let init_ident global_funs acc x = x, acc
+
+let der_ident global_funs acc x = x,acc
+
 let pattern funs acc pat = pat, acc
 
 let funs =
   let global_funs =
-    { Mapfold.default_global_funs with build; var_ident; last_ident } in
+    { Mapfold.default_global_funs with build; var_ident; 
+                                       last_ident; init_ident; der_ident } in
   { Mapfold.defaults with pattern; global_funs }
 
 type t =

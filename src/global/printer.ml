@@ -147,10 +147,12 @@ let out ff o_opt =
   match o_opt with | None -> () | Some(x) -> fprintf ff " out %a" name x
                                            
 let vardec exp ff
-      { var_name = x; var_default = d_opt; var_init = i_opt; var_is_last } =
-  fprintf ff "@[%s%a%a%a@]" 
+      { var_name = x; var_default = d_opt; var_init = i_opt; var_is_last; 
+        var_init_in_eq } =
+  fprintf ff "@[%s%a%a%a%s@]" 
     (if var_is_last then "last " else "")
-    name x (init exp) i_opt (default exp) d_opt 
+    name x (init exp) i_opt (default exp) d_opt
+    (if var_init_in_eq then " init ..." else "")
 
 let vardec_list exp ff vardec_list =
   print_if_not_empty
@@ -352,7 +354,7 @@ let rec expression ff e =
          Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
            ff for_size in
        fprintf ff
-         "@[<hov 2>%a%a@,%a[%a](%a)@,%a@,%a@ @]"
+         "@[<hov 2>%a%a@,%a%a(%a) %a@ @[%a@]@ @]"
          kind_of_forloop for_kind
          for_resume_or_restart for_resume
          size for_size
@@ -368,7 +370,7 @@ and result ff { r_desc } =
   | Returns(b) -> result_block ff b
 
 and result_block ff { b_vars; b_body; b_write } =
-  fprintf ff "@[<hov 2>returns@ %a@ @[%a@]@[%a@]@]"
+  fprintf ff "@[<hov 2>returns@ (%a)@ @[%a@]@[%a@]@]"
     (vardec_list expression) b_vars
     print_writes b_write
     equation b_body
@@ -518,7 +520,7 @@ and equation ff ({ eq_desc = desc } as eq) =
          fprintf ff "@[%a%a%a@]" 
            name x (init expression) i_opt out o_opt in
        print_list_r for_out "" "," "" ff l in
-     fprintf ff  "@[<hov 2>%a%a[%a](%a)(%a)@,%a@,%a@,%a@ @]"
+     fprintf ff  "@[<hov 2>%a%a%a%a@ (%a)@ returns@ (%a)@ @[%a@,%a@]@ @]"
        kind_of_forloop for_kind
        for_resume_or_restart for_resume
        size for_size
@@ -550,7 +552,7 @@ and for_exit_condition ff for_kind =
   | Kforeach -> ()
 
 and index_opt ff i_opt =
-  let index ff id = fprintf ff "@[[%a]@]" name id in
+  let index ff id = fprintf ff "[%a]" name id in
   Util.optional_unit index ff i_opt
 
 and input_list ff l =
@@ -572,7 +574,7 @@ and for_exp ff r =
   | Forexp { exp; default = d} ->
      fprintf ff "@[ do %a%a done@]" expression exp (default expression) d
   | Forreturns { returns; body } ->
-     fprintf ff "@[<hov 2> returns@ %a@ %a@]"
+     fprintf ff "@[<hov 2> returns@ (%a)@ %a@]"
        for_returns returns
        block_of_equation body
 

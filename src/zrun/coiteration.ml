@@ -13,16 +13,16 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* This work defines an operational (executable) semantics for a *)
-(* synchronous language like Lustre, Lucid Synchrone and Zelus. *)
-(* It is based on a companion file and working notes on the co-iterative *)
-(* semantics presented at the SYNCHRON workshop, December 2019, *)
-(* the class on "Advanced Functional Programming" given at Bamberg
-   Univ. in June-July 2019 and the Master MPRI - M2, Fall 2019, 2020, 2021 *)
-(* The original version of this code is taken from the GitHub Zrun repo: *)
-(* https://github.com/marcpouzet/zrun *)
-(* zrun was programmed right after the COVID confinment, in May-June 2020 *)
-(* This second version includes some of the Zelus constructs:
+(* This file defines an operational (executable) semantics for a
+ *- synchronous language like Lustre, Scade, Lucid Synchrone and Zelus.
+ *- It is based on a companion file and working notes on the co-iterative
+ *- semantics presented at the SYNCHRON workshop, December 2019,
+ *- the class on "Advanced Functional Programming" given at Bamberg
+ *- Univ. in June-July 2019 and the Master MPRI - M2, Fall 2019, 2020, 2021
+ *- The original version of this code is taken from the GitHub Zrun repo:
+ *- https://github.com/marcpouzet/zrun
+ *- zrun was programmed right after the COVID confinment, in May-June 2020
+ *- This second version includes some of the Zelus constructs:
  *- ODEs and zero-crossing; higher order functions;
  *- the implem. was done in 2021 and updated since then;
  *- first update during summer 2022 with array constructs inspired by that
@@ -31,17 +31,19 @@
  *- w.r.t SISAL, for-loops can contain stateful (stream) functions;
  *- two style of for loop constructs are provided:
  *- 1/ the foreach loop iteration runs several instances of a stream
- *- functions; in operational terms, every application has it own state;
- *- 2/ the forward loop is an "hyper-serial" loop iteration. A single stream
- *- function is applied to a stream of array, interpreting arrays as if they
- *- were streams. It is similar to "clock domains" (PPDP'13) by
- *- Louis Mandel, Cedric Pasteur et Marc Pouzet and is reminiscent of
- *- temporal refinement by Caspi and Mikac.
- *- 3/ the size of arrays/number of iterations must be known statically.
+ *- function; in operational terms, every application has it own state;
+ *- 2/ the forward loop is an "hyper-serial" loop iteration: a stream
+ *- function to an input array taken as a input sequence; the sequence of
+ *- outputs can be stored into an output array or only the last value is
+ *- return. This construction is similar to the "clock domains" construct
+ *- presented at PPDP'13/SCP'15 (Louis Mandel, Cedric Pasteur and Marc Pouzet)
+ *- and temporal refinement by Caspi and Mikac because it performs several
+ *- synchronous reactions as if it were a single one.
+ *- The size of arrays and thenumber of iterations must be known statically.
  *-
- *- This work is still very experimental. If you find it useful
- *- for your research, please cite the [EMSOFT'2023] paper and send 
- *- a mail: [Marc.Pouzet@ens.fr] *)
+ *- If you find this work useful for your research, please cite
+ *- the [EMSOFT'2023] paper and send a mail: [Marc.Pouzet@ens.fr]
+ *)
 
 open Misc
 open Error
@@ -93,18 +95,21 @@ let merge loc env1 env2 =
     | Some _, Some _ -> error { kind = Emerge_env { init; id = x }; loc }
     | Some _, _ -> return v1
     | None, _ -> return v2 in
-  let s1 = Env.to_seq env1 in
   let env2_in_1, env2 = Env.partition (fun x _ -> Env.mem x env1) env2 in
   if Env.is_empty env2_in_1 then
     return (Env.append env1 env2)
-  else seqfold
-         (fun acc (x, { cur = cur1; last = last1; reinit = r1 }) ->
-           let { cur = cur2; last = last2; reinit = r2 } =
-             Env.find x env2_in_1 in
-           let* cur = merge false x cur1 cur2 in
-           let* last = merge true x last1 last2 in
-           return (Env.add x { empty with cur; last; reinit = r1 || r2 } acc))
-         env2 s1
+  else 
+    let s1 = Env.to_seq env1 in
+    seqfold
+      (fun acc (x, ({ cur = cur1; last = last1; reinit = r1 } as entry)) ->
+        if Env.mem x env2_in_1 then
+          let { cur = cur2; last = last2; reinit = r2 } = 
+            Env.find x env2_in_1 in
+          let* cur = merge false x cur1 cur2 in
+          let* last = merge true x last1 last2 in
+          return (Env.add x { empty with cur; last; reinit = r1 || r2 } acc)
+        else return (Env.add x entry acc))
+      env2 s1
 
 (* check assertion *)
 let check_assertion loc ve ret =
@@ -123,7 +128,8 @@ let check_equality loc v0 v1 =
   | (Vbot, Vnil) | (Vnil, Vbot) -> return false
   | Value(v0), Value(v1) ->
      let* v =
-       Primitives.compare_pvalue v0 v1 |> Opt.to_result ~none: { kind = Etype; loc } in
+       Primitives.compare_pvalue v0 v1 |> 
+         Opt.to_result ~none: { kind = Etype; loc } in
      return (v = 0)
   | (Value _, Vnil) | (Vnil, Value _) -> error { kind = Enil; loc }
   | (Value _, Vbot) | (Vbot, Value _) -> error { kind = Ebot; loc }
@@ -1239,43 +1245,18 @@ and sforloop_exp
           let* missing, env_list, acc_env, s_for_body =
             match for_kind, s_for_body with
             | Kforeach, Slist(s_list) ->
-               let sbody env s =
-                 let* _, local_env, s = sblock genv env body s in
-                 return (local_env, s) in
+               let sbody env acc_env s =
+                 sforblock genv env acc_env body None s in
                let* env_list, acc_env, s_list =
-                 Forloop.foreach_with_accumulation_i loc
+                 Forloop.foreach_eq loc
                    sbody env i_env acc_env s_list in
                return (0, env_list, acc_env, Slist(s_list))
-            | Kforward(None), _ ->
-               let sbody env s =
-                 let* _, local_env, s = sblock genv env body s in
-                 return (local_env, s) in
+            | Kforward(exit), _ ->
+               let sbody env acc_env s =
+                 sforblock genv env acc_env body exit s in
                let* env_list, acc_env, s_for_body_new =
-                 Forloop.forward_i_without_exit_condition loc
+                 Forloop.forward_eq loc
                    sbody env i_env acc_env for_size s_for_body in
-               let s_for_body =
-                 if for_resume then s_for_body_new else s_for_body in
-               return (0, env_list, acc_env, s_for_body)
-            | Kforward(Some { for_exit; for_exit_kind }), _ ->
-               (* for the moment, the exit condition must be combinatorial *)
-               let sbody env s =
-                 let* _, local_env, s = sblock genv env body s in
-                 return (local_env, s) in
-               let cond env = vexp genv env for_exit in
-               let* env_list, acc_env, s_for_body_new =
-                  match for_exit_kind with
-                    | Ewhile ->
-                      Forloop.forward_i_with_while_condition 
-                        for_exit.e_loc body.b_write
-                        sbody cond env i_env acc_env for_size s_for_body
-                  | Eunless ->
-                    Forloop.forward_i_with_unless_condition 
-                      for_exit.e_loc body.b_write
-                      sbody cond env i_env acc_env for_size s_for_body
-                  | Euntil ->
-                    Forloop.forward_i_with_until_condition 
-                      for_exit.e_loc body.b_write
-                      sbody cond env i_env acc_env for_size s_for_body in
                (* was-it a complete iteration? *)
                let missing = for_size - List.length env_list in
                let s_for_body =
@@ -1525,7 +1506,7 @@ and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
             return (env, s_eq)
          | Either.Left(l_eq) ->
             (* compute a bounded fix-point in [n] steps *)
-            let bot = bot_env eq_write in
+            let bot = Match.bot_env eq_write in
             let n = (Fix.size l_eq) + 1 in
             let* env_eq, s_eq = Fix.eq genv env seq l_eq n s_eq bot in
             (* a dynamic check of causality: all defined names in [eq] *)
@@ -1547,9 +1528,9 @@ and slets loc genv env leq_list s_list =
 and seq genv env { eq_desc; eq_write; eq_loc } s =
   match eq_desc, s with
   | _, Sbot ->
-     return (bot_env eq_write, s)
+     return (Match.bot_env eq_write, s)
   | _, Snil ->
-     return (nil_env eq_write, s)
+     return (Match.nil_env eq_write, s)
   | EQeq(p, e), s ->
      let* v, s = sexp genv env e s in
      let* env_p =
@@ -1617,9 +1598,9 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
       let* env_eq, s_list =
         match v with
         (* if the condition is bot/nil then all variables have value bot/nil *)
-        | Vbot -> return (bot_env eq_write, [Sbot; Sbot])
+        | Vbot -> return (Match.bot_env eq_write, [Sbot; Sbot])
         (* Slist [se; s_eq1; s_eq2]) *)
-        | Vnil -> return (nil_env eq_write, [Snil; Snil])
+        | Vnil -> return (Match.nil_env eq_write, [Snil; Snil])
         (* Slist [se; s_eq1; s_eq2]) *)
         | Value(b) ->
            let* v =
@@ -1652,8 +1633,8 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* env_eq, s_eq =
        match v with
        (* if the condition is bot/nil then all variables have value bot/nil *)
-       | Vbot -> return (bot_env eq_write, Slist [s_eq; se])
-       | Vnil -> return (nil_env eq_write, Slist [s_eq; se])
+       | Vbot -> return (Match.bot_env eq_write, Slist [s_eq; se])
+       | Vnil -> return (Match.nil_env eq_write, Slist [s_eq; se])
        | Value(v) ->
           let* v =
             is_bool v |> Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
@@ -1661,8 +1642,8 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
           reset (ieq false) seq genv env eq s_eq v in
      return (env_eq, Slist [s_eq; se])
   | EQlocal(b_eq), s_eq ->
-     let* _, env_local, s_eq = sblock genv env b_eq s_eq in
-     return (env_local, s_eq)
+     let* _, env_visible, s_eq = sblock genv env b_eq s_eq in
+     return (env_visible, s_eq)
   | EQlet(leq, eq), Slist [s_leq; s_eq] ->
      let* env_eq, s_leq = sleq genv env leq s_leq in
      let env = Env.append env_eq env in
@@ -1686,9 +1667,9 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* env, ns, nr, s_list =
        match ps, pr with
        | (Vbot, _) | (_, Vbot) ->
-          return (bot_env eq_write, ps, pr, s_list)
+          return (Match.bot_env eq_write, ps, pr, s_list)
        | (Vnil, _) | (_, Vnil) ->
-          return (nil_env eq_write, ps, pr, s_list)
+          return (Match.nil_env eq_write, ps, pr, s_list)
        | Value(ps), Value(pr) ->
           let* pr =
             is_bool pr |> Opt.to_result ~none:{ kind = Etype; loc = eq_loc } in
@@ -1700,8 +1681,8 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* env, s_list =
        match ve with
        (* if the condition is bot/nil then all variables have value bot/nil *)
-       | Vbot -> return (bot_env eq_write, s_list)
-       | Vnil -> return (nil_env eq_write, s_list)
+       | Vbot -> return (Match.bot_env eq_write, s_list)
+       | Vnil -> return (Match.nil_env eq_write, s_list)
        | Value(ve) ->
           let* env_handler, s_list =
             smatch_handler_list eq_loc seq genv env ve handlers s_list in
@@ -1713,7 +1694,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      (* present z1 -> eq1 | ... | zn -> eqn [else eq] *)
      let* env_handler_opt, s_list =
        spresent_handler_list eq_loc
-         sscondpat (bot_env eq_write) (nil_env eq_write)
+         sscondpat (Match.bot_env eq_write) (Match.nil_env eq_write)
          seq genv env handlers s_list in
      let* env_handler, s =
        match env_handler_opt, default_opt, s with
@@ -1769,9 +1750,11 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
     let* r, s_size, s_for_body, so_list, si, si_list =
       match size_i_env with
       | Vbot ->
-         return (bot_env eq_write, None, s_for_block, so_list, si, si_list)
+         return 
+           (Match.bot_env eq_write, None, s_for_block, so_list, si, si_list)
       | Vnil ->
-         return (nil_env eq_write, None, s_for_block, so_list, si, si_list)
+         return 
+           (Match.nil_env eq_write, None, s_for_block, so_list, si, si_list)
       | Value(size, i_env) ->
          (* allocate the memory if the loop is a foreach loop *)
           let s_for_body = ialloc_foreach_loop size for_kind s_for_block in
@@ -1824,8 +1807,8 @@ and sforloop_eq
   loc genv env size for_kind for_resume { for_out; for_block }
   i_env s_for_block so_list =
   match i_env with
-  | Vbot -> return (bot_env for_block.b_write, s_for_block, so_list)
-  | Vnil -> return (nil_env for_block.b_write, s_for_block, so_list)
+  | Vbot -> return (Match.bot_env for_block.b_write, s_for_block, so_list)
+  | Vnil -> return (Match.nil_env for_block.b_write, s_for_block, so_list)
   | Value(i_env) ->
      (* 1/ computes the environment from the [returns] *)
      (* environment [env_v + acc_env]. Vars in [acc_env] *)
@@ -1839,43 +1822,18 @@ and sforloop_eq
      let* missing, env_list, acc_env, s_for_block =
        match for_kind, s_for_block with
        | Kforeach, Slist(s_list) ->
-          let sbody env s =
-            let* _, local_env, s = sblock genv env for_block s in
-            return (local_env, s) in
+          let sbody env acc_env s =
+            sforblock genv env acc_env for_block None s in
           let* env_list, acc_env, s_list =
-            Forloop.foreach_with_accumulation_i loc
+            Forloop.foreach_eq loc
               sbody env i_env acc_env s_list in
           return (0, env_list, acc_env, Slist(s_list))
-       | Kforward(None), _ ->
-          let sbody env s =
-            let* _, local_env, s = sblock genv env for_block s in
-            return (local_env, s) in
+       | Kforward(exit), _ ->
+          let sbody env acc_env s =
+            sforblock genv env acc_env for_block exit s in
           let* env_list, acc_env, s_for_block_new =
-            Forloop.forward_i_without_exit_condition loc
+            Forloop.forward_eq loc
               sbody env i_env acc_env size s_for_block in
-          let s_for_block =
-            if for_resume then s_for_block_new else s_for_block in
-          return (0, env_list, acc_env, s_for_block)
-       | Kforward(Some { for_exit; for_exit_kind }), _ ->
-          (* for the moment, the exit condition must be combinatorial *)
-          let sbody env s =
-            let* _, local_env, s = sblock genv env for_block s in
-            return (local_env, s) in
-          let cond env = vexp genv env for_exit in
-          let* env_list, acc_env, s_for_block_new =
-            match for_exit_kind with
-             | Ewhile ->
-               Forloop.forward_i_with_while_condition 
-                 for_exit.e_loc for_block.b_write
-               sbody cond env i_env acc_env size s_for_block
-             |  Eunless ->
-               Forloop.forward_i_with_unless_condition 
-                 for_exit.e_loc for_block.b_write
-                 sbody cond env i_env acc_env size s_for_block
-             |  Euntil ->
-               Forloop.forward_i_with_until_condition 
-                 for_exit.e_loc for_block.b_write
-                 sbody cond env i_env acc_env size s_for_block in
           (* was-it a complete iteration? *)
           let missing = size - List.length env_list in
           let s_for_block =
@@ -1933,35 +1891,35 @@ and sresult genv env { r_desc; r_loc } s =
   | Exp(e) -> sexp genv env e s
   | Returns(b) ->
      Debug.print_ienv "Return (env): before" env;
-     let* env, local_env, s = sblock genv env b s in
+     let* env, env_visible, s = sblock genv env b s in
      Debug.print_ienv "Return (env): after" env;
-     Debug.print_ienv "Return (local env): after" local_env;
+     Debug.print_ienv "Return (env visible): after" env_visible;
      let* v = matching_out env b in
      return (v, s)
 
 (* block [local x1 [init e1 | default e1 | ],..., xn [...] do eq done *)
-and sblock genv env { b_vars; b_body = ({ eq_write } as eq); b_loc } s_b =
+and sblock genv env { b_vars; b_body; b_loc } s_b =
   match s_b with
   | Slist (s_eq :: s_list) ->
-     let* env_v, s_list =
+     let* bot_x, s_list =
        mapfold3 { kind = Estate; loc = b_loc }
          (svardec genv env) Env.empty b_vars s_list (bot_list b_vars) in
-     let bot = Fix.initialize env env_v (names eq_write) in
-     let n = (Fix.size eq) + 1 in
-     let* env_eq, s_eq = Fix.eq genv env seq eq n s_eq bot in
+     let names = Match.names_env bot_x in
+     (* double the number of iterations because a variable [x] *)
+     (* can be defined by an equation [x = ...] and [init x = ...] *)
+     let n = 2 * Env.cardinal bot_x + 1 in
+     let* (env_eq_not_x, env_eq_x), s_eq = 
+       Fix.local genv env seq b_body n s_eq bot_x in
      (* a dynamic check of causality: all locally defined names *)
-     (* [x1,...,xn] must be non bottom provided that all free vars *)
-     (* are non bottom *)
-     let* _ =
-       Fix.causal b_loc env env_eq (Match.names_env env_v) in
+     (* [x1,...,xn] must be non bottom provided that the value of *)
+     (* all free variables is not bottom *)
+     let* _ = Fix.causal b_loc env env_eq_x names in
      (* store the next last value for [svardec] *)
      let* s_list = map2 { kind = Estate; loc = b_loc }
-                     (set_vardec env_eq) b_vars s_list in
-     (* remove all local variables from [env_eq] *)
-     let env = Env.append env_eq env in
-     (* compute variables that are visible - distinct from [x1,...,xn] *)
-     let env_visible_eq = remove env_v env_eq in
-     return (env, env_visible_eq, Slist (s_eq :: s_list))
+                     (set_vardec env_eq_x) b_vars s_list in
+     (* add local variables to [env] *)
+     let env = Env.append env_eq_x (Env.append env_eq_not_x env) in
+     return (env, env_eq_not_x, Slist (s_eq :: s_list))
   | _ ->
      error { kind = Estate; loc = b_loc }
 
@@ -1975,6 +1933,73 @@ and sblock_with_reset genv env b_eq s_eq r =
       (* keep the current one *)
       return s_eq in
   sblock genv env b_eq s_eq
+
+(* computes one step for the body of a for loop *)
+(* for[ward|each] [resume] (n)[i](...) returns (acc_env)
+     local x1,...,xm do eq [[while|until|unless] c] *)
+and sforblock genv env acc_env b for_exit s_b =
+  let l0 = Env.to_list env in
+  let l1 = Env.to_list acc_env in
+  (* the semantics for a block [local x1,...,xn do eq] *)
+  let sbody genv env b s_b acc_env =
+    let sem s_b env_in =
+      let* env, env_eq_not_x, s_b =
+        sblock genv (Env.append env_in env) b s_b in
+      let l1 = Env.to_list env in
+      let l2 = Env.to_list env_eq_not_x in
+      let new_env_in = Fix.complete env_in env_eq_not_x in
+      let l3 = Env.to_list new_env_in in
+      return ((env, new_env_in), s_b) in
+    let* _, (env, new_acc_env), s_b =
+      Fix.fixpoint b.b_loc (Env.cardinal acc_env + 1) Fix.stop sem s_b acc_env
+    in
+    return (env, new_acc_env, s_b) in
+  (* evaluation function for the exit condition; the condition *)
+  (* must be stateless. *)
+  let cond env e = vexp genv env e in
+  (* tell wheither a condition is true or not *)
+  let exit_condition loc v =
+    match v with
+    | Vbot -> return false
+    | Vnil -> return false
+    | Value(v) ->
+       let* v = Opt.to_result ~none:{ kind = Etype; loc } (is_bool v) in
+       return v in
+  (* main entry *)
+  match for_exit with
+  | None ->
+     let* env, new_acc_env, s_b = sbody genv env b s_b acc_env in
+     let l1 = Env.to_list env in
+     let l2 = Env.to_list new_acc_env in
+     return (false, new_acc_env, s_b)
+  | Some { for_exit; for_exit_kind } ->
+     match for_exit_kind with
+     | Ewhile ->
+        let* v = cond (Env.append acc_env env) for_exit in
+        let* c = exit_condition for_exit.e_loc v in
+        if c then
+          let* _, new_acc_env, s_b = sbody genv env b s_b acc_env in
+          return (false, new_acc_env, s_b)
+        else
+          (* otherwise, [x = last x] for every [x] in [Dom(acc_env)] *)
+          let acc_env = Forloop.lastx_to_x acc_env in
+          return (true, acc_env, s_b)
+     | Eunless ->
+        let* v = cond (Env.append acc_env env) for_exit in
+        let* c = exit_condition for_exit.e_loc v in
+        if c then
+          (* otherwise, [x = last x] for every [x] in [Dom(acc_env)] *)
+          let acc_env = Forloop.lastx_to_x acc_env in
+          return (true, acc_env, s_b)
+        else
+          let* _, new_acc_env, s_b = sbody genv env b s_b acc_env in
+          return (false, new_acc_env, s_b)
+     | Euntil ->
+        let* env, new_acc_env, s_b = sbody genv env b s_b acc_env in
+        let env = Env.append new_acc_env env in
+        let* v = cond env for_exit in
+        let* c = exit_condition for_exit.e_loc v in
+        return (c, new_acc_env, s_b)
 
 (* [v] is the returned value for [var_name] *)
 and svardec genv env acc
@@ -2119,9 +2144,9 @@ and sautomaton_handler_list
     (* execute the current state *)
     match ns, nr with
     | (Vbot, _) | (_, Vbot) ->
-       return (bot_env eq_write, ns, nr, s_list)
+       return (Match.bot_env eq_write, ns, nr, s_list)
     | (Vnil, _) | (_, Vnil) ->
-       return (bot_env eq_write, ns, nr, s_list)
+       return (Match.bot_env eq_write, ns, nr, s_list)
     | Value(vns), Value(vnr) ->
        let* vnr =
          is_bool vnr |>
@@ -2150,11 +2175,11 @@ and sescape_list loc genv env escape_list s_list ps pr =
        match v with
        (* if [v = bot/nil] the state and reset bit are also bot/nil *)
        | Vbot ->
-          return (bot_env e_body.b_write,
+          return (Match.bot_env e_body.b_write,
                   (Vbot, Vbot), Slist [s_cond; Slist(ss_let);
                                         s_body; s_next_state] :: s_list)
        | Vnil ->
-          return (nil_env e_body.b_write,
+          return (Match.nil_env e_body.b_write,
                   (Vnil, Vnil), Slist [s_cond; Slist(ss_let);
                                         s_body; s_next_state] :: s_list)
        | Value(v) ->

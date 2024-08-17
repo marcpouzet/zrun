@@ -49,7 +49,7 @@
  *- [present e(...x...) -> local (last m) do r = ... last* m and m = x in r]
  *- [present e(...x...) -> ... last x ...] is rewritten
  *- [present e(...x...) -> local (last m) ... last* m and m = x]
- *)
+*)
 
 open Location
 open Zelus
@@ -59,7 +59,9 @@ open Aux
 
 (* renaming(x) = lx for [x] in [out_names] *)
 type acc =
-  { locals: Misc.no_info Env.t; (* names that are defined locally in a block *)
+  { locals: Misc.no_info Env.t; 
+    (* names that are defined locally in a block. They are neither inputs *)
+    (* or outputs but introduced by a [local ... x ... do ... ] *)
     renaming: Ident.t Env.t; (* renaming [x -> m] *)
   }
 
@@ -88,26 +90,43 @@ let copy m x = Aux.id_eq m (Aux.var x)
 let add_eq_copy l_renaming acc =
   Env.fold (fun x m acc -> copy m x :: acc) l_renaming acc
 
-(* update a local declaration [local (last x)...] into [local lx, (last x)...] *)
-let update_vardec_list b_vars l_renaming =
+(* update a local declaration [local x...] into [local lx, x...] *)
+(* an equation [lx = last*x] is added in the body *)
+let update_local_vardec_list b_vars l_renaming =
   List.fold_left
     (fun acc ({ var_name } as v) ->
       try let lx = Env.find var_name l_renaming in
-          Aux.vardec lx false None None :: { v with var_is_last = true } :: acc
+          Aux.vardec lx false None None :: v :: acc
       with
       | Not_found -> v :: acc) [] b_vars
 
 (* update a local declaration which is an input or output *)
 (* remove [init ...] and [default ...] entries *)
 let update_inout_vardec l_renaming (v_list, eq_list)
-      ({ var_name; var_is_last; var_init; var_default } as v) =
+      ({ var_name; var_is_last; var_init; var_default; var_init_in_eq } as v) =
   try
     let m = Env.find var_name l_renaming in
-    { v with var_is_last = false; var_init = None; var_default = None },
-    (Aux.vardec m var_is_last var_init var_default :: v_list,
+    { v with var_is_last = false; var_init = None; var_default = None; 
+             var_init_in_eq = false },
+    (Aux.init_vardec m var_is_last var_init var_default var_init_in_eq ::
+       v_list,
      copy m var_name :: eq_list)
   with
   | Not_found -> v, (v_list, eq_list)
+
+(* add extra local declarations *)
+let vardec_list l_renaming acc =
+  Env.fold (fun x m acc -> Aux.vardec m true None None :: acc) l_renaming acc
+
+let e_local l_renaming e = 
+  if Env.is_empty l_renaming then e
+  else let r = fresh "r" in
+       Aux.e_local_vardec 
+         (Aux.vardec r false None None :: vardec_list l_renaming [])
+         (add_eq_copy l_renaming [Aux.id_eq r e]) (var r)
+
+let eq_local l_renaming eq =
+  Aux.eq_local_vardec (vardec_list l_renaming [])(add_eq_copy l_renaming [eq])
 
 let intro ({ locals; renaming } as acc) id =
   try
@@ -146,20 +165,25 @@ let leq_t funs ({ locals } as acc) ({ l_eq; l_env; l_rec } as leq) =
              l_env = update_env l_env l_renaming; l_rec },
   { locals; renaming }
 
-(* add extra equations [lx = last* x] *)
+(* if [last x] appears in the body with [x] a local variable *)
+(* an extra equation [lx = last* x] is introduced. [lx] becomes a new *)
+(* local variable *)
 let block funs acc ({ b_vars; b_body; b_env } as b) =
   let b_vars, ({ locals } as acc) =
     Util.mapfold (Mapfold.vardec funs) acc b_vars in
   let b_body, ({ renaming } as acc) =
     Mapfold.equation funs { acc with locals = Env.append b_env locals } b_body in
   let l_renaming, renaming = split b_env renaming in
-  let b_body = Aux.par (b_body :: add_last_eq_copy l_renaming) in
-  { b with b_vars = update_vardec_list b_vars l_renaming;
+  { b with b_vars = update_local_vardec_list b_vars l_renaming;
            b_env = update_env b_env l_renaming;
-           b_body }, { locals; renaming }
+           b_body = Aux.par (b_body :: add_last_eq_copy l_renaming) }, 
+  { locals; renaming }
 
-(* replace [init id = e] by [init m = e] *)
-let init_ident _ acc id = intro acc id
+(* replace [init id = e] by [init m = e] when [m] is an *)
+(* input/output variable. [acc.renaming id = m] *)
+let init_ident _ ({ locals; renaming } as acc) id = 
+  if Env.mem id locals then id, acc
+  else intro acc id
 
 let write_it funs ({ renaming } as acc) { dv; di; der } =
   let rename id = try Env.find id renaming with Not_found -> id in
@@ -168,16 +192,27 @@ let write_it funs ({ renaming } as acc) { dv; di; der } =
   let der = S.map rename der in
   { dv; di; der }, acc
   
-let e_local l_renaming e =
-  (* add extra local declarations *)
-  let vardec_list l_renaming acc =
-    Env.fold (fun x m acc -> Aux.vardec m true None None :: acc) l_renaming acc in
-  if Env.is_empty l_renaming then e
-  else let r = fresh "r" in
-       Aux.e_local
-         (Aux.block_make
-            (Aux.vardec r false None None :: vardec_list l_renaming [])
-            (add_eq_copy l_renaming [Aux.id_eq r e])) (var r)
+let match_handler_eq funs acc ({ m_body; m_env } as m_h) =
+  let m_body, ({ renaming } as acc) = Mapfold.equation_it funs acc m_body in 
+  let m_renaming, renaming = split m_env renaming in
+  { m_h with m_body = eq_local m_renaming m_body }, acc
+
+and match_handler_e funs acc ({ m_body; m_env } as m_h) =
+  let m_body, ({ renaming } as acc) = Mapfold.expression_it funs acc m_body in 
+  let m_renaming, renaming = split m_env renaming in
+  { m_h with m_body = e_local m_renaming m_body }, acc
+
+and present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_cond, acc = Mapfold.scondpat_it funs acc p_cond in
+  let p_body, ({ renaming } as acc) = Mapfold.equation_it funs acc p_body in
+  let p_renaming, renaming = split p_env renaming in
+  { p_b with p_cond; p_body = eq_local p_renaming p_body }, acc
+
+and present_handler_e funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_cond, acc = Mapfold.scondpat_it funs acc p_cond in
+  let p_body, ({ renaming } as acc) = Mapfold.expression_it funs acc p_body in
+  let p_renaming, renaming = split p_env renaming in
+  { p_b with p_cond; p_body = e_local p_renaming p_body }, acc
 
 (* the inputs/outputs must be unchanged *)
 let funexp funs ({ locals } as acc)
@@ -199,7 +234,11 @@ let funexp funs ({ locals } as acc)
          Util.mapfold (update_inout_vardec b_renaming) ([], []) b_vars in
        let f_renaming, renaming = split f_env renaming in
        let b_body =
+         (* add names for [last x] when [x] is an output *)
          Aux.eq_local_vardec v_list (b_body :: eq_list) in
+       let b_body =
+         (* add names for [last x] when [x] is an input *)
+         eq_local f_renaming b_body in
        Returns { b with b_vars; b_body },
        { locals; renaming } in
   { f with f_body = { r with r_desc } }, acc

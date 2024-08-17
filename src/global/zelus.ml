@@ -268,11 +268,13 @@ and 'info for_exp =
   | Forexp : { exp : 'info exp; default : 'info exp option } -> 'info for_exp
   (* [for[each|ward] ... do e done] *)
   | Forreturns :
-      { returns : 'info exp for_vardec_desc localized list; (* return *)
+      { returns : 'info exp for_vardec list; (* return *)
         body : ('info, 'info exp, 'info eq) block; (* body *)
         r_env : 'info Ident.Env.t; (* environment *)
       } -> 'info for_exp
 (* [for[each|ward] ... returns (...) local ... do eq ... done] *)
+
+and 'exp for_vardec = 'exp for_vardec_desc localized
 
 and 'exp for_vardec_desc =
   { for_array : int; (* 0 means x; 1 means [|x|]; 2 means [|[| x|]|]; etc *)
@@ -336,7 +338,7 @@ and 'info eq_desc =
 (*  do eq [while/unless/until e] e done]  *)
 
 and 'info for_eq =
-  { for_out : 'info for_out_desc localized list;
+  { for_out : 'info for_out list;
     for_block : ('info, 'info exp, 'info eq) block; (* loop body *)
   }
 
@@ -364,6 +366,8 @@ and 'info for_input_desc =
       'info for_input_desc
 
 (* output of a for loop in equational form *)
+and 'info for_out = 'info for_out_desc localized
+
 and 'info for_out_desc =
   { for_name : Ident.t; (* xi [init e] [default e] [out x] *)
     for_out_name : Ident.t option; (* [xi out x] *)
