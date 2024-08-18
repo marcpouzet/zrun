@@ -91,21 +91,6 @@ let by loc env env_handler write =
         return (Env.add x { entry with cur = Some(v) } acc))
     write (return env_handler) 
        
-(* initialize [env_handler] with inputs from [w] *)
-(* pre-condition: [Dom(env_handler) subseteq w] *)
-    (*
-      let initialize env env_handler w =
-  S.fold
-    (fun x acc ->
-      match Env.find_opt x env_handler with
-      | Some(entry) -> Env.add x entry acc
-      | None ->
-         match Env.find_opt x env with
-         | Some(entry) -> Env.add x entry acc
-         | None -> acc (* this case should not arrive *))
-    (Defnames.names S.empty w) Env.empty
-     *)
-
 (* given [env_in] and [env_eq = [x1 \ { cur1 },..., xn \ { curn }] *)
 (* returns [x1 \ { cur1; default x env; last1 },..., *)
 (* xn \ { curn; default x env; lastn }]. [lasti] is the definition in *)
