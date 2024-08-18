@@ -7,30 +7,35 @@ Zrun is a large subset of the language
 (synchronous) subset of the language for the moment. A discrete-time
 signal is represented as infinite stream and a synchronous system as a
 length-preserving stream function. The basic primitives are those of
-Lustre: a unit non-initialized delay (pre), the initialization operator (->), the
-initialized delay (fby). Streams can be defined by mutually recursive
-definitions. It also provides richer programming constructs that were introduced
-in Lucid Synchrone but are not in Lustre: by-case definition of
-streams with a possible default and initial value, the last computed value of a 
-stream, hierarchical automata with parameters, stream functions with static
-parameters that are either know at compile time or at instanciation time,
-and array operations. It also provides a limit form of recursion on
-a set of size parameters.
+the language Lustre: a unit non-initialized delay (pre), the
+initialization operator (->), the initialized delay (fby). Streams can
+be defined by mutually recursive definitions. It also provides richer
+programming constructs that were introduced in Lucid Synchrone and
+Scade 6: by-case definition of streams with a form of pattern
+matching, the operator "last" which refers to the previous value of a
+streams, hierarchical automata with parameters and array
+operations. Functions take streams as input and produce streams. Input
+streams can be constant values that are either known at compile time
+or at instanciation time. The language provides a limit form of
+recursion on a set of size parameters whose value must be ultimately
+known at compile-time.
 
-The objective of this prototype is to be a reference executable
-semantics; to be used independently of a compiler, e.g., as an oracle
-for compiler testing; to prove the correctness of compiler steps
-(e.g., that a well typed/causal/initialized program does not lead to
-an error; to prove semantics preservation of source-to-source
-transformations like static scheduling or the compilation of
-automata); to execute unfinished programs or programs that are
-semantically correct but are statically rejected by the compiler. It
-is defined is a quite generic manner w.r.t the treatment of
-causality loops, that is, how instantaneous feedback are treated. It
-is made to illustrate the differences in the
-treatment of causality between Lustre, Lucid Synchrone/Scade/Zelus and
-Esterel. Examples of correct but rejected programs are those with
-cyclic circuits accepted by an Esterel compiler (the so-called
+The goal of this prototype is to define a reference executable
+semantics to be used independently of a compiler, e.g., as an oracle
+for compiler testing. It serves to establish the correctness of every
+compiler steps (e.g., that a well typed/causal/initialized program
+does not lead to an error; to prove semantics preservation of
+source-to-source transformations (e.g., static scheduling or the
+compilation of automata); to execute unfinished programs or programs
+that are semantically correct but are statically rejected by the
+compiler. The interpreter makes no a priori hypothesis on typing and
+other type-based static analyses performed by a synchronous language compiler. It can illustrate key differences in the treatment of
+causality between Lustre, Lucid Synchrone/Scade/Zelus and
+Esterel. Lustre is the more restrictive in term of feed-back loops while
+Esterel is the more permissive; the three languages
+Lucid Synchrone/Scade/Zelus define an analysis which exploits by-case
+definitions of streams. Examples of correct but rejected programs are those with
+cyclic circuits that accepted by an Esterel compiler (the so-called
 "constructively causal" programs) but that are rejected by Lustre (and
 also Lucid Synchrone, Scade and Zélus) because the compiler imposes
 stronger causality constraints. Finally, being independent of a
@@ -38,7 +43,7 @@ compiler, this semantics can be used to prototype new language
 constructs before considering their compilation.
 
 The long term goal of this work is to define an executable semantics
-that deal with all the language features of Zélus. We are far away
+that deal with all the language features of Zélus. We are still far
 from that! Continuous-time features (ODEs and zero-crossings) are not
 treated for the moment.
 
