@@ -212,8 +212,8 @@ let present_handler scondpat body ff { p_cond; p_body; p_env } =
 
 let with_default body ff default_opt =
   match default_opt with
-  | Init(b) -> fprintf ff "@[<hov2>init@,%a@]" body b
-  | Else(b) -> fprintf ff "@[<hov2>else@,%a@]" body b
+  | Init(b) -> fprintf ff "@[<hov2>init@ %a@]" body b
+  | Else(b) -> fprintf ff "@[<hov2>else@ %a@]" body b
   | NoDefault -> ()
 
 let scondpat expression ff scpat =
@@ -366,7 +366,7 @@ let rec expression ff e =
   
 and result ff { r_desc } =
   match r_desc with
-  | Exp(e) -> expression ff e
+  | Exp(e) -> fprintf ff "@[<hov 2>->@ %a@]" expression e
   | Returns(b) -> result_block ff b
 
 and result_block ff { b_vars; b_body; b_write } =
@@ -384,7 +384,7 @@ and kind f_kind =
 and funexp ff { f_vkind; f_kind; f_args; f_body; f_env } =
   let vkind =
     match f_vkind with | Kconst -> "const" | Kstatic -> "static" | Kany -> "" in
-  fprintf ff "@[<hov 2>%s %s %a %a@ ->@ %a@]"
+  fprintf ff "@[<hov 2>%s %s %a %a@ %a@]"
     (kind f_kind) vkind arg_list f_args print_env_names f_env result f_body 
 
 and arg_list ff a_list =
@@ -497,14 +497,18 @@ and equation ff ({ eq_desc = desc } as eq) =
 	  (present_handler (scondpat expression) equation) """""") handlers
        (with_default equation) default_opt
   | EQreset(eq, e) ->
-     fprintf ff "@[<hov2>reset@ @[%a@]@ @[<hov 2>every@ %a@]@]"
+     (* remove useless do/done when [eq] is a list of equations *)
+     let equation ff ({ eq_desc } as eq) =
+       match eq_desc with
+       | EQand { ordered; eq_list } -> and_equation ordered "" "" ff eq_list
+       | _ -> equation ff eq in
+     fprintf ff "@[<hov>reset@   @[%a@]@ @[<hov 2>every@ %a@]@]"
        equation eq expression e
   | EQlet(l_eq, eq) ->
      fprintf ff "@[<hov0>(%a@,in@ %a)@]" leq l_eq equation eq
   | EQlocal(b_eq) -> block_of_equation ff b_eq
   | EQand { ordered; eq_list } ->
-     let a = if ordered then "then " else "and " in
-     print_list_l equation "do " a " done" ff eq_list
+     and_equation ordered "do " " done" ff eq_list
   | EQempty -> fprintf ff "()"
   | EQassert(e) ->
      fprintf ff "@[<hov2>assert %a@]" expression e
@@ -529,6 +533,10 @@ and equation ff ({ eq_desc = desc } as eq) =
        print_for_out for_out
        block_of_equation for_block
        for_exit_condition for_kind       
+
+and and_equation ordered po pf ff eq_list =
+  let a = if ordered then "then " else "and " in
+  print_list_l equation po a pf ff eq_list
 
 (* print for loops *)
 and kind_of_forloop ff for_kind =
