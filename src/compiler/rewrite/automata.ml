@@ -90,6 +90,9 @@ for every automaton, define a type:
 type ('a1,...,a'n) state_k = | S1 of 'a1 | ... | Sn of 'an
 *)
 
+let fresh_state () = Ident.fresh "state"
+let fresh_reset () = Ident.fresh "res"
+
 let eq_present handlers default =
   match handlers with
   | [] -> default
@@ -164,8 +167,8 @@ let automaton acc is_weak handlers state_opt =
   
   (* [state_name] is the target state computed in the current step *)
   (* [reset_name] is the target reset bit computed in the current step *)
-  let state_name = Ident.fresh "s" in
-  let reset_name = Ident.fresh "r" in
+  let state_name = fresh_state () in
+  let reset_name = fresh_reset () in
 
   let state_var n = Aux.var n in
   let reset_var n = Aux.var n in
@@ -233,7 +236,10 @@ let automaton acc is_weak handlers state_opt =
   let eq_list =
     if is_weak then weak_automaton handlers else strong_automaton handlers in
   (* initial state and reset value *)
-  par (eq_init state_name initial_state ::
+  Aux.eq_local_vardec
+    [Aux.init_vardec state_name false None None true;
+     Aux.init_vardec reset_name false None None true]
+    (eq_init state_name initial_state ::
          eq_init reset_name efalse :: eq_list), acc
 
 (* Translation of equations *)
