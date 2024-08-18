@@ -39,6 +39,11 @@ let read ({ eq_write; eq_desc } as eq) =
       let lv = S.diff lv w in
       let v = S.diff v w in
       fv { lv; v } e
+  | EQlocal _ | EQlet _ ->
+      let w = Defnames.names S.empty eq_write in
+      let lv = S.diff lv w in
+      let v = S.diff v w in
+      { lv; v }
   | _ -> { lv; v }
        
 let def { eq_write = { dv; di } } =
