@@ -1,31 +1,14 @@
-let iterate1() returns (o)
-  forward(45)[i] returns (o init 0) (* , index init 0) *)
-    do o = last o + 1
-    unless last o > 3 done
+type t = A | B | C | D
 
-let iterate() returns (o)
-  o = forward(45)[i] returns (o2 init 0)
-    do o2 = last o2 + 1
-    unless last o2 > 3 done
-
-let iterate2() returns (o)
-  o = forward(45)[i] returns (o2 init 0)
-    do o2 = last o2 + 1
-    while last o2 <= 3 done
-
-
-let find_33() returns (o, index)
- let t = iota(10) in
- forward[i](ti in t) returns (o init 0, index)
-   do index = i and o = ti while (last o <= 4) done
-
-let iota(n) returns (o)
-  forward(n)[i] returns (oi out o)
-    do oi = i done
-
-let iota2(n) =
-  forward(n)[i] returns ([|oi|])
-    do oi = i done
-
-let f = iota2(10)
-
+let
+  select_7_9 =
+    node  (x_8_10)  returns (o1_9_11, o2_10_12)
+         local lx_28, lx_29
+         do lx_29 = o1_9_11
+         and lx_28 = o2_10_12
+         and match x_8_10 with
+             | A  ->  do o1_9_11 = ((+) last* lx_29 1) and o2_10_12 = 1  done 
+             | B  ->  do o1_9_11 = ((-) last* lx_29 1) and o2_10_12 = 2  done 
+             | C  ->  do o1_9_11 = 0 and o2_10_12 = 3  done 
+             | D  ->  do o1_9_11 = 42 and o2_10_12 = 4  done  
+         and init lx_29 = (0) and init lx_28 = (0)  done  
