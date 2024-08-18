@@ -1,0 +1,9 @@
+let node f() returns (c, o)
+  local state, res do
+  init state = 0
+  and init res = 1
+  and state = 1
+  and res = 2
+  and c = state
+  and o = res
+  done
