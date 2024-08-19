@@ -68,7 +68,8 @@ let default_value last default =
 (* an a set of written variables [write] *)
 (* [by env env_handler write] complete [env_handler] with entries in [env] *)
 (* for variables that appear in [write] *)
-(* this is used for giving the semantics of a control-structure, e.g.,: *)
+(* this is used for giving the semantics of a by-case definition *)
+(* of streams in a control-structure, e.g.,: *)
 (* [if e then do x = ... and y = ... else do x = ... done]. When [e = false] *)
 (* the value of [y] is the default value given at the definition of [y] *)
 (* If no default value is given (e.g., local x in ...), for the moment *)
@@ -79,7 +80,7 @@ let by loc env env_handler write =
       (* if [x in env] but not [x in env_handler] *)
       (* then either [x = last x] or [x = default(x)] depending *)
       (* on what is declared for [x]. *)
-      let* { last; default } as entry =
+      let* { last; default } =
         Env.find_opt x env |>
           Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = loc } in
       if Env.mem x env_handler then acc
@@ -88,7 +89,7 @@ let by loc env env_handler write =
         let* v =
           default_value last default |>
             Opt.to_result ~none:{ kind = Eno_default(x); loc = loc } in
-        return (Env.add x { entry with cur = Some(v) } acc))
+        return (Env.add x { Match.empty with cur = Some(v) } acc))
     write (return env_handler) 
        
 (* given [env_in] and [env_eq = [x1 \ { cur1 },..., xn \ { curn }] *)

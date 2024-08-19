@@ -21,7 +21,7 @@
  *- Univ. in June-July 2019 and the Master MPRI - M2, Fall 2019, 2020, 2021
  *- The original version of this code is taken from the GitHub Zrun repo:
  *- https://github.com/marcpouzet/zrun
- *- zrun was programmed right after the COVID confinment, in May-June 2020
+ *- ZRun was programmed right after the COVID confinment, in May-June 2020
  *- This second version includes some of the Zelus constructs:
  *- ODEs and zero-crossing; higher order functions;
  *- the implem. was done in 2021 and updated since then;
@@ -1607,10 +1607,12 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
              is_bool b |> Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
            if v then
              let* env_true, s_eq_true = seq genv env eq_true s_eq_true in
+             let l1 = Env.to_list env_true in
              (* complete the output environment with default *)
              (* or last values from all variables defined in [eq_write] but *)
              (* not in [env1] *)
              let* env_true = Fix.by eq_loc env env_true (names eq_write) in
+             let l2 = Env.to_list env_true in
              return (env_true, [s_eq_true; s_eq_false])
            else
              let* env_false, s_eq_false = seq genv env eq_false s_eq_false in

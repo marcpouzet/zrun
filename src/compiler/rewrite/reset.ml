@@ -27,9 +27,10 @@ open Zelus
 open Mapfold
 
 (*
-  [e1 -> e2] is rewritten in [if last* i then e1 else e2]
-  adding a declaration [local i init true do i = false and ...] around
-
+  [e1 -> e2] is rewritten in [if id then e1 else e2]
+  the expression [e] in which [e1 -> e2] appears is rewritten
+  [local m init true, id do m = false and id = last*m in e]
+  
   [reset
    ... init x = e ... (* [e] is static *)
    every z]
@@ -86,10 +87,10 @@ let intro { init } =
   let id = match init with | None -> fresh () | Some(id) -> id in
   id, { init = Some(id) }
 
-(* [e1 -> e2] translated into [if last id then e1 else e2] *)
+(* [e1 -> e2] translated into [if id then e1 else e2] *)
 let ifthenelse acc e1 e2 =
   let id, acc = intro acc in
-  Aux.emake (Eop(Eifthenelse, [Aux.last_star id; e1; e2])), acc
+  Aux.emake (Eop(Eifthenelse, [Aux.var id; e1; e2])), acc
 
 (* Surround an equation by a reset *)
 let reset_init acc eq =
@@ -106,6 +107,17 @@ let local_in_eq { init } eq =
 
 (* [local m init true, i do m = false and i = last* m in e] *)
 let local_in_exp { init } e =
+  match init with
+  | None -> e
+  | Some(id) ->
+     let m = fresh () in
+     Aux.e_local
+       (Aux.block_make [Aux.vardec m false (Some(Aux.etrue)) None;
+                        Aux.vardec id false None None]
+          [Aux.id_eq id (Aux.last_star m); Aux.id_eq m (Aux.efalse)]) e
+
+(* [local m init true, i do m = false and i = last* m in e] *)
+let letrec_in_exp { init } e =
   match init with
   | None -> e
   | Some(id) ->
