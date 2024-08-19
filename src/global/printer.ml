@@ -192,7 +192,7 @@ let block exp body ff { b_vars; b_body; b_write; b_env } =
   match b_vars with
   | [] -> fprintf ff "@[<hov 0>%a@ %a@]" body b_body print_env_names b_env
   | _ ->
-     fprintf ff "@[<hov 0>(local@ %a@ %ado@ %a%a)@]"
+     fprintf ff "@[<hov 0>local@ %a@ %ado@ %a%a@]"
        (vardec_list exp) b_vars
        print_env_names b_env
        print_writes b_write       

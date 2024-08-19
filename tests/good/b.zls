@@ -1,3 +1,8 @@
-let node hh () = 
-  let rec c = true -> false -> false in
-  (if c then true else false)
+let f x = let y = x + 1 in y + 2
+
+let g x = inline f (x + x + 1)
+
+let h x =
+  let z = inline g (x + 2) + inline g (x + 1) in
+  z
+    

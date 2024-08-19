@@ -12,13 +12,6 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* inlining; this step assumes that static reduction is done already *)
-(* this means that all variable defined at top level in declarations *)
-(* are of the form [let x = e] where [x] is a closed term in head normal *)
-(* form. For the moment, we only consider explicit lambdas *)
-(* of the form \x1... e. all function calls [inline f e1 ... en] *)
-(* are inlined *)
-
 open Misc
 open Location
 open Zelus
@@ -29,6 +22,13 @@ open Genv
 open Value
 open Error
 open Mapfold
+
+let error { kind; loc } =
+  Format.eprintf "Error during static reduction\n";
+  Error.message loc kind;
+  raise Error
+
+let catch v = match v with | Ok(v) -> v | Error(v) -> error v
 
 (* the type of the accumulator *)
 type acc =
@@ -51,18 +51,19 @@ let build global_funs ({ renaming } as acc) env =
 
 let var_ident global_funs ({ renaming } as acc) x =
   try Env.find x renaming, acc with Not_found ->
-    Debug.print_string "Inline warning: unbound local" (Ident.name x);
-    x, acc
+    Format.eprintf 
+      "Inline error: unbound local variable %s\n" (Ident.name x);
+    raise Error
 
 
-(** Main transformation *)
+(* Main transformation *)
 (* [(\v_list1 ... v_listn. e) e1 ... en] 
  *- rewrites to:
- *- [local v_list1,...,v_listn do p1 = e1 ... pn = en in e]
+ *- [local v_list1',...,v_listn' do p1' = e1 ... pn' = en in e[pi\pi']]
  *- [(\(v_list1 ... v_listn. v_ret eq) e1 ... en
  *- rewrites to:
- *- [local v_list1,...,v_listn, v_ret
- *-  do p1 = e1 ... pn = en and eq in p_v *)
+ *- [local v_list1',...,v_listn', v_ret'
+ *-  do p1' = e1 ... pn' = en and eq[pi\pi'] in v_ret' *)
 let local_in funs f_args arg_list acc { r_desc } =
   (* build a list of equations *)
   let eq_list = List.map2 Aux.eq_of_f_arg_arg_make f_args arg_list in
@@ -82,7 +83,7 @@ let local_in funs f_args arg_list acc { r_desc } =
                Aux.returns_of_vardec_list_make b_vars)),
      acc
 
-(** Expressions *)
+(* Expressions *)
 let expression funs ({ genv } as acc) e = 
   let { e_desc } as e, acc = Mapfold.expression funs acc e in
   match e_desc with
@@ -110,7 +111,7 @@ let expression funs ({ genv } as acc) e =
 (* global environment only contains lambdas. Update [acc] *)
 (* this solution is fragile and may be changed later. It expect that *)
 (* all lambdas to be inlined are global and named ([letdef x = fun ...]) *)
-let value_and_update ({ genv } as acc) name { e_desc } =
+let value_and_update_env ({ genv } as acc) name { e_desc } =
   match e_desc with
   | Efun c_funexp ->
      let v = Vclosure { c_funexp; c_genv = genv; c_env = Env.empty } in
@@ -135,7 +136,7 @@ let implementation funs acc impl =
         d_leq =
           { l_eq = { eq_desc = EQeq({ pat_desc = Evarpat(n) }, e ) } } }
          when id = n -> 
-       value_and_update acc name e
+       value_and_update_env acc name e
     | _ -> raise Fallback in
   impl, acc
 
