@@ -55,16 +55,22 @@ let var_ident global_funs ({ renaming } as acc) x =
       "Inline error: unbound local variable %s\n" (Ident.name x);
     raise Error
 
+let eq_of_f_arg_arg acc f_args arg_list =
+  acc
 
 (* Main transformation *)
-(* [(\v_list1 ... v_listn. e) e1 ... en] 
+(* [(\a1...an. e) e1 ... en] 
  *- rewrites to:
- *- [local v_list1',...,v_listn' do p1' = e1 ... pn' = en in e[pi\pi']]
- *- [(\(v_list1 ... v_listn. v_ret eq) e1 ... en
+ *- [local a1',...,an' do a1' = e1 ... an' = en in e[ai\ai']]
+ *- [(\(a1 ... an. v_ret eq) e1 ... en
  *- rewrites to:
- *- [local v_list1',...,v_listn', v_ret'
- *-  do p1' = e1 ... pn' = en and eq[pi\pi'] in v_ret' *)
-let local_in funs f_args arg_list acc { r_desc } =
+ *- [local a1',...,an', v_ret'
+ *-  do a1' = e1 ... an' = en and eq[ai\ai'] in v_ret' *)
+let local_in funs f_env f_args arg_list acc { r_desc } =
+  (* build a renaming for arguments *)
+  let f_env, acc = build funs.global_funs acc f_env in
+  (* rename variables *)
+  (* let f_args, acc = Util.mapfold (Mapfold.vardec_it funs) acc f_args in *)
   (* build a list of equations *)
   let eq_list = List.map2 Aux.eq_of_f_arg_arg_make f_args arg_list in
   let vardec_list =
@@ -97,14 +103,15 @@ let expression funs ({ genv } as acc) e =
         raise Error in
       begin match info with
      | Vclosure
-       { c_funexp = { f_args; f_body }; c_genv } ->
+       { c_funexp = { f_args; f_body; f_env }; c_genv } ->
         let e, acc =
-          local_in funs f_args arg_list { acc with genv = c_genv } f_body in
+          local_in
+            funs f_env f_args arg_list { acc with genv = c_genv } f_body in
         e, { acc with genv }
      | _ -> e, acc
      end
-  | Eapp { f = { e_desc = Efun { f_args; f_body } }; arg_list } ->
-     local_in funs f_args arg_list acc f_body
+  | Eapp { f = { e_desc = Efun { f_args; f_body; f_env } }; arg_list } ->
+     local_in funs f_env f_args arg_list acc f_body
   | _ -> e, acc
 
 (* check that an expression is either a lambda or a global name; the *)
