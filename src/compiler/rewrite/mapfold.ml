@@ -13,7 +13,7 @@
 (* *********************************************************************)
 
 (* generic mapfold iterator on the Zelus AST *)
-(* it is based on a technique used in the Heptagon compiler in 2012 *)
+(* it is based on a technique used in the Heptagon compiler (2012) *)
 (* The text below is borrowed from the Heptagon compiler *)
 (* https://gitlab.inria.fr/synchrone/heptagon *)
 
@@ -73,6 +73,8 @@ type ('a, 'info1, 'info2) global_it_funs =
     build :  ('a, 'info1, 'info2) global_it_funs -> 'a ->
             'info1 Ident.Env.t -> 'info2 Ident.Env.t * 'a;
     var_ident :
+      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+    state_ident :
       ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
     last_ident :
       ('a, 'info1, 'info2) global_it_funs -> 'a -> last -> last * 'a;
@@ -242,6 +244,11 @@ and var_ident_it global_funs acc x =
   global_funs.var_ident global_funs acc x
 
 and var_ident global_funs acc x = x, acc
+
+and state_ident_it global_funs acc x =
+  global_funs.state_ident global_funs acc x
+
+and state_ident global_funs acc x = x, acc
 
 and typevar_it global_funs acc x =
   global_funs.typevar global_funs acc x
@@ -728,10 +735,10 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
 and statepat funs acc ({ desc } as spat) =
   let desc, acc = match desc with
     | Estate0pat(id) ->
-       let id, acc = var_ident_it funs.global_funs acc id in
+       let id, acc = state_ident_it funs.global_funs acc id in
        Estate0pat(id), acc
     | Estate1pat(id, id_list) ->
-       let id, ac = var_ident_it funs.global_funs acc id in
+       let id, ac = state_ident_it funs.global_funs acc id in
        let id_list, acc =
          Util.mapfold (var_ident_it funs.global_funs)
            acc id_list in
@@ -741,10 +748,10 @@ and statepat funs acc ({ desc } as spat) =
 and state funs acc ({ desc } as st) =
   let desc, acc  = match desc with
     | Estate0(id) ->
-       let id, acc = var_ident_it funs.global_funs acc id in
+       let id, acc = state_ident_it funs.global_funs acc id in
        Estate0(id), acc
     | Estate1(id, e_list) ->
-       let id, acc =  var_ident_it funs.global_funs acc id in
+       let id, acc =  state_ident_it funs.global_funs acc id in
        let e_list, acc =
          Util.mapfold (expression_it funs) acc e_list in
        Estate1(id, e_list), acc
@@ -838,6 +845,7 @@ and interface global_funs acc interf = interf, acc
 let default_global_funs =
   { build;
     var_ident;
+    state_ident;
     last_ident;
     init_ident;
     emit_ident;
@@ -884,6 +892,7 @@ let defaults =
 let default_global_stop =
   { build = stop;
     var_ident = stop;
+    state_ident = stop;
     last_ident = stop;
     init_ident = stop;
     emit_ident = stop;
