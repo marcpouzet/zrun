@@ -67,10 +67,13 @@ let eq_of_f_arg_arg acc f_args arg_list =
  *- [local a1',...,an', v_ret'
  *-  do a1' = e1 ... an' = en and eq[ai\ai'] in v_ret' *)
 let local_in funs f_env f_args arg_list acc { r_desc } =
+  (* rename an argument *)
+  let arg acc v_list =
+    Util.mapfold (Mapfold.vardec_it funs) acc v_list in
   (* build a renaming for arguments *)
   let f_env, acc = build funs.global_funs acc f_env in
-  (* rename variables *)
-  (* let f_args, acc = Util.mapfold (Mapfold.vardec_it funs) acc f_args in *)
+  (* rename the list of arguments *)
+  let f_args, acc = Util.mapfold arg acc f_args in  
   (* build a list of equations *)
   let eq_list = List.map2 Aux.eq_of_f_arg_arg_make f_args arg_list in
   let vardec_list =
