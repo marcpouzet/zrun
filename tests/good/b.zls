@@ -1,8 +1,3 @@
-let f x = let y = x + 1 in y + 2
+let node make(n)() = foreach(n)[j](i in 0 to n-1) do i done
 
-let g x = inline f (x + x + 1)
-
-let h x =
-  let z = inline g (x + 2) + inline g (x + 1) in
-  z
     
