@@ -583,9 +583,10 @@ and for_exp ff r =
   match r with
   | Forexp { exp; default = d} ->
      fprintf ff "@[ do %a%a done@]" expression exp (default expression) d
-  | Forreturns { returns; body } ->
-     fprintf ff "@[<hov 2> returns@ (%a)@ %a@]"
+  | Forreturns { returns; body; r_env } ->
+     fprintf ff "@[<hov 2> returns@ (%a)@ %a@ %a@]"
        for_returns returns
+       print_env_names r_env
        block_of_equation body
 
 and for_returns ff for_vardec_list =
