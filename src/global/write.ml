@@ -319,7 +319,8 @@ and expression ({ e_desc } as e) =
             let returns, dv = Util.mapfold for_vardec S.empty returns in
             let r_env = build_from_names dv in
             Forreturns({ returns; body; r_env }) in
-       Eforloop({ f with for_size; for_kind; for_input; for_body }) in
+       let for_env = build_from_names dv_input in
+       Eforloop({ f with for_size; for_kind; for_input; for_env; for_body }) in
   { e with e_desc = desc }
 
 and for_vardec acc ({ desc = ({ for_vardec } as v) } as fv) =
