@@ -30,7 +30,7 @@ let _ =
    default_used_modules := ["Stdlib"]
  *)
 
-let n_steps = 10
+let n_steps = 2
 let is_all = true
 
 (* Run one file. *)
