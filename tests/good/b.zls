@@ -1,3 +1,4 @@
-let node make(n)() = foreach(n)[j](i in 0 to n-1) do i done
+let node f x = 0 fby x + 1
 
-    
+let node main () = o where
+  rec o = run f (o)
