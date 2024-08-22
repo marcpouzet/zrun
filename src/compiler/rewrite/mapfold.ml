@@ -569,10 +569,11 @@ and expression funs acc ({ e_desc; e_loc } as e) =
        Util.optional_with_map (var_ident_it funs.global_funs) acc for_index in
      let for_size, acc =
        Util.optional_with_map (for_size_t funs) acc for_size in
-     let for_kind, acc = for_kind_t funs acc for_kind in
      let for_input, acc =
        Util.mapfold (for_input_t funs) acc for_input in
      let for_body, acc = for_exp_t acc for_body in
+     (* the exit condition can depend on output variables of the loop *)
+     let for_kind, acc = for_kind_t funs acc for_kind in
      { e with e_desc =
                 Eforloop
                   { f with for_size; for_kind; for_index; for_input;
@@ -703,10 +704,11 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        let for_env, acc = build_it funs.global_funs acc for_env in
        let for_size, acc =
          Util.optional_with_map (for_size_t funs) acc for_size in
-       let for_kind, acc = for_kind_t funs acc for_kind in
        let for_input, acc =
          Util.mapfold (for_input_t funs) acc for_input in
        let for_body, acc = for_eq_t acc for_body in
+       (* the exit condition can depend on output variables of the loop *)
+       let for_kind, acc = for_kind_t funs acc for_kind in
        { eq with eq_desc =
                    EQforloop
                      { f with for_size; for_kind; for_index; for_input;
