@@ -47,7 +47,7 @@ let equation funs acc eq =
      let e, acc = funs.expression funs acc e in
      let handlers = List.map handler handlers in
      { eq with eq_desc = EQmatch { m with e; handlers } }, acc
-  | _ -> raise Mapfold.Fallback
+  | _ -> eq, acc
 
 let program genv0 p =
   let global_funs = Mapfold.default_global_funs in
