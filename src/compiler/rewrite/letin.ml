@@ -98,7 +98,8 @@ let eq_local { c_vardec; c_eq } =
 let e_local { c_vardec; c_eq } e =
   let vardec_list = State.fold (@) c_vardec [] in
   let eq_list = equations c_eq in
-  Aux.e_local (block_make vardec_list eq_list) e    
+  match eq_list with
+  | [] -> e | _ -> Aux.e_local (Aux.block_make vardec_list eq_list) e    
   
 let pattern funs acc p = p, acc
 

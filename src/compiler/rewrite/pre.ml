@@ -30,8 +30,22 @@ open Mapfold
 let fresh_x () = fresh "x"
 let fresh_m () = fresh "m"
 
+(* two options - generates let/rec or local/in *)
+(* [let rec m = e and x = last* m in x] *)
+let let_mem_value e =
+  let x = fresh_x () in
+  let m = fresh_m () in
+  Aux.e_letrec [Aux.id_eq m e; Aux.id_eq x (Aux.last_star m)] (var x)
+    
+(* [let rec init m = e1 and m = e2 and x = last* m in x] *)
+let let_init_mem_value e1 e2 =
+  let x = fresh_x () in
+  let m = fresh_m () in
+  Aux.e_letrec [Aux.eq_init m e1; Aux.id_eq m e2; Aux.id_eq x (Aux.last_star m)]
+    (var x)
+
 (* Defines a value [local x, (last m) do m = e and x = last* m in x] *)
-let local_value e =
+let local_mem_value e =
   let x = fresh_x () in
   let m = fresh_m () in
   Aux.e_local (Aux.block_make [Aux.vardec x false None None;
@@ -39,7 +53,8 @@ let local_value e =
                  [Aux.id_eq m e; Aux.id_eq x (Aux.last_star m)]) (var x)
 
 (* Defines a state variable with initialization *)
-let local_init_value e1 e2 =
+(* [local x, m init e1 do m = e2 and x = last* m in x] *)
+let local_init_mem_value e1 e2 =
   let x = fresh_x () in
   let m = fresh_m () in
   Aux.e_local (Aux.block_make [Aux.vardec x false None None;
@@ -51,11 +66,11 @@ let expression funs acc e =
   let ({ e_desc } as e), acc = Mapfold.expression funs acc e in
   match e_desc with
   | Eop(Efby, [e1; e2]) ->
-     (* translate into [local x, m init e1 do m = e2 and x = last* m in x] *)
-     local_init_value e1 e2, acc
+     (* [let rec init m = e1 and m = e2 and x = last* m in x] *)
+     local_init_mem_value e1 e2, acc
   | Eop(Eunarypre, [e1]) ->
-     (* translate into [local x, (last m) do m = e and x = last* m in x] *)
-     local_value e1, acc
+     (* [let rec m = e1 and x = last* m in x] *)
+     local_mem_value e1, acc
   | _ -> e, acc
 
 let set_index funs acc n =

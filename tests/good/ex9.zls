@@ -22,7 +22,7 @@ let node w_same(x,y) returns (z, t)
 let node main() returns (ok)
   local z1, t1, z2, t2
   do
-    z1, t1 =  w(t1,1)
+    z1, t1 =  inline w (t1,1)
   and
     z2, t2 =  w(t2, 1)
   and

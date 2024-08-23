@@ -66,7 +66,7 @@ let eq_of_f_arg_arg acc f_args arg_list =
  *- rewrites to:
  *- [local a1',...,an', v_ret'
  *-  do a1' = e1 ... an' = en and eq[ai\ai'] in v_ret' *)
-let local_in funs f_env f_args arg_list acc { r_desc } =
+let local_in funs f_env f_args arg_list acc r =
   (* rename an argument *)
   let arg acc v_list =
     Util.mapfold (Mapfold.vardec_it funs) acc v_list in
@@ -78,19 +78,16 @@ let local_in funs f_env f_args arg_list acc { r_desc } =
   let eq_list = List.map2 Aux.eq_of_f_arg_arg_make f_args arg_list in
   let vardec_list =
     List.fold_left (fun acc vardec_list -> vardec_list @ acc) [] f_args in
+  let { r_desc } as r, acc = Mapfold.result funs acc r in
   match r_desc with
   | Exp(e_r) ->
-     let e_r, acc = Mapfold.expression_it funs acc e_r in
-     Aux.emake (Elocal(Aux.block_make vardec_list eq_list, e_r)),
-     acc
-  | Returns { b_vars; b_body; b_write; b_env } ->
-     let b_body, acc = Mapfold.equation_it funs acc b_body in
+     Aux.emake (Elocal(Aux.block_make vardec_list eq_list, e_r)), acc
+  | Returns { b_vars; b_body } ->
      let vardec_list = b_vars @ vardec_list in
      let eq_list = b_body :: eq_list in
      Aux.emake
        (Elocal(Aux.block_make vardec_list eq_list,
-               Aux.returns_of_vardec_list_make b_vars)),
-     acc
+               Aux.returns_of_vardec_list_make b_vars)), acc
 
 (* Expressions *)
 let expression funs ({ genv } as acc) e = 

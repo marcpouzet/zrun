@@ -621,7 +621,7 @@ and present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
   let p_env, acc = build_it funs.global_funs acc p_env in
   let p_cond, acc = scondpat_it funs acc p_cond in
   let p_body, acc = equation_it funs acc p_body in
-  { p_b with p_cond; p_body }, acc
+  { p_b with p_cond; p_body; p_env }, acc
 
 and present_handler_e_it funs acc p_handler =
   funs.present_handler_e funs acc p_handler
@@ -775,12 +775,13 @@ and escape funs acc ({ e_cond; e_let; e_body; e_next_state; e_env } as esc) =
 and automaton_handler_it funs acc handler =
   funs.automaton_handler funs acc handler
 
-and automaton_handler funs acc ({ s_state; s_let; s_body; s_trans } as h) =
+and automaton_handler funs acc ({ s_state; s_let; s_body; s_trans; s_env } as h) =
+  let s_env, acc = build_it funs.global_funs acc s_env in
   let s_state, acc = statepat funs acc s_state in
   let s_let, acc = slet_it funs acc s_let in
   let s_body, acc = block_it funs acc s_body in
   let s_trans, acc = Util.mapfold (escape funs) acc s_trans in
-  { h with s_state; s_let; s_body; s_trans }, acc
+  { h with s_state; s_let; s_body; s_trans; s_env }, acc
 
 let typedecl_it funs acc ty_decl = funs.typedecl funs acc ty_decl
 

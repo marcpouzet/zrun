@@ -199,6 +199,11 @@ let e_present handlers default_opt =
 let e_match is_total e handlers =
   emake (Ematch { is_total; e; handlers })
 
+let leq eq_list =
+  { l_kind = Kany; l_rec = true; l_eq = par eq_list; l_loc = no_location;
+    l_env = env_of (Defnames.names S.empty (defnames eq_list)); }
+let e_letrec eq_list e = emake (Elet(leq eq_list, e))
+
 let e_local b e = emake (Elocal(b, e))
 
 let e_local_vardec vardec_list eq_list e =
