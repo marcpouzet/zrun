@@ -1,0 +1,19 @@
+(library
+ (name typdefs_lib)
+ (public_name zrun.typdefs_lib)
+ (wrapped false)
+ (modules
+  genames ; generate fresh names
+  deftypes ; definition of types
+  defcaus ; definition of causality types
+  definit ; definition of initialisation types
+  initial ; definition of general types, values
+  ptypes ; printing types
+  pcaus ; printing causality types
+  pinit ; printing initialization types
+  global ; definition of entries in the global type environment
+  modules ; global symbol table for typing
+  )
+ (libraries zrun.global_lib)
+ (flags
+  (:standard -open Parse_lib -open Global_lib)))

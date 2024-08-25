@@ -16,6 +16,7 @@
 
 
 (* the main *)
+module Misc = Global_lib.Misc
 open Misc
    
 let main file =
