@@ -1,6 +1,33 @@
-let node f() returns (x)
+(* let node f() returns (x)
     automaton
-    | Await -> do x = 0 -> pre x + 1
+    | Await -> do x = 0
                until (x = 4) then Run(2)
-    | Run(v) -> do x = v -> pre x - 1 until (x = -3) then Await
-    end
+    | Run(v) -> do x = v until (x = -3) then Await
+    end *)
+
+let r_12 =
+    node  () returns (x_13)
+         local state_23, res_24
+         do init state_23 = Await_3
+         and init res_24 = false
+         and match last* state_23 with
+             | Await_3  -> 
+                 reset
+                   present
+                   | ((=) x_13 4)  ->
+                       do state_23 = (Run_4(2))
+                       and res_24 = true done else res_24 = false
+                   and x_13 = 0 -> ((+) (pre x_13) 1)
+		   every last* res_24
+             | Run_4(v_16)  -> 
+                 reset
+                   present
+                   | ((=) x_13 (-3))  ->
+                       do state_23 = Await_3 and res_24 = true done
+                   else res_24 = false
+                   and x_13 = v_16 -> ((-) (pre x_13) 1)  
+                 every last* res_24
+             end
+          done
+
+
