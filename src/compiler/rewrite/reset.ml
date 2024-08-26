@@ -97,13 +97,16 @@ let reset_init acc eq =
   let id, acc = intro acc in
   Aux.eq_reset eq (Aux.last_star id), acc
 
-(* [local i init true in do i = false and eq done] *)
+(* [local m init true, id do m = false and id = last* m and eq done] *)
 let local_in_eq { init } eq =
   match init with
   | None -> eq
   | Some(id) ->
-     Aux.eq_local (Aux.block_make [Aux.vardec id false (Some(Aux.etrue)) None]
-                  [Aux.eq_and (Aux.id_eq id Aux.efalse) eq])
+     let m = fresh () in
+     Aux.eq_local (Aux.block_make
+                     [Aux.vardec m false (Some(Aux.etrue)) None;
+                      Aux.vardec id false None None]
+                  [Aux.id_eq m Aux.efalse; Aux.id_eq id (Aux.last_star m); eq])
 
 (* [local m init true, i do m = false and i = last* m in e] *)
 let local_in_exp { init } e =
@@ -116,16 +119,15 @@ let local_in_exp { init } e =
                         Aux.vardec id false None None]
           [Aux.id_eq id (Aux.last_star m); Aux.id_eq m (Aux.efalse)]) e
 
-(* [local m init true, i do m = false and i = last* m in e] *)
+(* [let rec init m = true and m = false and id = last* m in e] *)
 let letrec_in_exp { init } e =
   match init with
   | None -> e
   | Some(id) ->
      let m = fresh () in
-     Aux.e_local
-       (Aux.block_make [Aux.vardec m false (Some(Aux.etrue)) None;
-                        Aux.vardec id false None None]
-          [Aux.id_eq id (Aux.last_star m); Aux.id_eq m (Aux.efalse)]) e
+     Aux.e_letrec
+       [Aux.eq_init m Aux.etrue; Aux.id_eq m Aux.efalse;
+        Aux.id_eq id (Aux.last_star m)] e
 
 let reset_eq funs acc eq =
   let eq, acc_local = Mapfold.equation_it funs empty eq in
