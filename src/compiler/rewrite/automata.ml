@@ -103,7 +103,7 @@ let eq_present handlers default =
 (* depending on the arity of the state handler. This code is taken and *)
 (* adapted from the Lucid Synchrone compiler *)
 let intro_type_for_automaton acc s_h_list =
-  let v i = "'a" ^ (string_of_int(i)) in
+  let v i = "a" ^ (string_of_int(i)) in
   (* build the result type *)
   let type_of (i, acc) { s_state = { desc } } =
     match desc with
@@ -146,7 +146,7 @@ let automaton acc is_weak handlers state_opt =
        { e_desc = Econstr0 { lname = lname n }; e_loc = loc;
          e_info = no_info }
     | Estate1(n, e_list) ->
-       { e_desc = Econstr1 { lname = lname n; arg_list = [Aux.tuple e_list] };
+       { e_desc = Econstr1 { lname = lname n; arg_list = e_list };
          e_loc = loc; e_info = no_info }
     | Estateif(e, st1, st2) ->
        ifthenelse e (state st1) (state st2) in
