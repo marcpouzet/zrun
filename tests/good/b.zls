@@ -1,9 +1,9 @@
-(* curried functions *)
-let node sum_from(n)(x) returns (o)
-    o = n fby (o + x)
+let node p(x, y) returns (o)
+  o = (0.0 fby o) +. x *. y
 
+let node sum_(s)() returns (o)
+  forward(s)[i] (xi in [|1;2;3;4|]) returns (o init 0) do
+    o = last o + i
+  done
 
-let node main0 () =
-  run (sum_from(42)) (1)
-
- 
+let node main() = run (sum_(4)) ()

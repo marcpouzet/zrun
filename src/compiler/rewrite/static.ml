@@ -303,6 +303,7 @@ let rec expression acc ({ e_desc; e_loc } as e) =
      let for_vardec_t acc ({ desc = { for_array; for_vardec } } as f) =
        let for_vardec, acc = vardec acc for_vardec in
        { f with desc = { for_array; for_vardec } }, acc in
+     let for_index_t acc id = rename_t acc id in
      let for_exp_t acc for_exp =
        match for_exp with
        | Forexp { exp; default } ->
@@ -315,6 +316,7 @@ let rec expression acc ({ e_desc; e_loc } as e) =
           let body, acc = block acc body in
           Forreturns { returns; body; r_env }, acc in
      let for_env, acc = build acc for_env in
+     let for_index, acc = Util.optional_with_map for_index_t acc for_index in
      let for_size, acc =
        Util.optional_with_map (for_size_t expression) acc for_size in
      let for_input, acc =
@@ -472,6 +474,7 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
        { eq with eq_desc = EQassert(e) }, acc
     | EQforloop
        ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
+       let for_index_t acc id = rename_t acc id in
        let for_eq_t acc { for_out; for_block } =
          let for_out_t acc
                ({ desc = { for_name; for_out_name; for_init; for_default } } as f) =
@@ -488,6 +491,7 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
          let for_block, acc = block acc for_block in
          { for_out; for_block }, acc in
        let for_env, acc = build acc for_env in
+       let for_index, acc = Util.optional_with_map for_index_t acc for_index in
        let for_size, acc =
          Util.optional_with_map (for_size_t expression) acc for_size in
        let for_input, acc =
