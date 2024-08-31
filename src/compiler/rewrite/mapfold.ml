@@ -702,6 +702,8 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
          let for_block, acc = block_it funs acc for_block in
          { for_out; for_block }, acc in
        let for_env, acc = build_it funs.global_funs acc for_env in
+       let for_index, acc =
+         Util.optional_with_map (var_ident_it funs.global_funs) acc for_index in
        let for_size, acc =
          Util.optional_with_map (for_size_t funs) acc for_size in
        let for_input, acc =
