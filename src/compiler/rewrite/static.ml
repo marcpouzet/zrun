@@ -101,7 +101,7 @@ let rename_t ({ e_renaming } as acc) x =
   try Env.find x e_renaming, acc
   with Not_found ->
     Debug.print_string "Static: unbound identifier" (Ident.name x);
-    x, acc
+    raise Error (* x, acc *)
 
 let write_t acc { dv; di; der } =
   let rename acc x = let x, _ = rename_t acc x in x in
