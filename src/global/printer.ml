@@ -182,7 +182,7 @@ let print_writes ff { dv ; di; der } =
 
 let print_env_names ff env =
   if !vverbose && not (Ident.Env.is_empty env) then 
-    Ident.Env.fprint_t (fun ff _ -> ()) ff env
+    fprintf ff "@[<v 0>(* %a *)@]" (Ident.Env.fprint_t (fun ff _ -> ())) env
 
 let print_eq_info ff { eq_write } =
   print_writes ff eq_write
