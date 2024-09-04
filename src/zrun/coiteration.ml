@@ -607,9 +607,9 @@ and ifor_exp is_fun is_resume genv env r =
   | Forexp { exp } ->
      let* s = iexp (is_fun && is_resume) genv env exp in
      return (s, [])
-  | Forreturns { returns; body } ->
-     let* sr_list = map (ifor_vardec is_fun is_resume genv env) returns in
-     let* s_b = iblock (is_fun && is_resume) genv env body in
+  | Forreturns { r_returns; r_block } ->
+     let* sr_list = map (ifor_vardec is_fun is_resume genv env) r_returns in
+     let* s_b = iblock (is_fun && is_resume) genv env r_block in
      return (s_b, sr_list)
 
 (* initial state of an equation *)
@@ -1231,7 +1231,7 @@ and sforloop_exp
                return (ve, s_for_body)
             | _ -> error { kind = Estate; loc } in
           return (ve, s_for_body, sr_list)
-       | Forreturns { returns; body } ->
+       | Forreturns { r_returns; r_block } ->
           (* 1/ computes the environment from the [returns] *)
           (* environment [env_v + acc_env]. Vars in [acc_env] *)
           (* are accumulated values such that *)
@@ -1239,21 +1239,21 @@ and sforloop_exp
           (* iteration index. *)
           let* acc_env, sr_list =
             mapfold3 { kind = Estate; loc }
-              (sfor_vardec genv env) Env.empty returns sr_list
-              (bot_list returns) in
+              (sfor_vardec genv env) Env.empty r_returns sr_list
+              (bot_list r_returns) in
           (* 2/ runs the body *)
           let* missing, env_list, acc_env, s_for_body =
             match for_kind, s_for_body with
             | Kforeach, Slist(s_list) ->
                let sbody env acc_env s =
-                 sforblock genv env acc_env body None s in
+                 sforblock genv env acc_env r_block None s in
                let* env_list, acc_env, s_list =
                  Forloop.foreach_eq loc
                    sbody env i_env acc_env s_list in
                return (0, env_list, acc_env, Slist(s_list))
             | Kforward(exit), _ ->
                let sbody env acc_env s =
-                 sforblock genv env acc_env body exit s in
+                 sforblock genv env acc_env r_block exit s in
                let* env_list, acc_env, s_for_body_new =
                  Forloop.forward_eq loc
                    sbody env i_env acc_env for_size s_for_body in
@@ -1268,10 +1268,10 @@ and sforloop_exp
           let* sr_list = 
             if for_resume then
               map2 { kind = Estate; loc } 
-                (set_forexp_out acc_env) returns sr_list
+                (set_forexp_out acc_env) r_returns sr_list
             else return sr_list in
           (* return the result of the for loop *)
-          let* v = for_matching_out missing env_list acc_env returns in
+          let* v = for_matching_out missing env_list acc_env r_returns in
           return (v, s_for_body, sr_list) in
      return (v, s_for_body, sr_list)
 

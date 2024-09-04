@@ -808,11 +808,11 @@ and forloop_exp env
        let exp = expression env exp in
        let default = Util.optional_map (expression env) default in
        env, Ast.Forexp { exp = exp; default = default }
-    | Forreturns { returns; body } ->
-       let returns, env_v_list = for_vardec_list env returns in
+    | Forreturns { r_returns; r_block } ->
+       let r_returns, env_v_list = for_vardec_list env r_returns in
        let env = Env.append env_v_list env in
-       let env_body, body = block equation env_v_list env body in
-       env_body, Ast.Forreturns { returns; body; r_env = Ident.Env.empty } in
+       let env_block, r_block = block equation env_v_list env r_block in
+       env_block, Ast.Forreturns { r_returns; r_block; r_env = Ident.Env.empty } in
   let for_kind =
     match for_kind with
     | Kforeach -> Ast.Kforeach

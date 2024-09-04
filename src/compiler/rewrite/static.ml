@@ -310,11 +310,11 @@ let rec expression acc ({ e_desc; e_loc } as e) =
           let exp, acc = expression acc exp in
           let default, acc = Util.optional_with_map expression acc default in
           Forexp { exp; default }, acc
-       | Forreturns { returns; body; r_env } ->
+       | Forreturns { r_returns; r_block; r_env } ->
           let r_env, acc = build acc r_env in
-          let returns, acc = Util.mapfold for_vardec_t acc returns in
-          let body, acc = block acc body in
-          Forreturns { returns; body; r_env }, acc in
+          let r_returns, acc = Util.mapfold for_vardec_t acc r_returns in
+          let r_block, acc = block acc r_block in
+          Forreturns { r_returns; r_block; r_env }, acc in
      let for_env, acc = build acc for_env in
      let for_index, acc = Util.optional_with_map for_index_t acc for_index in
      let for_size, acc =

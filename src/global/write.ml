@@ -314,11 +314,11 @@ and expression ({ e_desc } as e) =
          | Forexp { exp; default } ->
             Forexp { exp = expression exp;
                      default = Util.optional_map expression default }
-         | Forreturns { returns; body } ->
-            let body, _, _ = block body in
-            let returns, dv = Util.mapfold for_vardec S.empty returns in
+         | Forreturns { r_returns; r_block } ->
+            let r_block, _, _ = block r_block in
+            let r_returns, dv = Util.mapfold for_vardec S.empty r_returns in
             let r_env = build_from_names dv in
-            Forreturns({ returns; body; r_env }) in
+            Forreturns({ r_returns; r_block; r_env }) in
        let for_env = build_from_names dv_input in
        Eforloop({ f with for_size; for_kind; for_input; for_env; for_body }) in
   { e with e_desc = desc }

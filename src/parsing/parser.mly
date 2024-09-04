@@ -1171,7 +1171,7 @@ foreach_loop_exp:
     RETURNS p = for_return
     b = block(equation_empty_and_list)
     DONE
-    { (s_opt, i_opt, li, Forreturns { returns = p; body = b }) }
+    { (s_opt, i_opt, li, Forreturns { r_returns = p; r_block = b }) }
 ;
 
 forward_loop_exp:
@@ -1193,7 +1193,7 @@ forward_loop_exp:
     b = block(equation_empty_and_list)
     o_opt = optional(loop_exit_condition)
     DONE
-    { (s_opt, i_opt, li, o_opt, Forreturns { returns = p; body = b }) }
+    { (s_opt, i_opt, li, o_opt, Forreturns { r_returns = p; r_block = b }) }
 ;
 
 /* Loops for equations */

@@ -127,6 +127,9 @@ type ('a, 'info1, 'info2) it_funs =
     for_out_t :
       ('a, 'info1, 'info2) it_funs -> 'a ->
       'info1 for_out -> 'info2 for_out * 'a;
+    for_returns :
+      ('a, 'info1, 'info2) it_funs -> 'a ->
+      'info1 for_returns -> 'info2 for_returns * 'a;
     block :
       ('a, 'info1, 'info2) it_funs -> 'a ->
       ('info1, 'info1 exp, 'info1 eq) block ->
@@ -427,7 +430,7 @@ and for_vardec funs acc ({ desc = { for_array; for_vardec } } as f) =
 and for_out_it funs acc v = funs.for_out_t funs acc v
 
 and for_out_t funs acc
-  ({ desc = { for_name; for_out_name; for_init; for_default } }as f) =
+  ({ desc = { for_name; for_out_name; for_init; for_default } } as f) =
   let for_name, acc = var_ident_it funs.global_funs acc for_name in
   let for_out_name, acc = 
     Util.optional_with_map
@@ -439,6 +442,15 @@ and for_out_t funs acc
   { f with desc = { for_name; for_out_name; for_init; for_default } },
   acc         
      
+and for_returns_it funs acc f = funs.for_returns funs acc f
+
+and for_returns funs acc { r_returns; r_block; r_env } =
+  let r_env, acc = build_it funs.global_funs acc r_env in
+  let r_returns, acc =
+    Util.mapfold (for_vardec_it funs) acc r_returns in
+  let b, acc = block_it funs acc r_block in
+  { r_returns; r_block; r_env }, acc
+
 and block_it funs acc b = funs.block funs acc b
 
 and block funs acc ({ b_vars; b_body; b_write; b_env } as b) =
@@ -559,11 +571,9 @@ and expression funs acc ({ e_desc; e_loc } as e) =
           let default, acc =
             Util.optional_with_map (expression_it funs) acc default in
           Forexp { exp; default }, acc
-       | Forreturns { returns; body; r_env } ->
-          let r_env, acc = build_it funs.global_funs acc r_env in
-          let returns, acc = Util.mapfold (for_vardec_it funs) acc returns in
-          let body, acc = block_it funs acc body in
-          Forreturns { returns; body; r_env }, acc in
+       | Forreturns(f) ->
+          let f, acc = for_returns_it funs acc f in
+          Forreturns f, acc in
      let for_env, acc = build_it funs.global_funs acc for_env in
      let for_index, acc =
        Util.optional_with_map (var_ident_it funs.global_funs) acc for_index in
@@ -875,6 +885,7 @@ let defaults =
     vardec;
     for_vardec;
     for_out_t;
+    for_returns;
     block;
     result;
     funexp;
@@ -921,6 +932,7 @@ let defaults_stop =
     vardec = stop;
     for_vardec = stop;
     for_out_t = stop;
+    for_returns;
     block = stop;
     result = stop;
     funexp = stop;

@@ -73,9 +73,8 @@ let default_list =
    Inline.program;
    "der", "Remove handlers in definitions of derivatives. See below:",
    Der.program;
-   "copylast", "Add a copy for [last x] to remore false cycles when \
-                [x] is a local variable. \nRemove [last x] when [x] in \
-                an input or output. See below:",
+   "copylast", "Add a copy [lx = last* x] to remore false cycles when \
+                [x] is a local variable. See below:",
    Copylast.program;
    "auto", "Translation of automata. See below:",
    Automata.program;

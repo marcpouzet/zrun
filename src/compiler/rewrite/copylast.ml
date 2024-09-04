@@ -37,10 +37,6 @@
 (* is rewritten [last* m] and the copy equation [m = x] is introduced *)
 
 (* Example:
- *- [let node f(x) = ... last x...] is rewritten
- *- [let node f(x) = local (last m), r do r = ... last* m and m = x in r]
- *- [let node f(x) returns (...) ...last x...] is rewritten
- *- [let node f(x) returns (...y...) ... last* m and m = x]
  *- [match e with P(...x...) -> ...last x...] is rewritten
  *- [match e with P(...x...) -> local (last m) ...last* m... and m = x]
  *- [present e(...x...) -> ... last x ...] is rewritten
@@ -59,17 +55,18 @@ type acc =
   { locals: Misc.no_info Env.t; 
     (* names that are defined locally as [local ... x ... do ... ] or *)
     (* [let [rec] ... x ... in ...] *)
-    (* an extra equation [lx = last* x] must be introduced for them *)
-    (* They are neither inputs (of a function or free variables in a pattern) *)
-    (* nor outputs *)
-    renaming: Ident.t Env.t; (* renaming [x -> m] *)
+    (* if [x] is local and [last x] is used, [last x] is replaced by [lx] *)
+    (* and an equation [lx = last*x] is added. If [x] is a value *)
+    (* e.g., a variable in a pattern, [last x] is replaced by [last* m] *)
+    (* and an equation [m = x] is added *)
+    renaming: Ident.t Env.t; (* renaming [x -> m] or [x -> lx] *)
   }
 
 let empty = { locals = Env.empty; renaming = Env.empty }
 
-let copy m x = Aux.id_eq m (Aux.var x)
-
+(* add [m = x] *)
 let add_eq_copy l_renaming acc =
+  let copy m x = Aux.id_eq m (Aux.var x) in
   Env.fold (fun x m acc -> copy m x :: acc) l_renaming acc
 
 (* add extra local declarations *)
@@ -86,7 +83,9 @@ let e_local_m_x l_renaming e =
 
 (* [local m1,...,mn do m1 = x1 and ... and mn = xn and eq done] *)
 let eq_local_m_x l_renaming eq =
-  Aux.eq_local_vardec (vardec_list l_renaming [])(add_eq_copy l_renaming [eq])
+  if Env.is_empty l_renaming then eq
+  else
+    Aux.eq_local_vardec (vardec_list l_renaming []) (add_eq_copy l_renaming [eq])
 
 (* Make equations [lx1 = last* x1 and ... lxn = last* xn] *)
 (* from a [renaming] where [renaming(x) = lx] *)
@@ -100,8 +99,9 @@ let add_copy_names_in_env l_env l_renaming =
 
 (* Make an equation [let lx1 = last* x1 and ... lx_n = last* xn in eq] *)
 let eq_let_lx_lastx l_renaming eq =
-  let eq_list = add_last_copy_eq l_renaming in
-  Aux.eq_let (Aux.leq eq_list) eq
+  if Env.is_empty l_renaming then eq
+  else let eq_list = add_last_copy_eq l_renaming in
+       Aux.eq_let (Aux.leq eq_list) eq
 
 let intro ({ locals; renaming } as acc) id =
   try
@@ -112,7 +112,7 @@ let intro ({ locals; renaming } as acc) id =
                                              
 (* Given a [renaming] and an environment [l_env], decompose it in two *)
 (* Returns [l_renaming] (for local renaming) and [r_renaming] (for *)
-(* renaming that remains such that [renaming = l_renaming + r_renaming] *)
+(* renaming that remains) such that [renaming = l_renaming + r_renaming] *)
 (* [Names(l_renaming) subset Names(l_env)] *)
 let extract_local_renaming l_env renaming =
   Env.fold
@@ -162,19 +162,16 @@ let block funs acc ({ b_vars; b_body; b_env } as b) =
   { b with b_vars; b_body = eq_let_lx_lastx l_renaming b_body},
   { locals; renaming }
 
-(* replace [init id = e] by [init m = e] when [m] is an *)
-(* input/output variable. [acc.renaming id = m] *)
-let init_ident _ ({ locals; renaming } as acc) id = 
-  if Env.mem id locals then id, acc
-  else intro acc id
+let for_returns funs acc { r_returns; r_block; r_env } =
+  let r_returns, ({ locals } as acc) =
+    Util.mapfold (Mapfold.for_vardec_it funs) acc r_returns in
+  let { b_body } as r_block, ({ renaming } as acc) =
+    Mapfold.block_it funs { acc with locals = Env.append r_env locals } r_block in
+  let l_renaming, renaming = extract_local_renaming r_env renaming in
+  { r_returns;
+    r_block = { r_block with b_body = eq_let_lx_lastx l_renaming b_body };
+    r_env }, acc
 
-let write_it funs ({ renaming } as acc) { dv; di; der } =
-  let rename id = try Env.find id renaming with Not_found -> id in
-  let dv = S.map rename dv in
-  let di = S.map rename di in
-  let der = S.map rename der in
-  { dv; di; der }, acc
-  
 let match_handler_eq funs acc ({ m_body; m_env } as m_h) =
   let m_body, ({ renaming } as acc) = Mapfold.equation_it funs acc m_body in 
   let m_renaming, renaming = extract_local_renaming m_env renaming in
@@ -203,7 +200,7 @@ let funexp funs ({ locals } as acc) ({ f_args; f_body; f_env } as f) =
     Util.mapfold (Mapfold.vardec_it funs) acc vardec_list in
   let f_args, acc = Util.mapfold arg_t acc f_args in
   let ({ r_desc } as r), ({ renaming } as acc) =
-    Mapfold.result_it funs acc f_body in
+    Mapfold.result_it funs { acc with locals = Env.append f_env locals } f_body in
   let l_renaming, renaming = extract_local_renaming f_env renaming in
   let r_desc =
     match r_desc with
@@ -220,9 +217,11 @@ let set_index funs acc n =
 let get_index funs acc n = Ident.get (), acc
 
 let program _ p =
-  let global_funs = { Mapfold.default_global_funs with init_ident } in
+  let global_funs = Mapfold.default_global_funs  in (* with init_ident } in *)
   let funs =
     { Mapfold.defaults with pattern; expression; leq_t; block;
+                            for_returns; match_handler_eq; match_handler_e;
+                            present_handler_eq; present_handler_e;
                             funexp; set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }

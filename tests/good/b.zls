@@ -1,17 +1,19 @@
-let node f(i init 2) returns (o)
-  do o = last i + 1 done
-
-let node sum_() returns (o)
+(* let node sum_() returns (o)
   forward(2) returns (o init 42) do
     o = last o + 1
-  done
+  done *)
 
-let step self () =
+let node sum_() returns (o)
+  o  = forward(2) returns (o' init 42) do
+         o' = last o' + 1
+       done
+
+(* let step self () =
   let m = { o = 42 } in
   m.o <- 42;
   for i = 0 to 1 do
     m.o <- m.o + 1;
-  done; m.o
+  done; m.o *)
 
 (*
 let node f(i) returns (o)

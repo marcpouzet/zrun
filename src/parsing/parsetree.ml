@@ -268,7 +268,8 @@ and for_exp =
   | Forexp : { exp : exp; default : exp option } -> for_exp
   (* [for[each|ward] ... do e done] *)
   | Forreturns :
-      { returns : for_vardec_desc localized list; body : (exp, eq) block } -> for_exp
+      { r_returns : for_vardec_desc localized list;
+        r_block : (exp, eq) block } -> for_exp
   (* [for[each|ward] ... returns (...) local ... do eq ... done] *)
 
 and for_vardec_desc =

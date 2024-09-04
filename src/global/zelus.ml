@@ -267,12 +267,14 @@ and ('info, 'size, 'body) forloop =
 and 'info for_exp =
   | Forexp : { exp : 'info exp; default : 'info exp option } -> 'info for_exp
   (* [for[each|ward] ... do e done] *)
-  | Forreturns :
-      { returns : 'info exp for_vardec list; (* return *)
-        body : ('info, 'info exp, 'info eq) block; (* body *)
-        r_env : 'info Ident.Env.t; (* environment *)
-      } -> 'info for_exp
+  | Forreturns : 'info for_returns -> 'info for_exp
+
+and 'info for_returns =
+  { r_returns : 'info exp for_vardec list; (* return *)
+    r_block : ('info, 'info exp, 'info eq) block; (* body *)
+    r_env : 'info Ident.Env.t; (* environment for the return *)
 (* [for[each|ward] ... returns (...) local ... do eq ... done] *)
+  }
 
 and 'exp for_vardec = 'exp for_vardec_desc localized
 
