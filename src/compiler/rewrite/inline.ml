@@ -55,9 +55,6 @@ let var_ident global_funs ({ renaming } as acc) x =
       "Inline error: unbound local variable %s\n" (Ident.name x);
     raise Error
 
-let eq_of_f_arg_arg acc f_args arg_list =
-  acc
-
 (* Main transformation *)
 (* [(\a1...an. e) e1 ... en] 
  *- rewrites to:

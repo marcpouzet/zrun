@@ -130,6 +130,12 @@ type ('a, 'info1, 'info2) it_funs =
     for_returns :
       ('a, 'info1, 'info2) it_funs -> 'a ->
       'info1 for_returns -> 'info2 for_returns * 'a;
+    for_exp_t :
+      ('a, 'info1, 'info2) it_funs -> 'a ->
+      'info1 for_exp -> 'info2 for_exp * 'a;
+    for_eq_t :
+      ('a, 'info1, 'info2) it_funs -> 'a ->
+      'info1 for_eq -> 'info2 for_eq * 'a;
     block :
       ('a, 'info1, 'info2) it_funs -> 'a ->
       ('info1, 'info1 exp, 'info1 eq) block ->
@@ -370,6 +376,27 @@ and for_input_t funs acc ({ desc } as fi) =
        Eindex { ind with id; e_left; e_right }, acc in
   { fi with desc }, acc
 
+and for_exp_it funs acc for_body = funs.for_exp_t funs acc for_body
+
+and for_exp_t funs acc for_body =
+  match for_body with
+  | Forexp { exp; default } ->
+     let exp, acc = expression_it funs acc exp in
+     let default, acc =
+       Util.optional_with_map (expression_it funs) acc default in
+     Forexp { exp; default }, acc
+  | Forreturns(f) ->
+     let f, acc = for_returns_it funs acc f in
+     Forreturns f, acc
+
+and for_eq_it funs acc for_body = funs.for_eq_t funs acc for_body
+
+and for_eq_t funs acc { for_out; for_block } =
+  let for_out, acc =
+    Util.mapfold (for_out_it funs) acc for_out in
+  let for_block, acc = block_it funs acc for_block in
+  { for_out; for_block }, acc
+
 and slet_it funs acc leq_list =
   Util.mapfold (leq_it funs) acc leq_list
 
@@ -448,7 +475,7 @@ and for_returns funs acc { r_returns; r_block; r_env } =
   let r_env, acc = build_it funs.global_funs acc r_env in
   let r_returns, acc =
     Util.mapfold (for_vardec_it funs) acc r_returns in
-  let b, acc = block_it funs acc r_block in
+  let r_block, acc = block_it funs acc r_block in
   { r_returns; r_block; r_env }, acc
 
 and block_it funs acc b = funs.block funs acc b
@@ -564,16 +591,6 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      { e with e_desc = Efun f }, acc
   | Eforloop
      ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
-     let for_exp_t acc for_body =
-       match for_body with
-       | Forexp { exp; default } ->
-          let exp, acc = expression_it funs acc exp in
-          let default, acc =
-            Util.optional_with_map (expression_it funs) acc default in
-          Forexp { exp; default }, acc
-       | Forreturns(f) ->
-          let f, acc = for_returns_it funs acc f in
-          Forreturns f, acc in
      let for_env, acc = build_it funs.global_funs acc for_env in
      let for_index, acc =
        Util.optional_with_map (var_ident_it funs.global_funs) acc for_index in
@@ -581,7 +598,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
        Util.optional_with_map (for_size_t funs) acc for_size in
      let for_input, acc =
        Util.mapfold (for_input_t funs) acc for_input in
-     let for_body, acc = for_exp_t acc for_body in
+     let for_body, acc = for_exp_it funs acc for_body in
      (* the exit condition can depend on output variables of the loop *)
      let for_kind, acc = for_kind_t funs acc for_kind in
      { e with e_desc =
@@ -706,19 +723,14 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
        { eq with eq_desc = EQassert(e) }, acc
     | EQforloop
        ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
-       let for_eq_t acc { for_out; for_block } =
-         let for_out, acc =
-           Util.mapfold (for_out_it funs) acc for_out in
-         let for_block, acc = block_it funs acc for_block in
-         { for_out; for_block }, acc in
-       let for_env, acc = build_it funs.global_funs acc for_env in
+      let for_env, acc = build_it funs.global_funs acc for_env in
        let for_index, acc =
          Util.optional_with_map (var_ident_it funs.global_funs) acc for_index in
        let for_size, acc =
          Util.optional_with_map (for_size_t funs) acc for_size in
        let for_input, acc =
          Util.mapfold (for_input_t funs) acc for_input in
-       let for_body, acc = for_eq_t acc for_body in
+       let for_body, acc = for_eq_it funs acc for_body in
        (* the exit condition can depend on output variables of the loop *)
        let for_kind, acc = for_kind_t funs acc for_kind in
        { eq with eq_desc =
@@ -886,6 +898,8 @@ let defaults =
     for_vardec;
     for_out_t;
     for_returns;
+    for_exp_t;
+    for_eq_t;
     block;
     result;
     funexp;
@@ -933,6 +947,8 @@ let defaults_stop =
     for_vardec = stop;
     for_out_t = stop;
     for_returns;
+    for_exp_t;
+    for_eq_t;
     block = stop;
     result = stop;
     funexp = stop;

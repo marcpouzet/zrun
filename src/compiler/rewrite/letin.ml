@@ -126,91 +126,132 @@ let rec expression funs acc ({ e_desc } as e) =
      let e, acc_e = expression funs empty e in
      e, par acc (seq acc_b acc_e)
   | _ -> Mapfold.expression funs acc e
-     
+
+let atomic_expression funs acc e =
+  let e, acc_local = Mapfold.expression_it funs empty e in
+  e_local acc_local e, acc
+
+let atomic_equation funs acc e =
+  let _, acc_local = Mapfold.equation_it funs empty e in
+  eq_local acc_local, acc
+
 (* Translate an equation. *)
 (* [equation funs { c_vardec; c_eq } eq = empty_eq, [{ c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq and eq] and *)
 (* [local c_vardec' do c_eq'] are equivalent *)
-and equation funs acc ({ eq_desc } as eq) =
+let equation funs acc ({ eq_desc } as eq) =
   let acc_eq = match eq_desc with 
     | EQand { eq_list } ->
-       let _, acc = Util.mapfold (equation funs) empty eq_list in
+       let _, acc = Util.mapfold (Mapfold.equation_it funs) empty eq_list in
        acc
     | EQinit(id, e_init) ->
-       let e_init, acc_init = expression funs empty e_init in
-       add_par { eq with eq_desc = EQinit(id, e_local acc_init e_init) } empty
+       let e, acc = atomic_expression funs acc e_init in
+       add_par { eq with eq_desc = EQinit(id, e) } empty
     | EQlet(l, eq) ->
        (* the sequential order is preserved *)
-       let _, acc_l = leq_t funs empty l in
-       let eq, acc_eq = equation funs empty eq in
+       let _, acc_l = Mapfold.leq_it funs empty l in
+       let eq, acc_eq = Mapfold.equation_it funs empty eq in
        seq acc_l acc_eq
     | EQlocal(b) ->
-       let _, acc_b = block funs empty b in
+       let _, acc_b = Mapfold.block funs empty b in
        acc_b
     | _ ->
        let eq, acc = Mapfold.equation funs empty eq in
        seq acc (add_seq eq empty) in
   empty_eq, par acc acc_eq
 
-and leq_t funs acc { l_eq = { eq_write } as l_eq } =
-  let _, acc = equation funs acc l_eq in
+let leq_t funs acc { l_eq = { eq_write } as l_eq } =
+  let _, acc = Mapfold.equation_it funs acc l_eq in
   empty_leq, add_names (Defnames.names S.empty eq_write) acc
 
-and move_init_into_equations acc ({ var_name; var_init } as v) =
+let move_init_into_equations acc ({ var_name; var_init } as v) =
   match var_init with
   | None -> v, acc
   | Some(e) ->
      { v with var_init = None; var_init_in_eq = true },
      par acc (add_seq (Aux.eq_init var_name e) empty)
      
-and block funs acc { b_vars; b_body } =
+(* blocks are un-nested *)
+let block funs acc { b_vars; b_body } =
   let b_vars, acc_b_vars =
-    Util.mapfold (Mapfold.vardec funs) empty b_vars in
+    Util.mapfold (Mapfold.vardec_it funs) empty b_vars in
   let b_vars, acc_b_vars =
     Util.mapfold move_init_into_equations acc_b_vars b_vars in
-  let _, acc_b_body = equation funs empty b_body in
+  let _, acc_b_body = Mapfold.equation_it funs empty b_body in
   empty_block, (add_vardec b_vars (par acc (seq acc_b_vars acc_b_body)))
 
-and if_eq funs acc (eq_true, eq_false) =
-  let _, acc_true = equation funs empty eq_true in
-  let _, acc_false = equation funs empty eq_false in
+let if_eq funs acc (eq_true, eq_false) =
+  let _, acc_true = Mapfold.equation_it funs empty eq_true in
+  let _, acc_false = Mapfold.equation_it funs empty eq_false in
   (eq_local acc_true, eq_local acc_false), acc
 
-and match_handler_eq funs acc ({ m_body } as m_h) =
-  let _, acc_local = equation funs empty m_body in 
-  { m_h with m_body = eq_local acc_local }, acc
+let match_handler_eq funs acc ({ m_body } as m_h) =
+  let eq, acc = atomic_equation funs acc m_body in
+  { m_h with m_body = eq }, acc
 
-and match_handler_e funs acc ({ m_body } as m_h) =
-  let e, acc_local = expression funs empty m_body in 
-  { m_h with m_body = e_local acc_local e }, acc
+let match_handler_e funs acc ({ m_body } as m_h) =
+  let e, acc = atomic_expression funs acc m_body in 
+  { m_h with m_body = e }, acc
 
-and present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
-  let p_cond, acc = Mapfold.scondpat funs acc p_cond in
-  let _, acc_local = equation funs empty p_body in
-  { p_b with p_cond; p_body = eq_local acc_local }, acc
+let present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_cond, acc = Mapfold.scondpat_it funs acc p_cond in
+  let p_body, acc = atomic_equation funs acc p_body in
+  { p_b with p_cond; p_body }, acc
 
-and present_handler_e funs acc ({ p_cond; p_body; p_env } as p_b) =
-  let p_cond, acc = Mapfold.scondpat funs acc p_cond in
-  let p_body, acc_local = expression funs empty p_body in
-  { p_b with p_cond; p_body = e_local acc_local p_body }, acc
+let present_handler_e funs acc ({ p_cond; p_body; p_env } as p_b) =
+  let p_cond, acc = Mapfold.scondpat_it funs acc p_cond in
+  let p_body, acc = atomic_expression funs acc p_body in
+  { p_b with p_cond; p_body }, acc
 
-and result funs acc ({ r_desc } as r) =
+let reset_e funs acc e = atomic_expression funs acc e
+
+let reset_eq funs acc eq = atomic_equation funs acc eq
+
+let result funs acc ({ r_desc } as r) =
   let r_desc, acc = match r_desc with
   | Exp(e) ->
-     let e, acc_local = expression funs empty e in
-     Exp(e_local acc_local e), acc
+     let e, acc = atomic_expression funs acc e in
+     Exp(e), acc
   | Returns({ b_vars; b_body } as b) ->
-     let b_vars, acc_b_vars =
-       Util.mapfold (vardec funs) empty b_vars in
-     let b_vars, acc_b_vars =
-       Util.mapfold move_init_into_equations acc_b_vars b_vars in
-     let _, acc_local = equation funs empty b_body in
-     Returns({ b with b_vars; b_body = eq_local (seq acc_b_vars acc_local) }),
-     acc in
+     let b_vars, acc =
+       Util.mapfold (Mapfold.vardec_it funs) acc b_vars in
+     let b_body, acc = atomic_equation funs acc b_body in
+     Returns({ b with b_vars; b_body }), acc in
   { r with r_desc }, acc
 
-and letdecl funs acc (d_names, ({ l_eq } as leq)) =
-  let _, acc_local = equation funs empty l_eq in
+and vardec funs acc ({ var_default; var_init } as v) =
+  let var_default, acc =
+    Util.optional_with_map (atomic_expression funs) acc var_default in
+  let var_init, acc =
+    Util.optional_with_map (atomic_expression funs) acc var_init in
+  { v with var_default; var_init }, acc
+
+let for_exp_t funs acc for_body =
+  match for_body with
+  | Forexp { exp; default } ->
+     let exp, acc = atomic_expression funs empty exp in
+     let default, acc =
+       Util.optional_with_map (atomic_expression funs) acc default in
+     Forexp { exp; default }, acc
+  | Forreturns(f) ->
+     let f, acc = for_returns_it funs acc f in
+     Forreturns f, acc
+
+let for_eq_t funs acc { for_out; for_block } =
+  let for_out, acc =
+    Util.mapfold (for_out_t funs) acc for_out in
+  let for_block, acc = block funs acc for_block in
+  { for_out; for_block }, acc
+
+let for_out_t funs acc ({ desc = ({ for_init; for_default } as desc) } as f) =
+  let for_init, acc =
+    Util.optional_with_map (atomic_expression funs) acc for_init in
+  let for_default, acc =
+    Util.optional_with_map (atomic_expression funs) acc for_default in
+  { f with desc = { desc with for_init; for_default } }, acc
+
+let letdecl funs acc (d_names, ({ l_eq } as leq)) =
+  let _, acc_local = Mapfold.equation_it funs empty l_eq in
   (d_names, { leq with l_eq = eq_local acc_local }), acc
 
 let program _ p =
@@ -219,7 +260,7 @@ let program _ p =
     { Mapfold.defaults with pattern; expression; equation; leq_t; block;
                             if_eq; match_handler_eq; match_handler_e;
                             present_handler_eq; present_handler_e;
-                            result; letdecl; global_funs } in
+                            reset_e; reset_eq; result; letdecl; global_funs } in
   let { p_impl_list } as p, _ =
     Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }
