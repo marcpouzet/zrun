@@ -111,6 +111,9 @@ type ('a, 'info1, 'info2) it_funs =
       ('a, 'info1, 'info2) it_funs -> 'a -> defnames -> defnames * 'a;
     leq_t :
       ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 leq -> 'info2 leq * 'a;
+    slet_t :
+      ('a, 'info1, 'info2) it_funs -> 'a ->
+      'info1 leq list -> 'info2 leq list * 'a;
     equation :
       ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 eq -> 'info2 eq * 'a;
     scondpat :
@@ -397,8 +400,9 @@ and for_eq_t funs acc { for_out; for_block } =
   let for_block, acc = block_it funs acc for_block in
   { for_out; for_block }, acc
 
-and slet_it funs acc leq_list =
-  Util.mapfold (leq_it funs) acc leq_list
+and slet_it funs acc leq_list = funs.slet_t funs acc leq_list
+
+and slet_t funs acc leq_list = Util.mapfold (leq_it funs) acc leq_list
 
 and leq_it funs acc leq = funs.leq_t funs acc leq
 
@@ -891,6 +895,7 @@ let defaults =
     pattern;
     write_t;
     leq_t;
+    slet_t;
     equation;
     scondpat;
     expression;
@@ -940,6 +945,7 @@ let defaults_stop =
     pattern = stop;
     write_t = stop;
     leq_t = stop;
+    slet_t = stop;
     equation = stop;
     scondpat = stop;
     expression = stop;

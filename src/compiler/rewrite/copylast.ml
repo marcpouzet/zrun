@@ -157,7 +157,8 @@ let block funs acc ({ b_vars; b_body; b_env } as b) =
   let b_vars, ({ locals } as acc) =
     Util.mapfold (Mapfold.vardec_it funs) acc b_vars in
   let b_body, ({ renaming } as acc) =
-    Mapfold.equation_it funs { acc with locals = Env.append b_env locals } b_body in
+    Mapfold.equation_it
+      funs { acc with locals = Env.append b_env locals } b_body in
   let l_renaming, renaming = extract_local_renaming b_env renaming in
   { b with b_vars; b_body = eq_let_lx_lastx l_renaming b_body},
   { locals; renaming }
@@ -166,11 +167,30 @@ let for_returns funs acc { r_returns; r_block; r_env } =
   let r_returns, ({ locals } as acc) =
     Util.mapfold (Mapfold.for_vardec_it funs) acc r_returns in
   let { b_body } as r_block, ({ renaming } as acc) =
-    Mapfold.block_it funs { acc with locals = Env.append r_env locals } r_block in
+    Mapfold.block_it
+      funs { acc with locals = Env.append r_env locals } r_block in
   let l_renaming, renaming = extract_local_renaming r_env renaming in
   { r_returns;
     r_block = { r_block with b_body = eq_let_lx_lastx l_renaming b_body };
     r_env }, acc
+
+let for_exp_t funs acc for_body =
+  match for_body with
+  | Forexp { exp; default } ->
+     let exp, acc = expression funs empty exp in
+     let default, acc =
+       Util.optional_with_map (expression funs) acc default in
+     Forexp { exp; default }, acc
+  | Forreturns(f) ->
+     let f, acc = Mapfold.for_returns_it funs acc f in
+     Forreturns f, acc
+
+let for_out_t funs acc ({ desc = ({ for_init; for_default } as desc) } as f) =
+  let for_init, acc =
+    Util.optional_with_map (Mapfold.expression_it funs) acc for_init in
+  let for_default, acc =
+    Util.optional_with_map (Mapfold.expression_it funs) acc for_default in
+  { f with desc = { desc with for_init; for_default } }, acc
 
 let match_handler_eq funs acc ({ m_body; m_env } as m_h) =
   let m_body, ({ renaming } as acc) = Mapfold.equation_it funs acc m_body in 
@@ -200,7 +220,8 @@ let funexp funs ({ locals } as acc) ({ f_args; f_body; f_env } as f) =
     Util.mapfold (Mapfold.vardec_it funs) acc vardec_list in
   let f_args, acc = Util.mapfold arg_t acc f_args in
   let ({ r_desc } as r), ({ renaming } as acc) =
-    Mapfold.result_it funs { acc with locals = Env.append f_env locals } f_body in
+    Mapfold.result_it
+      funs { acc with locals = Env.append f_env locals } f_body in
   let l_renaming, renaming = extract_local_renaming f_env renaming in
   let r_desc =
     match r_desc with
@@ -220,7 +241,8 @@ let program _ p =
   let global_funs = Mapfold.default_global_funs  in (* with init_ident } in *)
   let funs =
     { Mapfold.defaults with pattern; expression; leq_t; block;
-                            for_returns; match_handler_eq; match_handler_e;
+                            for_returns; for_exp_t; for_out_t;
+                            match_handler_eq; match_handler_e;
                             present_handler_eq; present_handler_e;
                             funexp; set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs empty p in
