@@ -260,7 +260,7 @@ and ('info, 'size, 'body) forloop =
     for_input : 'info for_input_desc localized list; (* inputs *)
     for_body : 'body; (* the body of the loop *)
     for_resume : bool; (* resume or restart *)
-    for_in_env : 'info Ident.Env.t; (* environment for index and input *)
+    for_env : 'info Ident.Env.t; (* environment for index and input *)
   }
 
 (* body of a for loop whose result is an expression *)
@@ -268,48 +268,24 @@ and 'info for_exp =
   | Forexp :
       { exp : 'info exp; default : 'info exp option } -> 'info for_exp
   (* [for[each|ward] ... do e done] *)
-  | Forreturns : 'info for_returns -> 'info for_exp
+  | Foreq :
+      ('info, for_array) for_eq -> 'info for_exp
 
-and 'info for_returns =
-  { for_returns_vars: 'info exp for_vardec list; (* return *)
-    for_returns_block : ('info, 'info exp, 'info eq) block; (* body *)
-    for_returns_env : 'info Ident.Env.t; (* environment for the return *)
-(* [for[each|ward] ... returns (...) local ... do eq ... done] *)
+(* body of a for loop whose body is defined by a set of equations *)
+and ('info,  'out) for_eq =
+  { for_vars : ('info, 'out) for_vardec list; (* returns *)
+    for_block : ('info, 'info exp, 'info eq) block; (* loop body *)
+    for_vars_env : 'info Ident.Env.t; (* environment for the return *)
   }
 
-and 'exp for_vardec = 'exp for_vardec_desc localized
-
-and 'exp for_vardec_desc =
-  { for_array : int; (* 0 means x; 1 means [|x|]; 2 means [|[| x|]|]; etc *)
-    for_vardec : 'exp vardec; (* [x [init e] [default e]] *)
-  }
-
-(* body of a for loop whose result is an equation *)
-and 'info for_eq =
-  { for_eq_vars : 'info for_out list; (* returns *)
-    for_eq_block : ('info, 'info exp, 'info eq) block; (* loop body *)
-    for_eq_env : 'info Ident.Env.t; (* environment for the return *)
-  }
-
-(* output of a for loop in equational form *)
-and 'info for_out = 'info for_out_desc localized
-
-and 'info for_out_desc =
-  { for_vardec_name : Ident.t; (* xi [init e] [default e] [out x] *)
-    for_vardec_out_name : Ident.t option; (* [xi out x] *)
-    for_vardec_init : 'info exp option;
-    for_vardec_default : 'info exp option;
-  }
-
-and ('a, 'info) for_out =
-  { for_returns : 'a;
+and ('info, 'out) for_vardec =
+  { for_out : 'out;
     for_name: Ident.t;
     for_init : 'info exp option;
     for_default : 'info exp option;
   }
 
-(Ident.t option, 'info) for_out
-
+and for_array = int (* 0 means x; 1 means [x]; 2 means [[x]]; etc. *)
 
 and is_rec = bool
 
