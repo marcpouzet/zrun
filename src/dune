@@ -86,7 +86,39 @@
   (libraries zrun.global_lib)
 )
 
-;rewriting steps
+; type inference
+ (library
+  (name typing_lib)
+  (public_name zrun.typing_lib)
+  (wrapped false)
+  (modules
+    kind ; kinds
+    patternsig ; check totality of pattern matching
+    total ; check totatlity of pattern matching
+    types ; type manipulation and unification between types
+    matching ; check totality of pattern matching
+    sizeinference ; check size inference
+    typerrors ; type errors;
+    typing ; the main typing functions
+    )
+  (libraries zrun.global_lib zrun.typdefs_lib)
+)
+
+; causality and initialisation analyses
+ (library
+  (name analyses_lib)
+  (public_name zrun.analyses_lib)
+  (wrapped false)
+  (modules
+    causal ; type manipulation and unification between types for causality
+    init ;  type manipulation and unification between types for initialisation
+    causality ; causality inference
+    initialization ; initialization inference
+    )
+  (libraries zrun.global_lib zrun.typdefs_lib zrun.typing_lib)
+)
+
+; rewriting steps
  (library
   (name rewrite_lib)
   (public_name zrun.rewrite_lib)

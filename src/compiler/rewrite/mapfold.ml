@@ -394,11 +394,12 @@ and for_exp_t funs acc for_body =
 
 and for_eq_it funs acc for_body = funs.for_eq_t funs acc for_body
 
-and for_eq_t funs acc { for_out; for_block } =
+and for_eq_t funs acc { for_out; for_block; for_out_env } =
+  let for_out_env, acc = build_it funs.global_funs acc for_out_env in
   let for_out, acc =
     Util.mapfold (for_out_it funs) acc for_out in
   let for_block, acc = block_it funs acc for_block in
-  { for_out; for_block }, acc
+  { for_out; for_block; for_out_env }, acc
 
 and slet_it funs acc leq_list = funs.slet_t funs acc leq_list
 

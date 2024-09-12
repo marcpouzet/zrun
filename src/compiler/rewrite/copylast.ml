@@ -103,6 +103,10 @@ let eq_let_lx_lastx l_renaming eq =
   else let eq_list = add_last_copy_eq l_renaming in
        Aux.eq_let (Aux.leq eq_list) eq
 
+(* Inject [let lx1 = last* x1 and ... lx_n = last* xn in eq] into a block *)
+let block_let_lx_lastx l_renaming ({ b_body } as b) =
+  { b with b_body = eq_let_lx_lastx l_renaming b_body }
+
 let intro ({ locals; renaming } as acc) id =
   try
     let lx = Env.find id renaming in lx, acc
@@ -152,13 +156,13 @@ let leq_t funs ({ locals } as acc) ({ l_eq; l_env; l_rec } as leq) =
              l_env = add_copy_names_in_env l_env l_renaming; l_rec },
   { locals; renaming }
 
-(* add extra equations [lx = last* x] *)
 let block funs acc ({ b_vars; b_body; b_env } as b) =
   let b_vars, ({ locals } as acc) =
     Util.mapfold (Mapfold.vardec_it funs) acc b_vars in
   let b_body, ({ renaming } as acc) =
     Mapfold.equation_it
       funs { acc with locals = Env.append b_env locals } b_body in
+  (* add extra equations [lx = last* x] *)
   let l_renaming, renaming = extract_local_renaming b_env renaming in
   { b with b_vars; b_body = eq_let_lx_lastx l_renaming b_body},
   { locals; renaming }
@@ -184,6 +188,17 @@ let for_exp_t funs acc for_body =
   | Forreturns(f) ->
      let f, acc = Mapfold.for_returns_it funs acc f in
      Forreturns f, acc
+
+let for_eq_t funs ({ locals } as acc)
+      ({ for_out; for_block; for_out_env } as for_eq) =
+  let for_out, acc =
+    Util.mapfold (Mapfold.for_out_it funs) acc for_out in
+  let for_block, { renaming } =
+    Mapfold.block_it
+      funs { acc with locals = Env.append for_out_env locals } for_block in
+  let l_renaming, renaming = extract_local_renaming for_out_env renaming in
+  let for_block = block_let_lx_lastx l_renaming for_block in
+  { for_eq with for_out; for_block }, { locals; renaming }
 
 let for_out_t funs acc ({ desc = ({ for_init; for_default } as desc) } as f) =
   let for_init, acc =
@@ -241,7 +256,7 @@ let program _ p =
   let global_funs = Mapfold.default_global_funs  in (* with init_ident } in *)
   let funs =
     { Mapfold.defaults with pattern; expression; leq_t; block;
-                            for_returns; for_exp_t; for_out_t;
+                            for_returns; for_exp_t; for_eq_t;
                             match_handler_eq; match_handler_e;
                             present_handler_eq; present_handler_e;
                             funexp; set_index; get_index; global_funs } in

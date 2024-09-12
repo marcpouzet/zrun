@@ -475,7 +475,7 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
     | EQforloop
        ({ for_size; for_kind; for_index; for_input; for_body; for_env } as f) ->
        let for_index_t acc id = rename_t acc id in
-       let for_eq_t acc { for_out; for_block } =
+       let for_eq_t acc { for_out; for_block; for_out_env } =
          let for_out_t acc
                ({ desc = { for_name; for_out_name; for_init; for_default } } as f) =
            let for_name, acc = rename_t acc for_name in
@@ -486,10 +486,11 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
              Util.optional_with_map expression acc for_default in
            { f with desc = { for_name; for_out_name; for_init; for_default } },
            acc in
+         let for_out_env, acc = build acc for_out_env in
          let for_out, acc =
            Util.mapfold for_out_t acc for_out in
          let for_block, acc = block acc for_block in
-         { for_out; for_block }, acc in
+         { for_out; for_block; for_out_env }, acc in
        let for_env, acc = build acc for_env in
        let for_index, acc = Util.optional_with_map for_index_t acc for_index in
        let for_size, acc =

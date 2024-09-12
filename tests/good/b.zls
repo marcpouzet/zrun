@@ -1,22 +1,3 @@
-let node ff () returns (o)
+let node ff () returns (o init 42)
   forward(2) returns (o init last o)
-    do o = last o + 1 until o >= 42 done
-
-let node ff () returns (o)
-  forward(2) returns (o)
-    do o = last o + 1 until o >= 42
-    with init o = last o and default o = 42
-
-let node ff () returns (o)
-  o = forward(2) returns (o init 0)
     do o = last o + 1 done
-
-let node ff () returns (o)
-  o = forward(2) returns (o)
-      do o = last o + 1 with init o = 0 done
-
-let node ff () returns (o)
-  forward(2) returns (o)
-    do o = last o + 1 done
-  with last o = 0
-  

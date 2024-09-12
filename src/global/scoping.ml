@@ -541,7 +541,7 @@ and forloop_eq env_pat env { for_size; for_kind; for_index; for_input; for_resum
       Ast.for_kind = for_kind;
       Ast.for_index = for_index;
       Ast.for_input = for_input;
-      Ast.for_body = { for_out; for_block };
+      Ast.for_body = { for_out; for_block; for_out_env = Ident.Env.empty };
       Ast.for_resume = for_resume;
       Ast.for_env = Ident.Env.empty }
 

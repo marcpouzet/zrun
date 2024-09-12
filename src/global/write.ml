@@ -147,23 +147,25 @@ let rec equation ({ eq_desc } as eq)=
          for_input_w dv_index for_input in
        (* From outside, when the output is [xi out x] *)
        (* the defined variable in the loop body is [x], not [xi] *)
-       let for_out_one h_out
+       let for_out_one (acc, h_out)
              ({ desc = { for_name; for_init; for_default; for_out_name } }
               as fo) =
+         let acc = S.add for_name acc in
          let h_out =
            match for_out_name with
            | None -> h_out | Some(x) -> Env.add for_name x h_out in
          let for_init = Util.optional_map expression for_init in
          let for_default = Util.optional_map expression for_default in
          { fo with  desc = { for_name; for_init; for_default; for_out_name } },
-         h_out in
-       let for_out, h_out = Util.mapfold for_out_one Env.empty for_out in
+         (acc, h_out) in
+       let for_out, (dv_out, h_out) =
+         Util.mapfold for_out_one (S.empty, Env.empty) for_out in
        let for_block, defnames, dv_for_block = block for_block in
        let defnames = Defnames.subst defnames h_out in
-       let dv = Env.fold (fun n _ acc -> S.add n acc) h_out dv_input in
-       let for_env = build_from_names dv in
+       let for_env = build_from_names dv_input in
+       let for_out_env = build_from_names dv_out in
        EQforloop({ f with for_size; for_kind; for_input; for_env;
-                          for_body = { for_out; for_block }}),
+                          for_body = { for_out; for_block; for_out_env; }}),
        defnames in
   (* set the names defined in the equation *)
   { eq with eq_desc = eq_desc; eq_write = def }, def

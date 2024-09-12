@@ -260,7 +260,7 @@ and ('info, 'size, 'body) forloop =
     for_input : 'info for_input_desc localized list;
     for_body : 'body;
     for_resume : bool; (* resume or restart *)
-    for_env : 'info Ident.Env.t;
+    for_env : 'info Ident.Env.t; (* names (index and inputs) *)
   }
 
 (* result expression of a loop *)
@@ -340,8 +340,9 @@ and 'info eq_desc =
 (*  do eq [while/unless/until e] e done]  *)
 
 and 'info for_eq =
-  { for_out : 'info for_out list;
+  { for_out : 'info for_out list; (* outputs *)
     for_block : ('info, 'info exp, 'info eq) block; (* loop body *)
+    for_out_env: 'info Ident.Env.t; (* names in output *)
   }
 
 and 'info for_kind =

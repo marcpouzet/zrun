@@ -12,7 +12,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* the main functions *)
+(* the compiler *)
 open Misc
 open Location
                

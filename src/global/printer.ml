@@ -368,13 +368,12 @@ let rec expression ff e =
 and result ff { r_desc } =
   match r_desc with
   | Exp(e) -> fprintf ff "@[<hov 2>->@ %a@]" expression e
-  | Returns(b) -> result_block ff b
-
-and result_block ff { b_vars; b_body; b_write } =
-  fprintf ff "@[<hov 2>returns@ (%a)@ @[%a@]@[%a@]@]"
-    (vardec_list expression) b_vars
-    print_writes b_write
-    equation b_body
+  | Returns { b_vars; b_body; b_write; b_env } ->
+     fprintf ff "@[<hov 2>returns@ (%a)@ @[%a@]@[%a@]@ @[%a@]@]"
+       (vardec_list expression) b_vars
+       print_env_names b_env
+       print_writes b_write
+       equation b_body
   
 and kind f_kind =
   match f_kind with
@@ -514,7 +513,7 @@ and equation ff ({ eq_desc = desc } as eq) =
   | EQassert(e) ->
      fprintf ff "@[<hov2>assert %a@]" expression e
   | EQforloop({ for_size; for_kind; for_index; for_input; for_env; for_resume;
-                for_body = { for_out; for_block } }) ->
+                for_body = { for_out; for_block; for_out_env } }) ->
      let size ff for_size =
        Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
            ff for_size in
@@ -525,14 +524,16 @@ and equation ff ({ eq_desc = desc } as eq) =
          fprintf ff "@[%a%a%a@]" 
            name x (init expression) i_opt out o_opt in
        print_list_r for_out "" "," "" ff l in
-     fprintf ff  "@[<hov 2>%a%a%a%a@ (%a)@ returns@ (%a)@ %a@ @[%a@,%a@]@ @]"
+     fprintf ff
+       "@[<hov 2>%a%a%a%a@ (@[%a@])@ @[%a@]@ returns@ (%a)@ %a@ @[%a@,%a@]@ @]"
        kind_of_forloop for_kind
        for_resume_or_restart for_resume
        size for_size
        index_opt for_index
        input_list for_input
-       print_for_out for_out
        print_env_names for_env
+       print_for_out for_out
+       print_env_names for_out_env
        block_of_equation for_block
        for_exit_condition for_kind       
 
@@ -580,22 +581,22 @@ and input_list ff l =
   print_list_r input "" "," "" ff l
 
 and for_exp ff r =
+  let for_returns ff for_vardec_list =
+    let for_vardec ff { desc = { for_array; for_vardec } } =
+      let rec print_array_of n ff x =
+        if n = 0 then vardec expression ff x
+        else fprintf ff "@[<hov 1>[|@,%a@,|]@]" (print_array_of (n-1)) x in
+      print_array_of for_array ff for_vardec in
+    print_list_r for_vardec "(" "" ")" ff for_vardec_list in
   match r with
   | Forexp { exp; default = d} ->
      fprintf ff "@[ do %a%a done@]" expression exp (default expression) d
   | Forreturns { r_returns; r_block; r_env } ->
-     fprintf ff "@[<hov 2> returns@ (%a)@ %a@ %a@]"
+     fprintf ff "@[<hov 2> returns@ (%a)@ @[%a@]@ @[%a@]@]"
        for_returns r_returns
        print_env_names r_env
        block_of_equation r_block
 
-and for_returns ff for_vardec_list =
-  let for_vardec ff { desc = { for_array; for_vardec } } =
-    let rec print_array_of n ff x =
-      if n = 0 then vardec expression ff x
-      else fprintf ff "@[<hov 1>[|@,%a@,|]@]" (print_array_of (n-1)) x in
-    print_array_of for_array ff for_vardec in
-  print_list_r for_vardec "(" "" ")" ff for_vardec_list
 
 and block_of_equation ff b_eq =
   block expression equation ff b_eq

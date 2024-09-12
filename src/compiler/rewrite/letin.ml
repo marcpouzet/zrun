@@ -30,15 +30,6 @@ open Ident
 open Zelus
 open Aux
 open State
-open Mapfold
-
-let empty_eq = eqmake Defnames.empty EQempty
-let empty_leq =
-  { l_kind = Kstatic; l_rec = false; l_eq = empty_eq;
-    l_loc = no_location; l_env = Env.empty }
-let empty_block =
-  { b_vars = []; b_body = empty_eq; 
-    b_env = Env.empty; b_loc = no_location; b_write = Defnames.empty }
 
 (* a structure to represent nested equations before they are turned into *)
 (* Zelus equations *)
@@ -48,7 +39,8 @@ type 'a acc =
 
 let empty = { c_vardec = State.Empty; c_eq = State.Empty }
 
-let empty = { c_vardec = State.empty; c_eq = State.empty }
+let empty_eq = eqmake Defnames.empty EQempty
+
 let par { c_vardec = v1; c_eq = c_eq1 } { c_vardec = v2; c_eq = c_eq2 } =
   { c_vardec = State.par v1 v2; c_eq = State.par c_eq1 c_eq2 }
 let seq { c_vardec = v1; c_eq = c_eq1 } { c_vardec = v2; c_eq = c_eq2 } =
@@ -110,55 +102,41 @@ let move_inits_into_equations acc ({ var_name; var_init } as v) =
      { v with var_init = None; var_init_in_eq = true },
      par acc (add_seq (Aux.eq_init var_name e) empty)
 
-(* merge the block with the rest of equations *)
-let fuse_block funs { b_vars; b_body } =
-  let b_vars, acc_b_vars =
-    Util.mapfold (Mapfold.vardec_it funs) empty b_vars in
-  let b_vars, acc_b_vars =
-    Util.mapfold move_inits_into_equations acc_b_vars b_vars in
-  let _, acc_b_body = Mapfold.equation_it funs empty b_body in
-  add_vardec b_vars (seq acc_b_vars acc_b_body)
-
-let fuse_leq funs { l_eq = { eq_write } as l_eq } =
-  let _, acc = Mapfold.equation_it funs empty l_eq in
-  add_names (Defnames.names S.empty eq_write) acc
-
 (* Translation of expressions *)
 (* [expression funs { c_vardec; c_eq } e = [e', { c_vardec'; c_eq'}] *)
 (* such that [local c_vardec do c_eq in e] and *)
 (* [local c_vardec' do c_eq' in e'] are equivalent *)
 let rec expression funs acc ({ e_desc } as e) =
-  match e_desc with
-  | Eop(Eseq, [e1; e2]) ->
-     (* the sequential order is preserved *)
-     (* [e1; e2] is a short-cut for [let _ = e1 in e2] *)
-     let e1, acc_e1 = expression funs empty e1 in
-     let e2, acc_e2 = expression funs empty e2 in
-     e2, par acc (seq acc_e1 (add_seq (Aux.wildpat_eq e1) acc_e2))
-  | Elet(l, e) ->
-     (* the sequential order is preserved *)
-     let _, acc_l = leq_t funs empty l in
-     let e, acc_e = expression funs empty e in
-     e, par acc (seq acc_l acc_e)
-  | Elocal(b, e) ->
-     (* the sequential order is preserved *)
-     let acc_b = fuse_block funs b in
-     let e, acc_e = expression funs empty e in
-     e, par acc (seq acc_b acc_e)
-  | _ -> Mapfold.expression funs acc e
+  let e, acc_e = match e_desc with
+    | Eop(Eseq, [e1; e2]) ->
+       (* the sequential order is preserved *)
+       (* [e1; e2] is a short-cut for [let _ = e1 in e2] *)
+       let e1, acc_e1 = expression funs empty e1 in
+       let e2, acc_e2 = expression funs empty e2 in
+       e2, seq acc_e1 (add_seq (Aux.wildpat_eq e1) acc_e2)
+    | Elet(l, e) ->
+       (* the sequential order is preserved *)
+       let _, acc_l = Mapfold.leq_t funs empty l in
+       let e, acc_e = expression funs empty e in
+       e, seq acc_l acc_e
+    | Elocal(b, e) ->
+       (* the sequential order is preserved *)
+       let _, acc_b = Mapfold.block funs empty b in
+       let e, acc_e = expression funs empty e in
+       e, seq acc_b acc_e
+    | _ ->
+       Mapfold.expression funs empty e in
+  let acc_e = par acc acc_e in
+  e, acc_e
 
 let atomic_expression funs acc e =
-  let e, acc_local = Mapfold.expression_it funs empty e in
-  e_local acc_local e, acc
-
-let atomic_equation funs acc e =
-  let _, acc_local = Mapfold.equation_it funs empty e in
-  eq_local acc_local, acc
+  let e, acc = Mapfold.expression funs acc e in
+  e_local acc e, empty
 
 let vardec funs acc ({ var_default; var_init } as v) =
-  let var_default, acc =
+  let var_default, _ =
     Util.optional_with_map (atomic_expression funs) acc var_default in
-  let var_init, acc =
+  let var_init, _ =
     Util.optional_with_map (atomic_expression funs) acc var_init in
   { v with var_default; var_init }, acc
 
@@ -172,31 +150,40 @@ let equation funs acc ({ eq_desc } as eq) =
        let _, acc = Util.mapfold (Mapfold.equation_it funs) empty eq_list in
        acc
     | EQinit(id, e_init) ->
-       let e, acc = atomic_expression funs acc e_init in
+       let e, acc = expression funs acc e_init in
        add_par { eq with eq_desc = EQinit(id, e) } empty
     | EQlet(l, eq) ->
        (* definitions in [l] are merges with equations in [eq] *)
        (* but sequential order between them is preserved *)
-       let acc_l = fuse_leq funs l in
+       let _, acc_l = Mapfold.leq_t funs acc l in
        let _, acc_eq = Mapfold.equation_it funs empty eq in
        seq acc_l acc_eq
-    | EQlocal(b) ->
-       fuse_block funs b
+    | EQlocal { b_vars; b_body } ->
+       let b_vars, acc_b_vars =
+         Util.mapfold (Mapfold.vardec_it funs) empty b_vars in
+       let b_vars, acc_b_vars =
+         Util.mapfold move_inits_into_equations acc_b_vars b_vars in
+       let _, acc_b_body = Mapfold.equation_it funs empty b_body in
+       add_vardec b_vars (seq acc_b_vars acc_b_body)
     | _ ->
        let eq, acc = Mapfold.equation funs empty eq in
        seq acc (add_seq eq empty) in
   empty_eq, par acc acc_eq
 
+let atomic_equation funs acc eq =
+  let eq, acc = equation funs acc eq in
+  eq_local acc, empty
+
 let block funs acc ({ b_vars; b_body } as b) =
   let b_vars, acc =
-    Util.mapfold (Mapfold.vardec_it funs) acc b_vars in
+    Util.mapfold (vardec funs) acc b_vars in
   let b_body, acc = atomic_equation funs acc b_body in
   { b with b_vars; b_body }, acc
     
 let if_eq funs acc (eq_true, eq_false) =
-  let _, acc_true = Mapfold.equation_it funs empty eq_true in
-  let _, acc_false = Mapfold.equation_it funs empty eq_false in
-  (eq_local acc_true, eq_local acc_false), acc
+  let eq_true, _ = atomic_equation funs acc eq_true in
+  let eq_false, _ = atomic_equation funs acc eq_false in
+  (eq_true, eq_false), acc
 
 let match_handler_eq funs acc ({ m_body } as m_h) =
   let eq, acc = atomic_equation funs acc m_body in
@@ -241,6 +228,12 @@ let for_exp_t funs acc for_body =
      let f, acc = Mapfold.for_returns funs acc f in
      Forreturns f, acc
 
+let for_eq_t funs acc ({ for_out; for_block; for_out_env } as for_eq) =
+  let for_out, acc =
+    Util.mapfold (Mapfold.for_out_it funs) acc for_out in
+  let for_block, acc = Mapfold.block_it funs acc for_block in
+  { for_eq with for_out; for_block }, acc
+
 let for_out_t funs acc ({ desc = ({ for_init; for_default } as desc) } as f) =
   let for_init, acc =
     Util.optional_with_map (atomic_expression funs) acc for_init in
@@ -258,8 +251,9 @@ let program _ p =
     { Mapfold.defaults with pattern; expression; vardec; equation; block;
                             if_eq; match_handler_eq; match_handler_e;
                             present_handler_eq; present_handler_e;
-                            reset_e; reset_eq; result; for_out_t;
-                            for_exp_t; letdecl; global_funs } in
+                            reset_e; reset_eq; result;
+                            for_exp_t; for_eq_t; for_out_t;
+                            letdecl; global_funs } in
   let { p_impl_list } as p, _ =
     Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }

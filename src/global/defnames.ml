@@ -34,10 +34,12 @@ let union { dv = dv1; di = di1; der = der1 }
   { dv = Ident.S.union dv1 dv2;
     di = Ident.S.union di1 di2;
     der = Ident.S.union der1 der2 }
+(* removes names from [names] *)
 let diff { dv; di; der } names =
   { dv = Ident.S.diff dv names;
     di = Ident.S.diff di names;
     der = Ident.S.diff der names }
+(* replaces name x in [dv, di, der] by h(x) *)
 let subst { dv; di; der } h =
   let subst names =
     Ident.S.map (fun n -> try Ident.Env.find n h with | Not_found -> n) names in
