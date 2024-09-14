@@ -64,9 +64,6 @@ let default_list =
    Inline.program;
    "der", "Remove handlers in definitions of derivatives. See below:",
    Der.program;
-   "copylast", "Add a copy [lx = last* x] to remore false cycles when \
-                [x] is a local variable. See below:",
-   Copylast.program;
    "auto", "Translation of automata. See below:",
    Automata.program;
    "present", "Translation of present. See below:",
@@ -81,6 +78,12 @@ let default_list =
    Shared.program;
    (* "encore", "Add an extra discrete step for weak transitions. See below:",
     Encore.program; *)
+   "lastinpatterns", "Replace [last x] by [last* m] when [x] is an input \
+                      variable. See below:",
+   Lastinpatterns.program;
+   "copylast", "Add a copy [lx = last* x] to remore false cycles when \
+                [x] is a local variable. See below:",
+   Copylast.program;
    "letin", "Un-nesting of let/in and blocks. See below:",
    Letin.program;
    "schedule", "Static scheduling. See below:",

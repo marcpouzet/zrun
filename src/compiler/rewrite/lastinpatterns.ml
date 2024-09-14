@@ -12,38 +12,28 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* This pass is necessary for static scheduling. *)
-(* For every local variable [x] that is not an input nor output *)
-(* such that [last x] is used *)
-(* add an equation [lx = last* x] and replace [last x] by [lx] *)
-
-(*
-  Example:
-
-  local x, y, z init e
-  do init x = v0 and init y = v1 and ... y = last x + 1 and
-  ... x = last y + 1 and ... z ...
-
-  is rewritten:
-
-  local x, y, z init e do
-  local lx, ly do
-  init x = v0 and init y = v1 and ... lx = last* x ... y = lx + 1 and
-  ... x = ly + 1 and ly = last* y and ... z ...
-*)
-
-(* For input variables (e.g., variables in patterns), *)
-(* Any expression [last x] where [x] is and input *)
-(* is rewritten [last* m] and the copy equation [m = x] is introduced *)
+(* Remove last in patterns *)
+(* All variables in patterns must be values only                          *)
+(* e.g., function parameters, patterns in pattern matching handlers, etc. *)
+(* Any expression [last x] where [x] is expected to be a value            *)
+(* is rewritten [last* m] and equation [m = x] is added *)
 
 (* Example:
- *- [match e with P(...x...) -> ...last x...] is rewritten
- *- [match e with P(...x...) -> local (last m) ...last* m... and m = x]
- *- [present e(...x...) -> ... last x ...] is rewritten
- *- [present e(...x...) -> local (last m) do r = ... last* m and m = x in r]
- *- [present e(...x...) -> ... last x ...] is rewritten
- *- [present e(...x...) -> local (last m) ... last* m and m = x]
-*)
+ *- [let node f(x) = ... last x...] is rewritten
+ *- [let node f(x) = let m = x and lx = last m in ... lx ...]
+ *- [match e with P(...x...) -> 
+       let d1 in ... last x ... let dn in do ... last x ... done]
+ *- [match e with P(...x...) -> 
+       let lx = last m and m = x in
+       let d1 in ... lx ... let dn in do ... lx ... done]
+ *- [present
+       e(...x...) ->
+         let d1 in ... last x ... let dn in do ... last x ... done]
+ *- [present
+       e(...x...) ->
+         let lx = last m and m = x in 
+         ... lx ... let dn in do ... lx ... done]
+ *)
 
 open Location
 open Zelus

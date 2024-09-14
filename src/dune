@@ -131,6 +131,7 @@
     static ; static reduction
     inline ; inlining of function calls
     der ; remove the initialization and handler part of a derivative equation
+    lastinpatterns ; remove last in patterns
     copylast ; add copies [lx = last*x] for [last x] when [x] is local
              ; all variables in patterns must be value (remove last)
     automata ; rewrite automata into match/reset
