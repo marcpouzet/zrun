@@ -20,26 +20,26 @@
 
 (* Example:
  *- [let node f(x) = ... last x...] is rewritten
- *- [let node f(x) = let m = x and lx = last m in ... lx ...]
+ *- [let node f(m) = local x do x = m and ... last* m...]
+ *- [let node f(...) returns (...x init ... default ...) ... last x ...] is rewritten
+ *- [let node f(...) returns (...m ...)
+       local x init ... default ... do m = x and ... last* x]
+ *- [let node f(...x init e1 default e0...) returns (...) ...last x] is rewritten
+ *- [let node f(...m...) returns (...)
+ *-       local x init ... default ... do x = m and ...last* x done]
+ *- [match e with P(...x...) -> eq] is rewritten
  *- [match e with P(...x...) -> 
-       let d1 in ... last x ... let dn in do ... last x ... done]
- *- [match e with P(...x...) -> 
-       let lx = last m and m = x in
-       let d1 in ... lx ... let dn in do ... lx ... done]
+       let rec lx = last* m and m = x in eq[last x\lx]
+ *- [present
+       e(...x...) -> eq] is rewritten
  *- [present
        e(...x...) ->
-         let d1 in ... last x ... let dn in do ... last x ... done]
- *- [present
-       e(...x...) ->
-         let lx = last m and m = x in 
-         ... lx ... let dn in do ... lx ... done]
+         let rec lx = last* m and m = x in eq[last x\lx] 
  *)
 
-open Location
+           
 open Zelus
 open Ident
-open Defnames
-open Aux
 
 type acc =
   { locals: Misc.no_info Env.t; 
@@ -69,7 +69,7 @@ let e_local_m_x l_renaming e =
   else let r = fresh "r" in
        Aux.e_local_vardec 
          (Aux.vardec r false None None :: vardec_list l_renaming [])
-         (add_eq_copy l_renaming [Aux.id_eq r e]) (var r)
+         (add_eq_copy l_renaming [Aux.id_eq r e]) (Aux.var r)
 
 (* [local m1,...,mn do m1 = x1 and ... and mn = xn and eq done] *)
 let eq_local_m_x l_renaming eq =
@@ -125,7 +125,7 @@ let expression funs ({ locals } as acc) ({ e_desc } as e) =
        if copy then
          let lx, acc = intro acc id in
          (* turn [last x] into [lx] *)
-         var lx, acc
+         Aux.var lx, acc
        else e, acc
      else
        let m, acc = intro acc id in

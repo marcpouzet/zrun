@@ -32,11 +32,8 @@
   ... x = ly + 1 and ly = last* y and ... z ...
 *)
 
-open Location
 open Zelus
 open Ident
-open Defnames
-open Aux
 
 type acc =
   { (* names that are defined locally as [local ... x ... do ... ] or *)
@@ -96,7 +93,7 @@ let expression funs ({ locals } as acc) ({ e_desc } as e) =
        if copy then
          let lx, acc = intro acc id in
          (* turn [last x] into [lx] *)
-         var lx, acc
+         Aux.var lx, acc
        else e, acc
      else
        e, acc
