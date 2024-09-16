@@ -131,7 +131,7 @@ let set_index funs acc n =
 let get_index funs acc n = Ident.get (), acc
 
 let program _ p =
-  let global_funs = Mapfold.default_global_funs  in (* with init_ident } in *)
+  let global_funs = Mapfold.default_global_funs  in
   let funs =
     { Mapfold.defaults with pattern; expression; leq_t; block;
                             set_index; get_index; global_funs } in
