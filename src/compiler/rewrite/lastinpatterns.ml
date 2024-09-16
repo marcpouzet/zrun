@@ -15,26 +15,30 @@
 (* Remove last in patterns *)
 (* All variables in patterns must be values only                          *)
 (* e.g., function parameters, patterns in pattern matching handlers, etc. *)
-(* Any expression [last x] where [x] is expected to be a value            *)
-(* is rewritten [last* m] and equation [m = x] is added *)
+(* Any expression [last x] in an equation [eq] where [x] is expected to *)
+(* be a value is rewritten [last* x] and [eq] replaced by *)
+(* [local m do m = x and eq] *)
 
 (* Example:
  *- [let node f(x) = ... last x...] is rewritten
- *- [let node f(m) = local x do x = m and ... last* m...]
- *- [let node f(...) returns (...x init ... default ...) ... last x ...] is rewritten
- *- [let node f(...) returns (...m ...)
-       local x init ... default ... do m = x and ... last* x]
+ *- [let node f(m) = local x do x = m and ... last* x...]
+
  *- [let node f(...x init e1 default e0...) returns (...) ...last x] is rewritten
  *- [let node f(...m...) returns (...)
  *-       local x init ... default ... do x = m and ...last* x done]
+
+ *- [let node f(...) returns (...x init ... default ...) ... last x ...] is rewritten
+ *- [let node f(...) returns (...m ...)
+       local x init ... default ... do m = x and ... last* x]
+
  *- [match e with P(...x...) -> eq] is rewritten
- *- [match e with P(...x...) -> 
-       let rec lx = last* m and m = x in eq[last x\lx]
+ *- [match e with P(...m...) -> 
+       local x do x = m and eq[last* x \ last x]]
  *- [present
        e(...x...) -> eq] is rewritten
  *- [present
-       e(...x...) ->
-         let rec lx = last* m and m = x in eq[last x\lx] 
+       e(...m...) ->
+         local x do x = m and eq[last* x \ last x]]
  *)
 
            
@@ -42,29 +46,31 @@ open Zelus
 open Ident
 
 type acc =
-  { locals: Misc.no_info Env.t; 
-    (* names that are defined locally as [local ... x ... do ... ] or *)
-    (* [let [rec] ... x ... in ...] *)
-    (* if [x] is local and [last x] is used, [last x] is replaced by [lx] *)
-    (* and an equation [lx = last*x] is added. If [x] is a value *)
-    (* e.g., a variable in a pattern, [last x] is replaced by [last* m] *)
-    (* and an equation [m = x] is added *)
-    renaming: Ident.t Env.t; (* renaming [x -> m] or [x -> lx] *)
+  { env: Misc.no_info Env.t; (* environment of names *)
+    renaming: Ident.t Env.t; (* renaming [x -> m] *)
   }
 
-let empty = { locals = Env.empty; renaming = Env.empty }
+let empty = { env = Env.empty; renaming = Env.empty }
 
-(* add [m = x] *)
-let add_eq_copy l_renaming acc =
-  let copy m x = Aux.id_eq m (Aux.var x) in
-  Env.fold (fun x m acc -> copy m x :: acc) l_renaming acc
+let build funs ({ env } as acc) l_env =
+  env, { acc with env = Env.append l_env env }
 
-(* add extra local declarations *)
-let vardec_list l_renaming acc =
-  Env.fold (fun x m acc -> Aux.vardec m true None None :: acc) l_renaming acc
+let last_ident funs ({ env } as acc) ({ copy; id } as l) =
+  let l = if Env.mem id env then { l with copy = false } else l in
+  l, acc
 
-(* [local r, m1,..., mn do r = e and m1 = x1 and ... and mn = xn in r] *)
-let e_local_m_x l_renaming e = 
+(* rename a variable declaration *)
+let vardec l_renaming (v_list, eq_list) ({ var_name } as v) =
+  try
+    let m = Env.find var_name l_renaming in
+    Aux.vardec m false None None :: v_list,
+    Aux.id_eq var_name (Aux.var m) :: eq_list
+  with
+  | Not_found -> v :: v_list, eq_list
+
+(*
+  (* [local r, x1,..., xn do r = e and x1 = m1 and ... and xn = mn in r] *)
+let e_local_x_m l_renaming e = 
   if Env.is_empty l_renaming then e
   else let r = fresh "r" in
        Aux.e_local_vardec 
@@ -238,17 +244,19 @@ let funexp funs ({ locals } as acc) ({ f_args; f_body; f_env } as f) =
 
 let pattern funs acc p = p, acc
 
+ *)
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
 let get_index funs acc n = Ident.get (), acc
 
+
 let program _ p =
   let global_funs = Mapfold.default_global_funs  in (* with init_ident } in *)
-  let funs =
-    { Mapfold.defaults with pattern; expression; leq_t; block;
+  let funs = 
+    { Mapfold.defaults with (* pattern; expression; leq_t; block;
                             for_returns; for_exp_t; for_eq_t;
                             match_handler_eq; match_handler_e;
                             present_handler_eq; present_handler_e;
-                            funexp; set_index; get_index; global_funs } in
+                            funexp; *) set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }

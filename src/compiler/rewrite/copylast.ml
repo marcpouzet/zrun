@@ -38,13 +38,13 @@ open Ident
 type acc =
   { (* names that are defined locally as [local ... x ... do ... ] or *)
     (* [let [rec] ... x ... in ...] *)
-    locals: Misc.no_info Env.t; 
+    env: Misc.no_info Env.t; 
     (* if [x] is local and [last x] is used, [last x] is replaced by [lx] *)
     (* and an equation [lx = last*x] is added. *)
     renaming: Ident.t Env.t; (* renaming [x -> lx] *)
   }
 
-let empty = { locals = Env.empty; renaming = Env.empty }
+let empty = { env = Env.empty; renaming = Env.empty }
 
 (* Make equations [lx1 = last* x1 and ... lxn = last* xn] *)
 (* from a [renaming] where [renaming(x) = lx] *)
@@ -66,7 +66,7 @@ let eq_let_lx_lastx l_renaming eq =
 let block_let_lx_lastx l_renaming ({ b_body } as b) =
   { b with b_body = eq_let_lx_lastx l_renaming b_body }
 
-let intro ({ locals; renaming } as acc) id =
+let intro ({ env; renaming } as acc) id =
   try
     let lx = Env.find id renaming in lx, acc
   with
@@ -86,10 +86,10 @@ let extract_local_renaming l_env renaming =
     
 (* replace every occurrence of [last x] where [x] is a local variable *)
 (* by [lx]; an equation [lx = last*x] will be added. *)
-let expression funs ({ locals } as acc) ({ e_desc } as e) =
+let expression funs ({ env } as acc) ({ e_desc } as e) =
   match e_desc with
   | Elast { copy; id } ->
-     if Env.mem id locals then
+     if Env.mem id env then
        if copy then
          let lx, acc = intro acc id in
          (* turn [last x] into [lx] *)
@@ -100,10 +100,10 @@ let expression funs ({ locals } as acc) ({ e_desc } as e) =
   | _ -> raise Mapfold.Fallback
 
 (* add extra equations [lx = last* x] *)
-let leq_t funs ({ locals } as acc) ({ l_eq; l_env; l_rec } as leq) =
+let leq_t funs ({ env } as acc) ({ l_eq; l_env; l_rec } as leq) =
   let l_eq, { renaming } =
     Mapfold.equation_it
-      funs { acc with locals = Env.append l_env locals } l_eq in
+      funs { acc with env = Env.append l_env env } l_eq in
   (* add an equation [lx = last* x] for every [x\lx] in [renaming inter l_env] *)
   let l_renaming, renaming = extract_local_renaming l_env renaming in
   (* the resulting equations are recursive if [l_rec] or *)
@@ -111,18 +111,18 @@ let leq_t funs ({ locals } as acc) ({ l_eq; l_env; l_rec } as leq) =
   let l_rec = l_rec || not (Env.is_empty l_renaming) in
   { leq with l_eq = Aux.par (l_eq :: add_last_copy_eq l_renaming);
              l_env = add_last_names_in_env l_env l_renaming; l_rec },
-  { locals; renaming }
+  { env; renaming }
 
 let block funs acc ({ b_vars; b_body; b_env } as b) =
-  let b_vars, ({ locals } as acc) =
+  let b_vars, ({ env } as acc) =
     Util.mapfold (Mapfold.vardec_it funs) acc b_vars in
   let b_body, ({ renaming } as acc) =
     Mapfold.equation_it
-      funs { acc with locals = Env.append b_env locals } b_body in
+      funs { acc with env = Env.append b_env env } b_body in
   (* add extra equations [lx = last* x] *)
   let l_renaming, renaming = extract_local_renaming b_env renaming in
   { b with b_vars; b_body = eq_let_lx_lastx l_renaming b_body},
-  { locals; renaming }
+  { env; renaming }
 
 let pattern funs acc p = p, acc
 
