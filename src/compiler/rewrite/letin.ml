@@ -228,7 +228,7 @@ let for_exp_t funs acc for_body =
      let f, acc = Mapfold.for_returns funs acc f in
      Forreturns f, acc
 
-let for_eq_t funs acc ({ for_out; for_block; for_out_env } as for_eq) =
+let for_eq_t funs acc ({ for_out; for_block } as for_eq) =
   let for_out, acc =
     Util.mapfold (Mapfold.for_out_it funs) acc for_out in
   let for_block, acc = Mapfold.block_it funs acc for_block in

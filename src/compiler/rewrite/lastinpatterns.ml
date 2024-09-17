@@ -74,10 +74,7 @@ let var_ident funs acc x =
   try
     let { new_name } = Env.find x acc in new_name, acc
   with
-  | Not_found ->
-     Format.eprintf 
-      "Lastinpattern error: unbound local variable %s\n" (Ident.name x);
-    raise Misc.Error
+  | Not_found -> x, acc
 
 (* when [last x] appears, it is replaced by [last* x] and [x] is marked to *)
 (* be used in [acc] *)
@@ -172,7 +169,8 @@ let funexp funs acc f =
     let r_desc = match r_desc with
       | Exp(e) -> Exp(Aux.e_local_vardec v_list eq_list e)
       | Returns ({ b_body } as b) ->
-         Returns { b with b_body = Aux.eq_local_vardec v_list (b_body :: eq_list) } in
+         Returns
+           { b with b_body = Aux.eq_local_vardec v_list (b_body :: eq_list) } in
     { r with r_desc } in
   
   let f_args, (v_list, eq_list) =

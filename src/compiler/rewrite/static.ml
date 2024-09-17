@@ -486,7 +486,7 @@ and equation acc ({ eq_desc; eq_write; eq_loc } as eq) =
              Util.optional_with_map expression acc for_default in
            { f with desc = { for_name; for_out_name; for_init; for_default } },
            acc in
-         let for_out_env, acc = build acc for_out_env in
+         (* let for_out_env, acc = Ident.Env.mapfold rename_t acc for_out_env in *)
          let for_out, acc =
            Util.mapfold for_out_t acc for_out in
          let for_block, acc = block acc for_block in

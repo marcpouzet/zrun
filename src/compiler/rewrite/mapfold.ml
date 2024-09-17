@@ -395,7 +395,9 @@ and for_exp_t funs acc for_body =
 and for_eq_it funs acc for_body = funs.for_eq_t funs acc for_body
 
 and for_eq_t funs acc { for_out; for_block; for_out_env } =
-  let for_out_env, acc = build_it funs.global_funs acc for_out_env in
+  (* names in [for_out_env] must already exist *)
+  let for_out_env, acc =
+    Ident.Env.mapfold (var_ident funs.global_funs) acc for_out_env in
   let for_out, acc =
     Util.mapfold (for_out_it funs) acc for_out in
   let for_block, acc = block_it funs acc for_block in
