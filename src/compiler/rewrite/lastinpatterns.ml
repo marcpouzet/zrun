@@ -145,11 +145,19 @@ let for_eq_t funs acc ({ for_out; for_block } as f) =
   let for_block, acc = Mapfold.block_it funs acc for_block in
   { f with for_out; for_block }, acc
 
+(* variables in blocks are unchanged *)
+let block funs acc ({ b_vars; b_body; b_write } as b) =
+  let b_vars, acc = 
+    Util.mapfold (Mapfold.vardec_it funs) acc b_vars in
+  let b_body, acc = Mapfold.equation_it funs acc b_body in
+  { b with b_vars; b_body }, acc
+
+
 let funexp funs acc f =
   let { f_args; f_body } as f, acc = Mapfold.funexp funs acc f in
   (* add extra definitions in the body if [last x] is used with [x] an input *)
   (* or if [x] is declared with an init or default value *)
-  let update (v_list, eq_list)
+  let update_vardec (v_list, eq_list)
         ({ var_name; var_init; var_default; var_is_last; var_init_in_eq } as v) =
     let is_none = function | None -> true | _ -> false in
     let i = (is_none var_init) && (is_none var_default)
@@ -160,16 +168,20 @@ let funexp funs acc f =
         v :: v_list, Aux.id_eq var_name (Aux.var new_name) :: eq_list
     else v_list, eq_list in
   
+  let update_result v_list eq_list ({ r_desc } as r) =
+    let r_desc = match r_desc with
+      | Exp(e) -> Exp(Aux.e_local_vardec v_list eq_list e)
+      | Returns ({ b_body } as b) ->
+         Returns { b with b_body = Aux.eq_local_vardec v_list (b_body :: eq_list) } in
+    { r with r_desc } in
+  
   let f_args, (v_list, eq_list) =
     Util.mapfold (fun (v_list, eq_list) arg ->
-        Util.mapfold update (v_list, eq_list) arg) ([], []) f_args in
+        Util.mapfold update_vardec (v_list, eq_list) arg) ([], []) f_args in
   
-  let r_desc = match f_body.r_desc with
-  | Exp(e) -> Exp(Aux.e_local_vardec v_list eq_list e)
-  | Returns ({ b_body } as b) ->
-     Returns { b with b_body = Aux.eq_local_vardec v_list (b_body :: eq_list) } in
-  
-  { f with f_args; f_body = { f_body with r_desc } }, acc
+  let f_body = update_result v_list eq_list f_body in
+    
+  { f with f_args; f_body }, acc
 
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
