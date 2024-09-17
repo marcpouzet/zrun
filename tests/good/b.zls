@@ -1,3 +1,6 @@
-let node ff () returns (o init 42)
-  forward(2) returns (o init last o)
-    do o = last o + 1 done
+let node f(x init 0 default 42) returns (o init 42, m)
+  do o = x + last x and m = 42 done
+
+let node ff () returns (o init 42, m)
+  forward(2) returns (mi out m, o init last o)
+    do o = last o + 1 and mi = 2 done

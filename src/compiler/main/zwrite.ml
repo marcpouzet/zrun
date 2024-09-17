@@ -56,7 +56,8 @@ and doc_set_steps = "\t Option to control source-to-source rewriting steps\n\
     \t\t static: static reduction \n\
     \t\t inline: inlining \n\
     \t\t der: normalize derivative \n\
-    \t\t copylast: add copies for lasts \n\
+    \t\t copylast: add copy equations [lx = last* x] for lasts \n\
+    \t\t lastinpatterns: add copies for lasts that are inputs or outputs \n\
     \t\t auto: remove automata statements \n\
     \t\t present: remove present statements \n\
     \t\t pre: remove pre/fby \n\

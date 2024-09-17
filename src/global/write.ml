@@ -150,10 +150,11 @@ let rec equation ({ eq_desc } as eq)=
        let for_out_one (acc, h_out)
              ({ desc = { for_name; for_init; for_default; for_out_name } }
               as fo) =
-         let acc = S.add for_name acc in
-         let h_out =
+         let acc, h_out =
            match for_out_name with
-           | None -> h_out | Some(x) -> Env.add for_name x h_out in
+           | None -> acc, h_out
+           | Some(x) ->
+              S.add for_name acc, Env.add for_name x h_out in
          let for_init = Util.optional_map expression for_init in
          let for_default = Util.optional_map expression for_default in
          { fo with  desc = { for_name; for_init; for_default; for_out_name } },

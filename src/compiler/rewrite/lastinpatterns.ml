@@ -149,37 +149,40 @@ let block funs acc ({ b_vars; b_body; b_write } as b) =
   let b_body, acc = Mapfold.equation_it funs acc b_body in
   { b with b_vars; b_body }, acc
 
-
-let funexp funs acc f =
-  let { f_args; f_body } as f, acc = Mapfold.funexp funs acc f in
-  (* add extra definitions in the body if [last x] is used with [x] an input *)
-  (* or if [x] is declared with an init or default value *)
-  let update_vardec (v_list, eq_list)
+let update_arg_list acc (v_list, eq_list) f_args =
+  let update_vardec acc (v_list, eq_list)
         ({ var_name; var_init; var_default; var_is_last; var_init_in_eq } as v) =
     let is_none = function | None -> true | _ -> false in
     let i = (is_none var_init) && (is_none var_default)
             && not var_is_last && not var_init_in_eq in
-    let { last_is_used; new_name } = Env.find var_name acc in
+    let { last_is_used; new_name } =
+      try Env.find var_name acc with | Not_found -> assert false in
     { (new_vardec v) with var_name = new_name },
     if last_is_used || not i then
-        v :: v_list, Aux.id_eq var_name (Aux.var new_name) :: eq_list
+      v :: v_list, Aux.id_eq var_name (Aux.var new_name) :: eq_list
     else v_list, eq_list in
-  
-  let update_result v_list eq_list ({ r_desc } as r) =
-    let r_desc = match r_desc with
-      | Exp(e) -> Exp(Aux.e_local_vardec v_list eq_list e)
-      | Returns ({ b_body } as b) ->
-         Returns
-           { b with b_body = Aux.eq_local_vardec v_list (b_body :: eq_list) } in
-    { r with r_desc } in
-  
-  let f_args, (v_list, eq_list) =
-    Util.mapfold (fun (v_list, eq_list) arg ->
-        Util.mapfold update_vardec (v_list, eq_list) arg) ([], []) f_args in
-  
-  let f_body = update_result v_list eq_list f_body in
-    
-  { f with f_args; f_body }, acc
+
+  Util.mapfold (fun (v_list, eq_list) arg ->
+      Util.mapfold (update_vardec acc) (v_list, eq_list) arg) ([], []) f_args
+
+let funexp funs acc ({ f_args; f_body = ({ r_desc } as r); f_env } as f) =
+  let arg acc v_list = Util.mapfold (Mapfold.vardec_it funs) acc v_list in
+  let f_args, acc = Util.mapfold arg acc f_args in
+
+  let f_env, acc = Mapfold.build_it funs.global_funs acc f_env in
+
+  let f_args, r_desc, acc = match r_desc with
+    | Exp(e) ->
+       let e, acc = Mapfold.expression funs acc e in
+       let f_args, (v_list, eq_list) = update_arg_list acc ([], []) f_args in
+       let e = Aux.e_local_vardec v_list eq_list e in
+       f_args, Exp(e), acc
+    | Returns ({ b_body } as b) ->
+       let b_body, acc = Mapfold.equation funs acc b_body in
+       let f_args, (v_list, eq_list) = update_arg_list acc ([], []) f_args in
+       let b_body = Aux.eq_local_vardec v_list (b_body :: eq_list) in
+       f_args, Returns { b with b_body }, acc in
+  { f with f_args; f_body = { r with r_desc }; f_env }, acc
 
 let set_index funs acc n =
   let _ = Ident.set n in n, acc
@@ -191,7 +194,7 @@ let program _ p =
   let funs = 
     { Mapfold.defaults with match_handler_eq; match_handler_e;
                             present_handler_eq; present_handler_e;
-                            for_returns; for_eq_t; funexp;
+                            for_returns; for_eq_t; block; funexp;
                             set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }
