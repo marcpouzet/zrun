@@ -51,9 +51,17 @@ let apply_with_close_out f o =
     close_out o
   with x -> close_out o; raise x
 
+let print_message comment =
+  if !verbose then
+    Format.fprintf Format.err_formatter
+      "@[------------------------------------------------------------------\n\
+       %s\n\
+       --------------------------------------------------------------------@]@."
+      comment
+
 let do_step comment output step input = 
+  print_message comment;
   let o = step input in
-  Debug.print_message comment;
   output o;
   o
 
@@ -74,15 +82,18 @@ let default_list =
    Reset.program;
    "complete", "Complete equations with [der x = 0.0]. See below:",
    Complete.program;
-   "shared", "Normalise equations to shared variables in [x = ...]. See below:",
+   "shared",
+   "Normalise equations to shared variables in [x = ...]. See below:",
    Shared.program;
    (* "encore", "Add an extra discrete step for weak transitions. See below:",
     Encore.program; *)
-   "lastinpatterns", "Replace [last x] by [last* m] when [x] is an input \
+   "lastinpatterns",
+   "Replace [last x] by [last* m] when [x] is an input \n\
                       variable. See below:",
    Lastinpatterns.program;
-   "copylast", "Add a copy [lx = last* x] to remore false cycles when \
-                [x] is a local variable. See below:",
+   "copylast",
+   "Add a copy [lx = last* x] to remore false cycles when [x] \n\
+    is a local variable. See below:",
    Copylast.program;
    "letin", "Un-nesting of let/in and blocks. See below:",
    Letin.program;
@@ -125,7 +136,7 @@ let compare name n_steps genv0 p p' =
 let main modname filename n_steps =
   let transform_and_compare (name, comment, transform) genv p =
     let p' = transform genv p in
-    Debug.print_message comment;
+    print_message comment;
     Debug.print_program p';
     if n_steps = 0 then p' else compare name n_steps genv p p' in
     
