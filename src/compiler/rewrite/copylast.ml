@@ -124,6 +124,17 @@ let block funs acc ({ b_vars; b_body; b_env } as b) =
   { b with b_vars; b_body = eq_let_lx_lastx l_renaming b_body},
   { env; renaming }
 
+let for_eq_t funs acc ({ for_out; for_block; for_out_env } as f) =
+  let for_out, ({ env } as acc) =
+    Util.mapfold (Mapfold.for_out_it funs) acc for_out in
+  let ({ b_body } as for_block), ({ renaming } as acc) =
+    Mapfold.block_it funs
+      { acc with env = Env.append for_out_env env } for_block in
+  (* add extra equations [lx = last* x] *)
+  let l_renaming, renaming = extract_local_renaming for_out_env renaming in
+  let for_block = { for_block with b_body = eq_let_lx_lastx l_renaming b_body } in
+  { f with for_out; for_block }, { env; renaming }
+
 let pattern funs acc p = p, acc
 
 let set_index funs acc n =
