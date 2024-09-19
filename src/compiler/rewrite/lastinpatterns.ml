@@ -177,8 +177,8 @@ let funexp funs acc ({ f_args; f_body = ({ r_desc } as r); f_env } as f) =
        let f_args, (v_list, eq_list) = update_arg_list acc ([], []) f_args in
        let e = Aux.e_local_vardec v_list eq_list e in
        f_args, Exp(e), acc
-    | Returns ({ b_body } as b) ->
-       let b_body, acc = Mapfold.equation funs acc b_body in
+    | Returns (b) ->
+       let { b_body } as b, acc = Mapfold.block_it funs acc b in
        let f_args, (v_list, eq_list) = update_arg_list acc ([], []) f_args in
        let b_body = Aux.eq_local_vardec v_list (b_body :: eq_list) in
        f_args, Returns { b with b_body }, acc in
@@ -198,3 +198,4 @@ let program _ p =
                             set_index; get_index; global_funs } in
   let { p_impl_list } as p, _ = Mapfold.program_it funs empty p in
   { p with p_impl_list = p_impl_list }
+ 

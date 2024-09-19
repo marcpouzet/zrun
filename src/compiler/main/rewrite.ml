@@ -88,8 +88,8 @@ let default_list =
    (* "encore", "Add an extra discrete step for weak transitions. See below:",
     Encore.program; *)
    "lastinpatterns",
-   "Replace [last x] by [last* m] when [x] is an input \n\
-                      variable. See below:",
+   "Replace [last x] by [last* m] when [x] is an input variable.\n\
+    See below:",
    Lastinpatterns.program;
    "copylast",
    "Add a copy [lx = last* x] to remore false cycles when [x] \n\
