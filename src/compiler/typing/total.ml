@@ -23,9 +23,10 @@ open Zelus
 open Typerrors
 open Deftypes
 open Types
+open Defnames
 
 (** Names written in a block *)
-let union def1 def2 = Deftypes.union def1 def2
+let union def1 def2 = Defnames.union def1 def2
 
 (* add two sets of names provided they are distinct *)
 let add loc 
@@ -43,11 +44,11 @@ let add loc
 (* has a last value or a default value *)
 let all_last loc h set =
   let check elt =
-    let ({ t_sort; t_init; t_default; t_typ } as tentry) =
+    let ({ t_sort; t_typ } as tentry) =
       try Env.find elt h with | Not_found -> assert false in
-    match t_init, t_default with
-    | (InitEq | InitDecl _), _ | (_, Some _) -> ()
-    | NoInit, None ->
+    match t_sort with
+    | Sort_mem ({ m_init = Eq | Decl _ } | { m_default = Eq | Decl _ }) -> ()
+    | _ ->
        try
 	 ignore (Types.filter_signal t_typ);
 	 tentry.t_sort <- Sort_var
@@ -136,11 +137,11 @@ module Automaton =
     (* build an initial table associating set of names to every state *)
     type entry = 
         { e_loc: Location.t;(* location in the source for the current block *)
-          mutable e_state: Deftypes.defnames;
+          mutable e_state: Defnames.defnames;
 	     (* set of names defined in the current block *)
-          mutable e_until: Deftypes.defnames;
+          mutable e_until: Defnames.defnames;
 	     (* set of names defined in until transitions *)
-          mutable e_unless: Deftypes.defnames; 
+          mutable e_unless: Defnames.defnames; 
 	     (* set of names defined in unless transitions *)
         }
 

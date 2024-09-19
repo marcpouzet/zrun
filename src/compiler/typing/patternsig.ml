@@ -9,6 +9,7 @@ open Lident
 open Matching
 open Printf
 open Location
+open Typinfo
 open Deftypes
 open Misc
 
@@ -25,7 +26,7 @@ module LANG =
 
     let compare = Stdlib.compare
 
-    let pdescs = List.map (fun p -> p.pat_desc)
+    let pdescs l = List.map (fun p -> p.pat_desc) l
 
     let arity t = match t with
       | Ttuple i -> i
@@ -109,12 +110,12 @@ module LANG =
         | _ -> assert false
 
 
-    type pattern_ast = Zelus.pattern
+    type pattern_ast = Typinfo.typinfo Zelus.pattern
 
     (* Translation to tagged patterns is pretty easy, we just have to look for
        each possible constructors for constructed patterns, and sort fields for
        record patterns. *)
-    let rec inject p =
+    let rec inject (p: pattern_ast) =
       let rec find_variant_type_idents s =
         match (Modules.find_type s).info.type_desc with
           | Variant_type cdi ->
@@ -143,14 +144,14 @@ module LANG =
         | Ealiaspat (p, _) -> inject p
         | Econstr0pat s ->
             let variants = 
-              let { t_desc = desc } = Types.typ_repr p.pat_typ in
+              let { t_desc = desc } = Types.typ_repr p.pat_info.t_typ in
               match desc with
                 | Deftypes.Tconstr(id, _, _) ->
                     find_variant_type_idents (Modname id)
                 | _ -> assert false in
             Pconstr (Tconstr (source s, 0, variants), [])
         | Econstr1pat(s, l) ->
-            let { t_desc = desc } = Types.typ_repr p.pat_typ in
+            let { t_desc = desc } = Types.typ_repr p.pat_info.t_typ in
             Pconstr (Tconstr(source s, List.length l,
                              match desc with
                              | Deftypes.Tconstr(id, _, _) ->
@@ -159,7 +160,7 @@ module LANG =
                      List.map inject l)
         | Etypeconstraintpat (p, _) -> inject p
         | Erecordpat l ->
-            let ll = find_record_type_fields p.pat_typ in
+            let ll = find_record_type_fields p.pat_info.t_typ in
             let l' = List.map (fun { label; arg } -> (source label, arg)) l in
             (* Find the name of each field using type information *)
             let args = List.map
@@ -175,8 +176,9 @@ module LANG =
     let rec eject internal_pat =
       let sensible_default pdesc = (* TODO: ask Marc *)
         { pat_desc = pdesc; pat_loc = Loc (0, 0);
-          pat_typ = { t_desc = Tvar; t_index = 0; t_level = 0 };
-          pat_caus = Defcaus.no_typ; pat_init = Definit.no_typ } in
+          pat_info =
+            { Typinfo.no_info with
+              t_typ = { t_desc = Tvar; t_index = 0; t_level = 0 } } } in
       match internal_pat with
         | Pany -> sensible_default Ewildpat
         | Por (l, r) -> sensible_default (Eorpat (eject l, eject r))

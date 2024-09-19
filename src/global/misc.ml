@@ -64,6 +64,18 @@ let set_debug () =
   debug := true;
   set_verbose ()
 
+let print_types = ref false
+let no_stdlib = ref false
+let no_warning = ref false
+let print_causality_types = ref false
+let no_simplify_causality_types = ref false
+let print_initialization_types = ref false
+let no_causality = ref false
+let no_initialization = ref false
+let typeonly = ref false
+let parseonly = ref false
+
+
 (* the list of nodes to evaluate *)
 let main_nodes = ref ([] :string list)
 let set_main s = main_nodes := s :: !main_nodes

@@ -3,7 +3,7 @@
 (*                                                                     *)
 (*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
-(*  (c) 2023 Inria Paris (see the AUTHORS file)                        *)
+(*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -42,6 +42,7 @@ let const_of_kind k =
   | Tfun(Tstatic) -> false
   | Tfun _ | Tnode _ -> assert false
 
+(*
 (* kind from a sort *)
 let kind_of_sort sort =
   let k = match sort with
@@ -54,7 +55,8 @@ let sort_of_kind k =
   | Tfun(vkind) ->
      match vkind with
      | Tconst -> Sort_const | Tstatic -> Sort_static | Tany -> Sort_val
-                                               
+ *)
+
 (* order between kinds *)
 let vkind_is_less_than actual_v expected_v =
   match actual_v, expected_v with

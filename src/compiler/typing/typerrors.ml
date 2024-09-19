@@ -58,11 +58,11 @@ exception Error of Location.t * error
 let error loc kind = raise (Error(loc, kind))
 
 type warning =
-  | Wpartial_matching of Zelus.pattern
-  | Wunreachable_state of Ident.t
-  | Wmatch_unused of Zelus.pattern
+  | Wpartial_matching: 'a Zelus.pattern -> warning
+  | Wunreachable_state: Ident.t -> warning
+  | Wmatch_unused: 'a Zelus.pattern -> warning
   | Wequation_does_not_define_a_name
-  | Wreset_target_state of bool * bool
+  | Wreset_target_state: bool * bool -> warning
     		       
 let kind_of_global_ident k = match k with
     | Value -> "value" | Type -> "type" 

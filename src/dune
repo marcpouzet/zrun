@@ -92,6 +92,8 @@
   (public_name zrun.typing_lib)
   (wrapped false)
   (modules
+    typinfo ; type annotation for Zelus terms
+    interface ; interface
     kind ; kinds
     patternsig ; check totality of pattern matching
     total ; check totatlity of pattern matching
@@ -166,9 +168,10 @@
     oprinter; the printer
     ocamlprinter; print OCaml code
   )
-  (libraries zrun.global_lib typdefs_lib)
+  (libraries zrun.global_lib zrun.typdefs_lib)
 )
 
+; The ZRun interpreter
 (executable
  (name zrun)
   (modes (byte exe))
@@ -178,11 +181,21 @@
   (libraries zrun.parse_lib zrun.global_lib zrun.zrun_lib)
   (promote (until-clean) (into ..)))
 
+; The source-to-source transformations
 (executable
  (name zwrite)
   (modes (byte exe))
   (modules zwrite)
   (libraries zrun.parse_lib zrun.global_lib zrun.zrun_lib zrun.rewrite_lib)
+  (promote (until-clean) (into ..)))
+
+; The compiler
+(executable
+ (name zeluc)
+  (modes (byte exe))
+  (modules zeluc)
+  (libraries zrun.parse_lib zrun.global_lib zrun.zrun_lib
+  zrun.typing_lib zrun.rewrite_lib)
   (promote (until-clean) (into ..)))
 
 (install

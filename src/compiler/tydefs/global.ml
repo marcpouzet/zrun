@@ -53,8 +53,8 @@ and label_desc =
       label_res: Deftypes.typ; }
 
 type type_desc =
-  { type_desc: type_components;
-    type_parameters: int list;
+  { mutable type_desc: type_components;
+    mutable type_parameters: int list;
   }
 
 and type_components =

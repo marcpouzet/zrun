@@ -1,10 +1,13 @@
-all: zrun.exe zwrite.exe
+all: zrun.exe zwrite.exe zeluc.exe
 
 zrun.exe:
 	(cd src; dune build -- zrun.exe)
 
 zwrite.exe:
 	(cd src; dune build -- zwrite.exe)
+
+zeluc.exe:
+	(cd src; dune build -- zeluc.exe)
 
 zrun.exe.verbose:
 	(cd src; dune build --verbose -- zrun.exe)
@@ -15,6 +18,7 @@ tests:
 debug:
 	(cd src; dune build --debug-backtraces --debug-dependency-path -- zrun.bc)
 	(cd src; dune build --debug-backtraces --debug-dependency-path -- zwrite.bc)
+	(cd src; dune build --debug-backtraces --debug-dependency-path -- zeluc.bc)
 
 clean:
 	dune clean;
@@ -32,4 +36,4 @@ wc:
 	compiler/gencode/*.ml \
 	compiler/main/*.ml)
 
-.PHONY: zrun.exe zwrite.exe zrun.exe.verbose tests debug clean wc
+.PHONY: zeluc.exe zeluc.exe zrun.exe zwrite.exe zrun.exe.verbose tests debug clean wc

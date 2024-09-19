@@ -44,7 +44,6 @@ let parse parsing_fun lexing_fun source_name =
 let parse_implementation_file source_name =
   parse Parser.implementation_file Lexer.main source_name
                
-           
 let apply_with_close_out f o =
   try
     f o;

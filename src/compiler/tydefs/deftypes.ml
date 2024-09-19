@@ -76,20 +76,18 @@ and tkind =
 
 (* entry in the typing environment *)
 type 'a tentry = 
-  { t_path : 'a tsort list; (* [k1 on ... on kn x : t] *)
-    t_sort: 'a tsort; (* sort *)
+  { t_path : vkind list; (* [k1 on ... on kn x : t] *)
+    mutable t_sort: 'a tsort; (* sort *)
     t_typ: typ (* its type *)
   }
 
 and 'a tsort =
-  | Sort_const (* a variable whose value is known at compile time *)
-  | Sort_static (* the value is known at instantiation time *)
   | Sort_val (* a let variable *)
   | Sort_var (* a shared variable *)
   | Sort_mem of 'a mem
 
 and 'a mem =
-  { m_kind: mkind option;
+  { m_mkind: mkind option; (* discrete-time or continuous-time *)
     m_previous: bool; (* [last x] or [x] is used *)
     m_init: 'a init; (* is-it initialized? *)
     m_default: 'a init; (* default value *)
@@ -171,15 +169,12 @@ let no_typ_instance = { typ_instance = [] }
 let no_abbrev () = ref Tnil
 
 (* basic entries for variables *)
-let static = Sort_static
-let value = Sort_val
-let variable = Sort_var
-let empty_mem = { m_kind = None; m_previous = false; m_init = No; m_default = No }
+let empty_mem = { m_mkind = None; m_previous = false; m_init = No; m_default = No }
 let initialized mem = { mem with m_init = Eq }
 let previous mem = { mem with m_previous = true }
-let zero mem = Sort_mem { mem with m_kind = Some Zero }
-let horizon mem = Sort_mem { mem with m_kind = Some Horizon }
-let major () = Sort_mem { empty_mem with m_kind = Some Major }
+let zero mem = Sort_mem { mem with m_mkind = Some Zero }
+let horizon mem = Sort_mem { mem with m_mkind = Some Horizon }
+let major () = Sort_mem { empty_mem with m_mkind = Some Major }
 let imem = initialized empty_mem
 let mem = previous imem
 let memory = Sort_mem mem

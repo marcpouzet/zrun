@@ -278,7 +278,7 @@ let major env =
   let exception Return of no_info Zelus.exp in
   let find x t =
     match t with
-    | { t_sort = Sort_mem { m_kind = Some(Major) }; t_typ = typ } ->
+    | { t_sort = Sort_mem { m_mkind = Some(Major) }; t_typ = typ } ->
        raise (Return(var x))
     | _ -> () in
   try

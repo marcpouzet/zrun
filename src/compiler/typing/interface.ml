@@ -274,7 +274,7 @@ let check_no_repeated_constructor loc l =
 let check_no_repeated_label loc l =
   let rec checkrec cont l =
     match l with
-        [] -> ()
+      [] -> ()
       | (s,_) :: l ->
           if List.mem s cont then error loc (Erepeated_label(s))
           else checkrec (s :: cont) l in

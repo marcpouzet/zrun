@@ -77,13 +77,11 @@ and doc_simulation =
    \t\t   has been set, or <node> otherwise"
 and doc_sampling = "<p> \t Sets the sampling period to p (float <= 1.0)"
 and doc_check = "<n> \t Check that the simulated node returns true for n steps"
-and doc_use_gtk =
-  "\t Use lablgtk2 interface."
+and doc_use_gtk = "\t Use lablgtk2 interface."
 and doc_inlining_level = "<n> \t Level of inlining"
 and doc_inline_all = "\t Inline all function calls"
 and doc_dzero = "\t Turn on discrete zero-crossing detection"
 and doc_nocausality = "\t (undocumented)"
-and doc_no_opt = "\t (undocumented)"
 and doc_no_deadcode = "\t (undocumented)"
 and doc_noinitialisation = "\t (undocumented)"
 and doc_nosimplify = "\t (undocumented)"
@@ -94,6 +92,8 @@ and doc_zsign = "\t Use the sign function for the zero-crossing argument"
 and doc_with_copy = "\t Add of a copy method for the state"
 and doc_rif = "\t Use RIF format over stdin and stdout to communicate I/O to the node being simulated"
 and doc_deps = "\t Recursively compile dependencies"
+and doc_no_opt = "\t (undocumented)"
+and doc_no_warning = "\t Turn off warnings"
 let errmsg = "Options are:"
 
 let set_verbose () =
