@@ -93,13 +93,12 @@
   (wrapped false)
   (modules
     typinfo ; type annotation for Zelus terms
-    interface ; interface
+    ;interface ; interface
     kind ; kinds
-    patternsig ; check totality of pattern matching
     total ; check totatlity of pattern matching
     types ; type manipulation and unification between types
+    ;patternsig ; check totality of pattern matching
     matching ; check totality of pattern matching
-    sizeinference ; check size inference
     typerrors ; type errors;
     typing ; the main typing functions
     )
