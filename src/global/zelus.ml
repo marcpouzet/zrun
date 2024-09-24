@@ -32,16 +32,17 @@ and tkind =
   | Khybrid (* discrete-time and continuous-time state variables *)
 
 (** Types *)
-type type_expression = type_expression_desc localized
+type type_expression = 'a type_expression_desc localized
 
-and type_expression_desc =
-  | Etypevar : name -> type_expression_desc
-  | Etypeconstr : Lident.t * type_expression list -> type_expression_desc
-  | Etypetuple : type_expression list -> type_expression_desc
-  | Etypefun : kind * type_expression * type_expression -> type_expression_desc
+and 'a type_expression_desc =
+  | Etypevar : name -> 'a type_expression_desc
+  | Etypeconstr : Lident.t * 'a type_expression list -> 'a type_expression_desc
+  | Etypetuple : 'a type_expression list -> 'a type_expression_desc
+  | Etypefun :
+      kind * 'a type_expression * 'a type_expression -> 'a type_expression_desc
   (* refinement types for integers and arrays *)
   (* possibly a singleton; or interval [0..s]; if s < 0, interval is empty *)
-  | Esize : is_singleton * size -> type_expression_desc
+  | Esingletonsize : is_singleton * size -> type_expression_desc
   | Evec : type_expression * size -> type_expression_desc
   (* [size]t *)
 
