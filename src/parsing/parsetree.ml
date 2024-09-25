@@ -43,7 +43,19 @@ and type_expression_desc =
   | Etypevar : name -> type_expression_desc
   | Etypeconstr : longname * type_expression list -> type_expression_desc
   | Etypetuple : type_expression list -> type_expression_desc
-  | Etypefun : kind * type_expression * type_expression -> type_expression_desc
+  | Etypefun : kind * name option * type_expression * type_expression ->
+               type_expression_desc
+  | Etypevec : type_expression * size -> type_expression_desc
+
+and size = size_desc localized
+
+and size_desc =
+  | Sint of int
+  | Sident of name
+  | Sfrac of size * int
+  | Splus of size * size
+  | Sminus of size * size
+  | Smult of size * size
 
 (* constants *)
 type immediate =
@@ -169,16 +181,6 @@ and ('scondpat, 'body) present_handler =
 
 type is_weak = bool
 
-type size = size_desc localized
-
-and size_desc =
-  | Sint : int -> size_desc
-  | Sfrac : size * int  -> size_desc
-  | Sident : name -> size_desc
-  | Splus: size * size -> size_desc
-  | Sminus : size * size -> size_desc
-  | Smult: size * size -> size_desc
-  
 type exp = exp_desc localized
 
 and exp_desc =

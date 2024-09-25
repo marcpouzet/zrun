@@ -31,7 +31,7 @@ let abbrev_type params (ty_parameters, ty) =
 let abbrev_type qualident params (ty_parameters, ty) =
   { qualid = qualident; info = abbrev_type params (ty_parameters, ty)}
 let value qualident tys =
-  { qualid = qualident; info = value_desc false tys qualident }
+  { qualid = qualident; info = value_desc Kconst tys qualident }
   
 let stdlib_name id = { qual = stdlib_module;id = id }
 

@@ -39,11 +39,10 @@ and type_expression_desc =
   | Etypeconstr : Lident.t * type_expression list -> type_expression_desc
   | Etypetuple : type_expression list -> type_expression_desc
   | Etypefun :
-      kind * type_expression * type_expression -> type_expression_desc
-  (* refinement types for integers and arrays *)
-  (* possibly a singleton; or interval [0..s]; if s < 0, interval is empty *)
-  | Esize : is_singleton * size -> type_expression_desc
-  | Evec : type_expression * size -> type_expression_desc
+      { ty_kind: kind; ty_name_opt: Ident.t option;
+        ty_arg : type_expression; ty_res : type_expression } ->
+      type_expression_desc
+  | Etypevec : type_expression * size -> type_expression_desc
   (* [size]t *)
 
 and is_singleton = bool

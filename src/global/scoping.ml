@@ -164,18 +164,36 @@ and array_operator op =
   | Ereverse -> Ast.Ereverse
   | Eflatten -> Ast.Eflatten
  
-(* translate types. *)
-let rec types { desc; loc } =
+(* translate types. [env] is used to renames dependent variables *)
+let rec types env { desc; loc } =
   let desc = match desc with
     | Etypevar(n) -> Ast.Etypevar(n)
-    | Etypetuple(ty_list) -> Ast.Etypetuple(List.map types ty_list)
+    | Etypetuple(ty_list) -> Ast.Etypetuple(List.map (types env) ty_list)
     | Etypeconstr(lname, ty_list) ->
-       Ast.Etypeconstr(longname lname, List.map types ty_list)
-    | Etypefun(k, ty_arg, ty_res) ->
-       let ty_arg = types ty_arg in
-       let ty_res = types ty_res in
-       Ast.Etypefun(kind k, ty_arg, ty_res) in
-  { Ast.desc = desc; Ast.loc = loc }
+       Ast.Etypeconstr(longname lname, List.map (types env) ty_list)
+    | Etypefun(k, n_opt, ty_arg, ty_res) ->
+       let ty_arg = types env ty_arg in
+       let n_opt, env =
+	 match n_opt with
+	 | None -> None, env
+	 | Some(n) ->
+            let m = fresh n in Some(m), Env.add n m env in
+       let ty_res = types env ty_res in
+       Zelus.Etypefun
+         { ty_kind = kind k; ty_name_opt = n_opt; ty_arg; ty_res }
+    | Etypevec(ty_arg, si) -> Zelus.Etypevec(types env ty_arg, size env si) in
+    { Ast.desc = desc; Ast.loc = loc }
+
+(* size expressions *)
+and size env { desc; loc } =
+  let desc = match desc with
+  | Sint(i) -> Ast.Sint(i)
+  | Sfrac(s, q) -> Ast.Sfrac { num = size env s; denom = q }
+  | Sident(n) -> Ast.Sident(name loc env n)
+  | Splus(s1, s2) -> Ast.Splus(size env s1, size env s2)
+  | Sminus(s1, s2) -> Ast.Sminus(size env s1, size env s2)
+  | Smult(s1, s2) -> Ast.Smult(size env s1, size env s2) in
+  { desc; loc }
 
 (** Build a renaming environment **)
 (* if [check_linear = true], stop when the same name appears twice *)
@@ -334,7 +352,7 @@ let rec pattern_translate env { desc; loc } =
     | Eorpat(p1, p2) ->
        Ast.Eorpat(pattern_translate env p1, pattern_translate env p2)
     | Etypeconstraintpat(p, ty) ->
-       Ast.Etypeconstraintpat(pattern_translate env p, types ty)
+       Ast.Etypeconstraintpat(pattern_translate env p, types env ty)
     | Erecordpat(l_p_list) ->
        Ast.Erecordpat
          (List.map (fun (lname, p) -> { Ast.label = longname lname;
@@ -363,17 +381,6 @@ let match_handler body env { desc = { m_pat; m_body }; loc } =
   let m_body = body env m_body in
   { Ast.m_pat = m_pat; Ast.m_body = m_body; Ast.m_loc = loc;
     Ast.m_reset = false; Ast.m_zero = false; Ast.m_env = Ident.Env.empty }
-
-(* size expressions *)
-let rec size env { desc; loc } =
-  let desc = match desc with
-  | Sint(i) -> Ast.Sint(i)
-  | Sfrac(s, q) -> Ast.Sfrac { num = size env s; denom = q }
-  | Sident(n) -> Ast.Sident(name loc env n)
-  | Splus(s1, s2) -> Ast.Splus(size env s1, size env s2)
-  | Sminus(s1, s2) -> Ast.Sminus(size env s1, size env s2)
-  | Smult(s1, s2) -> Ast.Smult(size env s1, size env s2) in
-  { desc; loc }
 
 (* [env_pat] is the environment for names that appear on the *)
 (* left of a definition. [env] is for names that appear on the right *)
@@ -563,7 +570,7 @@ and vardec env
   let var_init =
     Util.optional_map (expression env) var_init in
   let var_typeconstraint =
-    Util.optional_map types var_typeconstraint in
+    Util.optional_map (types env) var_typeconstraint in
   let m = name loc env var_name in
   { Ast.var_name = m; Ast.var_init = var_init;
     Ast.var_default = var_default;
@@ -768,7 +775,7 @@ and expression env { desc; loc } =
     | Erecord_with(e, label_e_list) ->
        Ast.Erecord_with(expression env e, recordrec loc env label_e_list)
     | Etypeconstraint(e, texp) ->
-       Ast.Etypeconstraint(expression env e, types texp)
+       Ast.Etypeconstraint(expression env e, types env texp)
     | Efun(fd) -> Ast.Efun(funexp env fd)
     | Ematch(e, m_h_list) ->
        let e = expression env e in
@@ -870,19 +877,19 @@ and result env { desc; loc } =
 let rec type_decl { desc; loc } =
   let desc = match desc with
   | Eabstract_type -> Ast.Eabstract_type
-  | Eabbrev(ty) -> Ast.Eabbrev(types ty)
+  | Eabbrev(ty) -> Ast.Eabbrev(types Env.empty ty)
   | Evariant_type(constr_decl_list) ->
       Ast.Evariant_type(List.map constr_decl constr_decl_list)
   | Erecord_type(n_ty_list) ->
       Ast.Erecord_type
-        (List.map (fun (n, ty) -> (n, types ty)) n_ty_list) in
+        (List.map (fun (n, ty) -> (n, types Env.empty ty)) n_ty_list) in
   { Ast.desc = desc; Ast.loc = loc }
 
 and constr_decl { desc; loc } =
   let desc = match desc with
   | Econstr0decl(n) -> Ast.Econstr0decl(n)
   | Econstr1decl(n, ty_list) ->
-      Ast.Econstr1decl(n, List.map types ty_list) in
+      Ast.Econstr1decl(n, List.map (types Env.empty) ty_list) in
   { Ast.desc = desc; Ast.loc = loc }
 
 let type_decls n_params_typdecl_list =
@@ -897,7 +904,7 @@ let interface interf =
          let ty_decl = type_decl ty_decl in
          Ast.Einter_typedecl { name; ty_params; size_params; ty_decl }
       | Einter_constdecl { name; const; ty; info } ->
-         let ty = types ty in
+         let ty = types Env.empty ty in
          Ast.Einter_constdecl { name; const = const; ty; info } in
       { Ast.desc = desc; Ast.loc = interf.loc }
   with

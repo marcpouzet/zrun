@@ -1387,7 +1387,10 @@ type_expression:
   | tl = type_star_list
       { make(Etypetuple(List.rev tl)) $startpos $endpos}
   | t_arg = type_expression a = arrow t_res = type_expression
-      { make(Etypefun(a, t_arg, t_res)) $startpos $endpos}
+      { make(Etypefun(a, None, t_arg, t_res)) $startpos $endpos}
+  | LPAREN id = IDENT COLON t_arg = type_expression RPAREN
+			    a = arrow t_res = type_expression
+      { make(Etypefun(a, Some(id), t_arg, t_res)) $startpos $endpos}
 ;
 
 simple_type:
@@ -1399,6 +1402,8 @@ simple_type:
       { make (Etypeconstr(i, [t])) $startpos $endpos }
   | LPAREN t = type_expression COMMA tl = type_comma_list RPAREN i = ext_ident
       { make (Etypeconstr(i, t :: tl)) $startpos $endpos }
+  | t_arg = simple_type LBRACKET s = size_expression RBRACKET
+      { make(Etypevec(t_arg, s)) $startpos $endpos}
   | LPAREN t = type_expression RPAREN
       { t }
 ;

@@ -42,20 +42,13 @@ let const_of_kind k =
   | Tfun(Tstatic) -> false
   | Tfun _ | Tnode _ -> assert false
 
-(*
-(* kind from a sort *)
-let kind_of_sort sort =
-  let k = match sort with
-    | Sort_const -> Tconst | Sort_static -> Tstatic | _ -> Tany in
-  Tfun(k)
-
-let sort_of_kind k =
-  match k with
-  | Tnode _ -> Sort_val
-  | Tfun(vkind) ->
-     match vkind with
-     | Tconst -> Sort_const | Tstatic -> Sort_static | Tany -> Sort_val
- *)
+(* kind *)
+let kind k =
+  let k = match k with
+    | Zelus.Kconst -> Deftypes.Tconst
+    | Zelus.Kstatic -> Deftypes.Tstatic
+    | Zelus.Kany -> Deftypes.Tany in
+  k
 
 (* order between kinds *)
 let vkind_is_less_than actual_v expected_v =

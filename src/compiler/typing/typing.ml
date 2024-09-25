@@ -94,7 +94,7 @@ let less_than loc actual_k expected_k =
   then error loc (Ekind_clash(actual_k, expected_k))
 
 let sort_less_than loc sort expected_k =
-  let actual_k = Kind.kind_of_sort sort in
+  let actual_k = Kind.kindrt sort in
   less_than loc actual_k expected_k
 
 let path_less_than loc sort path =

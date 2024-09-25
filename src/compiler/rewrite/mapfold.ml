@@ -70,6 +70,8 @@ let stop funs _ _ = raise Fallback
 
 type ('a, 'info1, 'info2) global_it_funs =
   {
+    intro_ident :  ('a, 'info1, 'info2) global_it_funs -> 'a ->
+            Ident.t -> Ident.t * 'a;
     build :  ('a, 'info1, 'info2) global_it_funs -> 'a ->
             'info1 Ident.Env.t -> 'info2 Ident.Env.t * 'a;
     var_ident :
@@ -189,7 +191,12 @@ type ('a, 'info1, 'info2) it_funs =
       ('a, 'info1, 'info2) it_funs -> 'a -> name -> name * 'a;
   }
 
-(** Build from an environment *)
+(* introduce a fresh name *)
+let intro_ident_it funs acc ident = funs.intro_ident funs acc ident
+
+and intro_ident funs acc ident = funs.intro_ident funs acc ident
+
+(* Build from an environment *)
 let build_it funs acc env = funs.build funs acc env
 
 and build funs acc env = env, acc
@@ -295,18 +302,17 @@ and type_expression global_funs acc ({ desc } as ty) =
      let ty_list, acc =
        Util.mapfold (type_expression_it global_funs) acc ty_list in
      Etypetuple(ty_list), acc     
-  | Etypefun(kind, ty1, ty2) ->
-     let kind, acc = kind_it global_funs acc kind in
-     let ty1, acc = type_expression_it global_funs acc ty1 in
-     let ty2, acc = type_expression_it global_funs acc ty2 in
-     Etypefun(kind, ty1, ty2), acc
-  | Esize(is_singleton, si) ->
-     let si, acc = size_it global_funs acc si in
-     Esize(is_singleton, si), acc
-  | Evec(ty, si) ->
+  | Etypefun { ty_kind; ty_name_opt; ty_arg; ty_res } ->
+     let ty_kind, acc = kind_it global_funs acc ty_kind in
+     let ty_name_opt, acc =
+       Util.optional_with_map (intro_ident_it global_funs) acc ty_name_opt in
+     let ty1, acc = type_expression_it global_funs acc ty_arg in
+     let ty2, acc = type_expression_it global_funs acc ty_res in
+     Etypefun { ty_kind; ty_name_opt; ty_arg; ty_res }, acc
+  | Etypevec(ty, si) ->
     let ty, acc = type_expression_it global_funs acc ty in
     let si, acc = size_it global_funs acc si in
-    Evec(ty, si), acc in
+    Etypevec(ty, si), acc in
   { ty with desc }, acc
 
 and size_it global_funs acc si =
@@ -878,6 +884,7 @@ and interface global_funs acc interf = interf, acc
 
 let default_global_funs =
   { build;
+    intro_ident;
     var_ident;
     state_ident;
     last_ident;
@@ -929,6 +936,7 @@ let defaults =
                  
 let default_global_stop =
   { build = stop;
+    intro_ident = stop;
     var_ident = stop;
     state_ident = stop;
     last_ident = stop;

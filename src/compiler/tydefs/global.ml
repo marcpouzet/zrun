@@ -24,7 +24,7 @@ type no_info = unit
 (* values in the symbol table *)
 type value_desc =
     { mutable value_typ: Deftypes.typ_scheme; (* its type scheme *)
-      mutable value_static: bool; (* is-it a static value? *)
+      mutable value_kind: vkind; (* kind *)
       mutable value_caus: Defcaus.tc_scheme option; (* its causality scheme *)
       mutable value_init: Definit.ti_scheme option; (* its init. scheme *)
       mutable value_code: value_code; (* source code *)
@@ -33,6 +33,10 @@ type value_desc =
 (** The type of values *)
 and value_exp =
   | Vconst of immediate (* constant *)
+  | Vconstr0 of Lident.qualident (* constructor *)
+  | Vconstr1 of Lident.qualident * value_code list (* constructor *)
+  | Vtuple of value_code list (* tuple *)
+  | Vrecord of (Lident.qualident * value_code) list (* record *)
   | Vfun of no_info funexp * value_code Env.t
   (* a closure: the function body; the environment of values *)
   | Vabstract of Lident.qualident (* no implementation is given *)
@@ -69,8 +73,8 @@ let value_name n ({ value_exp = value_exp; value_name = opt_name } as v) =
   match opt_name with
   | None -> { v with value_name = Some(n) }
   | Some _ -> v
-let value_desc is_static typs qualident = 
-  { value_typ = typs; value_static = is_static; value_caus = None; 
+let value_desc k typs qualident = 
+  { value_typ = typs; value_kind = k; value_caus = None; 
     value_init = None; value_code = value_code (Vabstract(qualident)) }
 let set_type { info = ({ value_typ = _ } as v) } tys = 
   v.value_typ <- tys

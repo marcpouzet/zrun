@@ -49,6 +49,10 @@ let build global_funs ({ renaming } as acc) env =
   let env, renaming = Env.fold buildrec env (Env.empty, renaming) in
   env, { acc with renaming }
 
+let intro_ident global_funs ({ renaming } as acc) n =
+  let m = Ident.fresh (Ident.source n) in
+  m, { acc with renaming = Env.add n m renaming }
+
 let var_ident global_funs ({ renaming } as acc) x =
   try Env.find x renaming, acc with Not_found ->
     Format.eprintf 

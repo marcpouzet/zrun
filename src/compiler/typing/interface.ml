@@ -103,28 +103,35 @@ let make desc = { desc = desc; loc = no_location }
 (* type checking of type declarations *)
 let global n desc = { qualid = Modules.qualify n; info = desc }
 		      
-let rec free_of_type (size_vars, typ_vars) ty =
+let rec free_of_type bounded (size_vars, typ_vars) ty =
+  let module S = Set.Make(String) in
   match ty.desc with
   | Etypevar(x) ->
-     size_vars, if List.mem x typ_vars then typ_vars else x :: typ_vars
+     size_vars, if S.mem x typ_vars then typ_vars else S.add x typ_vars
   | Etypetuple(ty_list) ->
-     List.fold_left free_of_type (size_vars, typ_vars) ty_list
+     List.fold_left (free_of_type bounded) (size_vars, typ_vars) ty_list
   | Etypeconstr(_,ty_list) ->
-     List.fold_left free_of_type (size_vars, typ_vars) ty_list
-  | Etypefun(_, ty_arg, ty_res) ->
-     free_of_type (free_of_type (size_vars, typ_vars) ty_arg) ty_res
-  | Evec(ty, si) ->
-     let size_vars, typ_vars = free_of_type (size_vars, typ_vars) ty in
-     free_size_of_type size_vars si, typ_vars
-  | Esize(_, si) -> free_size_of_type size_vars si, typ_vars
+     List.fold_left (free_of_type bounded) (size_vars, typ_vars) ty_list
+  | Etypefun { ty_name_opt; ty_arg; ty_res } ->
+     let bounded =
+       match ty_name_opt with
+       | None -> bounded | Some(n) -> Ident.S.add n bounded in
+     free_of_type bounded
+       (free_of_type bounded (size_vars, typ_vars) ty_arg) ty_res
+  | Etypevec(ty, si) ->
+     let size_vars, typ_vars = free_of_type bounded (size_vars, typ_vars) ty in
+     free_size_of_type bounded size_vars si, typ_vars
 
-and free_size_of_type size_vars si =
+and free_size_of_type bounded size_vars si =
+  let module S = Ident.S in
   match si.desc with
-  | Esizevar(x) -> if List.mem x size_vars then size_vars else x :: size_vars
-  | Esizeconst _ -> size_vars
-  | Esizeop(_, si1, si2) ->
-     free_size_of_type (free_size_of_type size_vars si1) si2
-					
+  | Sint _ -> size_vars
+  | Sident(n) -> if S.mem n bounded then size_vars
+                 else if S.mem n size_vars then size_vars else S.add n size_vars
+  | Sfrac { num } -> free_size_of_type bounded size_vars num
+  | Splus(s1, s2) | Sminus(s1, s2) | Smult(s1, s2) ->
+     free_size_of_type bounded (free_size_of_type bounded size_vars s1) s2
+  					
 (* checks that every type is defined *)
 (* and used with the correct arity *)
 let constr_name loc s arity =
@@ -150,7 +157,7 @@ let skindoftype = function
 let kindoftype = function
   | Tfun(k) -> Kfun(skindoftype k) | Tnode(k) -> Knode(tkindoftype k)
 
-let typ_of_type_expression size_vars typ_vars typ =
+let typ_of_type_expression typ_vars typ =
   let rec typrec typ =
     match typ.desc with
     | Etypevar(s) ->
@@ -164,11 +171,9 @@ let typ_of_type_expression size_vars typ_vars typ =
     | Etypeconstr(s, ty_list) ->
        let name = constr_name typ.loc s (List.length ty_list) in
        Types.nconstr name (List.map typrec ty_list)
-    | Etypefun(k, ty_arg, ty_res) ->
-       Types.arrowtype (kindtype k) (typrec ty_arg) (typrec ty_res)
-    | Esize(is_singleton, si) ->
-       Types.size is_singleton (size si)
-    | Evec(ty, si) ->
+    | Etypefun { ty_kind; ty_name_opt; ty_arg; ty_res } ->
+       Types.arrowtype (kindtype k) ty_name_opt (typrec ty_arg) (typrec ty_res)
+    | Etypevec(ty, si) ->
        Types.vec (typrec ty) (size si)
   and size si =
     match si.desc with

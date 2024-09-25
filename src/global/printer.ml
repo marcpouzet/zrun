@@ -94,19 +94,19 @@ let rec ptype ff { desc } =
        longname ln
   | Etypetuple(ty_list) ->
      fprintf ff "@[<hov2>%a@]" (print_list_r ptype "(" " * " ")") ty_list
-  | Etypefun(k, ty_arg, ty_res) ->
-     let s = match k with
+  | Etypefun { ty_kind; ty_name_opt; ty_arg; ty_res } ->
+     let pas ff (n_opt, ty_arg) =
+	 match n_opt with
+	 | None -> () | Some(n) -> fprintf ff "(%a : %a)" name n ptype ty_arg in
+     let s = match ty_kind with
        | Kfun(k) ->
           (match k with
            | Kconst -> "-V->" | Kstatic -> "-S->" | Kany -> "-A->" )
        | Knode(k) ->
           (match k with
            | Kdiscrete -> "-D->" | Khybrid -> "-C->") in
-     fprintf ff "@[<hov2>%a %s %a@]" ptype ty_arg s ptype ty_res
-  | Esize(is_singleton, s) ->
-     if is_singleton then fprintf ff "@[<%a>@]" size s
-     else fprintf ff "@[[%a]@]" size s
-  | Evec(ty, s) -> fprintf ff "@[[%a]]%a@]" size s ptype ty
+     fprintf ff "@[<hov2>%a %s %a@]" pas (ty_name_opt, ty_arg) s ptype ty_res
+  | Etypevec(ty, s) -> fprintf ff "@[[%a]]%a@]" size s ptype ty
                      
 let print_type_params ff pl =
   print_list_r_empty (fun ff s -> fprintf ff "'%s" s) "("","") " ff pl

@@ -93,7 +93,7 @@
   (wrapped false)
   (modules
     typinfo ; type annotation for Zelus terms
-    ;interface ; interface
+    interface ; interface
     kind ; kinds
     total ; check totatlity of pattern matching
     types ; type manipulation and unification between types
