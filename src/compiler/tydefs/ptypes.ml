@@ -1,3 +1,17 @@
+(***********************************************************************)
+(*                                                                     *)
+(*                                                                     *)
+(*          Zelus, a synchronous language for hybrid systems           *)
+(*                                                                     *)
+(*  (c) 2020 Inria Paris (see the AUTHORS file)                        *)
+(*                                                                     *)
+(*  Copyright Institut National de Recherche en Informatique et en     *)
+(*  Automatique. All rights reserved. This file is distributed under   *)
+(*  the terms of the INRIA Non-Commercial License Agreement (see the   *)
+(*  LICENSE file).                                                     *)
+(*                                                                     *)
+(* *********************************************************************)
+
 (* Printing a type expression *)
 
 open Format
@@ -31,37 +45,39 @@ let arrow_tostring = function
   | Tfun(k) ->
      (match k with Tconst -> "-V->" | Tstatic -> "-S->" | Tany -> "-A->")
   | Tnode(k) ->
-     (match k with Tdiscrete -> "-D->" | Thybrid -> "-C->")
+     (match k with Tdiscrete -> "-D->" | Tcont -> "-C->")
 
-let print_size_type ff si =
+let print_size ff si =
   let operator = function Splus -> "+" | Sminus -> "-" | Smult -> "*" in
-  let priority = function Splus -> 0 | Sminus -> 1 | Smult -> 2 in
-  let rec printrec prio ff { t_desc; t_level; t_index } =
-    match t_desc with
-    | Svar ->
-       (* prefix non generalized type variables with "_" *)
-       let p = if t_level <> Deftypes.notgeneric then "" else "_" in
-       fprintf ff "@['%s%s@]" p (type_name#name t_index)
-    | Sconst(i) -> fprintf ff "%d" i
+  let priority = function Splus -> 0 | Sminus -> 1 | Smult -> 3 in
+  let priority si =
+    match si with
+    | Svar _ | Sint _ -> 3 | Sfrac _ -> 2 | Sop(op, _, _) -> priority op in
+  let rec printrec prio ff si =
+    let prio_s = priority si in
+    if prio > prio_s then fprintf ff "(";
+    begin match si with
+    | Svar(x) -> fprintf ff "%s" (Ident.name x)
+    | Sint(i) -> fprintf ff "%d" i
+    | Sfrac { num; denom } ->
+       fprintf ff "@[%a/%d]@]" (printrec prio_s) num denom
     | Sop(op, si1, si2) ->
-       let prio_op = priority op in
-       if prio > prio_op then fprintf ff "(";
        fprintf ff "@[%a %s %a@]"
-	 (printrec prio_op) si1 (operator op) (printrec prio_op) si2;
-       if prio > prio_op then fprintf ff ")"
-    | Slink(si) -> printrec prio ff si in
+	 (printrec prio_s) si1 (operator op) (printrec prio_s) si2;
+    end;
+    if prio > prio_s then fprintf ff ")" in       
   printrec 0 ff si
 
 let rec print prio ff { t_desc; t_level; t_index } =
   let priority = function
-    | Tvar -> 3 | Tproduct _ -> 2 | Tconstr _ | Tvec _ | Tsize _ -> 3
+    | Tvar -> 3 | Tproduct _ -> 2 | Tconstr _ | Tvec _ -> 3
     | Tarrow _ -> 1 | Tlink _ -> prio in
   let prio_current = priority t_desc in
   if prio_current < prio then fprintf ff "(";
   begin match t_desc with
   | Tvar ->
       (* prefix non generalized type variables with "_" *)
-      let p = if t_level <> Deftypes.notgeneric then "" else "_" in
+      let p = if t_level <> Misc.notgeneric then "" else "_" in
       fprintf ff "@['%s%s@]" p (type_name#name t_index)
   | Tproduct [] ->
      (* this situation should not happen after typing *)
@@ -76,15 +92,16 @@ let rec print prio ff { t_desc; t_level; t_index } =
       then fprintf ff "@[(%a)@ %a@]" (print_list (print 0) ",") ty_list
 		   print_qualid name 
       else fprintf ff "@[%a@]" print_qualid name
-  | Tarrow(k, ty_arg, ty_res) ->
-     let print_arg ff ty = print (prio_current + 1) ff ty in
+  | Tarrow { ty_kind; ty_name_opt; ty_arg; ty_res } ->
+     let print_arg ff ty =
+       match ty_name_opt with
+       | None -> print (prio_current + 1) ff ty
+       | Some(n) -> fprintf ff "(%s:%a)" (Ident.name n) (print 0) ty in
      fprintf ff "@[<hov 2>%a@ %s@ %a@]"
-       print_arg ty_arg (arrow_tostring k) (print prio_current) ty_res
-  | Tsize(is_singleton, si) ->
-     if is_singleton then fprintf ff "@[<%a>@]" print_size_type si
-     else fprintf ff "@[[%a]@]" print_size_type si
+       print_arg ty_arg (arrow_tostring ty_kind)
+       (print prio_current) ty_res
   | Tvec(ty, si) ->
-     fprintf ff "@[%a[%a]@]" (print prio_current) ty print_size_type si
+     fprintf ff "@[%a[%a]@]" (print prio_current) ty print_size si
   | Tlink(link) -> print prio ff link
   end;
   if prio_current < prio then fprintf ff ")"  
@@ -148,6 +165,8 @@ let print_value_type_declaration ff { qualid; info = (is_const, ty_scheme) } =
 (* the main printing functions *)
 let output ff ty =
   fprintf ff "%a" (print 0) ty
+
+let output_size ff si = print_size ff si
 
 let output_type_declaration ff global_list =
   fprintf ff "@[<hov 2>%a@.@]"

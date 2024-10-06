@@ -44,8 +44,9 @@ let add loc
 (* has a last value or a default value *)
 let all_last loc h set =
   let check elt =
-    let ({ t_sort; t_typ } as tentry) =
+    let ({ t_sort; t_tys } as tentry) =
       try Env.find elt h with | Not_found -> assert false in
+    let t_typ = Types.instance t_tys in
     match t_sort with
     | Sort_mem ({ m_init = Eq | Decl _ } | { m_default = Eq | Decl _ }) -> ()
     | _ ->

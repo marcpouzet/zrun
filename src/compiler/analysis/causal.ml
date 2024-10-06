@@ -255,24 +255,24 @@ let rec skeleton ty =
   match ty.t_desc with
   | Tvar -> atom (new_var ())
   | Tproduct(ty_list) -> product (List.map skeleton ty_list)
-  | Tarrow(_, ty_arg, ty) ->
-     funtype (skeleton ty_arg) (skeleton ty)
-  | Tconstr _ | Tvec _ | Tsize _ -> atom (new_var ())
+  | Tarrow { ty_arg; ty_res } ->
+     funtype (skeleton ty_arg) (skeleton ty_res)
+  | Tconstr _ | Tvec _ -> atom (new_var ())
   | Tlink(ty) -> skeleton ty
 
 (* the type is synchronised on [c] *)
 let skeleton_on_c c ty =
   let rec skeleton_on_c is_right c_right ty =
     match ty.t_desc with
-    | Tvar | Tconstr _ | Tvec _ | Tsize _ -> atom c_right
+    | Tvar | Tconstr _ | Tvec _ -> atom c_right
     | Tproduct(ty_list) ->
         product (List.map (skeleton_on_c is_right c_right) ty_list)
-    | Tarrow(_, ty_arg, ty) ->
+    | Tarrow { ty_arg; ty_res } ->
         let c_left = new_var () in
         (* if is_right then *) less_c c_left c_right;
         funtype
           (skeleton_on_c (not is_right) c_left ty_arg)
-          (skeleton_on_c is_right c_right ty)
+          (skeleton_on_c is_right c_right ty_res)
     | Tlink(ty) -> skeleton_on_c is_right c_right ty in
   skeleton_on_c true c ty
 
@@ -283,7 +283,7 @@ let skeleton_for_variables ty =
   let c = new_var () in
   let rec skeleton_rec ty =
     match ty.t_desc with
-    | Tvar | Tconstr _ | Tvec _ | Tsize _ -> atom c
+    | Tvar | Tconstr _ | Tvec _ -> atom c
     | Tproduct(ty_list) -> product (List.map skeleton_rec ty_list)
     | Tarrow _ -> skeleton ty
     | Tlink(ty) -> skeleton_rec ty in
@@ -686,8 +686,8 @@ let rec copy tc ty =
 
   let { t_desc = t_desc } as ty = Types.typ_repr ty in
   match tc, t_desc with
-  | Cfun(tc1, tc2), Tarrow(_, ty1, ty2) ->
-     funtype (copy tc1 ty1) (copy tc2 ty2)
+  | Cfun(tc1, tc2), Tarrow { ty_arg; ty_res } ->
+     funtype (copy tc1 ty_arg) (copy tc2 ty_res)
   | Cproduct(tc_list), Tproduct(ty_list) ->
      begin try product (List.map2 copy tc_list ty_list)
            with | Invalid_argument _ -> assert false end
@@ -718,8 +718,8 @@ let rec copy tc =
 let rec instance tc ty = 
   let { t_desc = t_desc } as ty = Types.typ_repr ty in
   match tc, t_desc with
-  | Cfun(tc1, tc2), Tarrow(_, ty1, ty2) ->
-     funtype (instance tc1 ty1) (instance tc2 ty2)
+  | Cfun(tc1, tc2), Tarrow { ty_arg; ty_res } ->
+     funtype (instance tc1 ty_arg) (instance tc2 ty_res)
   | Cproduct(tc_list), Tproduct(ty_list) ->
      begin try product (List.map2 instance tc_list ty_list)
            with | Invalid_argument _ -> assert false end

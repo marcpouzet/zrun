@@ -33,9 +33,9 @@ open State
 
 (* a structure to represent nested equations before they are turned into *)
 (* Zelus equations *)
-type 'a acc =
-  { c_vardec: 'a exp vardec list State.t;
-    c_eq: 'a eq State.t }
+type ('info, 'env) acc =
+  { c_vardec: ('info, ('info, 'env) exp) vardec list State.t;
+    c_eq: ('info, 'env) eq State.t }
 
 let empty = { c_vardec = State.Empty; c_eq = State.Empty }
 

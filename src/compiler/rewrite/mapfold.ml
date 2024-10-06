@@ -68,140 +68,190 @@ exception Fallback
 
 let stop funs _ _ = raise Fallback
 
-type ('a, 'info1, 'info2) global_it_funs =
+type ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs =
   {
-    intro_ident :  ('a, 'info1, 'info2) global_it_funs -> 'a ->
-            Ident.t -> Ident.t * 'a;
-    build :  ('a, 'info1, 'info2) global_it_funs -> 'a ->
-            'info1 Ident.Env.t -> 'info2 Ident.Env.t * 'a;
+    intro_ident :
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> Ident.t -> Ident.t * 'a;
+    build :
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> 'info1 Ident.Env.t -> 'info2 Ident.Env.t * 'a;
+    lident :
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> Lident.t -> Lident.t * 'a;
     var_ident :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> Ident.t -> Ident.t * 'a;
     state_ident :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> Ident.t -> Ident.t * 'a;
     last_ident :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> last -> last * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> last -> last * 'a;
     init_ident :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> Ident.t -> Ident.t * 'a;
     emit_ident :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> Ident.t -> Ident.t * 'a;
     der_ident :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> Ident.t -> Ident.t * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> Ident.t -> Ident.t * 'a;
     typevar :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> name -> name * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> name -> name * 'a;
     typeconstr :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> Lident.t -> Lident.t * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> Lident.t -> Lident.t * 'a;
     type_expression :
-      ('a, 'info1, 'info2) global_it_funs -> 'a ->
-      type_expression -> type_expression * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> type_expression -> type_expression * 'a;
     typedecl :
-      ('a, 'info1, 'info2) global_it_funs -> 'a ->
-      ((name * name list * name list * type_decl) as 'ty) -> 'ty * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> ((name * name list * type_decl) as 'ty) -> 'ty * 'a;
+    constr_decl :
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> constr_decl -> constr_decl * 'a;
     kind :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> kind -> kind * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> kind -> kind * 'a;
     interface :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> interface -> interface * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a -> interface -> interface * 'a;
     size_t :
-      ('a, 'info1, 'info2) global_it_funs -> 'a -> size -> size * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      'a ->
+      size_expression -> size_expression * 'a;
   }
 
-type ('a, 'info1, 'info2) it_funs =
+type ('a, 'info1, 'env1, 'info2, 'env2) it_funs =
   {
-    global_funs : ('a, 'info1, 'info2) global_it_funs;
-    pattern : ('a, 'info1, 'info2) it_funs -> 'a ->
-              'info1 pattern -> 'info2 pattern * 'a;
+    global_funs :
+      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs;
+    pattern :
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> 'info1 pattern -> 'info2 pattern * 'a;
     write_t :
-      ('a, 'info1, 'info2) it_funs -> 'a -> defnames -> defnames * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> defnames -> defnames * 'a;
     leq_t :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 leq -> 'info2 leq * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) leq -> ('info2, 'env2) leq * 'a;
     slet_t :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      'info1 leq list -> 'info2 leq list * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) leq list -> ('info2, 'env2) leq list * 'a;
     equation :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 eq -> 'info2 eq * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) eq -> ('info2, 'env2) eq * 'a;
     scondpat :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      'info1 scondpat -> 'info2 scondpat * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) scondpat -> ('info2, 'env2) scondpat * 'a;
     expression :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 exp -> 'info2 exp * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) exp -> ('info2, 'env2) exp * 'a;
     vardec :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      'info1 exp vardec -> 'info2 exp vardec * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, ('info1, 'env1) exp) vardec ->
+      ('info2, ('info2, 'env2) exp) vardec * 'a;
     for_vardec :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      'info1 exp for_vardec -> 'info2 exp for_vardec * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
+      ('info1, 'env1) for_vardec -> ('info2, 'env2) for_vardec * 'a;
     for_out_t :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      'info1 for_out -> 'info2 for_out * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
+      ('info1, 'env1) for_out -> ('info2, 'env2) for_out * 'a;
     for_returns :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      'info1 for_returns -> 'info2 for_returns * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
+      ('info1, 'env1) for_returns -> ('info2, 'env2) for_returns * 'a;
     for_exp_t :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      'info1 for_exp -> 'info2 for_exp * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
+      ('info1, 'env1) for_exp -> ('info2, 'env2) for_exp * 'a;
     for_eq_t :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      'info1 for_eq -> 'info2 for_eq * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
+      ('info1, 'env1) for_eq -> ('info2, 'env2) for_eq * 'a;
     block :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      ('info1, 'info1 exp, 'info1 eq) block ->
-      ('info2, 'info2 exp, 'info2 eq) block * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
+      ('info1, 'env1, ('info1, 'env1) exp, ('info1, 'env1) eq) block ->
+      ('info2, 'env2, ('info2, 'env2) exp, ('info2, 'env2) eq) block * 'a;
     result :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 result -> 'info2 result * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) result -> ('info2, 'env2) result * 'a;
     funexp :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 funexp -> 'info2 funexp * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) funexp -> ('info2, 'env2) funexp * 'a;
     match_handler_eq :
-      ('a, 'info1, 'info2) it_funs -> 'a -> ('info1, 'info1 eq) match_handler
-        -> ('info2, 'info2 eq) match_handler * 'a; 
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'info1 pattern, ('info1, 'env1) eq) match_handler
+        -> ('info2, 'info2 pattern, ('info2, 'env2) eq) match_handler * 'a; 
     match_handler_e :
-      ('a, 'info1, 'info2) it_funs -> 'a -> ('info1, 'info1 exp) match_handler
-      -> ('info2, 'info2 exp) match_handler * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a
+      -> ('info1, 'info1 pattern, ('info1, 'env1) exp) match_handler
+      -> ('info2, 'info2 pattern, ('info2, 'env2) exp) match_handler * 'a;
     if_eq :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 eq * 'info1 eq
-        -> ('info2 eq * 'info2 eq) * 'a; 
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) eq * ('info1, 'env1) eq ->
+      (('info2, 'env2) eq * ('info2, 'env2) eq) * 'a; 
     reset_eq :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 eq -> 'info2 eq * 'a; 
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) eq -> ('info2, 'env2) eq * 'a; 
     reset_e :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 exp -> 'info2 exp * 'a; 
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ('info1, 'env1) exp -> ('info2, 'env2) exp * 'a; 
     present_handler_eq :
-      ('a, 'info1, 'info2) it_funs -> 'a 
-      -> ('info1, 'info1 scondpat, 'info1 eq) present_handler 
-      -> ('info2, 'info2 scondpat, 'info2 eq) present_handler * 'a; 
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a 
+      -> ('info1, ('info1, 'env1) scondpat, ('info1, 'env1) eq) present_handler 
+      -> ('info2, ('info2, 'env2) scondpat, ('info2, 'env2) eq) present_handler
+                                            * 'a; 
     present_handler_e :
-       ('a, 'info1, 'info2) it_funs -> 'a 
-      -> ('info1, 'info1 scondpat, 'info1 exp) present_handler 
-      -> ('info2, 'info2 scondpat, 'info2 exp) present_handler * 'a; 
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a 
+      -> ('info1, ('info1, 'env1) scondpat, ('info1, 'env1) exp)
+           present_handler 
+      -> ('info2, ('info2, 'env2) scondpat, ('info2, 'env2) exp)
+           present_handler * 'a; 
     automaton_handler : 
-      ('a, 'info1, 'info2) it_funs -> 'a 
-      -> ('info1, ('info1, 'info1 exp, 'info1 eq) block) automaton_handler 
-      -> ('info2, ('info2, 'info2 exp, 'info2 eq) block) automaton_handler * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a 
+      -> ('info1, 'env1,
+          ('info1, 'env1, ('info1, 'env1) exp, ('info1, 'env1) eq) block)
+           automaton_handler 
+      -> ('info2, 'env2,
+          ('info2, 'env2, ('info2, 'env2) exp, ('info2, 'env2) eq) block)
+           automaton_handler * 'a;
     letdecl :
-      ('a, 'info1, 'info2) it_funs -> 'a -> ((name * Ident.t) list * 'info1 leq)
-      -> ((name * Ident.t) list * 'info2 leq) * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> ((name * Ident.t) list * ('info1, 'env1) leq)
+      -> ((name * Ident.t) list * ('info2, 'env2) leq) * 'a;
     implementation :
-      ('a, 'info1, 'info2) it_funs -> 'a ->
-      'info1 implementation -> 'info2 implementation * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
+      ('info1, 'env1) implementation -> ('info2, 'env2) implementation * 'a;
     program :
-      ('a, 'info1, 'info2) it_funs -> 'a -> 'info1 program 
-      -> 'info2 program * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
+      ('info1, 'env1) program -> ('info2, 'env2) program * 'a;
     get_index :
-     ('a, 'info1, 'info2) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> Ident.num -> Ident.num * 'a;
     set_index :
-      ('a, 'info1, 'info2) it_funs -> 'a -> Ident.num -> Ident.num * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'a -> Ident.num -> Ident.num * 'a;
     open_t :
-      ('a, 'info1, 'info2) it_funs -> 'a -> name -> name * 'a;
+      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a -> name -> name * 'a;
   }
 
 (* introduce a fresh name *)
-let intro_ident_it funs acc ident = funs.intro_ident funs acc ident
+let intro_ident_it global_funs acc ident =
+  global_funs.intro_ident global_funs acc ident
 
-and intro_ident funs acc ident = funs.intro_ident funs acc ident
+and intro_ident global_funs acc ident = ident, acc
+
+(* global ident *)
+let lident_it global_funs acc lident = global_funs.lident global_funs acc lident
+
+and lident global_funs acc lident = lident, acc
 
 (* Build from an environment *)
-let build_it funs acc env = funs.build funs acc env
+let build_it global_funs acc env = global_funs.build global_funs acc env
 
-and build funs acc env = env, acc
+and build global_funs acc env = env, acc
 
-and last_ident_it funs acc l = funs.last_ident funs acc l
+and last_ident_it global_funs acc l = global_funs.last_ident global_funs acc l
 
 and last_ident global_funs acc { copy; id } =
   let id, acc = global_funs.var_ident global_funs acc id in
@@ -228,20 +278,25 @@ let rec pattern_it funs acc pat =
 
 and pattern funs acc ({ pat_desc } as p) =
   let pat_desc, acc = match pat_desc with
-    | Ewildpat | Econstpat _ | Econstr0pat _ -> pat_desc, acc
+    | Ewildpat | Econstpat _ -> pat_desc, acc
+    | Econstr0pat(lname) ->
+       let lname, acc = lident_it funs.global_funs acc lname in
+       Econstr0pat(lname), acc
     | Evarpat(v) ->
        let v, acc = var_ident_it funs.global_funs acc v in
        Evarpat(v), acc
     | Etuplepat(p_list) ->
        let p_list, acc = Util.mapfold (pattern_it funs) acc p_list in
        Etuplepat(p_list), acc
-    | Econstr1pat(c, p_list) ->
+    | Econstr1pat(lname, p_list) ->
+       let lname, acc = lident_it funs.global_funs acc lname in
        let p_list, acc = Util.mapfold (pattern_it funs) acc p_list in
-       Econstr1pat(c, p_list), acc
+       Econstr1pat(lname, p_list), acc
     | Erecordpat(n_p_list) ->
        let n_p_list, acc =
          Util.mapfold 
            (fun acc { label; arg } ->
+             let label, acc = lident_it funs.global_funs acc label in
              let p, acc = pattern_it funs acc p in
              { label; arg = p}, acc) acc n_p_list in
        Erecordpat(n_p_list), acc
@@ -321,25 +376,17 @@ and size_it global_funs acc si =
 
 and size_t global_funs acc ({ desc } as si) =
   let desc, acc = match desc with
-  | Sint _ -> desc, acc
-  | Sfrac { num; denom } ->
+  | Size_int _ -> desc, acc
+  | Size_frac { num; denom } ->
      let num, acc = size_it global_funs acc num in
-     Sfrac { num; denom }, acc
-  | Sident(id) ->
+     Size_frac { num; denom }, acc
+  | Size_var(id) ->
      let id, acc = var_ident_it global_funs acc id in
-     Sident(id), acc
-  | Splus(si1, si2) ->
+     Size_var(id), acc
+  | Size_op(op, si1, si2) ->
      let si1, acc = size_it global_funs acc si1 in
      let si2, acc = size_it global_funs acc si2 in
-     Splus(si1, si2), acc
-  | Sminus(si1, si2) ->
-     let si1, acc = size_it global_funs acc si1 in
-     let si2, acc = size_it global_funs acc si2 in
-     Splus(si1, si2), acc
-  | Smult(si1, si2) ->
-     let si1, acc = size_it global_funs acc si1 in
-     let si2, acc = size_it global_funs acc si2 in
-     Splus(si1, si2), acc in
+     Size_op(op, si1, si2), acc in
   { si with desc }, acc
 
 let write_it funs acc w = funs.write_t funs acc w
@@ -529,7 +576,13 @@ and expression_it funs acc e =
 
 and expression funs acc ({ e_desc; e_loc } as e) =
   match e_desc with
-  | Econst _ | Econstr0 _ | Eglobal _ -> e, acc
+  | Econst _ -> e, acc
+  | Econstr0 { lname } ->
+     let lname, acc = lident_it funs.global_funs acc lname in
+     { e with e_desc = Econstr0 { lname } }, acc
+  | Eglobal { lname } ->
+     let lname, acc = lident_it funs.global_funs acc lname in
+     { e with e_desc = Eglobal { lname } }, acc
   | Evar(x) ->
      let x, acc = var_ident_it funs.global_funs acc x in
      { e with e_desc = Evar(x) }, acc
@@ -540,15 +593,18 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      let e_list, acc = Util.mapfold (expression_it funs) acc e_list in
      { e with e_desc = Etuple(e_list) }, acc
   | Econstr1 { lname; arg_list } ->
+     let lname, acc = lident_it funs.global_funs acc lname in
      let arg_list, acc = Util.mapfold (expression_it funs) acc arg_list in
      { e with e_desc = Econstr1 { lname; arg_list } }, acc
   | Erecord(l_e_list) -> 
      let l_e_list, acc =
        Util.mapfold (fun acc { label; arg } ->
+           let label, acc = lident_it funs.global_funs acc label in
            let arg, acc = expression_it funs acc arg in 
            { label; arg }, acc) acc l_e_list in
      { e with e_desc = Erecord(l_e_list) }, acc
   | Erecord_access { label; arg } ->
+     let label, acc = lident_it funs.global_funs acc label in
      let arg, acc = expression_it funs acc arg in
      { e with e_desc = Erecord_access { label; arg } }, acc
   | Erecord_with(e_record, l_e_list) -> 
@@ -556,6 +612,7 @@ and expression funs acc ({ e_desc; e_loc } as e) =
      let l_e_list, acc =
        Util.mapfold
 	 (fun acc { label; arg } ->
+           let label, acc = lident_it funs.global_funs acc label in
            let arg, acc = expression_it funs acc e in { label; arg }, acc)
          acc l_e_list in
      { e with e_desc = Erecord_with(e_record, l_e_list) }, acc
@@ -853,12 +910,49 @@ and implementation funs acc ({ desc } as impl) =
     | Eletdecl { d_names; d_leq } ->
        let (d_names, d_leq), acc = letdecl_it funs acc (d_names, d_leq) in
        Eletdecl { d_names; d_leq }, acc
-    | Etypedecl { name; ty_params; size_params; ty_decl } ->
-       let (name, ty_params, size_params, ty_decl), acc =
+    | Etypedecl { name; ty_params; ty_decl } ->
+       let (name, ty_params, ty_decl), acc =
          typedecl_it
-           funs.global_funs acc (name, ty_params, size_params, ty_decl) in
-       Etypedecl { name; ty_params; size_params; ty_decl }, acc in
+           funs.global_funs acc (name, ty_params, ty_decl) in
+       Etypedecl { name; ty_params; ty_decl }, acc in
   { impl with desc }, acc
+
+let constr_decl_it global_funs acc c_decl =
+  global_funs.constr_decl global_funs acc c_decl
+
+and constr_decl global_funs acc ({ desc } as c_decl) =
+  let desc, acc = match desc with
+  | Econstr0decl _ -> desc, acc
+  | Econstr1decl(name, ty_list) ->
+     let ty_list, acc =
+       Util.mapfold (type_expression_it global_funs) acc ty_list in
+     Econstr1decl(name, ty_list), acc in
+  { c_decl with desc }, acc
+
+let typedecl_it global_funs acc (name, ty_params, ty_decl) =
+  global_funs.typedecl global_funs acc (name, ty_params, ty_decl)
+
+and typedecl global_funs acc (name, ty_params, ty_decl) =
+  let one_ty_decl acc ({ desc } as ty_decl) =
+    let desc, acc = match desc with
+      | Eabstract_type -> Eabstract_type, acc
+      | Eabbrev(ty_e) ->
+         let ty_e, acc = type_expression_it global_funs acc ty_e in
+         Eabbrev(ty_e), acc
+      | Evariant_type(constr_list) ->
+         let constr_list, acc =
+           Util.mapfold (constr_decl_it global_funs) acc constr_list in
+         Evariant_type(constr_list), acc
+      | Erecord_type(name_ty_list) ->
+         let name_ty_list, acc =
+           Util.mapfold
+             (fun acc (name, ty) ->
+               let ty, acc = type_expression_it global_funs acc ty in
+               (name, ty), acc) acc name_ty_list in
+         Erecord_type(name_ty_list), acc in
+    { ty_decl with desc }, acc in
+  let ty_decl, acc = one_ty_decl acc ty_decl in
+  (name, ty_params, ty_decl), acc
 
 let set_index_it funs acc n = funs.set_index funs acc n
 
@@ -885,6 +979,7 @@ and interface global_funs acc interf = interf, acc
 let default_global_funs =
   { build;
     intro_ident;
+    lident;
     var_ident;
     state_ident;
     last_ident;
@@ -896,6 +991,7 @@ let default_global_funs =
     kind;
     type_expression;
     typedecl;
+    constr_decl;
     interface;
     size_t;
   }
@@ -933,9 +1029,11 @@ let defaults =
     set_index;
     open_t;
   }
-                 
+
+
 let default_global_stop =
   { build = stop;
+    lident = stop;
     intro_ident = stop;
     var_ident = stop;
     state_ident = stop;
@@ -948,9 +1046,12 @@ let default_global_stop =
     kind = stop;
     type_expression = stop;
     typedecl = stop;
+    constr_decl = stop;
     interface = stop;
     size_t = stop;
   }
+
+
 let defaults_stop =
   { global_funs = default_global_stop;
     pattern = stop;

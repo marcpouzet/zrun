@@ -78,13 +78,13 @@ and 'a map =
 (* a size parameterized expression - f <n1,...,nk> = e *)
 and 'a sizefun = 
   { s_params: Ident.t list; 
-    s_body: Misc.no_info Zelus.exp; 
+    s_body: (Misc.no_info, Misc.no_info) Zelus.exp; 
     s_genv: 'a Genv.genv; 
     s_env: 'a star ientry Ident.Env.t }
                                    
 (* a functional value - [fun|node] x1 ... xn -> e *)
 and 'a closure =
-  { c_funexp : Misc.no_info Zelus.funexp;
+  { c_funexp : (Misc.no_info, Misc.no_info) Zelus.funexp;
     c_genv: 'a Genv.genv;
     c_env: 'a star ientry Ident.Env.t }
                                      

@@ -33,11 +33,12 @@ type 'a env =
     e_values: 'a Ident.Env.t;  (* environment of static values *)
     e_gvalues: 'a Genv.genv;
     (* global environment of static values *)
-    e_defs: no_info implementation list;
+    e_defs: (no_info, no_info) implementation list;
     (* global definitions of static values introduced during the reduction *)
     (* the head of the list is the last added value *)
-    e_exp: no_info exp Ident.Env.t; (* the expression associated to [x] *)
-                                    (* when [x] is a static value *)
+    e_exp: (no_info, no_info) exp Ident.Env.t;
+    (* the expression associated to [x] *)
+    (* when [x] is a static value *)
   }
 
 (* All static expressions are reduced. Static expressions bound to variables *)

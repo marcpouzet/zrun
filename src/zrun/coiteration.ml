@@ -285,28 +285,23 @@ let immediate v =
 (* sizes *)
 let rec size env { desc; loc } =
   match desc with
-  | Sint(i) -> return i
-  | Sfrac { num; denom} ->
+  | Size_int(i) -> return i
+  | Size_frac { num; denom} ->
       let* v = size env num in
       return (v / denom)
-  | Sident(x) ->
+  | Size_var(x) ->
       let* v =
        find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc } in
       let* v = is_int loc v in
       return v
-  | Splus(s1, s2) ->
+  | Size_op(op, s1, s2) ->
      let* v1 = size env s1 in
      let* v2 = size env s2 in
-     return (v1 + v2)
-  | Sminus(s1, s2) ->
-     let* v1 = size env s1 in
-     let* v2 = size env s2 in
-     return (v1 - v2)
-  | Smult(s1, s2) ->
-     let* v1 = size env s1 in
-     let* v2 = size env s2 in
-     return (v1 * v2)
+     match op with
+     | Size_plus -> return (v1 + v2)
+     | Size_minus -> return (v1 - v2)
+     | Size_mult -> return (v1 * v2)
 
 (* mutually recursive definitions must either define *)
 (* functions parameterized by a size or stream values *)

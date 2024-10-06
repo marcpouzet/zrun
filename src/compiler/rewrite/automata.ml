@@ -120,7 +120,7 @@ let intro_type_for_automaton acc s_h_list =
   (* introduce a new type *)
   let name = "state__" ^ (string_of_int(Genames.symbol#name)) in
   
-  make (Etypedecl { name; ty_params = a1_ak; size_params = []; ty_decl }) ::
+  make (Etypedecl { name; ty_params = a1_ak; ty_decl }) ::
   acc
 
 (* Translation of an automaton *)

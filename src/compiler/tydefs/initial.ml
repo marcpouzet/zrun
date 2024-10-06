@@ -31,7 +31,7 @@ let abbrev_type params (ty_parameters, ty) =
 let abbrev_type qualident params (ty_parameters, ty) =
   { qualid = qualident; info = abbrev_type params (ty_parameters, ty)}
 let value qualident tys =
-  { qualid = qualident; info = value_desc Kconst tys qualident }
+  { qualid = qualident; info = value_desc true tys qualident }
   
 let stdlib_name id = { qual = stdlib_module;id = id }
 
@@ -60,7 +60,9 @@ let type_desc_signal = abstract_type sig_ident [generic]
 let type_desc_list = abstract_type list_ident [generic]
 
 let constr id ty_list = make (Tconstr(id, ty_list, ref Tnil))
-let tarrow ty1 ty2 = make (Tarrow(Tfun(Tany), ty1, ty2))
+let tarrow ty1 ty2 =
+  make (Tarrow { ty_kind = Tfun(Tany); ty_name_opt = None;
+                 ty_arg = ty1; ty_res = ty2 })
 
 (* the [array] type *)
 let array_ident = stdlib_name "array"
@@ -104,16 +106,17 @@ let cons_ident = stdlib_name cons_name
 
 let value_desc_nil =
   let ta = make Tvar in
-  value nil_ident { size_vars = []; typ_vars = [ta]; typ_body = typ_list ta }
+  value nil_ident { typ_vars = [ta]; typ_body = typ_list ta }
     
 let value_desc_cons =
   let ta = make Tvar in
   let ta_list = typ_list ta in
   value cons_ident
     { typ_vars = [ta];
-      size_vars = [];
       typ_body =
-        make (Tarrow(Tfun(Tany), make (Tproduct [ta; ta_list]), ta_list))
+        make (Tarrow { ty_kind = Tfun(Tany); ty_name_opt = None;
+                       ty_arg = make (Tproduct [ta; ta_list]);
+                       ty_res = ta_list })
     }
 
 (* basic values for arrays *)
@@ -124,8 +127,7 @@ let value_desc_concat =
   let ty = make Tvar in
   let ty_array = typ_array ty in
   value concat_ident
-    { size_vars = [];
-      typ_vars = [ty];
+    { typ_vars = [ty];
       typ_body = tarrow ty_array (tarrow ty_array ty_array) }
 (* [| e1;...;en |] *)
 let array_list_name = "array_list"
@@ -136,8 +138,7 @@ let value_desc_array_list n =
   let rec tarrow_n n =
     if n = 0 then ty_array else tarrow ty (tarrow_n (n-1)) in
   value array_list_ident
-    { size_vars = [];
-      typ_vars = [ty];
+    { typ_vars = [ty];
       typ_body = tarrow_n n }
 (* [get e i = e.(i)] *)
 let array_get_name = "array_get"
@@ -146,8 +147,7 @@ let value_desc_get =
   let ty = make Tvar in
   let ty_array = typ_array ty in
   value array_get_ident
-    { size_vars = [];
-      typ_vars = [ty];
+    { typ_vars = [ty];
       typ_body = tarrow ty_array (tarrow typ_int ty) }
 (* [get e i e' = e.(i) with e'] *)
 let array_get_default_name = "array_get_default"
@@ -156,8 +156,7 @@ let value_desc_get_default =
   let ty = make Tvar in
   let ty_array = typ_array ty in
   value array_get_default_ident
-    { size_vars = [];
-      typ_vars = [ty];
+    { typ_vars = [ty];
       typ_body = tarrow ty_array (tarrow typ_int (tarrow ty ty)) }
 (* [slice e e1 e2 = e.(e1..e2) *)
 let array_slice_name = "array_slice"
@@ -166,8 +165,7 @@ let value_desc_slice =
   let ty = make Tvar in
   let ty_array = typ_array ty in
   value array_slice_ident
-    { size_vars = [];
-      typ_vars = [ty];
+    { typ_vars = [ty];
       typ_body = tarrow ty_array (tarrow ty (tarrow ty ty_array)) }
 (* [update e e1 e2 = [| e with e1 <- e2 |] *)
 let array_update_name = "array_update"
@@ -176,8 +174,7 @@ let value_desc_update =
   let ty = make Tvar in
   let ty_array = typ_array ty in
   value array_update_ident
-    { size_vars = [];
-      typ_vars = [ty];
+    { typ_vars = [ty];
       typ_body = tarrow ty_array (tarrow typ_int (tarrow ty ty_array)) }
 (* [transpose] *)
 let array_transpose_name = "array_transpose"
@@ -186,8 +183,7 @@ let value_desc_transpose =
   let ty = make Tvar in
   let ty_array = typ_array ty in
   value array_update_ident
-    { size_vars = [];
-      typ_vars = [ty];
+    { typ_vars = [ty];
       typ_body = tarrow ty_array (tarrow typ_int (tarrow ty ty_array)) }
 
 (* global constructed values loaded initially *)

@@ -40,9 +40,9 @@ let defnames eq_list =
 let desc e = e.desc
 let make x = { desc = x; loc = no_location }
 
-let emake desc =
+let emake desc : (no_info, no_info) exp =
   { e_desc = desc; e_loc = no_location; e_info = no_info }
-let pmake desc =
+let pmake desc : no_info pattern =
   { pat_desc = desc; pat_loc = no_location; pat_info = no_info }
 
 
@@ -108,7 +108,8 @@ let par eq_list = par false eq_list
 
 let init_vardec id var_is_last var_init var_default var_init_in_eq = 
   { var_name = id; var_is_last; var_init; var_default; var_clock = false;
-    var_typeconstraint = None; var_loc = no_location; var_init_in_eq }
+    var_typeconstraint = None; var_loc = no_location; var_init_in_eq;
+    var_info = no_info }
 
 let vardec id var_is_last var_init var_default =
   init_vardec id var_is_last var_init var_default false
@@ -269,16 +270,17 @@ let record_access arg label = emake (Erecord_access { arg; label })
 let new_major env =
   let m = Ident.fresh "major" in
   let env =
-    Env.add m { t_path = [];
-                t_sort = Deftypes.major (); t_typ = Initial.typ_bool } env in
+    Env.add m { t_path = Pkind(Tnode(Tcont));
+                t_sort = Deftypes.major ();
+                t_tys = Deftypes.scheme Initial.typ_bool } env in
   let major = var m in
   env, major
 	 
 let major env =
-  let exception Return of no_info Zelus.exp in
+  let exception Return of (no_info, no_info) Zelus.exp in
   let find x t =
     match t with
-    | { t_sort = Sort_mem { m_mkind = Some(Major) }; t_typ = typ } ->
+    | { t_sort = Sort_mem { m_mkind = Some(Major) } } ->
        raise (Return(var x))
     | _ -> () in
   try

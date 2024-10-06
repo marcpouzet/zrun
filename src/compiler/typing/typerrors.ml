@@ -3,7 +3,7 @@
 (*                                                                     *)
 (*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
-(*  (c) 2021 Inria Paris (see the AUTHORS file)                        *)
+(*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -52,6 +52,11 @@ type error =
   | Eglobal_is_a_function of Lident.t
   | Eapplication_of_non_function
   | Epattern_not_total
+  | Esize_parameter_must_be_a_name
+  | Enot_a_size_expression
+  | Esize_of_vec_is_undetermined
+  | Esize_clash of size * size
+  | Esize_parameter_cannot_be_generalized of Ident.t * typ
   | Econstr_arity of Lident.t * int * int							 
 exception Error of Location.t * error
 				
@@ -80,7 +85,7 @@ let vkind_message = function
 
 let kind_message = function
   | Tfun(k) -> vkind_message k
-  | Tnode(k) -> (match k with | Tdiscrete -> "node" | Thybrid -> "hybrid node")
+  | Tnode(k) -> (match k with | Tdiscrete -> "node" | Tcont -> "hybrid node")
   		
 let message loc kind =
   begin match kind with
@@ -202,6 +207,33 @@ let message loc kind =
      eprintf
        "@[%aType error: this pattern must be total.@.@]"
        output_location loc
+ | Esize_parameter_must_be_a_name ->
+    eprintf
+      "@[%aType error: the type of the result depend on some variables \
+       from this pattern. This pattern must be a variable.@.@]"
+       output_location loc
+ | Esize_of_vec_is_undetermined ->
+    eprintf
+      "@[<hov 0>%aType error: this expression is either not a vector@ or its \
+       size cannot be determined at that point.@.@]"
+      output_location loc
+ | Enot_a_size_expression ->
+    eprintf
+      "@[%aType error: this is not a valid size expression.@.@]"
+      output_location loc
+ | Esize_clash(actual_size, expected_size) ->
+      eprintf "@[%aType error: this expression is equal to@ %a,@ \
+               but is expected to have equal to@ %a.@.@]"
+        output_location loc
+        Ptypes.output_size actual_size
+        Ptypes.output_size expected_size
+ | Esize_parameter_cannot_be_generalized(n, ty) ->
+     eprintf
+       "@[%aType error: this pattern has type@ %a,@ \
+        which contains the variable %s that is bounded later or never.@.@]"
+	output_location loc
+        Ptypes.output ty
+	(Ident.name n)
  | Econstr_arity(ln, expected_arity, actual_arity) ->
      eprintf
        "@[%aType error: the type constructor %a expects %d argument(s),@ \

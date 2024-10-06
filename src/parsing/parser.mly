@@ -363,10 +363,10 @@ interface_file:
 interface:
   | OPEN c = CONSTRUCTOR
       { Einter_open(c) }
-  | TYPE tp = type_params i = IDENT sp = size_params
+  | TYPE tp = type_params i = IDENT
     td = localized(type_declaration_desc)
     { Einter_typedecl
-	{ name = i; ty_params = tp; size_params = sp; ty_decl = td } }
+	{ name = i; ty_params = tp; ty_decl = td } }
   | v = val_or_const i = ide COLON t = type_expression
       { Einter_constdecl { name = i; const = v; ty = t; info = [] } }
 ;
@@ -383,7 +383,7 @@ scalar_interface :
   | OPEN c = CONSTRUCTOR
       { [make (Einter_open(c)) $startpos $endpos] }
   | TYPE tp = type_params i = IDENT td = localized(type_declaration_desc)
-    { [make (Einter_typedecl { name = i; ty_params = tp; size_params = [];
+    { [make (Einter_typedecl { name = i; ty_params = tp;
 			       ty_decl = td }) $startpos $endpos] }
   | v = val_or_const i = ide COLON t = type_expression
     { [make (Einter_constdecl { name = i; const = v; ty = t; info = [] })
@@ -417,15 +417,6 @@ val_or_const :
 
 type_params :
   | LPAREN tvl = list_of(COMMA, type_var) RPAREN
-      { tvl }
-  | tv = type_var
-      { [tv] }
-  |
-      { [] }
-;
-
-size_params :
-  | LBRACKET tvl = list_of(COMMA, type_var) RBRACKET
       { tvl }
   | tv = type_var
       { [tv] }
@@ -471,10 +462,10 @@ decl_list(X):
 implementation:
   | OPEN c = CONSTRUCTOR
     { Eopen c }
-  | TYPE tp = type_params id = IDENT sp = size_params
+  | TYPE tp = type_params id = IDENT
     td = localized(type_declaration_desc)
     { Etypedecl
-	{ name = id; ty_params = tp; size_params = sp; ty_decl = td } }
+	{ name = id; ty_params = tp; ty_decl = td } }
   | LET v = vkind_opt i = is_rec let_eq = equation_and_list
     { Eletdecl(make 
                  { l_rec = i; l_kind = v; l_eq = let_eq } $startpos $endpos) }
@@ -493,7 +484,7 @@ vkind_opt:
 fun_kind:
   | FUN    { Kfun(Kany) }
   | NODE   { Knode(Kdiscrete) }
-  | HYBRID { Knode(Khybrid) }
+  | HYBRID { Knode(Kcont) }
 ;
 
 %inline fun_kind_opt:
@@ -1000,17 +991,17 @@ size_expression:
 
 size_expression_desc:
   | i = ide
-    { Sident(i) }
+    { Size_var(i) }
   | i = INT
-    { Sint(i) }
+    { Size_int(i) }
   | num = size_expression DIV denom = INT
-    { Sfrac(num, denom) }
+    { Size_frac(num, denom) }
   | e1 = size_expression PLUS e2 = size_expression
-    { Splus(e1, e2) }
+    { Size_op(Size_plus, e1, e2) }
   | e1 = size_expression MINUS e2 = size_expression
-    { Sminus(e1, e2) }
+    { Size_op(Size_minus, e1, e2) }
   | e1 = size_expression STAR e2 = size_expression
-    { Smult(e1, e2) }
+    { Size_op(Size_mult, e1, e2) }
 ;
 
 /* [| e with e1,...,en <- e' |] */
@@ -1439,5 +1430,5 @@ type_comma_list :
   | DFUN
        { Knode(Kdiscrete) }
   | CFUN
-       { Knode(Khybrid) }
+       { Knode(Kcont) }
 ;

@@ -18,12 +18,12 @@ open Compiler
 
 let compile file =
   Modules.clear();
-  if !no_stdlib then set_no_stdlib();
+  if !Misc.no_stdlib then Initial.set_no_stdlib();
   if Filename.check_suffix file ".zls" || Filename.check_suffix file ".zlus"
   then
     let filename = Filename.chop_extension file in
     let modname = String.capitalize_ascii (Filename.basename filename) in
-    compile modname filename
+    Compiler.compile modname filename
   else if Filename.check_suffix file ".zli"
   then
     let filename = Filename.chop_suffix file ".zli" in
@@ -37,26 +37,6 @@ let compile file =
   else
     raise (Arg.Bad ("don't know what to do with " ^ file))
 
-module SS = Depend.StringSet
-let build file = 
-  Deps_tools.add_to_load_path Filename.current_dir_name;
-  let rec _build acc file = 
-    let deps = 
-      match (Filename.extension file) with
-      | ".zls" -> Deps_tools.zls_dependencies file
-      | ".zli" -> Deps_tools.zli_dependencies file
-      | _ -> raise (Arg.Bad ("don't know what to do with " ^ file))
-    in
-    let acc = List.fold_left _build acc deps in
-    let basename = Filename.chop_extension file in
-    if not (SS.mem basename acc) then begin
-      compile file; 
-      SS.add basename acc
-    end else
-      acc
-  in
-  ignore (_build (SS.empty) file)
-  
 let doc_verbose = "\t Set verbose mode"
 let doc_vverbose = "\t Set even more verbose mode"
 and doc_version = "\t The version of the compiler"
@@ -91,7 +71,6 @@ and doc_red_name = "\t Static reduction for"
 and doc_zsign = "\t Use the sign function for the zero-crossing argument"
 and doc_with_copy = "\t Add of a copy method for the state"
 and doc_rif = "\t Use RIF format over stdin and stdout to communicate I/O to the node being simulated"
-and doc_deps = "\t Recursively compile dependencies"
 and doc_no_opt = "\t (undocumented)"
 and doc_no_warning = "\t Turn off warnings"
 let errmsg = "Options are:"
@@ -105,7 +84,6 @@ let set_vverbose () =
   set_verbose ()
 
 let add_include d =
-  Deps_tools.add_to_load_path d;
   load_path := d :: !load_path
 
 let set_gtk () =
@@ -121,7 +99,6 @@ let main () =
           "-v", Arg.Unit set_verbose, doc_verbose;
           "-vv", Arg.Unit set_vverbose, doc_vverbose;
           "-version", Arg.Unit show_version, doc_version;
-          "-o", Arg.String set_outname, doc_outname;
           "-I", Arg.String add_include, doc_include;
           "-i", Arg.Set print_types, doc_print_types;
           "-ic", Arg.Set print_causality_types, doc_print_causality_types;
@@ -132,24 +109,15 @@ let main () =
           "-typeonly", Arg.Set typeonly, doc_typeonly;
           "-s", Arg.String set_simulation_node, doc_simulation;
           "-sampling", Arg.Float set_sampling_period, doc_sampling;
-          "-check", Arg.Int set_check, doc_check;
           "-gtk2", Arg.Unit set_gtk, doc_use_gtk;
-          "-dzero", Arg.Set dzero, doc_dzero;
           "-nocausality", Arg.Set no_causality, doc_nocausality;
-          "-nopt", Arg.Set no_opt, doc_no_opt;
-          "-nodeadcode", Arg.Set no_deadcode, doc_no_deadcode;
-          "-noinit", Arg.Set no_initialisation, doc_noinitialisation;
           "-inline", Arg.Int set_inlining_level, doc_inlining_level;
           "-inlineall", Arg.Set inline_all, doc_inline_all;
-          "-nosimplify", Arg.Set no_simplify_causality_type, doc_nosimplify;
-          "-noreduce", Arg.Set no_reduce, doc_noreduce;
           "-zsign", Arg.Set zsign, doc_zsign;
           "-copy", Arg.Set with_copy, doc_with_copy;
-          "-lmm", Arg.String set_lmm_nodes, doc_lmm;
           "-rif", Arg.Set use_rif, doc_rif;
-          "-deps", Arg.Set build_deps, doc_deps;
-        ])
-      (fun filename -> if !build_deps then build filename else compile filename)
+      ])
+      compile
       errmsg;
     begin
       match !simulation_node with
@@ -158,7 +126,7 @@ let main () =
       | _ -> ()
     end
   with
-  | Zmisc.Error -> exit 2;;
+  | Error -> exit 2;;
 
 main ();;
 exit 0;;

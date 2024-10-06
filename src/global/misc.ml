@@ -48,6 +48,32 @@ let show_version () =
   Printf.printf "\n";
   ()
 
+
+(* sets the main simulation node *)
+let simulation_node = ref None
+let set_simulation_node (n:string) = simulation_node := Some(n)
+
+(* sets the output filepath *)
+let outname = ref None
+let set_outname (n:string) = outname := Some(n)
+
+(* sets the output filepath for nodes *)
+let node_outname = ref None
+let set_node_outname (n:string) = node_outname := Some(n)
+
+(* sets the checking flag *)
+let number_of_checks = ref 0
+let set_check (n: int) = number_of_checks := n
+
+(* sampling the main loop on a real timer *)
+let sampling_period = ref 0.0
+let set_sampling_period p = sampling_period := p
+
+(* level of inlining *)
+let inlining_level = ref 10
+let set_inlining_level l = inlining_level := l
+let inline_all = ref false
+
 let verbose = ref false
 let vverbose = ref false
 let debug = ref false
@@ -74,7 +100,10 @@ let no_causality = ref false
 let no_initialization = ref false
 let typeonly = ref false
 let parseonly = ref false
-
+let use_gtk = ref false
+let zsign = ref false
+let with_copy = ref false
+let use_rif = ref false
 
 (* the list of nodes to evaluate *)
 let main_nodes = ref ([] :string list)
@@ -123,3 +152,27 @@ let set_equivalence_checking n = equivalence_checking := n
 let inlining_level = ref 10
 let set_inlining_level l = inlining_level := l
 let inline_all = ref false
+
+(* generic and non generic variables in the various type systems *)
+let generic = -1
+let notgeneric = 0
+let maxlevel = max_int
+
+let binding_level = ref 0
+let top_binding_level () = !binding_level = 0
+
+let push_binding_level () = binding_level := !binding_level + 1
+let pop_binding_level () =
+  binding_level := !binding_level - 1;
+  assert (!binding_level > generic)
+let reset_binding_level () = binding_level := 0
+
+(* Internal error in the compiler. *)
+let internal_error message printer input =
+  Format.eprintf "@[Internal error (%s)@. %a@.@]" message printer input;
+  raise Error
+
+(* Not yet implemented *)
+let not_yet_implemented message =
+  Format.eprintf "@[Not yet implemented (%s)@.@]" message;
+  raise Error

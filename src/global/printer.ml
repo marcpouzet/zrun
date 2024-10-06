@@ -64,25 +64,25 @@ let immediate ff = function
 
 (* size expressions *)
 let size ff e =
+  let operator =
+    function Size_plus -> "+" | Size_minus -> "-" | Size_mult -> "*" in
+  let priority_op = function Size_plus -> 0 | Size_minus -> 1 | Size_mult -> 3 in
+  let priority s = match s with
+    | Size_int _ | Size_var _ -> 3
+    | Size_frac _ -> 2
+    | Size_op(op, _, _) -> priority_op op in
   let rec size prio ff { desc } =
-    match desc with
-    | Sint(i) -> fprintf ff "%d" i
-    | Sfrac { num; denom } -> 
-       if prio >= 2 then fprintf ff "(";
-       fprintf ff "(%a/%d)" (size 1) num denom;
-       if prio >= 2 then fprintf ff ")"
-    | Sident(n) -> name ff n
-    | Splus(s1, s2) -> 
-      (* if the surrending operator has a greater priority *)
-      if prio >= 1 then fprintf ff "(";
-      fprintf ff "@[%a + %a@]" (size 0) s1 (size 0) s2;
-      if prio >= 1 then fprintf ff ")"
-    | Sminus(s1, s2) -> 
-      (* if the surrending operator has a greater priority *)
-      if prio >= 1 then fprintf ff "(";
-      fprintf ff "@[%a - %a@]" (size 1) s1 (size 1) s2;
-      if prio >= 1 then fprintf ff ")"
-    | Smult(s1, s2) -> fprintf ff "@[%a * %a@]" (size 2) s1 (size 2) s2 in
+    let prio_s = priority desc  in
+    if prio > prio_s then fprintf ff "(";
+    begin match desc with
+    | Size_int(i) -> fprintf ff "%d" i
+    | Size_frac { num; denom } -> 
+       fprintf ff "(%a/%d)" (size prio_s) num denom
+    | Size_var(n) -> name ff n
+    | Size_op(op, s1, s2) ->
+       fprintf ff "@[%a %s %a@]" (size prio_s) s1 (operator op) (size prio_s) s2
+    end;
+    if prio > prio_s then fprintf ff ")" in
   size 0 ff e
 
 let rec ptype ff { desc } =
@@ -104,7 +104,7 @@ let rec ptype ff { desc } =
            | Kconst -> "-V->" | Kstatic -> "-S->" | Kany -> "-A->" )
        | Knode(k) ->
           (match k with
-           | Kdiscrete -> "-D->" | Khybrid -> "-C->") in
+           | Kdiscrete -> "-D->" | Kcont -> "-C->") in
      fprintf ff "@[<hov2>%a %s %a@]" pas (ty_name_opt, ty_arg) s ptype ty_res
   | Etypevec(ty, s) -> fprintf ff "@[[%a]]%a@]" size s ptype ty
                      
@@ -379,7 +379,7 @@ and kind f_kind =
   match f_kind with
   | Kfun _ -> "fun"
   | Knode(k) ->
-     (match k with | Kdiscrete -> "node" | Khybrid -> "hybrid")
+     (match k with | Kdiscrete -> "node" | Kcont -> "hybrid")
 
 and funexp ff { f_vkind; f_kind; f_args; f_body; f_env } =
   let vkind =
@@ -633,11 +633,9 @@ let open_module ff n =
 let interface ff { desc } =
   match desc with
   | Einter_open(n) -> open_module ff n
-  | Einter_typedecl { name; ty_params; size_params; ty_decl } ->
-     fprintf ff "@[<v 2>type %a%s%a %a@]@."
-       print_type_params ty_params
-       name print_size_params size_params
-       type_decl ty_decl
+  | Einter_typedecl { name; ty_params; ty_decl } ->
+     fprintf ff "@[<v 2>type %a%s %a@]@."
+       print_type_params ty_params name type_decl ty_decl
   | Einter_constdecl { name; const; ty; info } ->
      let print_n ff n = fprintf ff "%s" n in
      fprintf ff "@[<v 2>%s %s : %a%a@]@."
@@ -650,11 +648,9 @@ let interface_list ff int_list =
 let implementation ff { desc } =
   match desc with
   | Eopen(n) -> open_module ff n
-  | Etypedecl { name; ty_params; size_params; ty_decl } ->
-     fprintf ff "@[<v 2>type %a%s%a %a@]@."
-       print_type_params ty_params
-       name print_size_params size_params
-       type_decl ty_decl
+  | Etypedecl { name; ty_params; ty_decl } ->
+     fprintf ff "@[<v 2>type %a%s %a@]@."
+       print_type_params ty_params name type_decl ty_decl
   | Eletdecl { d_names; d_leq } ->
      (* print the set of equations and the list of globally defined names *)
      leq ff d_leq;

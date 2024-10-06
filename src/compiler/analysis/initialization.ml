@@ -120,7 +120,7 @@ let last_env shared defnames env =
     let { t_typ } = Env.find n env in
     Env.add n { t_typ = Init.fresh_on_i izero t_typ; t_last = izero }
       acc in
-  let names = Deftypes.cur_names Ident.S.empty defnames in
+  let names = Defnames.cur_names Ident.S.empty defnames in
   let env_defnames =
     Ident.S.fold add (Ident.S.diff shared names) Env.empty in
   Env.append env_defnames env
@@ -166,9 +166,10 @@ let initialized loc env shared =
 (** Patterns *)
 (* [pattern env p expected_ty] means that the type of [p] must be less *)
 (* than [expected_ty] *)
-let rec pattern env ({ pat_desc; pat_loc; pat_typ } as p) expected_ti =
+let rec pattern env ({ pat_desc; pat_loc; pat_info } as p) expected_ti =
+  let pat_typ = Typinfo.get_type pat_info in
   (* annotate the pattern with the initialization type *)
-  p.pat_init <- expected_ti;
+  p.pat_info <- Typinfo.set_init pat_info expected_ti;
   match pat_desc with
     | Ewildpat | Econstpat _ | Econstr0pat _ -> ()
     | Evarpat(x) -> 
@@ -199,7 +200,8 @@ let rec pattern env ({ pat_desc; pat_loc; pat_typ } as p) expected_ti =
           with | Not_found -> assert false in
         less_than pat_loc expected_ti ti_n
 
-and pattern_less_than_on_i env ({ pat_typ } as pat) i =
+and pattern_less_than_on_i env ({ pat_info } as pat) i =
+  let pat_typ = Typinfo.get_type pat_info in
   let expected_ti = Init.skeleton_on_i i pat_typ in
   pattern env pat expected_ti
         
@@ -237,7 +239,7 @@ let automaton_handlers scondpat exp_less_than_on_i leqs block_eq block_eq
        state env s2 in
      (* Compute the set of names defined by a state *)
      let cur_names_in_state b trans =
-       let block acc { b_write } = Deftypes.cur_names acc b_write in
+       let block acc { b_write } = Defnames.cur_names acc b_write in
        let escape acc { e_body } = block acc e_body in
        block (List.fold_left escape Ident.S.empty trans) b in
      (* transitions *)
@@ -260,7 +262,7 @@ let automaton_handlers scondpat exp_less_than_on_i leqs block_eq block_eq
        let env = block_eq shared env s_body in
        List.iter (escape shared env) s_trans in
      (* compute the set of shared names *)
-     let shared = Deftypes.cur_names Ident.S.empty defnames in
+     let shared = Defnames.cur_names Ident.S.empty defnames in
      (* do a special treatment for the potential initial states *)
      let first_s_h_list, remaining_s_h_list = split se_opt s_h_list in
      (* first type the initial branch *)
@@ -268,7 +270,7 @@ let automaton_handlers scondpat exp_less_than_on_i leqs block_eq block_eq
      (* if the initial states have only weak transitions then all *)
      (* variables from [defined_names] do have a last value *)
      let cur_names acc { s_body = { b_write } } =
-       Deftypes.cur_names acc b_write in
+       Defnames.cur_names acc b_write in
      let last_names =
        List.fold_left cur_names Ident.S.empty first_s_h_list in
      let env =
@@ -280,7 +282,8 @@ let automaton_handlers scondpat exp_less_than_on_i leqs block_eq block_eq
      ignore (Util.optional_map (state env) se_opt)
 
 (** Initialization of an expression *)
-let rec exp env ({ e_desc; e_typ; e_loc } as e) =
+let rec exp env ({ e_desc; e_info; e_loc } as e) =
+  let e_typ = Typinfo.get_type e_info in
   let ti =
     match e_desc with
     | Econst _ | Econstr0 _ -> Init.skeleton_on_i (Init.new_var ()) e_typ
@@ -288,15 +291,15 @@ let rec exp env ({ e_desc; e_typ; e_loc } as e) =
        let { info } =
          try Modules.find_value lname with | Not_found -> assert false in
        Init.instance info e_typ
-    | Elocal(x) -> 
+    | Evar(x) -> 
        begin try let { t_typ } = Env.find x env in t_typ 
              with | Not_found -> print x
        end
-    | Elast(x) -> 
+    | Elast { id } -> 
        begin try 
            (* [last x] is initialized only if an equation [init x = e] *)
            (* appears and [e] is also initialized *)
-           let { t_typ; t_last } = Env.find x env in
+           let { t_typ; t_last } = Env.find id env in
            Init.fresh_on_i t_last t_typ
          with 
          | Not_found -> Init.skeleton_on_i ione e_typ end
@@ -307,8 +310,8 @@ let rec exp env ({ e_desc; e_typ; e_loc } as e) =
        List.iter (fun e -> exp_less_than_on_i env e i) arg_list;
        Init.skeleton_on_i i e_typ
     | Eop(op, e_list) -> operator env op e_typ e_list
-    | Eapp(e, e_list) ->
-       app env (exp env e) e_list
+    | Eapp { f; arg_list } ->
+       app env (exp env f) arg_list
     | Erecord_access { arg } -> 
        let i = Init.new_var () in
        exp_less_than_on_i env arg i;
@@ -345,9 +348,13 @@ let rec exp env ({ e_desc; e_typ; e_loc } as e) =
        exp env e_body
     | Eassert(e_body) -> exp env e_body
     | Eforloop _ ->
-       Misc.not_yet_implemented "initialisation analysis for for-loops" in
+       Misc.not_yet_implemented "initialisation analysis for for-loops"
+    | Esizeapp _ ->
+       Misc.not_yet_implemented "initialisation analysis for size functions"
+    | Elocal _ ->
+       Misc.not_yet_implemented "initialisation analysis for local definitions" in
   (* annotate the expression with the initialization type *)
-  e.e_init <- ti;
+  e.e_info <- Typinfo.set_init e.e_info ti;
   ti
   
 (** Typing an operator *)
@@ -430,7 +437,8 @@ and arg h n_list = type_of_vardec_list h n_list
 
 and exp_less_than_on_i env e expected_i =
   let actual_ti = exp env e in
-  less_than e.e_loc actual_ti (Init.skeleton_on_i expected_i e.e_typ);
+  let e_typ = Typinfo.get_type e.e_info in
+  less_than e.e_loc actual_ti (Init.skeleton_on_i expected_i e_typ);
 
 and exp_less_than env ({ e_loc } as e) expected_ti =
   let actual_ty = exp env e in
@@ -446,18 +454,19 @@ and equation env
   | EQeq(p, e) -> 
      let ti = exp env e in
      pattern env p ti
-  | EQder(n, e, e0_opt, handlers) ->
+  | EQder { id; e; e_opt; handlers } ->
      (* e must be of type 0 *)
      exp_less_than_on_i env e izero;
      let ti_n, last = 
-        try let { t_typ; t_last } = Env.find n env in 
+        try let { t_typ; t_last } = Env.find id env in 
           t_typ, t_last 
         with | Not_found -> assert false in
       exp_less_than env e ti_n;
-      less_than loc ti_n (Init.skeleton_on_i Init.izero e.e_typ);
-      (match e0_opt with
+      let e_typ = Typinfo.get_type e.e_info in
+      less_than loc ti_n (Init.skeleton_on_i Init.izero e_typ);
+      (match e_opt with
        | Some(e0) -> exp_less_than_on_i env e0 izero
-       | None -> less_for_last loc n last izero);
+       | None -> less_for_last loc id last izero);
       present_handler_exp_list env handlers NoDefault ti_n 
   | EQinit(n, e) ->
       exp_less_than_on_i env e izero
@@ -471,28 +480,28 @@ and equation env
   | EQautomaton {is_weak; handlers; state_opt } ->
      automaton_handler_eq_list
        loc is_weak defnames env handlers state_opt
-  | EQif(e, eq1, eq2) ->
+  | EQif { e; eq_true; eq_false } ->
      exp_less_than_on_i env e izero;
-     let shared = Deftypes.cur_names Ident.S.empty defnames in
-     let env1 = last_env shared eq1.eq_write env in
-     equation env1 eq1;
-     let env2 = last_env shared eq2.eq_write env in
-     equation env2 eq2
+     let shared = Defnames.cur_names Ident.S.empty defnames in
+     let env1 = last_env shared eq_true.eq_write env in
+     equation env1 eq_true;
+     let env2 = last_env shared eq_false.eq_write env in
+     equation env2 eq_false
   | EQmatch { e; handlers } ->
      exp_less_than_on_i env e izero;
-     let shared = Deftypes.cur_names Ident.S.empty defnames in
+     let shared = Defnames.cur_names Ident.S.empty defnames in
      match_handler_eq_list shared env handlers;
      (* every defined variable must be initialized *)
      initialized loc env shared
   | EQpresent { handlers; default_opt } ->
-     let shared = Deftypes.cur_names Ident.S.empty defnames in
+     let shared = Defnames.cur_names Ident.S.empty defnames in
      present_handler_eq_list shared env handlers default_opt;
      (* every defined variable must be initialized *)
      initialized loc env shared
   | EQreset(eq, e) -> 
      exp_less_than_on_i env e izero;
      equation env eq
-  | EQand(eq_list) -> equation_list env eq_list
+  | EQand { eq_list } -> equation_list env eq_list
   | EQlocal(b_eq) ->
      ignore (block_eq Ident.S.empty env b_eq)
   | EQlet(l_eq, eq) ->
@@ -501,6 +510,8 @@ and equation env
   | EQempty -> ()
   | EQforloop _ ->
      Misc.not_yet_implemented "initialisation analysis for for-loops"
+  | EQsizefun _ ->
+     Misc.not_yet_implemented "initialisation analysis for size functions"
        
 (* typing rule for a present statement *)
 and present_handler_eq_list shared env p_h_list default_opt =
@@ -537,9 +548,12 @@ and block_eq shared env { b_loc; b_body; b_env; b_write } =
 
 and leq env { l_eq; l_env } =
   (* First extend the typing environment *)
+  Misc.push_binding_level ();
   let env = build_env l_env env in
   (* then type the body *)
-  equation env l_eq; env
+  equation env l_eq;
+  Misc.pop_binding_level ();
+  env
 
 and leqs env l = List.fold_left leq env l
                
@@ -572,7 +586,7 @@ and result env ({ r_desc } as r) =
        let env = block_eq Ident.S.empty env b in
        type_of_vardec_list env b_vars in
   (* type annotation *)
-  r.r_init <- ti;
+  r.r_info <- Typinfo.set_init r.r_info ti;
   ti
  
 let implementation ff impl =
@@ -590,7 +604,7 @@ let implementation ff impl =
   with
   | Error(loc, kind) -> message loc kind
                           
-let program ff impl_list =
-  List.iter (implementation ff) impl_list; impl_list
-
-let implementation_list = program
+(* the main entry function *)
+let program ff ({ p_impl_list } as p) =
+  List.iter (implementation ff) p_impl_list;
+  p

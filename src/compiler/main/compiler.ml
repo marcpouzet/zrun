@@ -90,112 +90,56 @@ let apply_with_close_out f o =
     close_out o
   with x -> close_out o; raise x
 
+let print_message comment =
+  if !verbose then
+    Format.fprintf Format.err_formatter
+      "@[------------------------------------------------------------------\n\
+       %s\n\
+       --------------------------------------------------------------------@]@."
+      comment
+
 let do_step comment output step input = 
+  print_message comment;
   let o = step input in
-  Debug.print_message comment;
   output o;
   o
 
-let default_list =
-  ["static", "Static reduction done. See below:",
-   Static.program;
-   "inline", "Inlining done. See below:",
-   Inline.program;
-   "der", "Remove handlers in definitions of derivatives. See below:",
-   Der.program;
-   "copylast", "Add a copy [lx = last* x] to remore false cycles when \
-                [x] is a local variable. See below:",
-   Copylast.program;
-   "auto", "Translation of automata. See below:",
-   Automata.program;
-   "present", "Translation of present. See below:",
-   Present.program;
-   "pre", "Compilation of memories (fby/pre) into (init/last). See below:",
-   Pre.program;
-   "reset", "Compilation of initialization and resets. See below:",
-   Reset.program;
-   "complete", "Complete equations with [der x = 0.0]. See below:",
-   Complete.program;
-   "shared", "Normalise equations to shared variables in [x = ...]. See below:",
-   Shared.program;
-   (* "encore", "Add an extra discrete step for weak transitions. See below:",
-    Encore.program; *)
-   "letin", "Un-nesting of let/in and blocks. See below:",
-   Letin.program;
-   "schedule", "Static scheduling. See below:",
-   Schedule.program ]
+let do_optional_step is_step comment output step p = 
+  if is_step then do_step comment output step p else p
 
-(* select the rewritting steps *)
-module S = Set.Make (String)
-let s_all = List.fold_left (fun acc (s, _, _) -> S.add s acc) S.empty default_list
-let s_set = ref s_all
-let step_list = ref s_all
-let set_steps w =
-  let set p s =
-    match s with
-    | "a" -> s_set := if p then s_all else S.empty
-    | "static" | "inline" | "der" | "copylast" | "auto" | "present"
-    | "pre" | "reset" | "complete" | "shared" | "encore" | "letin" 
-    | "schedule" -> s_set := if p then S.add s !s_set else S.remove s !s_set
-    | "" -> ()
-    | _ -> raise (Arg.Bad ("unknown pass " ^ s)) in
-  let l = String.split_on_char '+' w in
-  let l_l = List.map (String.split_on_char '-') l in
-  List.iter
-    (fun l -> set true (List.hd l); List.iter (fun s -> set false s) (List.tl l))
-    l_l
-let rewrite_list () =
-  List.filter (fun (w, _, _) -> S.mem w !s_set) default_list
-
-let compare name n_steps genv0 p p' =
-  Debug.print_message
-    ("Checks the pass " ^ name ^
-     " for " ^ (string_of_int n_steps) ^" steps\n");
-  let genv = Coiteration.program genv0 p in
-  let genv' = Coiteration.program genv0 p' in
-  Coiteration.check n_steps genv genv'; p'
-    
-(* Apply a sequence of source-to-source transformation *)
-(* do equivalence checking for every step if the flag is turned on *)
-let main modname filename n_steps =
-  let transform_and_compare (name, comment, transform) genv p =
-    let p' = transform genv p in
-    Debug.print_message comment;
-    Debug.print_program p';
-    if n_steps = 0 then p' else compare name n_steps genv p p' in
-    
-  let rec iter genv l p =
-    match l with
-    | [] -> p
-    | (name, comment, transform) :: l ->
-       let p = transform_and_compare (name, comment, transform) genv p in
-       iter genv l p in
-  
-  let _ = Format.std_formatter in
-  
-  (* output file in which values are stored *)
-  let obj_name = filename ^ ".zlo" in
-  let otc = open_out_bin obj_name in
+(* The main function for compiling a program *)
+let compile modname filename =
   let source_name = filename ^ ".zls" in
+  let obj_interf_name = filename ^ ".zci" in
+
+  (* standard output for printing types *)
+  let info_ff = Format.formatter_of_out_channel stdout in
+  Format.pp_set_max_boxes info_ff max_int;
+
   (* set the current opened module *)
+  Modules.initialize modname;
   Location.initialize source_name;
 
   (* Parsing *)
   let p = parse_implementation_file source_name in
   Debug.print_message "Parsing done";
 
-  (* defines the initial global environment for values *)
-  let genv0 = Genv.initialize modname [] in
-  (* Add Stdlib *)
-  let genv0 = Genv.add_module genv0 Primitives.stdlib_env in
-  
-  (* Associate unique index to variables *)
-  let p = do_step "Scoping done. See below:" Debug.print_program
-            Scoping.program p in
-  (* Write defined variables for equations *)
-  let p = do_step "Write done. See below: "
-      Debug.print_program Write.program p in
-  (* Source-to-source transformations start here *)
-  let _ = iter genv0 (rewrite_list ()) p in
-
-  apply_with_close_out (fun _ -> ()) otc
+  try
+    (* Associate unique index to variables *)
+    let p = do_step "Scoping done. See below:" Debug.print_program
+              Scoping.program p in
+    (* Write defined variables for equations *)
+    let p = do_step "Write done. See below: "
+              Debug.print_program Write.program p in
+    if !parseonly then raise Stop;
+    let p = do_step "Typing done. See below:" Debug.print_program
+              (Typing.program info_ff true) p in
+    let p = do_step "Causality done. See below:" Debug.print_program
+              (Causality.program info_ff) p in
+    let _ = do_step "Initialization done. See below:" Debug.print_program
+              (Initialization.program info_ff) p in
+    (* Write the symbol table into the interface file *)
+    let itc = open_out_bin obj_interf_name in
+    apply_with_close_out Modules.write itc
+  with
+  | Stop -> ()

@@ -3,7 +3,7 @@
 (*                                                                     *)
 (*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
-(*  (c) 2020 Inria Paris (see the AUTHORS file)                        *)
+(*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -13,10 +13,11 @@
 (* *********************************************************************)
 
 (* glue code for simulating a main node *)
+open Misc
+open Zelus
 open Deftypes
 open Global
 open Format
-open Zmisc
 
 (*
    Generating a main .ml file in order to simulate a node.
@@ -32,34 +33,33 @@ let find name =
   with
   | Not_found ->
       eprintf "The name %s is unbound.@." name;
-      raise Zmisc.Error
+      raise Error
 
 (* the main node must be of type [expected_ty_arg_list] and the result of *)
 (* type [expected_ty_res_list] *)
 let check_type_of_main_node name
     { qualid = qualid; info = { value_typ = tys } }
     opt_name expected_ty_arg expected_ty_res =
-  let actual_ty = Ztypes.instance_of_type tys in
+  let actual_ty = Types.instance tys in
   let actual_k, opt_name, actual_ty_arg, actual_ty_res =
     try
-      Ztypes.filter_actual_arrow actual_ty
+      Types.filter_actual_arrow actual_ty
     with
     | _ ->  eprintf "@[The name %s must define a function.@.@]" name;
-        raise Zmisc.Error in
-  let expected_k =
-    match actual_k with | Tproba -> Tdiscrete(true) | _ -> actual_k in
+        raise Error in
+  let expected_k = actual_k in
   let expected_ty =
-    Ztypes.funtype expected_k opt_name actual_ty_arg actual_ty_res in
+    Types.arrowtype expected_k opt_name actual_ty_arg actual_ty_res in
   try
-    Ztypes.unify expected_ty actual_ty; qualid, expected_k
+    Types.unify expected_ty actual_ty; qualid, expected_k
   with
-  | Ztypes.Unify ->
+  | Types.Unify ->
       eprintf "@[The name %s has type@ %a,@ \
                but is expected to have type@ %a.@.@]"
         name
         Ptypes.output actual_ty
         Ptypes.output expected_ty;
-      raise Zmisc.Error
+      raise Error
 
 (* the  main node must be of type [unit -> unit] *)
 (* in case of sampled simulation *)
@@ -84,18 +84,18 @@ let rec check_simple_ty ty =
   match ty.t_desc with
   | Tvar ->
       eprintf "Undefined type variables are not supported by Luciole.@.";
-      raise Zmisc.Error
-  | Tfun _ ->
+      raise Error
+  | Tarrow _ ->
       eprintf "Higher order functions are not supported by Luciole.@.";
-      raise Zmisc.Error
+      raise Error
   | Tvec _ ->
       eprintf "Vectors are not supported by Luciole.@.";
-      raise Zmisc.Error
+      raise Error
   | Tproduct ty -> List.iter check_simple_ty ty
   | Tconstr (id, _, _) ->
       if List.mem id.id allowed_types then () else begin
         eprintf "Type %s is not allowed.@." id.id;
-        raise Zmisc.Error
+        raise Error
       end
   | Tlink ty -> check_simple_ty ty
 
@@ -104,10 +104,10 @@ let rec flatten ty =
   | Tproduct ty -> List.concat (List.map flatten ty)
   | Tconstr (id, _, _) -> [id.id]
   | Tlink ty -> flatten ty
-  | Tvar | Tfun _ | Tvec _ -> assert false
+  | Tvar | Tarrow _ | Tvec _ -> assert false
 
 let rec flatten_patt patt =
-  match patt.Zelus.p_desc with
+  match patt.pat_desc with
   | Etuplepat p_l -> List.concat (List.map flatten_patt p_l)
   | Ealiaspat (p, id) -> flatten_patt p
   | Evarpat id -> [id.source]
@@ -115,6 +115,8 @@ let rec flatten_patt patt =
   | Econstpat Evoid -> ["unit"]
   | Econstr0pat _ | Econstr1pat _ | Ewildpat | Econstpat _ | Eorpat _
   | Erecordpat _  -> assert false
+
+let flatten_arg arg = List.map (fun { var_name } -> var_name.source) arg
 
 let print_string_of_ty ff ty =
   Format.fprintf ff "string_of_%s" ty
@@ -128,7 +130,7 @@ let rec type_size ty =
       List.fold_left ( + ) 0 (List.map type_size ty)
   | Tconstr (_, _, _) -> 1
   | Tlink ty -> type_size ty
-  | Tvec _ | Tfun _ | Tvar -> assert false
+  | Tvec _ | Tarrow _ | Tvar -> assert false
 
 let format_names names ty =
   let rec aux i0 ty =
@@ -137,7 +139,7 @@ let format_names names ty =
     | Tconstr (id, _, _) ->
         if id.id = unit_id then "()" else names.(i0)
     | Tlink ty -> aux i0 ty
-    | Tvar | Tfun _ | Tvec _ -> assert false
+    | Tvar | Tarrow _ | Tvec _ -> assert false
   and aux_list i0 ty_list =
     match ty_list with
     | [] -> assert false
@@ -157,11 +159,11 @@ let emit_open ff open_list =
 
 let emit_discrete_main k ff name =
   match k with
-  | Deftypes.Tstatic _ | Deftypes.Tany | Deftypes.Tdiscrete(false) ->
-      fprintf ff
+  | Deftypes.Tfun _ ->
+     fprintf ff
         "@[<v>@[(* simulation (any) function *)@]@;\
          @[let main x = %s x@]@]" name
-  | Deftypes.Tdiscrete(true) ->
+  | Deftypes.Tnode _ ->
       fprintf ff
         "@[<v>@[(* simulation (discrete) function *)@]@;\
          @[<v 2>@[let main =@]@;\
@@ -170,24 +172,22 @@ let emit_discrete_main k ff name =
          @[let mem = alloc () in@]@;\
          @[reset mem;@]@;\
          @[(fun x -> step mem x)@]@]@]"
-        (if !Zmisc.with_copy then "Cnode" else "Node") name
-  | Deftypes.Tcont | Deftypes.Tproba -> assert false
+        (if !Misc.with_copy then "Cnode" else "Node") name
 
 let emit_prelude ff ({ Lident.id = id } as qualid) info k =
   (* the prelude *)
   let s = Lident.qualidname qualid in
   match k with
-  | Deftypes.Tstatic _ | Deftypes.Tany | Deftypes.Tdiscrete(false)
-  | Deftypes.Tdiscrete(true) ->
+  | Deftypes.Tfun _ | Deftypes.Tnode(Deftypes.Tdiscrete) ->
       if !use_rif then begin
         let ({ typ_vars; typ_body } as scheme) = info.info.value_typ in
         let t1, t2, inp_patt =
           begin match typ_body.t_desc with
-            | Tfun (_, _, t1, t2) ->
+            | Tarrow { ty_arg; ty_res } ->
                 begin match info.info.value_code.value_exp with
                   | Global.Vfun (fexp, _) ->
                       let inp_patt = List.hd fexp.f_args in
-                      t1, t2, inp_patt
+                      ty_arg, ty_res, inp_patt
                   | _ -> assert false
                 end
             | _ -> assert false
@@ -201,7 +201,7 @@ let emit_prelude ff ({ Lident.id = id } as qualid) info k =
 
         let inp_names =
           List.map2 (fun name ty -> if ty = unit_id then "_" else name)
-            (flatten_patt inp_patt) flat_t1 in
+            (flatten_arg inp_patt) flat_t1 in
         let out_names = List.mapi (fun i ty -> if ty = unit_id then "_" else "o" ^ (string_of_int i)) flat_t2 in
 
         let filtered_inp_names =
@@ -285,10 +285,10 @@ let emit_prelude ff ({ Lident.id = id } as qualid) info k =
           (String.concat " " (List.filter_map (fun n -> if n = "_" then None else Some n) out_names));
       end else
         fprintf ff "@[%a;;@]@." (emit_discrete_main k) s
-  | Deftypes.Tcont ->
+  | Deftypes.Tnode Tcont ->
       if !use_rif then begin
         eprintf "Cannot use option -rif with hybrid main node.@.";
-        raise Zmisc.Error
+        raise Error
       end else
       fprintf ff
         "@[<v>@[open Ztypes@]@;\
@@ -340,29 +340,27 @@ let emit_prelude ff ({ Lident.id = id } as qualid) info k =
          crossings; @,\
          maxsize; @ csize; @ zsize; @,\
          horizon }@]@]@];;@]@.@]@]"
-        (if !Zmisc.with_copy then "Cnode" else "Node") s
-  | Tproba -> assert false
+        (if !Misc.with_copy then "Cnode" else "Node") s
 
 (* emited code for control-driven programs: the transition function *)
 (* is executed at full speed *)
 let emit_simulation_code ff k =
   match k with
-  | Deftypes.Tstatic _ | Deftypes.Tany | Deftypes.Tdiscrete _ ->
+  | Deftypes.Tfun _ | Deftypes.Tnode (Deftypes.Tdiscrete) ->
       fprintf ff
         "@[(* (discrete) simulation loop *)\n\
          while true do main () done;\n\
          exit(0);;@.@]"
-  | Deftypes.Tcont ->
+  | Deftypes.Tnode Tcont ->
       fprintf ff "@[(* instantiate a numeric solver *)\n\
                   module Runtime = Zlsrun.Make (Defaultsolver)\n\
                   let _ = Runtime.go main@.@]"
-  | Deftypes.Tproba -> assert false
 
 (* emited code for bounded checking. Check that the function returns [true] *)
 (* during [n] steps *)
 let emit_checked_code ff k n =
   match k with
-  | Deftypes.Tstatic _ | Deftypes.Tany | Deftypes.Tdiscrete _ ->
+  | Deftypes.Tfun _ | Deftypes.Tnode (Deftypes.Tdiscrete) ->
       fprintf ff
         "@[(* (discrete) simulation loop *)
            let ok = ref true in
@@ -376,32 +374,32 @@ let emit_checked_code ff k n =
            done;
            exit(0)@.@]" n
 
-  | Deftypes.Tcont ->
+  | Deftypes.Tnode(Tcont) ->
       fprintf ff "@[(* instantiate a numeric solver *)\n\
                   module Runtime = Zlsrun.Make (Defaultsolver)\n\
                   let _ = Runtime.check main %d@.@]" n
-  | Deftypes.Tproba -> assert false
 
 let emit_gtkmain_code ff k sampling =
   match k with
-  | Deftypes.Tstatic _ | Deftypes.Tany | Deftypes.Tdiscrete _ ->
+  | Deftypes.Tnode(Tcont) ->
+      fprintf ff "@[(* instantiate a numeric solver *)\n\
+                  module Runtime = Zlsrungtk.Make (Defaultsolver)\n\
+                  let _ = Runtime.go main@.@]"
+  | Deftypes.Tfun _ | Deftypes.Tnode _ ->
       fprintf ff
         "@[(* simulation loop: sampled on period %f Hz *)\n@.@]" sampling;
       fprintf ff "@[(* instantiate the discrete interface *)\n\
                   module Runtime = Zlsrungtk.MakeDiscrete ()\n\
                   let _ = Runtime.go %f main@.@]" sampling
-  | Deftypes.Tcont ->
-      fprintf ff "@[(* instantiate a numeric solver *)\n\
-                  module Runtime = Zlsrungtk.Make (Defaultsolver)\n\
-                  let _ = Runtime.go main@.@]"
-  | Deftypes.Tproba -> assert false
-
+  
 (* emited code for event-driven programs: the transition function *)
 (* is executed every [1/sampling] seconds *)
 let emit_periodic_code ff k sampling =
   match k with
-  | Deftypes.Tstatic _ | Deftypes.Tany
-  | Deftypes.Tdiscrete _ ->
+  | Deftypes.Tnode (Tcont) ->
+      fprintf ff "@[(* instantiate a numeric solver *)
+                 let _ = Zlsrun.go main@.@]"
+  | Deftypes.Tfun _ | Deftypes.Tnode _ ->
       fprintf ff
         "@[(* simulation loop: sampled on period %f *)\n\
          (* compiles with -custom unix.cma    *)@.@]" sampling;
@@ -412,11 +410,7 @@ let emit_periodic_code ff k sampling =
               in Sys.set_signal Sys.sigalrm (Sys.Signal_handle (fun _ -> main ()));
               while true do Unix.sleep 1 done;;
               periodic();exit(0)@.@]" sampling
-  | Deftypes.Tcont ->
-      fprintf ff "@[(* instantiate a numeric solver *)
-                 let _ = Zlsrun.go main@.@]"
-  | Deftypes.Tproba -> assert false
-
+  
 (** The main entry function. Simulation of a main function *)
 let main outname name sampling number_of_checks use_gtk =
   (* - open the module where main occurs
@@ -436,7 +430,7 @@ let main outname name sampling number_of_checks use_gtk =
     if sampling <> 0.0 then
       begin
         eprintf "Do not use -sampling when checking node %s.@." name;
-        raise Zmisc.Error
+        raise Misc.Error
       end
     else
       emit_checked_code ff k number_of_checks

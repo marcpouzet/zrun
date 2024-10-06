@@ -169,19 +169,19 @@ and less_i left_i right_i =
 let rec skeleton { t_desc = desc } =
   match desc with
   | Tvar -> atom (new_var ())
-  | Tarrow(_, ti1, ti2) -> funtype (skeleton ti1) (skeleton ti2)
+  | Tarrow { ty_arg; ty_res } -> funtype (skeleton ty_arg) (skeleton ty_res)
   | Tproduct(ti_list) -> product (List.map skeleton ti_list)
   | Tconstr(_, _, _) -> atom (new_var ())
-  | Tvec _ | Tsize _ -> atom (new_var ())
+  | Tvec _ -> atom (new_var ())
   | Tlink(ti) -> skeleton ti
                           
 let rec skeleton_on_i i { t_desc = desc } =
   match desc with
   | Tvar -> atom i
-  | Tarrow(_, ti1, ti2) ->
-     funtype (skeleton_on_i i ti1) (skeleton_on_i i ti2)
+  | Tarrow { ty_arg; ty_res } ->
+     funtype (skeleton_on_i i ty_arg) (skeleton_on_i i ty_res)
   | Tproduct(ti_list) -> product (List.map (skeleton_on_i i) ti_list)
-  | Tconstr _ | Tvec _ | Tsize _ -> atom i
+  | Tconstr _ | Tvec _ -> atom i
   | Tlink(ti) -> skeleton_on_i i ti
 
 (* For external values, the skeleton type is over constrained *)
@@ -457,8 +457,8 @@ and icopy i =
 let rec instance ti ty =
   let { t_desc = t_desc } as ty = Types.typ_repr ty in
   match ti, t_desc with
-  | Ifun(ti1, ti2), Tarrow(_, ty1, ty2) ->
-     funtype (instance ti1 ty1) (instance ti2 ty2)
+  | Ifun(ti1, ti2), Tarrow { ty_arg; ty_res } ->
+     funtype (instance ti1 ty_arg) (instance ti2 ty_res)
   | Iproduct(ti_list), Tproduct(ty_list) ->
     begin try product (List.map2 instance ti_list ty_list)
       with | Invalid_argument _ -> assert false end
@@ -510,7 +510,7 @@ let filter_product ti =
 (** An entry in the type environment *)
 type tentry =
     { t_typ: Definit.ti; (* the init type [ty] of x *)
-      t_last: Definit.t; (* v in [0, 1/2, 1] so that last x: ty[v] *)
+      t_last: Definit.t; (* v in [0, 1] so that last x: ty[v] *)
     }
     
 (* prints the typing environment *)

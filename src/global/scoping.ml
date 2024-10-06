@@ -119,7 +119,7 @@ let vkind =
 
 let tkind =
   function
-  | Kdiscrete -> Ast.Kdiscrete | Khybrid -> Ast.Khybrid
+  | Kdiscrete -> Ast.Kdiscrete | Kcont -> Ast.Kcont
 
 let kind =
   function
@@ -186,13 +186,15 @@ let rec types env { desc; loc } =
 
 (* size expressions *)
 and size env { desc; loc } =
+  let operator =
+    function
+    | Size_plus -> Ast.Size_plus | Size_minus -> Ast.Size_minus
+    | Size_mult -> Ast.Size_mult in
   let desc = match desc with
-  | Sint(i) -> Ast.Sint(i)
-  | Sfrac(s, q) -> Ast.Sfrac { num = size env s; denom = q }
-  | Sident(n) -> Ast.Sident(name loc env n)
-  | Splus(s1, s2) -> Ast.Splus(size env s1, size env s2)
-  | Sminus(s1, s2) -> Ast.Sminus(size env s1, size env s2)
-  | Smult(s1, s2) -> Ast.Smult(size env s1, size env s2) in
+  | Size_int(i) -> Ast.Size_int(i)
+  | Size_frac(s, q) -> Ast.Size_frac { num = size env s; denom = q }
+  | Size_var(n) -> Ast.Size_var(name loc env n)
+  | Size_op(op, s1, s2) -> Ast.Size_op(operator op, size env s1, size env s2) in
   { desc; loc }
 
 (** Build a renaming environment **)
@@ -577,7 +579,8 @@ and vardec env
     Ast.var_typeconstraint = var_typeconstraint;
     Ast.var_clock = var_clock; Ast.var_loc = loc;
     Ast.var_is_last = var_is_last;
-    Ast.var_init_in_eq = false }
+    Ast.var_init_in_eq = false;
+    Ast.var_info = Misc.no_info }
 
 (* treat a list of variable declarations *)
 (*- computes the list of names;
@@ -871,7 +874,7 @@ and result env { desc; loc } =
        let env = Env.append env_v_list env in
        let eq = equation env_v_list env eq in
        Ast.Returns(make_block loc v_list eq) in
-  { r_desc; r_loc = loc }
+  { r_desc; r_loc = loc; r_info = Misc.no_info }
   
 (* type declarations. *)
 let rec type_decl { desc; loc } =
@@ -900,9 +903,9 @@ let interface interf =
   try
     let desc = match interf.desc with
       | Einter_open(n) -> Ast.Einter_open(n)
-      | Einter_typedecl { name; ty_params; size_params; ty_decl } ->
+      | Einter_typedecl { name; ty_params; ty_decl } ->
          let ty_decl = type_decl ty_decl in
-         Ast.Einter_typedecl { name; ty_params; size_params; ty_decl }
+         Ast.Einter_typedecl { name; ty_params; ty_decl }
       | Einter_constdecl { name; const; ty; info } ->
          let ty = types Env.empty ty in
          Ast.Einter_constdecl { name; const = const; ty; info } in
@@ -918,9 +921,9 @@ let implementation { desc; loc } =
          let d_leq, env = letin Env.empty d_leq in
          let d_names = Env.to_list env in
          Ast.Eletdecl { d_names = d_names; d_leq = d_leq }
-      | Etypedecl { name; ty_params; size_params; ty_decl } ->
+      | Etypedecl { name; ty_params; ty_decl } ->
          let ty_decl = type_decl ty_decl in
-         Ast.Etypedecl { name = name; ty_params; size_params; ty_decl } in
+         Ast.Etypedecl { name = name; ty_params; ty_decl } in
     { Ast.desc = desc; Ast.loc = loc }
   with
     Error.Err(loc, kind) -> Error.message loc kind

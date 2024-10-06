@@ -17,14 +17,13 @@
 open Deftypes
 open Typerrors
    
-(** The kind of an expression tells wheither it is:
- *- const: a compile-time known constant;
- *- static: a static expression, known at instantiation time;
+(* The kind of an expression tells wheither it is:
+ *- const: an expression that must be computed at compile-time;
+ *- static: an expression that must be computed at instanciation time;
  *- any: a combinational expression;
- *- node: a stateful expression; either with only discrete-state variables
- *-       or both *)
+ *- node: a stateful expression; either only discrete-time or continuous-time *)
 
-(** The kind for function types:
+(* The kind for function types:
  *- -V->                 -V|V->
  *- -S->                 -S|S->
  *- -A->                 -*|A->  any input; output is combinational
@@ -32,7 +31,7 @@ open Typerrors
  *- -C->                 -*|C ->                      stateful (continuous)
  *)
 
-let vkind k = match k with | Tfun(v) -> v | Tnode _ -> Tany
+let vkind_of_kind k = match k with | Tfun(v) -> v | Tnode _ -> Tany
 
 (* kind from const or static *)
 let kind_of_const is_const = Tfun(if is_const then Tconst else Tstatic)
@@ -43,12 +42,11 @@ let const_of_kind k =
   | Tfun _ | Tnode _ -> assert false
 
 (* kind *)
-let kind k =
-  let k = match k with
-    | Zelus.Kconst -> Deftypes.Tconst
-    | Zelus.Kstatic -> Deftypes.Tstatic
-    | Zelus.Kany -> Deftypes.Tany in
-  k
+let vkind k =
+  match k with
+  | Zelus.Kconst -> Deftypes.Tconst
+  | Zelus.Kstatic -> Deftypes.Tstatic
+  | Zelus.Kany -> Deftypes.Tany
 
 (* order between kinds *)
 let vkind_is_less_than actual_v expected_v =
@@ -97,7 +95,7 @@ let vinf v1 v2 =
   | (Tstatic, _) -> v2 | (_, Tstatic) -> v1
   | _ -> v1
 
-(* Check that a type belong to kind [ka]. The intuition is this:
+(* Check that a type belong to kind [ka]. The intuition is that:
  *- a function f of type t1 -{k1|k2}-> t2 must be such that:
  *- t1 is in kind k1 and t2 is in kind k2;
  *- it can only be applied in a context [ka]
@@ -108,11 +106,10 @@ let rec in_kind ka { t_desc } =
   | Tproduct(ty_list) | Tconstr(_, ty_list, _) ->
      List.for_all (in_kind ka) ty_list
   | Tlink(ty_link) -> in_kind ka ty_link
-  | Tsize _ -> true
   | Tvec(ty, _) -> in_kind ka ty
-  | Tarrow(kfun, t1, t2) ->
-     let left_kfun, right_kfun = left_right kfun in
-     in_kind left_kfun t1 && in_kind right_kfun t2
+  | Tarrow { ty_kind; ty_arg; ty_res } ->
+     let left_kfun, right_kfun = left_right ty_kind in
+     in_kind left_kfun ty_arg && in_kind right_kfun ty_res
                                && vkind_is_less_than ka left_kfun
 
 (* Kind inheritance. If the context has kind [expected_k] *)

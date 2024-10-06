@@ -28,7 +28,7 @@ and vkind =
 
 and tkind =
   | Kdiscrete (* only discrete-time state variables *)
-  | Khybrid (* discrete-time and continuous-time state variables *)
+  | Kcont (* discrete-time and continuous-time state variables *)
 
 type longname =
   | Name : name -> longname
@@ -50,12 +50,12 @@ and type_expression_desc =
 and size = size_desc localized
 
 and size_desc =
-  | Sint of int
-  | Sident of name
-  | Sfrac of size * int
-  | Splus of size * size
-  | Sminus of size * size
-  | Smult of size * size
+  | Size_int of int
+  | Size_var of name
+  | Size_frac of size * int
+  | Size_op of op * size * size
+
+and op = Size_plus | Size_minus | Size_mult
 
 (* constants *)
 type immediate =
@@ -385,8 +385,7 @@ type interface = interface_desc localized
 and interface_desc =
   | Einter_open : name -> interface_desc
   | Einter_typedecl :
-      { name: name; ty_params: name list; size_params: name list;
-        ty_decl: type_decl } -> interface_desc
+      { name: name; ty_params: name list; ty_decl: type_decl } -> interface_desc
   | Einter_constdecl :
       { name: name; const: bool; ty: type_expression; info: name list }
       -> interface_desc
@@ -411,7 +410,7 @@ and implementation_desc =
   | Eopen : name -> implementation_desc
   | Eletdecl : leq -> implementation_desc
   | Etypedecl :
-      { name: name; ty_params: name list; size_params: name list;
-        ty_decl: type_decl } -> implementation_desc
+      { name: name; ty_params: name list; ty_decl: type_decl } ->
+      implementation_desc
 
 type program = implementation list
