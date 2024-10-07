@@ -71,7 +71,8 @@ let rec funtype_list tc_arg_list tc_res =
   | tc :: tc_arg_list ->
      funtype tc (funtype_list tc_arg_list tc_res)
 let atom c = Catom(c)
-  
+let scheme tc = { typ_vars = []; typ_rel = []; typ_body = tc }
+
 (* path compression *)
 let rec crepr c =
   match c.c_desc with
@@ -647,7 +648,7 @@ and cgen c =
 and gen_set l = List.fold_left (fun acc c -> max (cgen c) acc) generic l
     
 (** Main generalisation function *)
-let generalise tc =
+let gen tc =
   list_of_vars := [];
   (* we compute useful variables *)
   mark_and_polarity true tc;
@@ -660,7 +661,14 @@ let generalise tc =
   let c_set = vars S.empty tc in
   if not !Misc.no_simplify_causality_types then reduce c_set;
   let _, rel = relation (S.empty, []) c_set in
-  { typ_vars = !list_of_vars; typ_rel = rel; typ = tc }
+  { typ_vars = !list_of_vars; typ_rel = rel; typ_body = tc }
+
+let gen_decl env =
+  Env.map
+    (fun ({ t_tys = { typ_body } } as tentry) ->
+      let t_tys = gen typ_body in
+      { tentry with t_tys })
+    env
 
 (** Instantiation of a type *)
 (* save and cleanup links *)
@@ -684,7 +692,7 @@ let rec copy tc ty =
        else c
     | Clink(link) -> if c.c_level = generic then link else ccopy link in
 
-  let { t_desc = t_desc } as ty = Types.typ_repr ty in
+  let { t_desc } as ty = Types.typ_repr ty in
   match tc, t_desc with
   | Cfun(tc1, tc2), Tarrow { ty_arg; ty_res } ->
      funtype (copy tc1 ty_arg) (copy tc2 ty_res)
@@ -716,7 +724,7 @@ let rec copy tc =
 
 (* instanciate the causality type according to the type *)
 let rec instance tc ty = 
-  let { t_desc = t_desc } as ty = Types.typ_repr ty in
+  let { t_desc } as ty = Types.typ_repr ty in
   match tc, t_desc with
   | Cfun(tc1, tc2), Tarrow { ty_arg; ty_res } ->
      funtype (instance tc1 ty_arg) (instance tc2 ty_res)
@@ -739,14 +747,14 @@ let rec subtype right tc =
       if right then less_c c new_c else less_c new_c c;
       atom new_c
         
-let instance { typ = tc } ty =
+let instance { typ_body = tc } ty =
   let tc = copy tc in
   cleanup ();
   let tc = subtype true tc in
   instance tc ty
 
 (** Type instance *)
-let instance { value_caus = tcs_opt } ty =
+let instance_of_global_value { value_caus = tcs_opt } ty =
   (* build a default signature *)
   let default ty =
     let c = new_var () in
@@ -770,21 +778,16 @@ let filter_arrow tc =
   | Cfun(tc1, tc2) -> tc1, tc2
   | _ -> assert false
 
-(* Environment for causality types *)
-type tentry = 
-  { t_typ: tc;      (* the causality type of x *)
-    t_last_typ: tc option; (* [last x] is allowed *)
-  }
-
+(*
 (* simplifies a typing environment *)
 let simplify_by_io_env env expected_tc actual_tc =
-  let mark_env _ { t_typ = tc; t_last_typ = ltc_opt } =
-    mark_and_polarity true tc;
+  let mark_env _ { t_tys = { typ_body }; t_last_typ = ltc_opt } =
+    mark_and_polarity true typ_body;
     Util.optional_unit mark_and_polarity true ltc_opt in
-  let simplify_env { t_typ = tc; t_last_typ = ltc_opt } =
-    let tc = simplify_by_io tc in
+  let simplify_env { t_tys = { typ_body }; t_last_typ = ltc_opt } =
+    let typ_body = simplify_by_io typ_body in
     let ltc_opt = Util.optional_map simplify_by_io ltc_opt in
-    { t_typ = tc; t_last_typ = ltc_opt } in
+    { t_tys = p = tc; t_last_typ = ltc_opt } in
   Env.iter mark_env env;
   mark_and_polarity true expected_tc;
   mark_and_polarity true actual_tc;
@@ -797,6 +800,7 @@ let simplify_by_io_env env expected_tc actual_tc =
   let cset = vars (vars cset expected_tc) actual_tc in
   let already, rel = relation (S.empty, []) cset in
   env, cset, rel, simplify_by_io expected_tc, simplify_by_io actual_tc
+ *)
 
 (* compute the dependence relations *)
 let prel ff rel =
@@ -807,11 +811,11 @@ let prel ff rel =
 (* prints the typing environment *)
 let penv ff env =
   (* print every entry in the typing environment *)
-  let pentry ff (n, { t_typ = tc; t_last_typ = ltc_opt }) =
+  let pentry ff (n, { t_tys = tc; t_last_typ = ltc_opt }) =
     match ltc_opt with
-    | None -> Format.fprintf ff "@[%a: %a@]" Printer.source_name n Pcaus.ptype tc
+    | None -> Format.fprintf ff "@[%a: %a@]" Printer.source_name n Pcaus.scheme tc
     | Some(ltc) ->
         Format.fprintf ff "@[%a: %a | %a@]"
-          Printer.source_name n Pcaus.ptype tc Pcaus.ptype ltc in
+          Printer.source_name n Pcaus.scheme tc Pcaus.ptype ltc in
   let env = Env.bindings env in
   Pp_tools.print_list_r pentry "{" ";" "}" ff env

@@ -76,7 +76,7 @@ let prelation ff rel =
 	       
 (* print a type scheme *)
 (* { a1 < a2,...,ak; ...; }. ti *)
-let scheme ff { typ_rel = rel; typ = ty } =
+let scheme ff { typ_rel = rel; typ_body = ty } =
   match rel with
   | [] -> ptype ff ty
   | _ -> Format.fprintf ff "@[<hov2>%a.@ %a@]" prelation rel ptype ty

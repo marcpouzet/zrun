@@ -24,7 +24,7 @@
 type ti_scheme = 
     { typ_vars: t list; (* list of type variables *)
       typ_rel: (t * t list) list; (* the relation between variables *)
-      typ: ti;        (* type of the result *)
+      typ_body: ti;        (* type of the result *)
     }
 
  and ti =
@@ -60,3 +60,11 @@ and polarity = Punknown | Pplus | Pminus | Pplusminus
 let compare i1 i2 = Stdlib.compare i1.i_index i2.i_index
 
 let no_typ = Iproduct []
+
+(** An entry in the type environment *)
+type tentry =
+    { t_tys: ti_scheme; (* the init type [ti] of x *)
+      t_last: t; (* t in [0, 1] so that last x: ti[t] *)
+    }
+    
+

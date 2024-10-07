@@ -20,7 +20,7 @@
 type tc_scheme = 
     { typ_vars: t list; (* list of type variables *)
       typ_rel: (t * t list) list; (* the relation between variables *)
-      typ: tc; (* type *)
+      typ_body: tc; (* type *)
     }
 
 and tc =
@@ -55,3 +55,9 @@ and polarity = Punknown | Pplus | Pminus | Pplusminus
 let compare c1 c2 = Stdlib.compare c1.c_index c2.c_index 
     
 let no_typ = Cproduct []
+
+(* Environment for causality types *)
+type tentry = 
+  { t_tys: tc_scheme;      (* the causality type of x *)
+    t_last_typ: tc option; (* [last x] is allowed *)
+  }

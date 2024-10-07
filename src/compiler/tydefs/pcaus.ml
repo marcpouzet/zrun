@@ -94,8 +94,8 @@ let relation ff rel =
   print_list_r print "{" ";" "}" ff rel
     
 (* print a causality type signature *)
-let scheme ff { typ_rel = rel; typ = ty } = 
-  Format.fprintf ff "@[<hov2>%a.@ %a@]" relation rel ptype ty
+let scheme ff { typ_rel; typ_body } = 
+  Format.fprintf ff "@[<hov2>%a.@ %a@]" relation typ_rel ptype typ_body
     
 (* prints a dependence cycle *)
 let cycle with_info ff c_list =

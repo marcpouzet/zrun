@@ -64,6 +64,7 @@ let rec funtype_list ti_arg_list ti_res =
   | ti :: ti_arg_list -> funtype ti (funtype_list ti_arg_list ti_res)
 let product l = Iproduct(l)
 let atom i = Iatom(i)
+let scheme ti = { typ_vars = []; typ_rel = []; typ_body = ti }
     
 (* basic operation on initialization values *)
 let rec irepr ({ i_desc } as i) =
@@ -410,7 +411,7 @@ let relation i_list =
   rel
 
 (** Main generalisation function *)
-let generalise ti =
+let gen ti =
   list_of_vars := [];
   (* we mark useful variables *)
   mark true ti;
@@ -421,7 +422,14 @@ let generalise ti =
   shorten ti;
   gen ti;
   let rel = relation !list_of_vars in
-  { typ_vars = !list_of_vars; typ_rel = rel; typ = ti }
+  { typ_vars = !list_of_vars; typ_rel = rel; typ_body = ti }
+
+let gen_decl h =
+  Ident.Env.map
+    (fun ({ t_tys = { typ_body } } as tentry) ->
+      let t_tys = gen typ_body in
+      { tentry with t_tys })
+    h
 
 (** Instantiation of a type *)
 (* save and cleanup links *)
@@ -479,14 +487,14 @@ let rec subtype right ti =
       atom new_i
 
 (* instanciation *)
-let instance { typ = ti } ty =
+let instance { typ_body = ti } ty =
   let ti = copy ti in
   cleanup ();
   let ti = subtype true ti in
   instance ti ty
 
 (* type instance *)
-let instance { value_init = tis_opt } ty =
+let instance_of_global_value { value_init = tis_opt } ty =
   (* build a default signature *)
   let default ty =
     skeleton_on_i (new_var ()) ty in
@@ -507,17 +515,11 @@ let filter_product ti =
   | Iproduct(ti_list) -> ti_list
   | _ -> assert false
 
-(** An entry in the type environment *)
-type tentry =
-    { t_typ: Definit.ti; (* the init type [ty] of x *)
-      t_last: Definit.t; (* v in [0, 1] so that last x: ty[v] *)
-    }
-    
 (* prints the typing environment *)
 let penv ff env =
   (* print every entry in the typing environment *)
-  let pentry ff (n, { t_typ = ti; t_last = i }) =
+  let pentry ff (n, { t_tys; t_last }) =
     Format.fprintf ff "@[%a: %a | %a@]"
-      Printer.source_name n Pinit.ptype ti Pinit.init i in
+      Printer.source_name n Pinit.scheme t_tys Pinit.init t_last in
   let env = Ident.Env.bindings env in
   Pp_tools.print_list_r pentry "{" ";" "}" ff env

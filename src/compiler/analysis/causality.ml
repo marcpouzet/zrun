@@ -43,7 +43,7 @@ let print x = Misc.internal_error "unbound" Printer.name x
 type error =
     { kind: kind;
       cycle: cycle;
-      env: Causal.tentry Env.t }
+      env: Defcaus.tentry Env.t }
 	       
  and kind =
    | Cless_than of tc * tc
@@ -127,10 +127,11 @@ let pattern env pat =
     | Ewildpat | Econstpat _ | Econstr0pat _ ->
         Causal.skeleton_on_c (Causal.new_var ()) pat_typ
     | Evarpat(x) ->
-       let { t_typ = actual_tc } =
+       let { t_tys } =
          try Env.find x env with | Not_found -> print x in
        (* every variable that is not a function has an atomic type *)
        let expected_tc = Causal.skeleton_for_variables pat_typ in
+       let actual_tc = Causal.instance t_tys pat_typ in
        less_than pat_loc env expected_tc actual_tc;
        expected_tc
     | Econstr1pat(_, pat_list) ->
@@ -153,10 +154,11 @@ let pattern env pat =
     | Ealiaspat(p, x) ->
         let tc_p = pattern p in
         let tc_n =
-          let { t_typ = actual_tc } =
+          let { t_tys } =
 	    try Env.find x env with | Not_found -> print x  in
           (* every variable that is not a function has an atomic type *)
           let expected_tc = Causal.skeleton_for_variables pat_typ in
+          let actual_tc = Causal.instance t_tys pat_typ in
           less_than pat_loc env expected_tc actual_tc;
           expected_tc in
         less_than pat_loc env tc_n tc_p;
@@ -168,36 +170,39 @@ let pattern env pat =
 
 (** Build an environment from a typing environment. *)
 let build_env l_env env =
-  let entry n { t_tys = { typ_body }; t_sort } acc =
-    let cur_tc = Causal.annotate (Cname n) (Causal.skeleton typ_body) in
+  let entry n { t_sort; t_tys = { typ_body } } acc =
+    let t_tys =
+      Causal.scheme (Causal.annotate (Cname n) (Causal.skeleton typ_body)) in
     let last_tc_opt =
       match t_sort with
       | Sort_mem _ ->
           Some(Causal.annotate (Clast n) (Causal.skeleton typ_body))
       | _ -> None in
-    Env.add n { t_typ = cur_tc; t_last_typ = last_tc_opt } acc in
+    Env.add n { t_tys; t_last_typ = last_tc_opt } acc in
   Env.append (Env.fold entry l_env Env.empty) env
     
 (** Build an environment with all entries synchronised on [c] *)
 let build_env_on_c c l_env env =
   let entry n { t_tys = { typ_body }; t_sort } acc =
-    let cur_tc = Causal.annotate (Cname n) (Causal.skeleton_on_c c typ_body) in
+    let t_tys =
+      Causal.scheme
+        (Causal.annotate (Cname n) (Causal.skeleton_on_c c typ_body)) in
     let last_tc_opt =
       match t_sort with
       | Sort_mem _ ->
           Some(Causal.annotate (Clast n) (Causal.skeleton_on_c c typ_body))
       | _ -> None in
-    Env.add n { t_typ = cur_tc; t_last_typ = last_tc_opt } acc in
+    Env.add n { t_tys; t_last_typ = last_tc_opt } acc in
   Env.append (Env.fold entry l_env Env.empty) env
 
 (** Build an environment for a set of written variables *)
 (* [x1:ct1;...; xn:tcn] with [cti < ct'i] where [env(xi) = ct'i] *)
 let def_env loc defnames env =
     let add x acc =
-      let { t_typ = tc } as tentry = Env.find x env in
-      let ltc = Causal.fresh tc in
-      less_than_name loc env x ltc tc;
-      Env.add x { tentry with t_typ = ltc  } acc in
+      let { t_tys = { typ_body } as t_tys } as tentry = Env.find x env in
+      let tc_copy = Causal.fresh typ_body in
+      less_than_name loc env x tc_copy typ_body;
+      Env.add x { tentry with t_tys = { t_tys with typ_body = tc_copy }  } acc in
     let env_defnames =
       Ident.S.fold add (Defnames.cur_names Ident.S.empty defnames) Env.empty in
     Env.append env_defnames env
@@ -208,10 +213,10 @@ let def_env loc defnames env =
 (* for all xi such that [env(xi) = ct'i] *)
 let def_env_on_c loc defnames env c =
   let add x acc =
-      let { t_typ = tc } as tentry = Env.find x env in
-      let ltc = Causal.fresh_on_c c tc in
-      less_than_name loc env x ltc tc;
-      Env.add x { tentry with t_typ = ltc  } acc in
+      let { t_tys = { typ_body } as t_tys } as tentry = Env.find x env in
+      let tc_copy = Causal.fresh_on_c c typ_body in
+      less_than_name loc env x tc_copy typ_body;
+      Env.add x { tentry with t_tys = { t_tys with typ_body = tc_copy }  } acc in
   let shared = Defnames.cur_names Ident.S.empty defnames in
   let env_defnames = Ident.S.fold add shared Env.empty in
   shared, Env.append env_defnames env
@@ -224,11 +229,11 @@ let def_env_on_c loc defnames env c =
 (* was written. *)
 let last_env shared defnames env =
   let add x acc =
-    let { t_typ = tc; t_last_typ = ltc_opt } = Env.find x env in
+    let { t_tys = { typ_body }; t_last_typ = ltc_opt } = Env.find x env in
     let tc, ltc_opt =
       match ltc_opt with
-      | None -> Causal.fresh tc, None | Some(ltc) -> ltc, Some(ltc) in
-    Env.add x { t_typ = tc; t_last_typ = ltc_opt } acc in
+      | None -> Causal.fresh typ_body, None | Some(ltc) -> ltc, Some(ltc) in
+    Env.add x { t_tys = Causal.scheme tc; t_last_typ = ltc_opt } acc in
   let names = Defnames.cur_names Ident.S.empty defnames in
   let env_defnames =
     Ident.S.fold add (Ident.S.diff shared names) Env.empty in
@@ -340,10 +345,11 @@ let rec exp env c_free ({ e_desc; e_info; e_loc } as e) =
     | Econst _ | Econstr0 _ -> Causal.skeleton e_typ
     | Eglobal { lname } ->
         let { info } = Modules.find_value lname in
-        Causal.instance info e_typ
+        Causal.instance_of_global_value info e_typ
     | Evar(x) ->
-        let { t_typ } = try Env.find x env with Not_found -> print x in
-        let tc = subtype true t_typ in
+        let { t_tys } = try Env.find x env with Not_found -> print x in
+        let tc = Causal.instance t_tys e_typ in
+        let tc = subtype true tc in
         let cset = Causal.vars S.empty tc in
         (* all elements [ci in cset] are such that [ci < c_free] *)
         S.iter (fun ci -> less_than_c e_loc env ci c_free) cset;
@@ -517,21 +523,23 @@ and exp_less_than env c_free e expected_tc =
 (** Typing a list of equations [env |-c eq list] *)
 and equation_list env c_free eq_list = List.iter (equation env c_free) eq_list
 
-(** Typing of an equation. [env |-cfree eq] *)
+(* Typing of an equation. [env |-c_free eq] *)
+(* any fresh causality variable [c] introduced in the typing of [e] *)
+(* is such that [c < c_free] *)
 and equation env c_free { eq_desc; eq_write; eq_loc } =
   match eq_desc with
   | EQeq(p, e) ->
       let tc_p = pattern env p in
       exp_less_than env c_free e tc_p
   | EQinit(n, e0) ->
-      let { t_typ; t_last_typ } =
+      let { t_tys = { typ_body }; t_last_typ } =
         try Env.find n env with | Not_found -> print n in 
       let actual_tc = exp env c_free e0 in
-      less_than e0.e_loc env actual_tc t_typ;
+      less_than e0.e_loc env actual_tc typ_body;
       (match t_last_typ with
        | None -> () | Some(ltc) -> less_than e0.e_loc env actual_tc ltc)
   | EQder { id; e; e_opt; handlers } ->
-      let { t_typ; t_last_typ } =
+      let { t_tys = { typ_body }; t_last_typ } =
         try Env.find id env with | Not_found -> print id in 
       let _ = exp env c_free e in
       let c_body = Causal.intro_less_c c_free in
@@ -545,15 +553,15 @@ and equation env c_free { eq_desc; eq_write; eq_loc } =
         present_handler_exp_list
           env c_free c_e c_body handlers NoDefault in
       let actual_tc = on_c actual_tc c_body in
-      less_than eq_loc env actual_tc t_typ
+      less_than eq_loc env actual_tc typ_body
   | EQemit(n, e_opt) ->
       let c_res = Causal.new_var () in
       Util.optional_unit
         (fun c_res e -> exp_less_than_on_c env c_free e c_res) c_res e_opt;
-      let { t_typ } =
+      let { t_tys = { typ_body } } =
         try Env.find n env with Not_found -> print n in
       let actual_tc = Causal.annotate (Cname n) (atom c_res) in
-      less_than eq_loc env actual_tc t_typ
+      less_than eq_loc env actual_tc typ_body
   | EQautomaton { is_weak; handlers; state_opt } ->
      automaton_handler_eq_list
        eq_loc c_free is_weak eq_write env handlers state_opt
@@ -698,9 +706,13 @@ and scondpat env c_free sc =
 
 (* Computes the result type for [returns (...) eq] *)
 and type_of_vardec_list env n_list =
-  let type_of_vardec { var_name } =
-    let { t_typ = tc } =
+  let type_of_vardec ({ var_name; var_info } as v) =
+    let { t_tys } =
       try Env.find var_name env with Not_found -> print var_name in
+    let ty = Typinfo.get_type var_info in
+    let tc = Causal.instance t_tys ty in
+    (* annotate with the causality type *)
+    v.var_info <- Typinfo.set_caus var_info tc;
     tc in
   let tc_list = List.map type_of_vardec n_list in
   match tc_list with
@@ -723,14 +735,23 @@ let implementation ff { desc = desc; loc = loc } =
   try
     match desc with
     | Eopen _ | Etypedecl _ -> ()
-    | Eletdecl { name; e } ->
+    | Eletdecl { d_leq } ->
+       (* generalisation is done only for global declarations *)
        Misc.push_binding_level ();
-       let tc = exp Env.empty (Causal.new_var ()) e in
+       let env = leq Env.empty (new_var ()) d_leq in
        Misc.pop_binding_level ();
-       let tcs = generalise tc in
-       Global.set_causality (Modules.find_value (Lident.Name(name))) tcs;
+       let env = gen_decl env in
+       Env.iter
+         (fun name { t_tys } ->
+           Global.set_causality
+             (Modules.find_value (Lident.Name(Ident.source name))) t_tys)
+         env;
        (* output the signature *)
-       if !Misc.print_causality_types then Pcaus.declaration ff name tcs
+       if !Misc.print_causality_types
+       then
+         Env.iter
+           (fun name { t_tys } ->
+             Pcaus.declaration ff (Ident.source name) t_tys) env
   with
   | Error(loc, kind) -> message loc kind
 

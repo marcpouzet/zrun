@@ -97,19 +97,23 @@ let less_for_var loc n actual_ti expected_ti =
   with
     | Init.Clash _ -> error loc (Ivar(n))
 
-(** Build an environment from a typing environment *)
+(* Build an environment from a typing environment *)
 (* if [x] is defined by [init x = e] then
  *- [x] is initialized, that is [last x: 0]; otherwise [last x: 1] *)
 let build_env l_env env =
-  let entry x { Deftypes.t_init = t_init; Deftypes.t_typ = ty } =
-    match t_init with
-    | NoInit ->
-       { t_last = ione; t_typ = Init.skeleton_on_i (Init.new_var ()) ty }
-    | InitEq | InitDecl _ ->
-       { t_last = izero; t_typ = Init.skeleton_on_i (Init.new_var ()) ty } in
+  let open Deftypes in
+  let entry x { t_sort; t_tys = { typ_body } } =
+    match t_sort with
+    | Sort_mem { m_init } ->
+       let t_last = match m_init with | Eq | Decl _ -> izero | No -> ione in
+       let t_tys = Init.scheme (Init.skeleton_on_i (Init.new_var ()) typ_body) in
+       { t_last; t_tys }
+    | _ ->
+       let t_tys = Init.scheme (Init.skeleton typ_body) in
+       { t_last = ione; t_tys } in
   Env.fold (fun n tentry acc -> Env.add n (entry n tentry) acc) l_env env
 
-(** Build an environment from [env] by replacing the initialization *)
+(* Build an environment from [env] by replacing the initialization *)
 (* type of [x] by the initialization of its last value for all *)
 (* [x in [shared\defnames] *)
 (* this is because an absent definition for [x] in the current branch *)
@@ -117,9 +121,9 @@ let build_env l_env env =
 (* or [x = default_x] if [x] is declared with a default value *)
 let last_env shared defnames env =
   let add n acc =
-    let { t_typ } = Env.find n env in
-    Env.add n { t_typ = Init.fresh_on_i izero t_typ; t_last = izero }
-      acc in
+    let { t_tys = { typ_body } } = Env.find n env in
+    Env.add n { t_tys = Init.scheme (Init.fresh_on_i izero typ_body);
+                t_last = izero } acc in
   let names = Defnames.cur_names Ident.S.empty defnames in
   let env_defnames =
     Ident.S.fold add (Ident.S.diff shared names) Env.empty in
@@ -128,8 +132,9 @@ let last_env shared defnames env =
 (* Names from the set [last_names] are considered to be initialized *)
 let add_last_to_env env last_names =
   let add n acc =
-    let { t_typ } = Env.find n env in
-    Env.add n { t_typ = Init.fresh_on_i izero t_typ; t_last = izero } acc in
+    let { t_tys = { typ_body } } = Env.find n env in
+    Env.add n { t_tys = Init.scheme (Init.fresh_on_i izero typ_body);
+                t_last = izero } acc in
   let env_last_names =
     Ident.S.fold add last_names Env.empty in
   Env.append env_last_names env
@@ -159,8 +164,9 @@ let split se_opt s_h_list =
 let initialized loc env shared =
   (* check that shared variable are initialialized *)
   let check n =
-    let { t_typ } = try Env.find n env with Not_found -> assert false in
-    less_for_var loc n t_typ (Init.fresh_on_i izero t_typ) in
+    let { t_tys = { typ_body } } =
+      try Env.find n env with Not_found -> assert false in
+    less_for_var loc n typ_body (Init.fresh_on_i izero typ_body) in
   Ident.S.iter check shared
 
 (** Patterns *)
@@ -173,9 +179,10 @@ let rec pattern env ({ pat_desc; pat_loc; pat_info } as p) expected_ti =
   match pat_desc with
     | Ewildpat | Econstpat _ | Econstr0pat _ -> ()
     | Evarpat(x) -> 
-        let ti =
-          try let { t_typ } = Env.find x env in t_typ
+        let t_tys =
+          try let { t_tys } = Env.find x env in t_tys
           with | Not_found -> assert false in
+        let ti = Init.instance t_tys pat_typ in
         less_than pat_loc expected_ti ti
     | Econstr1pat(_, pat_list) ->
         let i = Init.new_var () in
@@ -195,10 +202,11 @@ let rec pattern env ({ pat_desc; pat_loc; pat_info } as p) expected_ti =
         pattern env p2 expected_ti
     | Ealiaspat(p, n) -> 
         pattern env p expected_ti;
-        let ti_n = 
-          try let { t_typ } = Env.find n env in t_typ
+        let t_tys_n = 
+          try let { t_tys } = Env.find n env in t_tys
           with | Not_found -> assert false in
-        less_than pat_loc expected_ti ti_n
+        let ti = Init.instance t_tys_n pat_typ in
+        less_than pat_loc expected_ti ti
 
 and pattern_less_than_on_i env ({ pat_info } as pat) i =
   let pat_typ = Typinfo.get_type pat_info in
@@ -290,17 +298,17 @@ let rec exp env ({ e_desc; e_info; e_loc } as e) =
     | Eglobal { lname = lname } ->
        let { info } =
          try Modules.find_value lname with | Not_found -> assert false in
-       Init.instance info e_typ
+       Init.instance_of_global_value info e_typ
     | Evar(x) -> 
-       begin try let { t_typ } = Env.find x env in t_typ 
-             with | Not_found -> print x
-       end
+       let t_tys = try let { t_tys } = Env.find x env in t_tys 
+                   with | Not_found -> print x in
+       Init.instance t_tys e_typ
     | Elast { id } -> 
        begin try 
            (* [last x] is initialized only if an equation [init x = e] *)
            (* appears and [e] is also initialized *)
-           let { t_typ; t_last } = Env.find id env in
-           Init.fresh_on_i t_last t_typ
+           let { t_tys = { typ_body } ; t_last } = Env.find id env in
+           Init.fresh_on_i t_last typ_body
          with 
          | Not_found -> Init.skeleton_on_i ione e_typ end
     | Etuple(e_list) -> 
@@ -458,8 +466,8 @@ and equation env
      (* e must be of type 0 *)
      exp_less_than_on_i env e izero;
      let ti_n, last = 
-        try let { t_typ; t_last } = Env.find id env in 
-          t_typ, t_last 
+        try let { t_tys = { typ_body }; t_last } = Env.find id env in 
+          typ_body, t_last 
         with | Not_found -> assert false in
       exp_less_than env e ti_n;
       let e_typ = Typinfo.get_type e.e_info in
@@ -472,7 +480,7 @@ and equation env
       exp_less_than_on_i env e izero
   | EQemit(n, e_opt) ->
       let ti_n = 
-        try let { t_typ } = Env.find n env in t_typ
+        try let { t_tys = { typ_body } } = Env.find n env in typ_body
         with | Not_found -> assert false in
       less_than loc ti_n (Init.atom izero);
       Util.optional_unit
@@ -548,11 +556,9 @@ and block_eq shared env { b_loc; b_body; b_env; b_write } =
 
 and leq env { l_eq; l_env } =
   (* First extend the typing environment *)
-  Misc.push_binding_level ();
   let env = build_env l_env env in
   (* then type the body *)
   equation env l_eq;
-  Misc.pop_binding_level ();
   env
 
 and leqs env l = List.fold_left leq env l
@@ -571,14 +577,19 @@ and scondpat env { desc = desc } =
 
 (* Computes the result type for [returns (...) eq] *)
 and type_of_vardec_list env n_list =
-  let type_of_vardec { var_name = n } =
-    let { t_typ } = try Env.find n env with Not_found -> print n in t_typ in
+  let type_of_vardec ({ var_name; var_info } as v) =
+    let { t_tys } = try Env.find var_name env with Not_found -> print var_name in
+    let ty = Typinfo.get_type var_info in
+    let ti = Init.instance t_tys ty in
+    (* annotate with the initialization type *)
+    v.var_info <- Typinfo.set_init var_info ti;
+    ti in
   let ti_list = List.map type_of_vardec n_list in
   match ti_list with
   | [] -> Init.atom(Init.new_var ())
   | _ -> Init.product ti_list
 
-and result env ({ r_desc } as r) =
+and result env ({ r_desc; r_info } as r) =
   let ti =
     match r_desc with
     | Exp(e) -> exp env e
@@ -586,21 +597,30 @@ and result env ({ r_desc } as r) =
        let env = block_eq Ident.S.empty env b in
        type_of_vardec_list env b_vars in
   (* type annotation *)
-  r.r_info <- Typinfo.set_init r.r_info ti;
+  r.r_info <- Typinfo.set_init r_info ti;
   ti
  
 let implementation ff impl =
   try
     match impl.desc with
     | Eopen _ | Etypedecl _ -> ()
-    | Eletdecl { name; e } ->
-        Misc.push_binding_level ();
-        let ti = exp Env.empty e in
-        Misc.pop_binding_level ();
-        let tis = generalise ti in
-        Global.set_init (Modules.find_value (Lident.Name(name))) tis;
-        (* output the signature *)
-        if !Misc.print_initialization_types then Pinit.declaration ff name tis
+    | Eletdecl { d_leq } ->
+       (* generalisation is done only for global declarations *)
+       Misc.push_binding_level ();
+       let env = leq Env.empty d_leq in
+       Misc.pop_binding_level ();
+       let env = gen_decl env in
+       Env.iter
+         (fun name { t_tys } ->
+           Global.set_init
+             (Modules.find_value (Lident.Name(Ident.source name))) t_tys)
+         env;
+       (* output the signature *)
+       if !Misc.print_initialization_types
+       then
+         Env.iter
+           (fun name { t_tys } ->
+             Pinit.declaration ff (Ident.source name) t_tys) env
   with
   | Error(loc, kind) -> message loc kind
                           
