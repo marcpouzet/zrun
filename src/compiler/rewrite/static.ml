@@ -28,15 +28,15 @@ open Error
 (* Invariant: defined names in [e_renaming] and [e_values] *)
 (* are pairwise distinct. For that, all defined names in the source *)
 (* must be pairwise distinct *)
-type 'a env =
+type ('info, 'ienv, 'value) env =
   { e_renaming: Ident.t Ident.Env.t; (* environment for renaming *)
-    e_values: 'a Ident.Env.t;  (* environment of static values *)
-    e_gvalues: 'a Genv.genv;
+    e_values: 'value Ident.Env.t;  (* environment of static values *)
+    e_gvalues: 'value Genv.genv;
     (* global environment of static values *)
-    e_defs: (no_info, no_info) implementation list;
+    e_defs: ('info, 'ienv) implementation list;
     (* global definitions of static values introduced during the reduction *)
     (* the head of the list is the last added value *)
-    e_exp: (no_info, no_info) exp Ident.Env.t;
+    e_exp: ('info, 'ienv) exp Ident.Env.t;
     (* the expression associated to [x] *)
     (* when [x] is a static value *)
   }
@@ -593,8 +593,6 @@ and value_t loc acc v =
                             { arg = s;
                               print = fun ff s -> Format.fprintf ff "%s" s };
                    loc = no_location }) in
-  let make e_desc = 
-    { e_desc; e_loc = Location.no_location; e_info = no_info } in
   let rec value_t acc v =
     let open Value in
     let e_desc, acc = match v with
@@ -634,7 +632,7 @@ and value_t loc acc v =
          let m = Ident.fresh "r" in
          let name = Ident.name m in
          Eglobal { lname = Name(Ident.name m) },
-         { acc with e_defs = impl name m (make (Efun(f))) :: acc_local.e_defs }
+         { acc with e_defs = impl name m (Aux.emake (Efun(f))) :: acc_local.e_defs }
       | Varray(a) ->
          let v = catch (Arrays.flat_of_map a) in
          let v, acc = Util.mapfold value_t acc (Array.to_list v) in
@@ -651,7 +649,7 @@ and value_t loc acc v =
       | Vsizefix _ ->
          unexpected_failure "sizefix"
       | Vfun _  -> unexpected_failure "vfun" in
-    make e_desc, acc in
+    Aux.emake e_desc, acc in
   let e, acc = value_t acc v in
   (* if [e] is not immediate, add a global definition to store it *)
   if immediate e then e, acc
@@ -659,7 +657,7 @@ and value_t loc acc v =
     (* add a definition in the global environment *)
     let m = fresh () in
     let name = Ident.name m in
-    let gname = make (Eglobal { lname = Name(name) }) in
+    let gname = Aux.emake (Eglobal { lname = Name(name) }) in
     gname, { acc with e_defs = impl name m e :: acc.e_defs;
                       e_gvalues = Genv.add name v acc.e_gvalues }
 

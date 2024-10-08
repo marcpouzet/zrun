@@ -136,18 +136,17 @@ let automaton acc is_weak handlers state_opt =
       match desc with
       | Estate0pat(n) -> Econstr0pat(lname n)
       | Estate1pat(n, l) -> Econstr1pat(lname n, List.map Aux.varpat l) in
-    { pat_desc = desc; pat_loc = loc; pat_info = no_info } in
+    { (Aux.pmake desc) with pat_loc = loc } in
   
   (* translating a state *)
   let rec state { desc; loc } =
     (* make an equation [n = e] *)
     match desc with
     | Estate0(n) ->
-       { e_desc = Econstr0 { lname = lname n }; e_loc = loc;
-         e_info = no_info }
+       { (Aux.emake (Econstr0 { lname = lname n })) with e_loc = loc }
     | Estate1(n, e_list) ->
-       { e_desc = Econstr1 { lname = lname n; arg_list = e_list };
-         e_loc = loc; e_info = no_info }
+       { (Aux.emake (Econstr1 { lname = lname n; arg_list = e_list }))
+       with e_loc = loc }
     | Estateif(e, st1, st2) ->
        ifthenelse e (state st1) (state st2) in
   
@@ -159,8 +158,7 @@ let automaton acc is_weak handlers state_opt =
        let { desc; loc } = (List.hd handlers).s_state in
        begin match desc with
        | Estate0pat(n) ->
-          { e_desc = Econstr0 { lname = lname n }; e_loc = loc;
-            e_info = no_info }
+          { (Aux.emake (Econstr0 { lname = lname n })) with e_loc = loc }
        | _ -> assert false
        end
     | Some(si) -> state si in

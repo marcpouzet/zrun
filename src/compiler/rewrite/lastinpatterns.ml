@@ -64,9 +64,9 @@ let update_vardec acc ({ var_name } as v) =
     | Not_found -> v
 
 let build funs acc l_env =
-  let add x _ (new_env, acc) =
+  let add x entry (new_env, acc) =
     let m = fresh "m" in
-    Env.add m Misc.no_info new_env,
+    Env.add m entry new_env,
     Env.add x { last_is_used = false; new_name = m } acc in
   Env.fold add l_env (Env.empty, acc)
 

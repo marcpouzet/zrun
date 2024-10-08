@@ -100,9 +100,9 @@ let funexp funs acc ({ f_kind } as f) =
   match f_kind with
   | Knode(Kcont) ->
      let { f_args; f_env } as f, acc_local = Mapfold.funexp funs empty f in
-     let t, _ = intro acc_local in
-     { f with f_args = [Aux.vardec t false None None] :: f_args;
-              f_env = Env.add t Misc.no_info f_env }, acc
+     let time, _ = intro acc_local in
+     { f with f_args = [Aux.vardec time false None None] :: f_args;
+              f_env = Env.add time Misc.no_info f_env }, acc
   | _ -> raise Mapfold.Fallback
 
 (* add the extra time argument for the application of hybrid nodes *)

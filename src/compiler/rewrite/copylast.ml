@@ -35,10 +35,10 @@
 open Zelus
 open Ident
 
-type acc =
+type 'a acc =
   { (* names that are defined locally as [local ... x ... do ... ] or *)
     (* [let [rec] ... x ... in ...] *)
-    env: Misc.no_info Env.t; 
+    env: 'a Env.t; 
     (* if [x] is local and [last x] is used, [last x] is replaced by [lx] *)
     (* and an equation [lx = last*x] is added. *)
     renaming: Ident.t Env.t; (* renaming [x -> lx] *)

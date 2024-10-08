@@ -133,18 +133,13 @@ let compare name n_steps genv0 p p' =
 (* Apply a sequence of source-to-source transformation *)
 (* do equivalence checking for every step if the flag is turned on *)
 let main modname filename n_steps =
-  let transform_and_compare (name, comment, transform) genv p =
+  let transform_and_compare genv p (name, comment, transform) =
     let p' = transform genv p in
     print_message comment;
     Debug.print_program p';
     if n_steps = 0 then p' else compare name n_steps genv p p' in
     
-  let rec iter genv l p =
-    match l with
-    | [] -> p
-    | (name, comment, transform) :: l ->
-       let p = transform_and_compare (name, comment, transform) genv p in
-       iter genv l p in
+  let iter genv p l = List.fold_left (transform_and_compare genv) p l in
   
   let _ = Format.std_formatter in
   
@@ -171,6 +166,6 @@ let main modname filename n_steps =
   let p = do_step "Write done. See below: "
       Debug.print_program Write.program p in
   (* Source-to-source transformations start here *)
-  let _ = iter genv0 (rewrite_list ()) p in
+  let _ = iter genv0 p (rewrite_list ()) in
 
   apply_with_close_out (fun _ -> ()) otc
