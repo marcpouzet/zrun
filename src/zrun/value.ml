@@ -28,41 +28,43 @@ type 'a ientry =
 type 'a result = ('a, Error.error) Result.t
 
 type 'a star =
-  | Vnil : 'a star (* non initialized value *)
-  | Vbot : 'a star (* bottom value *)
-  | Value : 'a -> 'a star (* value *)
-  
-type pvalue =
-  | Vint : int -> pvalue
-  | Vbool : bool -> pvalue
-  | Vfloat : float -> pvalue
-  | Vchar : char -> pvalue
-  | Vstring : string -> pvalue
-  | Vvoid : pvalue
-  | Vconstr0 : Lident.t -> pvalue
-  | Vconstr1 : Lident.t * pvalue list -> pvalue
-  | Vrecord : pvalue Zelus.record list -> pvalue
-  | Vpresent : pvalue -> pvalue
-  | Vabsent : pvalue
-  | Vstuple : pvalue list -> pvalue
-  | Vtuple : pvalue star list -> pvalue
-  | Vstate0 : Ident.t -> pvalue
-  | Vstate1 : Ident.t * pvalue list -> pvalue
-  | Varray : pvalue array -> pvalue
+  | Vnil (* non initialized value *)
+  | Vbot (* bottom value *)
+  | Value of 'a (* value *)
+
+type ('info, 'ienv) value = ('info, 'ienv) pvalue star
+
+and ('info, 'ienv) pvalue =
+  | Vint of int
+  | Vbool of bool
+  | Vfloat of float
+  | Vchar of char
+  | Vstring of string
+  | Vvoid 
+  | Vconstr0 of Lident.t
+  | Vconstr1 of Lident.t * ('info, 'ienv) pvalue list
+  | Vrecord of ('info, 'ienv) pvalue Zelus.record list
+  | Vpresent of ('info, 'ienv) pvalue 
+  | Vabsent 
+  | Vstuple of ('info, 'ienv) pvalue list
+  | Vtuple of ('info, 'ienv) pvalue star list
+  | Vstate0 of Ident.t
+  | Vstate1 of Ident.t * ('info, 'ienv) pvalue list
+  | Varray of ('info, 'ienv) pvalue array
   (* imported stateless functions; they must verify that *)
   (* f(atomic v) not= bot *)
-  | Vfun : (pvalue -> pvalue option) -> pvalue
-  | Vclosure : pvalue closure -> pvalue
+  | Vfun of (('info, 'ienv) pvalue -> ('info, 'ienv) pvalue option)
+  | Vclosure of ('info, 'ienv) pvalue closure
   (* function parameterized by sizes *)
-  | Vsizefun : pvalue sizefun -> pvalue
+  | Vsizefun of ('info, 'ienv) sizefun
   (* a representation for mutually recursive functions over sizes *)
   (* f where rec [f1<s,...> = e1 and ... fk<s,...> = ek] *)
-  | Vsizefix : 
+  | Vsizefix of 
       { bound: int list option; (* the maximum number of iterations *)
         name: Ident.t; (* name of the defined function *)
-        defs: pvalue sizefun Ident.Env.t; (* the set of mutually recursive
-                                                function definitions *) 
-      } -> pvalue
+        defs: ('info, 'ienv) sizefun Ident.Env.t;
+        (* the set of mutually recursive function definitions *) 
+      }
 
 and 'a array =
   | Vflat : 'a Array.t -> 'a array
@@ -76,11 +78,11 @@ and 'a map =
   { m_length : int; m_u : int -> 'a result }
      
 (* a size parameterized expression - f <n1,...,nk> = e *)
-and sizefun = 
+and ('info, 'ienv) sizefun = 
   { s_params: Ident.t list; 
     s_body: (Misc.no_info, Misc.no_info) Zelus.exp; 
-    s_genv: 'a Genv.genv; 
-    s_env: value ientry Ident.Env.t }
+    s_genv: ('info, 'ienv) pvalue Genv.genv; 
+    s_env: ('info, 'ienv) pvalue star ientry Ident.Env.t }
                                    
 (* a functional value - [fun|node] x1 ... xn -> e *)
 and 'a closure =
@@ -112,7 +114,6 @@ and 'a instance =
     step : 'a closure; (* step function *)
   }
 
-type value = pvalue star
 
 (*
 type ('a, 's) costream =
