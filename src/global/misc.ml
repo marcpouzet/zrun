@@ -137,10 +137,6 @@ let esterel = ref false
 (* sets the interpretation of the if/then/else to Lustre *)
 let lustre = ref false
 
-(* no information associated to expressions *)
-type no_info = unit
-let no_info: no_info = ()
-
 (* static reduction *)
 let static_reduction = ref false
 
@@ -166,6 +162,10 @@ let pop_binding_level () =
   binding_level := !binding_level - 1;
   assert (!binding_level > generic)
 let reset_binding_level () = binding_level := 0
+
+(* no information associated to expressions *)
+type 'a no_info = 'a option
+let no_info: 'a no_info = None
 
 (* Internal error in the compiler. *)
 let internal_error message printer input =
