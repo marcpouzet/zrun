@@ -35,7 +35,7 @@ let names_env env = Env.fold (fun n _ acc -> S.add n acc) env S.empty
 let names eq_write = Defnames.names S.empty eq_write
 
 (* match a value [v] against a pattern [p] *)
-let pmatch (v : pvalue) (p : _ pattern) : pvalue Env.t Opt.t =
+let pmatch v p =
   let rec pmatch acc v { pat_desc } =
     match v, pat_desc with
     | _, Etypeconstraintpat(p, _) -> pmatch acc v p
@@ -83,7 +83,7 @@ let pmatch (v : pvalue) (p : _ pattern) : pvalue Env.t Opt.t =
 (* [v] is an star value; [p] is a pattern but pattern matching *)
 (* should not fail. In the case of a failure, this is considered as *)
 (* a typing error *)
-let pmatcheq (v : pvalue) (p : _ pattern) : pvalue Env.t Opt.t =
+let pmatcheq v p =
   let rec pmatcheq acc v { pat_desc } =
     match v, pat_desc with
     | Vstuple(v_list), Etuplepat(l_list) ->
@@ -114,7 +114,7 @@ let pmatcheq (v : pvalue) (p : _ pattern) : pvalue Env.t Opt.t =
   pmatcheq Env.empty v p
 
 (* Pattern matching of a signal *)
-let matchsig (vstate: pvalue) (p: _ pattern) : (pvalue * pvalue Env.t) Opt.t =
+let matchsig vstate p =
   match vstate with
   | Vabsent -> return (Vbool(false), Env.empty)
   | Vpresent(v) ->
@@ -123,7 +123,7 @@ let matchsig (vstate: pvalue) (p: _ pattern) : (pvalue * pvalue Env.t) Opt.t =
   | _ -> none
 
 (* match a state f(v1,...,vn) against a state name f(x1,...,xn) *)
-let matchstate (ps : pvalue) ({ desc; loc } : statepat) : (pvalue Env.t) Opt.t =
+let matchstate ps { desc; loc } =
   match ps, desc with
   | Vstate0(f), Estate0pat(g) when Ident.compare f g = 0 -> return Env.empty
   | Vstate1(f, v_list), Estate1pat(g, id_list) when

@@ -85,7 +85,7 @@ let main modname filename n_steps is_all l_names =
   (* defines the initial global environment for values *)
   let genv0 = Genv.initialize modname [] in
   (* Add Stdlib *)
-  let genv0 = Genv.add_module genv0 Primitives.stdlib_env in
+  let genv0 = Genv.add_module genv0 (Primitives.stdlib_env ()) in
   
   (* Associate unique index to variables *)
   let p = do_step "Scoping done" Debug.print_program Scoping.program p in

@@ -24,6 +24,9 @@ let no_info =
     t_caus = Defcaus.no_typ;
     t_init = Definit.no_typ }
 
+let no_ienv =
+  Deftypes.entry (Deftypes.Tfun(Tany)) Deftypes.Sort_val (Types.scheme Deftypes.no_typ)
+
 let set_type typinfo ty = { typinfo with t_typ = ty }
 let set_caus typinfo tc = { typinfo with t_caus = tc }
 let set_init typinfo ti = { typinfo with t_init = ti }

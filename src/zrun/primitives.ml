@@ -475,7 +475,7 @@ let random_float_op v =
 
 
 (* The initial Stdlib *)
-let list_of_primitives =
+let list_of_primitives () =
   ["+", binop add_op;
    "-", binop minus_op;
    "~-", unop uminus_op;
@@ -506,7 +506,7 @@ let list_of_primitives =
    ">=", binop gte_op;
    "length", unop length_op]
 
-let list_of_random_primitives =
+let list_of_random_primitives () =
   ["random_bool", zerop random_bool_op;
    "random_int", unop random_int_op;
    "random_float", unop random_float_op]
@@ -516,9 +516,9 @@ let to_env acc l = List.fold_left (fun acc (n, v) -> Genv.E.add n v acc) acc l
 let list_of_esterel_primitives =
   if !esterel then ["or", esterel_or_op; "&", esterel_and_op] else []
 
-let stdlib_env =
+let stdlib_env () =
   { Genv.name = "Stdlib";
     Genv.values =
-      to_env (to_env Genv.E.empty list_of_primitives)
-        list_of_random_primitives }
+      to_env (to_env Genv.E.empty (list_of_primitives ()))
+        (list_of_random_primitives ()) }
 

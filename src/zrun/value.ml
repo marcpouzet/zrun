@@ -54,7 +54,7 @@ and ('info, 'ienv) pvalue =
   (* imported stateless functions; they must verify that *)
   (* f(atomic v) not= bot *)
   | Vfun of (('info, 'ienv) pvalue -> ('info, 'ienv) pvalue option)
-  | Vclosure of ('info, 'ienv) pvalue closure
+  | Vclosure of ('info, 'ienv) closure
   (* function parameterized by sizes *)
   | Vsizefun of ('info, 'ienv) sizefun
   (* a representation for mutually recursive functions over sizes *)
@@ -80,38 +80,37 @@ and 'a map =
 (* a size parameterized expression - f <n1,...,nk> = e *)
 and ('info, 'ienv) sizefun = 
   { s_params: Ident.t list; 
-    s_body: (Misc.no_info, Misc.no_info) Zelus.exp; 
+    s_body: ('info, 'ienv) Zelus.exp; 
     s_genv: ('info, 'ienv) pvalue Genv.genv; 
     s_env: ('info, 'ienv) pvalue star ientry Ident.Env.t }
                                    
 (* a functional value - [fun|node] x1 ... xn -> e *)
-and 'a closure =
-  { c_funexp : (Misc.no_info, Misc.no_info) Zelus.funexp;
-    c_genv: 'a Genv.genv;
-    c_env: 'a star ientry Ident.Env.t }
+and ('info, 'ienv) closure =
+  { c_funexp : ('info, 'ienv) Zelus.funexp;
+    c_genv: ('info, 'ienv) pvalue Genv.genv;
+    c_env: ('info, 'ienv) pvalue star ientry Ident.Env.t }
                                      
-and 'a state =
-  | Sbot : 'a state
-  | Snil : 'a state
-  | Sempty : 'a state
-  | Sval : 'a star -> 'a state
-  | Sstatic : 'a -> 'a state
-  | Slist : 'a state list -> 'a state
-  | Sopt : 'a star option -> 'a state
-  | Sinstance : 'a instance -> 'a state
-  | Scstate : { pos : 'a star; der : 'a star } -> 'a state 
-  | Szstate : { zin : bool; zout : 'a star } -> 'a state
-  | Shorizon : { zin : bool; horizon : float } -> 'a state
-  | Speriod :
-      { zin : bool; phase : float; period : float; horizon : float } -> 
-      'a state
+and ('info, 'ienv) state =
+  | Sbot 
+  | Snil 
+  | Sempty 
+  | Sval of ('info, 'ienv) value
+  | Sstatic of ('info, 'ienv) pvalue
+  | Slist of ('info, 'ienv) state list
+  | Sopt of ('info, 'ienv) value option
+  | Sinstance of ('info, 'ienv) instance
+  | Scstate of { pos : ('info, 'ienv) value; der : ('info, 'ienv) value }
+  | Szstate of { zin : bool; zout : ('info, 'ienv) value }
+  | Shorizon of { zin : bool; horizon : float }
+  | Speriod of
+      { zin : bool; phase : float; period : float; horizon : float }
   (* environment of values *)
-  | Senv : 'a star ientry Ident.Env.t -> 'a state
+  | Senv of ('info, 'ienv) value ientry Ident.Env.t
 
 (* instance of a node *)
-and 'a instance =
-  { init : 'a state; (* current state *)
-    step : 'a closure; (* step function *)
+and ('info, 'ienv) instance =
+  { init : ('info, 'ienv) state; (* current state *)
+    step : ('info, 'ienv) closure; (* step function *)
   }
 
 

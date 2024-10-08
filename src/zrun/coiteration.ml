@@ -1359,7 +1359,7 @@ and sfor_out genv env acc_env
   | _ -> error { kind = Estate; loc}
 
 (* evaluate an index returns a local environment *)
-and sfor_input size genv env (i_env: Forloop.index Env.t) { desc; loc } s =
+and sfor_input size genv env i_env { desc; loc } s =
   let open Forloop in
   match desc, s with
   | Einput { id; e; by = None }, Slist [se; se_opt] ->

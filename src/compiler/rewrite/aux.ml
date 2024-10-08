@@ -13,7 +13,7 @@
 (* *********************************************************************)
 
 (* Functions to build terms *)
-(* Invariant: variables defined by an equation (writes) must be correct *)
+(* Invariant: writes for equations must be correct *)
 
 open Misc
 open Location
@@ -23,14 +23,15 @@ open Lident
 open Initial
 open Deftypes
 
-(* Static expressions - simple sufficient condition for [e] to be static *)
-let rec static { e_desc } =
+(* Constant expressions - simple and sufficient condition for [e] to be *)
+(* constant *)
+let rec const { e_desc } =
   match e_desc with
   | Econst _ | Econstr0 _ | Eglobal _ -> true
-  | Etuple(e_list) -> List.for_all static e_list
+  | Etuple(e_list) -> List.for_all const e_list
   | Erecord(qual_e_list) ->
-     List.for_all (fun { arg } -> static arg) qual_e_list
-  | Erecord_access { arg } -> static arg
+     List.for_all (fun { arg } -> const arg) qual_e_list
+  | Erecord_access { arg } -> const arg
   | _ -> false
 
 let defnames eq_list =
@@ -40,9 +41,9 @@ let defnames eq_list =
 let desc e = e.desc
 let make x = { desc = x; loc = no_location }
 
-let emake desc : (no_info, no_info) exp =
+let emake desc =
   { e_desc = desc; e_loc = no_location; e_info = no_info }
-let pmake desc : no_info pattern =
+let pmake desc =
   { pat_desc = desc; pat_loc = no_location; pat_info = no_info }
 
 
@@ -277,7 +278,7 @@ let new_major env =
   env, major
 	 
 let major env =
-  let exception Return of (no_info, no_info) Zelus.exp in
+  let exception Return of ('info, 'ienv) Zelus.exp in
   let find x t =
     match t with
     | { t_sort = Sort_mem { m_mkind = Some(Major) } } ->
