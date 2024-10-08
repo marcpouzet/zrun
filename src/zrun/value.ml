@@ -90,6 +90,12 @@ and ('info, 'ienv) closure =
     c_genv: ('info, 'ienv) pvalue Genv.genv;
     c_env: ('info, 'ienv) pvalue star ientry Ident.Env.t }
                                      
+(* instance of a node *)
+and ('info, 'ienv) instance =
+  { init : ('info, 'ienv) state; (* current state *)
+    step : ('info, 'ienv) closure; (* step function *)
+  }
+
 and ('info, 'ienv) state =
   | Sbot 
   | Snil 
@@ -106,13 +112,6 @@ and ('info, 'ienv) state =
       { zin : bool; phase : float; period : float; horizon : float }
   (* environment of values *)
   | Senv of ('info, 'ienv) value ientry Ident.Env.t
-
-(* instance of a node *)
-and ('info, 'ienv) instance =
-  { init : ('info, 'ienv) state; (* current state *)
-    step : ('info, 'ienv) closure; (* step function *)
-  }
-
 
 (*
 type ('a, 's) costream =
