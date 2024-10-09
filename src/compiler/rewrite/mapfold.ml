@@ -211,15 +211,15 @@ type ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs =
     present_handler_eq :
       'info1 'ienv1 'info2 'ienv2.
         ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
-      -> ('info1, ('info1, 'ienv1) scondpat, ('info1, 'ienv1) eq) present_handler 
-      -> ('info2, ('info2, 'ienv2) scondpat, ('info2, 'ienv2) eq) present_handler
+      -> ('ienv1, ('info1, 'ienv1) scondpat, ('info1, 'ienv1) eq) present_handler 
+      -> ('ienv2, ('info2, 'ienv2) scondpat, ('info2, 'ienv2) eq) present_handler
                                             * 'a; 
     present_handler_e :
       'info1 'ienv1 'info2 'ienv2.
         ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
-      -> ('info1, ('info1, 'ienv1) scondpat, ('info1, 'ienv1) exp)
+      -> ('ienv1, ('info1, 'ienv1) scondpat, ('info1, 'ienv1) exp)
            present_handler 
-      -> ('info2, ('info2, 'ienv2) scondpat, ('info2, 'ienv2) exp)
+      -> ('ienv2, ('info2, 'ienv2) scondpat, ('info2, 'ienv2) exp)
            present_handler * 'a; 
     automaton_handler : 
       'info1 'ienv1 'info2 'ienv2.
@@ -477,13 +477,13 @@ and for_eq_t funs acc { for_out; for_block; for_out_env } =
 
 and slet_it funs acc leq_list = funs.slet_t funs acc leq_list
 
-and slet_t funs acc leq_list = Util.mapfold (leq_it funs) acc leq_list
+and slet_t funs acc leq_list = Util.mapfold (funs.leq_t (* _it *) funs) acc leq_list
 
 and leq_it funs acc leq = funs.leq_t funs acc leq
 
 and leq_t funs acc ({ l_eq; l_env } as leq) =
   let l_env, acc = build_it funs.global_funs acc l_env in
-  let l_eq, acc = equation_it funs acc l_eq in
+  let l_eq, acc = funs.equation (* _it *) funs acc l_eq in
   { leq with l_eq; l_env }, acc
 
 and scondpat_it funs acc scpat =
@@ -501,15 +501,15 @@ and scondpat funs acc ({ desc = desc } as scpat) =
      let scpat2, acc = scondpat_it funs acc scpat2 in
      { scpat with desc = Econdor(scpat1, scpat2) }, acc
   | Econdexp(e) ->
-     let e, acc = expression_it funs acc e in
+     let e, acc = funs.expression (*it *) funs acc e in
      { scpat with desc = Econdexp(e) }, acc
   | Econdpat(e, p) ->
-     let e, acc = expression_it funs acc e in
-     let p, acc = pattern_it funs acc p in
+     let e, acc = funs.expression (*it *) funs acc e in
+     let p, acc = funs.pattern (*it *) funs acc p in
      { scpat with desc = Econdpat(e, p) }, acc
   | Econdon(scpat, e) ->
-     let scpat, acc = scondpat_it funs acc scpat in
-     let e, acc = expression_it funs acc e in
+     let scpat, acc = funs.scondpat (*it*) funs acc scpat in
+     let e, acc = funs.expression (*it*) funs acc e in
      { scpat with desc = Econdon(scpat, e) }, acc
 
 and vardec_it funs acc v = funs.vardec funs acc v
@@ -735,7 +735,7 @@ and present_handler_eq_it funs acc p_handler =
 
 and present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
   let p_env, acc = build_it funs.global_funs acc p_env in
-  let p_cond, acc = scondpat_it funs acc p_cond in
+  let p_cond, acc = funs.scondpat (*it*) funs acc p_cond in
   let p_body, acc = equation_it funs acc p_body in
   { p_b with p_cond; p_body; p_env }, acc
 
@@ -744,7 +744,7 @@ and present_handler_e_it funs acc p_handler =
 
 and present_handler_e funs acc ({ p_cond; p_body; p_env } as p_b) =
   let p_env, acc = build_it funs.global_funs acc p_env in
-  let p_cond, acc = scondpat_it funs acc p_cond in
+  let p_cond, acc = funs.scondpat (*it*) funs acc p_cond in
   let p_body, acc = expression_it funs acc p_body in
   { p_b with p_cond; p_body }, acc
 
@@ -771,7 +771,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
     | EQder { id; e; e_opt; handlers } ->
        let body acc ({ p_cond; p_body; p_env } as p_b) =
          let p_env, acc = build_it funs.global_funs acc p_env in
-         let p_cond, acc = scondpat_it funs acc p_cond in
+         let p_cond, acc = funs.scondpat (*it*) funs acc p_cond in
          let p_body, acc = expression_it funs acc p_body in
          { p_b with p_cond; p_body }, acc in
        let id, acc = der_ident_it funs.global_funs acc id in
@@ -879,7 +879,7 @@ and state funs acc ({ desc } as st) =
 
 and escape funs acc ({ e_cond; e_let; e_body; e_next_state; e_env } as esc) =
   let e_env, acc = build_it funs.global_funs acc e_env in
-  let e_cond, acc = scondpat_it funs acc e_cond in
+  let e_cond, acc = funs.scondpat (*it*) funs acc e_cond in
   let e_let, acc = slet_it funs acc e_let in
   let e_body, acc = block_it funs acc e_body in
   let e_next_state, acc = state funs acc e_next_state in
@@ -908,7 +908,7 @@ let letdecl_it funs acc (d_names, d_leq) =
   funs.letdecl funs acc (d_names, d_leq)
 
 and letdecl funs acc (d_names, d_leq) =
-  let d_leq, acc = leq_it funs acc d_leq in
+  let d_leq, acc = funs.leq_t (*_it*) funs acc d_leq in
   let d_names, acc =
     Util.mapfold
       (fun acc (name, id) ->
@@ -1083,9 +1083,9 @@ let defaults_stop =
     vardec = stop;
     for_vardec = stop;
     for_out_t = stop;
-    for_returns;
-    for_exp_t;
-    for_eq_t;
+    for_returns = stop;
+    for_exp_t = stop;
+    for_eq_t = stop;
     block = stop;
     result = stop;
     funexp = stop;
