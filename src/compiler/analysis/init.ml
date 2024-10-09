@@ -64,7 +64,6 @@ let rec funtype_list ti_arg_list ti_res =
   | ti :: ti_arg_list -> funtype ti (funtype_list ti_arg_list ti_res)
 let product l = Iproduct(l)
 let atom i = Iatom(i)
-let scheme ti = { typ_vars = []; typ_rel = []; typ_body = ti }
     
 (* basic operation on initialization values *)
 let rec irepr ({ i_desc } as i) =

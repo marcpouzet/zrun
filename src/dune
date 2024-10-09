@@ -81,6 +81,7 @@
     ptypes ; printing types
     pcaus ; printing causality types
     pinit ; printing initialization types
+    typinfo ; type annotation for Zelus terms
     global ; definition of entries in the global type environment
     modules ; global symbol table for typing
   )
@@ -93,7 +94,6 @@
   (public_name zrun.typing_lib)
   (wrapped false)
   (modules
-    typinfo ; type annotation for Zelus terms
     types ; type manipulation and unification between types
     interface ; interface
     kind ; kinds

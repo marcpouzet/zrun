@@ -42,25 +42,26 @@ let desc e = e.desc
 let make x = { desc = x; loc = no_location }
 
 let emake desc =
-  { e_desc = desc; e_loc = no_location; e_info = no_info }
+  { e_desc = desc; e_loc = no_location; e_info = Typinfo.no_info }
 let pmake desc =
-  { pat_desc = desc; pat_loc = no_location; pat_info = no_info }
+  { pat_desc = desc; pat_loc = no_location; pat_info = Typinfo.no_info }
 
 
 let global lname = Eglobal { lname = lname }
 let const c = emake (Econst c)
 let constr0 lname = emake (Econstr0 { lname })
 let constr1 lname arg_list = emake (Econstr1 { lname; arg_list })
-let evoid = const Evoid
-let efalse = const (Ebool(false))
-let etrue = const (Ebool(true))
+let evoid : Typinfo.exp = const Evoid
+let efalse : Typinfo.exp = const (Ebool(false))
+let etrue : Typinfo.exp = const (Ebool(true))
 let truepat = pmake (Econstpat(Ebool(true)))
 let falsepat = pmake (Econstpat(Ebool(false)))
 let wildpat = pmake (Ewildpat)
-let zero = emake (Econst(Efloat(0.0)))
+let zero : Typinfo.exp = emake (Econst(Efloat(0.0)))
 let one = emake (Econst(Efloat(1.0)))
 let minus_one = emake (Econst(Efloat(-1.0)))
-let infinity = emake (global (Modname(Initial.stdlib_name "infinity")))
+let infinity : Typinfo.exp =
+  emake (global (Modname(Initial.stdlib_name "infinity")))
 let tuplepat pat_list = pmake (Etuplepat(pat_list))
 let tuple e_list = emake (Etuple(e_list))
 let record l_list e_list =
@@ -73,7 +74,7 @@ let eqmake w desc =
     eq_safe = true; eq_index = -1 }
 
 let pat_make x =
-  { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = no_info }
+  { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = Typinfo.no_info }
 
 let eq_make p e =
   let w = { Defnames.empty with dv = Write.fv_pat S.empty p } in
@@ -110,14 +111,14 @@ let par eq_list = par false eq_list
 let init_vardec id var_is_last var_init var_default var_init_in_eq = 
   { var_name = id; var_is_last; var_init; var_default; var_clock = false;
     var_typeconstraint = None; var_loc = no_location; var_init_in_eq;
-    var_info = no_info }
+    var_info = Typinfo.no_info }
 
 let vardec id var_is_last var_init var_default =
   init_vardec id var_is_last var_init var_default false
 
 let id_vardec id = vardec id false None None
 
-let env_of s = S.fold (fun n acc -> Env.add n no_info acc) s Env.empty
+let env_of s = S.fold (fun n acc -> Env.add n Typinfo.no_ienv acc) s Env.empty
   
 let block_make vardec_list eq_list =
   let b_body =
@@ -278,7 +279,7 @@ let new_major env =
   env, major
 	 
 let major env =
-  let exception Return of ('info, 'ienv) Zelus.exp in
+  let exception Return of (Typinfo.typinfo, Typinfo.ienv) Zelus.exp in
   let find x t =
     match t with
     | { t_sort = Sort_mem { m_mkind = Some(Major) } } ->

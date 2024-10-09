@@ -71,7 +71,6 @@ let rec funtype_list tc_arg_list tc_res =
   | tc :: tc_arg_list ->
      funtype tc (funtype_list tc_arg_list tc_res)
 let atom c = Catom(c)
-let scheme tc = { typ_vars = []; typ_rel = []; typ_body = tc }
 
 (* path compression *)
 let rec crepr c =

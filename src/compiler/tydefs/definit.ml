@@ -61,6 +61,8 @@ let compare i1 i2 = Stdlib.compare i1.i_index i2.i_index
 
 let no_typ = Iproduct []
 
+let scheme ti = { typ_vars = []; typ_rel = []; typ_body = ti }
+
 (** An entry in the type environment *)
 type tentry =
     { t_tys: ti_scheme; (* the init type [ti] of x *)

@@ -55,6 +55,7 @@ and polarity = Punknown | Pplus | Pminus | Pplusminus
 let compare c1 c2 = Stdlib.compare c1.c_index c2.c_index 
     
 let no_typ = Cproduct []
+let scheme tc = { typ_vars = []; typ_rel = []; typ_body = tc }
 
 (* Environment for causality types *)
 type tentry = 

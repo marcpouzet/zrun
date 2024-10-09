@@ -19,13 +19,18 @@ type typinfo =
     t_caus: Defcaus.tc;
     t_init: Definit.ti }
 
+type ienv = Deftypes.typentry
+
+type exp = (typinfo, ienv) Zelus.exp
+
 let no_info =
   { t_typ = Deftypes.no_typ;
     t_caus = Defcaus.no_typ;
     t_init = Definit.no_typ }
 
 let no_ienv =
-  Deftypes.entry (Deftypes.Tfun(Tany)) Deftypes.Sort_val (Types.scheme Deftypes.no_typ)
+  Deftypes.entry (Deftypes.Tfun(Tany))
+    Deftypes.Sort_val (Deftypes.scheme Deftypes.no_typ)
 
 let set_type typinfo ty = { typinfo with t_typ = ty }
 let set_caus typinfo tc = { typinfo with t_caus = tc }

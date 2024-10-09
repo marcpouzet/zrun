@@ -68,171 +68,190 @@ exception Fallback
 
 let stop funs _ _ = raise Fallback
 
-type ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs =
+type ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs =
   {
     intro_ident :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> Ident.t -> Ident.t * 'a;
     build :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> 'info1 Ident.Env.t -> 'info2 Ident.Env.t * 'a;
     lident :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> Lident.t -> Lident.t * 'a;
     var_ident :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> Ident.t -> Ident.t * 'a;
     state_ident :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> Ident.t -> Ident.t * 'a;
     last_ident :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> last -> last * 'a;
     init_ident :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> Ident.t -> Ident.t * 'a;
     emit_ident :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> Ident.t -> Ident.t * 'a;
     der_ident :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> Ident.t -> Ident.t * 'a;
     typevar :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> name -> name * 'a;
     typeconstr :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> Lident.t -> Lident.t * 'a;
     type_expression :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> type_expression -> type_expression * 'a;
     typedecl :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> ((name * name list * type_decl) as 'ty) -> 'ty * 'a;
     constr_decl :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> constr_decl -> constr_decl * 'a;
     kind :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> kind -> kind * 'a;
     interface :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> interface -> interface * 'a;
     size_t :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a ->
       size_expression -> size_expression * 'a;
   }
 
-type ('a, 'info1, 'env1, 'info2, 'env2) it_funs =
+type ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs =
   {
     global_funs :
-      ('a, 'info1, 'env1, 'info2, 'env2) global_it_funs;
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs;
     pattern :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> 'info1 pattern -> 'info2 pattern * 'a;
     write_t :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> defnames -> defnames * 'a;
     leq_t :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) leq -> ('info2, 'env2) leq * 'a;
+      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) leq -> ('info2, 'ienv2) leq * 'a;
     slet_t :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) leq list -> ('info2, 'env2) leq list * 'a;
+      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) leq list -> ('info2, 'ienv2) leq list * 'a;
     equation :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) eq -> ('info2, 'env2) eq * 'a;
+      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) eq -> ('info2, 'ienv2) eq * 'a;
     scondpat :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) scondpat -> ('info2, 'env2) scondpat * 'a;
+      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) scondpat -> ('info2, 'ienv2) scondpat * 'a;
     expression :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) exp -> ('info2, 'env2) exp * 'a;
+      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) exp -> ('info2, 'ienv2) exp * 'a;
     vardec :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, ('info1, 'env1) exp) vardec ->
-      ('info2, ('info2, 'env2) exp) vardec * 'a;
+      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, ('info1, 'ienv1) exp) vardec ->
+      ('info2, ('info2, 'ienv2) exp) vardec * 'a;
     for_vardec :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
-      ('info1, 'env1) for_vardec -> ('info2, 'env2) for_vardec * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('info1, 'ienv1) for_vardec -> ('info2, 'ienv2) for_vardec * 'a;
     for_out_t :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
-      ('info1, 'env1) for_out -> ('info2, 'env2) for_out * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('info1, 'ienv1) for_out -> ('info2, 'ienv2) for_out * 'a;
     for_returns :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
-      ('info1, 'env1) for_returns -> ('info2, 'env2) for_returns * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('info1, 'ienv1) for_returns -> ('info2, 'ienv2) for_returns * 'a;
     for_exp_t :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
-      ('info1, 'env1) for_exp -> ('info2, 'env2) for_exp * 'a;
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('info1, 'ienv1) for_exp -> ('info2, 'ienv2) for_exp * 'a;
     for_eq_t :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
-      ('info1, 'env1) for_eq -> ('info2, 'env2) for_eq * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('info1, 'ienv1) for_eq -> ('info2, 'ienv2) for_eq * 'a;
     block :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
-      ('info1, 'env1, ('info1, 'env1) exp, ('info1, 'env1) eq) block ->
-      ('info2, 'env2, ('info2, 'env2) exp, ('info2, 'env2) eq) block * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('info1, 'ienv1, ('info1, 'ienv1) exp, ('info1, 'ienv1) eq) block ->
+      ('info2, 'ienv2, ('info2, 'ienv2) exp, ('info2, 'ienv2) eq) block * 'a;
     result :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) result -> ('info2, 'env2) result * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) result -> ('info2, 'ienv2) result * 'a;
     funexp :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) funexp -> ('info2, 'env2) funexp * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) funexp -> ('info2, 'ienv2) funexp * 'a;
     match_handler_eq :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'info1 pattern, ('info1, 'env1) eq) match_handler
-        -> ('info2, 'info2 pattern, ('info2, 'env2) eq) match_handler * 'a; 
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'info1 pattern, ('info1, 'ienv1) eq) match_handler
+        -> ('info2, 'info2 pattern, ('info2, 'ienv2) eq) match_handler * 'a; 
     match_handler_e :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a
-      -> ('info1, 'info1 pattern, ('info1, 'env1) exp) match_handler
-      -> ('info2, 'info2 pattern, ('info2, 'env2) exp) match_handler * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a
+      -> ('info1, 'info1 pattern, ('info1, 'ienv1) exp) match_handler
+      -> ('info2, 'info2 pattern, ('info2, 'ienv2) exp) match_handler * 'a;
     if_eq :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) eq * ('info1, 'env1) eq ->
-      (('info2, 'env2) eq * ('info2, 'env2) eq) * 'a; 
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) eq * ('info1, 'ienv1) eq ->
+      (('info2, 'ienv2) eq * ('info2, 'ienv2) eq) * 'a; 
     reset_eq :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) eq -> ('info2, 'env2) eq * 'a; 
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) eq -> ('info2, 'ienv2) eq * 'a; 
     reset_e :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ('info1, 'env1) exp -> ('info2, 'env2) exp * 'a; 
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('info1, 'ienv1) exp -> ('info2, 'ienv2) exp * 'a; 
     present_handler_eq :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a 
-      -> ('info1, ('info1, 'env1) scondpat, ('info1, 'env1) eq) present_handler 
-      -> ('info2, ('info2, 'env2) scondpat, ('info2, 'env2) eq) present_handler
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
+      -> ('info1, ('info1, 'ienv1) scondpat, ('info1, 'ienv1) eq) present_handler 
+      -> ('info2, ('info2, 'ienv2) scondpat, ('info2, 'ienv2) eq) present_handler
                                             * 'a; 
     present_handler_e :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a 
-      -> ('info1, ('info1, 'env1) scondpat, ('info1, 'env1) exp)
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
+      -> ('info1, ('info1, 'ienv1) scondpat, ('info1, 'ienv1) exp)
            present_handler 
-      -> ('info2, ('info2, 'env2) scondpat, ('info2, 'env2) exp)
+      -> ('info2, ('info2, 'ienv2) scondpat, ('info2, 'ienv2) exp)
            present_handler * 'a; 
     automaton_handler : 
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a 
-      -> ('info1, 'env1,
-          ('info1, 'env1, ('info1, 'env1) exp, ('info1, 'env1) eq) block)
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
+      -> ('info1, 'ienv1,
+          ('info1, 'ienv1, ('info1, 'ienv1) exp, ('info1, 'ienv1) eq) block)
            automaton_handler 
-      -> ('info2, 'env2,
-          ('info2, 'env2, ('info2, 'env2) exp, ('info2, 'env2) eq) block)
+      -> ('info2, 'ienv2,
+          ('info2, 'ienv2, ('info2, 'ienv2) exp, ('info2, 'ienv2) eq) block)
            automaton_handler * 'a;
     letdecl :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
-      'a -> ((name * Ident.t) list * ('info1, 'env1) leq)
-      -> ((name * Ident.t) list * ('info2, 'env2) leq) * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ((name * Ident.t) list * ('info1, 'ienv1) leq)
+      -> ((name * Ident.t) list * ('info2, 'ienv2) leq) * 'a;
     implementation :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
-      ('info1, 'env1) implementation -> ('info2, 'env2) implementation * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('info1, 'ienv1) implementation -> ('info2, 'ienv2) implementation * 'a;
     program :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a ->
-      ('info1, 'env1) program -> ('info2, 'env2) program * 'a;
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('info1, 'ienv1) program -> ('info2, 'ienv2) program * 'a;
     get_index :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      'info1 'ienv1 'info2 'ienv2.
+        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> Ident.num -> Ident.num * 'a;
     set_index :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> Ident.num -> Ident.num * 'a;
     open_t :
-      ('a, 'info1, 'env1, 'info2, 'env2) it_funs -> 'a -> name -> name * 'a;
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a -> name -> name * 'a;
   }
 
 (* introduce a fresh name *)
