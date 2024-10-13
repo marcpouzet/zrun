@@ -75,7 +75,7 @@ type ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs =
       'a -> Ident.t -> Ident.t * 'a;
     build :
       ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
-      'a -> 'info1 Ident.Env.t -> 'info2 Ident.Env.t * 'a;
+      'a -> 'ienv1 Ident.Env.t -> 'ienv2 Ident.Env.t * 'a;
     lident :
       ('a, 'info1, 'ienv1, 'info2, 'ienv2) global_it_funs ->
       'a -> Lident.t -> Lident.t * 'a;
@@ -135,95 +135,82 @@ type ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs =
       ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> defnames -> defnames * 'a;
     leq_t :
-      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) leq -> ('info2, 'ienv2) leq * 'a;
     slet_t :
-      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) leq list -> ('info2, 'ienv2) leq list * 'a;
     equation :
-      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) eq -> ('info2, 'ienv2) eq * 'a;
     scondpat :
-      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) scondpat -> ('info2, 'ienv2) scondpat * 'a;
     expression :
-      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) exp -> ('info2, 'ienv2) exp * 'a;
     vardec :
-      'info1 'ienv1 'info2 'ienv2. ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, ('info1, 'ienv1) exp) vardec ->
       ('info2, ('info2, 'ienv2) exp) vardec * 'a;
     for_vardec :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
       ('info1, 'ienv1) for_vardec -> ('info2, 'ienv2) for_vardec * 'a;
     for_out_t :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
       ('info1, 'ienv1) for_out -> ('info2, 'ienv2) for_out * 'a;
     for_returns :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
       ('info1, 'ienv1) for_returns -> ('info2, 'ienv2) for_returns * 'a;
     for_exp_t :
       ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
       ('info1, 'ienv1) for_exp -> ('info2, 'ienv2) for_exp * 'a;
     for_eq_t :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
       ('info1, 'ienv1) for_eq -> ('info2, 'ienv2) for_eq * 'a;
     block :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
       ('info1, 'ienv1, ('info1, 'ienv1) exp, ('info1, 'ienv1) eq) block ->
       ('info2, 'ienv2, ('info2, 'ienv2) exp, ('info2, 'ienv2) eq) block * 'a;
     result :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) result -> ('info2, 'ienv2) result * 'a;
     funexp :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) funexp -> ('info2, 'ienv2) funexp * 'a;
     match_handler_eq :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
-      'a -> ('info1, 'info1 pattern, ('info1, 'ienv1) eq) match_handler
-        -> ('info2, 'info2 pattern, ('info2, 'ienv2) eq) match_handler * 'a; 
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      'a -> ('ienv1, 'info1 pattern, ('info1, 'ienv1) eq) match_handler
+      -> ('ienv2, 'info2 pattern, ('info2, 'ienv2) eq) match_handler * 'a; 
     match_handler_e :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a
-      -> ('info1, 'info1 pattern, ('info1, 'ienv1) exp) match_handler
-      -> ('info2, 'info2 pattern, ('info2, 'ienv2) exp) match_handler * 'a;
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a
+      -> ('ienv1, 'info1 pattern, ('info1, 'ienv1) exp) match_handler
+      -> ('ienv2, 'info2 pattern, ('info2, 'ienv2) exp) match_handler * 'a;
     if_eq :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) eq * ('info1, 'ienv1) eq ->
       (('info2, 'ienv2) eq * ('info2, 'ienv2) eq) * 'a; 
     reset_eq :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) eq -> ('info2, 'ienv2) eq * 'a; 
     reset_e :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ('info1, 'ienv1) exp -> ('info2, 'ienv2) exp * 'a; 
     present_handler_eq :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
-      -> ('ienv1, ('info1, 'ienv1) scondpat, ('info1, 'ienv1) eq) present_handler 
-      -> ('ienv2, ('info2, 'ienv2) scondpat, ('info2, 'ienv2) eq) present_handler
-                                            * 'a; 
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
+      -> ('ienv1, ('info1, 'ienv1) scondpat,
+          ('info1, 'ienv1) eq) present_handler 
+      -> ('ienv2, ('info2, 'ienv2) scondpat,
+          ('info2, 'ienv2) eq) present_handler
+         * 'a; 
     present_handler_e :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
       -> ('ienv1, ('info1, 'ienv1) scondpat, ('info1, 'ienv1) exp)
            present_handler 
       -> ('ienv2, ('info2, 'ienv2) scondpat, ('info2, 'ienv2) exp)
            present_handler * 'a; 
     automaton_handler : 
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a 
       -> ('info1, 'ienv1,
           ('info1, 'ienv1, ('info1, 'ienv1) exp, ('info1, 'ienv1) eq) block)
            automaton_handler 
@@ -231,21 +218,17 @@ type ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs =
           ('info2, 'ienv2, ('info2, 'ienv2) exp, ('info2, 'ienv2) eq) block)
            automaton_handler * 'a;
     letdecl :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> ((name * Ident.t) list * ('info1, 'ienv1) leq)
       -> ((name * Ident.t) list * ('info2, 'ienv2) leq) * 'a;
     implementation :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
       ('info1, 'ienv1) implementation -> ('info2, 'ienv2) implementation * 'a;
     program :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs -> 'a ->
       ('info1, 'ienv1) program -> ('info2, 'ienv2) program * 'a;
     get_index :
-      'info1 'ienv1 'info2 'ienv2.
-        ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
+      ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
       'a -> Ident.num -> Ident.num * 'a;
     set_index :
       ('a, 'info1, 'ienv1, 'info2, 'ienv2) it_funs ->
@@ -477,13 +460,13 @@ and for_eq_t funs acc { for_out; for_block; for_out_env } =
 
 and slet_it funs acc leq_list = funs.slet_t funs acc leq_list
 
-and slet_t funs acc leq_list = Util.mapfold (funs.leq_t (* _it *) funs) acc leq_list
+and slet_t funs acc leq_list = Util.mapfold (leq_it funs) acc leq_list
 
 and leq_it funs acc leq = funs.leq_t funs acc leq
 
 and leq_t funs acc ({ l_eq; l_env } as leq) =
   let l_env, acc = build_it funs.global_funs acc l_env in
-  let l_eq, acc = funs.equation (* _it *) funs acc l_eq in
+  let l_eq, acc = equation_it funs acc l_eq in
   { leq with l_eq; l_env }, acc
 
 and scondpat_it funs acc scpat =
@@ -501,15 +484,15 @@ and scondpat funs acc ({ desc = desc } as scpat) =
      let scpat2, acc = scondpat_it funs acc scpat2 in
      { scpat with desc = Econdor(scpat1, scpat2) }, acc
   | Econdexp(e) ->
-     let e, acc = funs.expression (*it *) funs acc e in
+     let e, acc = expression_it funs acc e in
      { scpat with desc = Econdexp(e) }, acc
   | Econdpat(e, p) ->
-     let e, acc = funs.expression (*it *) funs acc e in
-     let p, acc = funs.pattern (*it *) funs acc p in
+     let e, acc = expression_it funs acc e in
+     let p, acc = pattern_it funs acc p in
      { scpat with desc = Econdpat(e, p) }, acc
   | Econdon(scpat, e) ->
-     let scpat, acc = funs.scondpat (*it*) funs acc scpat in
-     let e, acc = funs.expression (*it*) funs acc e in
+     let scpat, acc = scondpat_it funs acc scpat in
+     let e, acc = expression_it funs acc e in
      { scpat with desc = Econdon(scpat, e) }, acc
 
 and vardec_it funs acc v = funs.vardec funs acc v
@@ -588,7 +571,7 @@ and funexp funs acc ({ f_args; f_body; f_env } as f) =
   let f_body, acc = result_it funs acc f_body in
   { f with f_args; f_body; f_env }, acc
 
-(** Expressions **)
+(* Expressions *)
 and expression_it funs acc e =
   try funs.expression funs acc e
   with Fallback -> expression funs acc e
@@ -735,7 +718,7 @@ and present_handler_eq_it funs acc p_handler =
 
 and present_handler_eq funs acc ({ p_cond; p_body; p_env } as p_b) =
   let p_env, acc = build_it funs.global_funs acc p_env in
-  let p_cond, acc = funs.scondpat (*it*) funs acc p_cond in
+  let p_cond, acc = scondpat_it funs acc p_cond in
   let p_body, acc = equation_it funs acc p_body in
   { p_b with p_cond; p_body; p_env }, acc
 
@@ -744,13 +727,13 @@ and present_handler_e_it funs acc p_handler =
 
 and present_handler_e funs acc ({ p_cond; p_body; p_env } as p_b) =
   let p_env, acc = build_it funs.global_funs acc p_env in
-  let p_cond, acc = funs.scondpat (*it*) funs acc p_cond in
+  let p_cond, acc = scondpat_it funs acc p_cond in
   let p_body, acc = expression_it funs acc p_body in
   { p_b with p_cond; p_body }, acc
 
 (* Equations *)
 and equation_it funs acc eq =
-  try funs.equation funs acc eq
+    try funs.equation funs acc eq
   with Fallback -> equation funs acc eq
 
 and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) = 
@@ -771,7 +754,7 @@ and equation funs acc ({ eq_desc; eq_write; eq_loc } as eq) =
     | EQder { id; e; e_opt; handlers } ->
        let body acc ({ p_cond; p_body; p_env } as p_b) =
          let p_env, acc = build_it funs.global_funs acc p_env in
-         let p_cond, acc = funs.scondpat (*it*) funs acc p_cond in
+         let p_cond, acc = scondpat_it funs acc p_cond in
          let p_body, acc = expression_it funs acc p_body in
          { p_b with p_cond; p_body }, acc in
        let id, acc = der_ident_it funs.global_funs acc id in
@@ -879,7 +862,7 @@ and state funs acc ({ desc } as st) =
 
 and escape funs acc ({ e_cond; e_let; e_body; e_next_state; e_env } as esc) =
   let e_env, acc = build_it funs.global_funs acc e_env in
-  let e_cond, acc = funs.scondpat (*it*) funs acc e_cond in
+  let e_cond, acc = scondpat_it funs acc e_cond in
   let e_let, acc = slet_it funs acc e_let in
   let e_body, acc = block_it funs acc e_body in
   let e_next_state, acc = state funs acc e_next_state in
@@ -908,7 +891,7 @@ let letdecl_it funs acc (d_names, d_leq) =
   funs.letdecl funs acc (d_names, d_leq)
 
 and letdecl funs acc (d_names, d_leq) =
-  let d_leq, acc = funs.leq_t (*_it*) funs acc d_leq in
+  let d_leq, acc = leq_it funs acc d_leq in
   let d_names, acc =
     Util.mapfold
       (fun acc (name, id) ->
