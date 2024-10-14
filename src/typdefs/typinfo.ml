@@ -14,14 +14,16 @@
 
 (* type annotations for terms *)
 
-type typinfo =
+type info =
   { t_typ: Deftypes.typ;
     t_caus: Defcaus.tc;
     t_init: Definit.ti }
 
 type ienv = Deftypes.typentry
 
-type exp = (typinfo, ienv) Zelus.exp
+type pattern = info Zelus.pattern
+type exp = (info, ienv) Zelus.exp
+type eq = (info, ienv) Zelus.eq
 
 let no_info =
   { t_typ = Deftypes.no_typ;

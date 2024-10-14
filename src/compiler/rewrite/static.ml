@@ -33,10 +33,10 @@ type ('info, 'ienv, 'value) env =
     e_values: 'value Ident.Env.t;  (* environment of static values *)
     e_gvalues: 'value Genv.genv;
     (* global environment of static values *)
-    e_defs: ('info, 'ienv) implementation list;
+    e_defs: ('info, 'ienv) Zelus.implementation list;
     (* global definitions of static values introduced during the reduction *)
     (* the head of the list is the last added value *)
-    e_exp: ('info, 'ienv) exp Ident.Env.t;
+    e_exp: ('info, 'ienv) Zelus.exp Ident.Env.t;
     (* the expression associated to [x] *)
     (* when [x] is a static value *)
   }
@@ -48,7 +48,7 @@ type ('info, 'ienv, 'value) env =
 (* add global definitions in the list of global declarations of the module *)
 let leq id e = 
   { l_rec = false; l_kind = Kstatic; l_eq = Aux.id_eq id e; 
-    l_loc = Location.no_location; l_env = Env.singleton id no_info }
+    l_loc = Location.no_location; l_env = Env.singleton id Typinfo.no_ienv }
 let impl name id e = 
     { desc = Eletdecl { d_names = [name, id]; d_leq = leq id e };
       loc = e.e_loc }

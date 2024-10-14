@@ -31,8 +31,8 @@ let error { kind; loc } =
 let catch v = match v with | Ok(v) -> v | Error(v) -> error v
 
 (* the type of the accumulator *)
-type acc =
-  { genv : Value.pvalue Genv.genv;
+type 'a acc =
+  { genv : 'a Genv.genv;
     (* the global environment *)
     renaming : Ident.t Env.t;
     (* name to name environment *)

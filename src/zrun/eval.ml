@@ -66,6 +66,7 @@ let do_step comment output step input =
   output o;
   o
 
+
 (* Evaluate all the definition in a file, store values *)
 let main modname filename n_steps is_all l_names =
   let open Genv in
@@ -87,8 +88,10 @@ let main modname filename n_steps is_all l_names =
   (* Add Stdlib *)
   let genv0 = Genv.add_module genv0 (Primitives.stdlib_env ()) in
   
+  let module Scoping = Scoping.Make(Noinfo) in
   (* Associate unique index to variables *)
   let p = do_step "Scoping done" Debug.print_program Scoping.program p in
+  let module Write = Write.Make(Noinfo) in
   (* Write defined variables for equations *)
   let p = do_step "Write done" Debug.print_program Write.program p in
 

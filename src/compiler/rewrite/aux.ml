@@ -23,6 +23,8 @@ open Lident
 open Initial
 open Deftypes
 
+module Write =  Write.Make(Typinfo)
+
 (* Constant expressions - simple and sufficient condition for [e] to be *)
 (* constant *)
 let rec const { e_desc } =
@@ -41,9 +43,9 @@ let defnames eq_list =
 let desc e = e.desc
 let make x = { desc = x; loc = no_location }
 
-let emake desc =
+let emake desc : Typinfo.exp =
   { e_desc = desc; e_loc = no_location; e_info = Typinfo.no_info }
-let pmake desc =
+let pmake desc : Typinfo.pattern =
   { pat_desc = desc; pat_loc = no_location; pat_info = Typinfo.no_info }
 
 
@@ -76,7 +78,7 @@ let eqmake w desc =
 let pat_make x =
   { pat_desc = Evarpat(x); pat_loc = no_location; pat_info = Typinfo.no_info }
 
-let eq_make p e =
+let eq_make p e : Typinfo.eq =
   let w = { Defnames.empty with dv = Write.fv_pat S.empty p } in
   eqmake w (EQeq(p, e))
 
@@ -87,7 +89,7 @@ let id_eq id e =
 let wildpat_eq e =
   eqmake Defnames.empty (EQeq(wildpat, e))
 
-let eq_init id e =
+let eq_init id e : Typinfo.eq =
   let eq = eqmake (Defnames.singleton id) (EQinit(id, e)) in
   let eq, _ = Write.equation eq in eq
 
@@ -279,7 +281,7 @@ let new_major env =
   env, major
 	 
 let major env =
-  let exception Return of (Typinfo.typinfo, Typinfo.ienv) Zelus.exp in
+  let exception Return of (Typinfo.info, Typinfo.ienv) Zelus.exp in
   let find x t =
     match t with
     | { t_sort = Sort_mem { m_mkind = Some(Major) } } ->

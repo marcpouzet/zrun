@@ -54,7 +54,7 @@ let add_last_copy_eq l_renaming =
 
 (* add copy names in [l_env] *)
 let add_last_names_in_env l_env l_renaming =
-  Env.fold (fun x lx acc -> Env.add lx Misc.no_info acc) l_renaming l_env
+  Env.fold (fun x lx acc -> Env.add lx Typinfo.no_ienv acc) l_renaming l_env
 
 (* Make an equation [let lx1 = last* x1 and ... lx_n = last* xn in eq] *)
 let eq_let_lx_lastx l_renaming eq =

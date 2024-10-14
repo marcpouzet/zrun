@@ -110,7 +110,7 @@ module LANG =
         | _ -> assert false
 
 
-    type pattern_ast = Typinfo.typinfo Zelus.pattern
+    type pattern_ast = Typinfo.info Zelus.pattern
 
     (* Translation to tagged patterns is pretty easy, we just have to look for
        each possible constructors for constructed patterns, and sort fields for

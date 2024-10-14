@@ -106,10 +106,11 @@ let build_env l_env env =
     match t_sort with
     | Sort_mem { m_init } ->
        let t_last = match m_init with | Eq | Decl _ -> izero | No -> ione in
-       let t_tys = Init.scheme (Init.skeleton_on_i (Init.new_var ()) typ_body) in
+       let t_tys =
+         Definit.scheme (Init.skeleton_on_i (Init.new_var ()) typ_body) in
        { t_last; t_tys }
     | _ ->
-       let t_tys = Init.scheme (Init.skeleton typ_body) in
+       let t_tys = Definit.scheme (Init.skeleton typ_body) in
        { t_last = ione; t_tys } in
   Env.fold (fun n tentry acc -> Env.add n (entry n tentry) acc) l_env env
 
@@ -122,7 +123,7 @@ let build_env l_env env =
 let last_env shared defnames env =
   let add n acc =
     let { t_tys = { typ_body } } = Env.find n env in
-    Env.add n { t_tys = Init.scheme (Init.fresh_on_i izero typ_body);
+    Env.add n { t_tys = Definit.scheme (Init.fresh_on_i izero typ_body);
                 t_last = izero } acc in
   let names = Defnames.cur_names Ident.S.empty defnames in
   let env_defnames =
@@ -133,7 +134,7 @@ let last_env shared defnames env =
 let add_last_to_env env last_names =
   let add n acc =
     let { t_tys = { typ_body } } = Env.find n env in
-    Env.add n { t_tys = Init.scheme (Init.fresh_on_i izero typ_body);
+    Env.add n { t_tys = Definit.scheme (Init.fresh_on_i izero typ_body);
                 t_last = izero } acc in
   let env_last_names =
     Ident.S.fold add last_names Env.empty in

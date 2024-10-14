@@ -157,12 +157,14 @@ let main modname filename n_steps =
   (* defines the initial global environment for values *)
   let genv0 = Genv.initialize modname [] in
   (* Add Stdlib *)
-  let genv0 = Genv.add_module genv0 Primitives.stdlib_env in
+  let genv0 = Genv.add_module genv0 (Primitives.stdlib_env ()) in
   
   (* Associate unique index to variables *)
+  let module Scoping = Scoping.Make(Typinfo) in
   let p = do_step "Scoping done. See below:" Debug.print_program
             Scoping.program p in
   (* Write defined variables for equations *)
+  let module Write = Write.Make(Typinfo) in
   let p = do_step "Write done. See below: "
       Debug.print_program Write.program p in
   (* Source-to-source transformations start here *)

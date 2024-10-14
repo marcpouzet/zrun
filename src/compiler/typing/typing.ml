@@ -33,6 +33,8 @@ open Deftypes
 open Types
 open Typerrors
 
+module Write = Write.Make(Typinfo)
+
 (* environments are extended with a path of kinds. *)
 (* entry [k1 on ... ) on kn x: t] means that x was introduced *)
 (* in a block with kind [k1] and used in a nested block with *)

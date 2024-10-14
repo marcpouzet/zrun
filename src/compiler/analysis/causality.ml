@@ -172,7 +172,7 @@ let pattern env pat =
 let build_env l_env env =
   let entry n { t_sort; t_tys = { typ_body } } acc =
     let t_tys =
-      Causal.scheme (Causal.annotate (Cname n) (Causal.skeleton typ_body)) in
+      Defcaus.scheme (Causal.annotate (Cname n) (Causal.skeleton typ_body)) in
     let last_tc_opt =
       match t_sort with
       | Sort_mem _ ->
@@ -185,7 +185,7 @@ let build_env l_env env =
 let build_env_on_c c l_env env =
   let entry n { t_tys = { typ_body }; t_sort } acc =
     let t_tys =
-      Causal.scheme
+      Defcaus.scheme
         (Causal.annotate (Cname n) (Causal.skeleton_on_c c typ_body)) in
     let last_tc_opt =
       match t_sort with
@@ -233,7 +233,7 @@ let last_env shared defnames env =
     let tc, ltc_opt =
       match ltc_opt with
       | None -> Causal.fresh typ_body, None | Some(ltc) -> ltc, Some(ltc) in
-    Env.add x { t_tys = Causal.scheme tc; t_last_typ = ltc_opt } acc in
+    Env.add x { t_tys = Defcaus.scheme tc; t_last_typ = ltc_opt } acc in
   let names = Defnames.cur_names Ident.S.empty defnames in
   let env_defnames =
     Ident.S.fold add (Ident.S.diff shared names) Env.empty in

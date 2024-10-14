@@ -68,6 +68,7 @@ let compile_interface parse modname filename suffix =
     (* Parsing of the file *)
     let l = parse source_name in
     (* Scoping *)
+    let module Scoping = Scoping.Make(Typinfo) in
     let l = Scoping.interface_list l in
     Interface.interface_list info_ff l;
     (* Write the symbol table into the interface file *)
@@ -126,9 +127,11 @@ let compile modname filename =
 
   try
     (* Associate unique index to variables *)
+    let module Scoping = Scoping.Make(Typinfo) in
     let p = do_step "Scoping done. See below:" Debug.print_program
               Scoping.program p in
     (* Write defined variables for equations *)
+    let module Write = Write.Make(Typinfo) in
     let p = do_step "Write done. See below: "
               Debug.print_program Write.program p in
     if !parseonly then raise Stop;
