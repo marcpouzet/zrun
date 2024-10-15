@@ -1,4 +1,6 @@
+## Build zrun, compiler and libraries
 all: zrun.exe zwrite.exe zeluc.exe
+	dune build lib
 
 zrun.exe:
 	(cd src; dune build -- zrun.exe)
@@ -26,10 +28,11 @@ clean:
 	(cd tests/bad/; rm -f *.zlo)
 
 wc:
-	(cd src; wc global/*.ml \
+	(cd src;
+	wc global/*.ml \
 	parsing/parsetree.ml parsing/*.mll \
 	zrun/*.ml \
-	compiler/tydefs/*.ml \
+	tydefs/*.ml \
 	compiler/rewrite/*.ml \
 	compiler/typing/*.ml \
 	compiler/analysis/*.ml \

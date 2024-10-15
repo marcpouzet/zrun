@@ -2,6 +2,7 @@ all:
 	dune build -- zrun.exe
 	dune build -- zwrite.exe
 	dune build -- zeluc.exe
+	dune build lib
 
 debug:
 	dune build --debug-backtraces --debug-dependency-path -- zrun.bc
