@@ -1,6 +1,5 @@
 ## Build zrun, compiler and libraries
 all: zrun.exe zwrite.exe zeluc.exe
-	dune build lib
 
 zrun.exe:
 	(cd src; dune build -- zrun.exe)

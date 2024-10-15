@@ -1,1 +1,2 @@
-let f x = x + 1
+let f x =
+  let m = x + 1 in m + m
