@@ -105,8 +105,8 @@ let do_step comment output step input =
   output o;
   o
 
-let do_optional_step is_step comment output step p = 
-  if is_step then do_step comment output step p else p
+let do_optional_step no_step comment output step input = 
+  if no_step then input else do_step comment output step input
 
 (* The main function for compiling a program *)
 let compile modname filename =
@@ -137,12 +137,14 @@ let compile modname filename =
     if !parseonly then raise Stop;
     let p = do_step "Typing done. See below:" Debug.print_program
               (Typing.program info_ff true) p in
-    let p = do_step "Causality done. See below:" Debug.print_program
-              (Causality.program info_ff) p in
-    let _ = do_step "Initialization done. See below:" Debug.print_program
-              (Initialization.program info_ff) p in
+    let p = do_optional_step !Misc.no_causality "Causality done. See below:"
+              Debug.print_program (Causality.program info_ff) p in
+    let _ = do_optional_step
+              !Misc.no_initialization "Initialization done. See below:"
+              Debug.print_program (Initialization.program info_ff) p in
     (* Write the symbol table into the interface file *)
     let itc = open_out_bin obj_interf_name in
+    if !Misc.typeonly then raise Stop;
     apply_with_close_out Modules.write itc
   with
   | Stop -> ()

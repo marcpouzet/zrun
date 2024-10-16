@@ -285,7 +285,6 @@ let type_of_vardec_list n_list =
   | [] -> Initial.typ_unit
   | [ty] -> ty
   | _ -> Types.product ty_list
-
     
 (* make a function type from a function definition. *)
 (* remove useless dependences:
@@ -358,6 +357,7 @@ let intro_sort expected_k =
   | Tfun _ -> Sort_val
   | Tnode _ -> Sort_mem Deftypes.empty_mem
     
+(* introduce a typing environment from a set of names *)
 let env_of_equation expected_k { eq_write } =
   let n_set = Defnames.names S.empty eq_write in
   let env =
@@ -381,7 +381,7 @@ let pateq h { desc; loc } ty_e =
   | _ -> error loc (Earity_clash(n, List.length ty_e_list))
        
 (* Typing a size expression *)
-let rec size h { desc; loc } =
+let rec size h expected_k { desc; loc } =
   match desc with
   | Size_int(i) -> Types.size_int i
   | Size_var(x) ->
@@ -389,16 +389,16 @@ let rec size h { desc; loc } =
       let t_typ = Types.instance t_tys in
       unify loc Initial.typ_int t_typ;
       let actual_k = kind_of_path loc t_path in
-      less_than loc actual_k (Tfun(Tconst));
+      less_than loc actual_k expected_k;
       Types.size_var x
   | Size_op(op, s1, s2) ->
      let op = match op with
        | Size_plus -> Splus | Size_minus -> Sminus | Size_mult -> Smult in
-     let s1 = size h s1 in
-     let s2 = size h s2 in
+     let s1 = size h expected_k s1 in
+     let s2 = size h expected_k s2 in
      Types.size_op op s1 s2
   | Size_frac { num; denom } ->
-      let num = size h num in
+      let num = size h expected_k num in
       Types.size_frac num denom
 
 (* Convert an expression into a size expression *)
@@ -1116,20 +1116,20 @@ and block_eq expected_k h ({ b_vars; b_body = { eq_write } as b_body } as b) =
   b.b_write <- defined_names;
   h0, h, defined_names, Kind.sup actual_k_h0 actual_k_body
 
-and leq expected_k h ({ l_rec; l_kind; l_eq; l_loc } as l) =
+and leq expected_k h ({ l_kind; l_eq; l_loc } as l) =
   (* in a static or constant context all introduced names inherits it *)
   let expected_k = Kind.inherits expected_k (Interface.vkindtype l_kind) in
   Misc.push_binding_level ();
   let h0 = env_of_equation expected_k l_eq in
-  let h = if l_rec then Env.append h0 h else h in
-  let _, actual_k = equation expected_k h l_eq in
+  (* because names are unique, typing of [l_eq] is done with [h+h0] *)
+  let new_h = Env.append h0 h in
+  let _, actual_k = equation expected_k new_h l_eq in
   Misc.pop_binding_level ();
   let is_gen = not (expansive l_eq) in
   let h0 = Types.gen_decl is_gen h0 in
   (* check that the type for every entry has the right kind *)
   check_type_is_in_kind l_loc h0 (Kind.vkind l_kind);
   l.l_env <- h0;
-  let new_h = Env.append h0 h in
   new_h, actual_k
 
 and leqs expected_k h l =

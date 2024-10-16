@@ -1,2 +1,4 @@
-let f x =
-  let m = x + 1 in m + m
+let const node f g x =
+  let m = x in run g (m + 1), m
+
+let g = fun () -> f (fun x -> x + 1) 1

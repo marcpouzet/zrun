@@ -63,7 +63,7 @@ and doc_inline_all = "\t Inline all function calls"
 and doc_dzero = "\t Turn on discrete zero-crossing detection"
 and doc_nocausality = "\t (undocumented)"
 and doc_no_deadcode = "\t (undocumented)"
-and doc_noinitialisation = "\t (undocumented)"
+and doc_no_initialization = "\t (undocumented)"
 and doc_nosimplify = "\t (undocumented)"
 and doc_noreduce = "\t (undocumented)"
 and doc_lmm = "<n>\t Translate the node into Lustre--"
@@ -111,6 +111,7 @@ let main () =
           "-sampling", Arg.Float set_sampling_period, doc_sampling;
           "-gtk2", Arg.Unit set_gtk, doc_use_gtk;
           "-nocausality", Arg.Set no_causality, doc_nocausality;
+          "-noinit", Arg.Set no_initialization, doc_no_initialization;
           "-inline", Arg.Int set_inlining_level, doc_inlining_level;
           "-inlineall", Arg.Set inline_all, doc_inline_all;
           "-zsign", Arg.Set zsign, doc_zsign;
