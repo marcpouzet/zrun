@@ -704,6 +704,7 @@ let rec vardec_list expected_k h v_list =
 
 (* [expression expected_k h e] returns the type for [e] and [actual kind] *)
 and expression expected_k h ({ e_desc; e_loc } as e) =
+  let l = Env.to_list h in
   let ty, actual_k = match e_desc with
     | Econst(i) -> immediate i, Tfun(Tconst)
     | Evar(x) ->
@@ -801,12 +802,14 @@ and expression expected_k h ({ e_desc; e_loc } as e) =
     | Eassert(e_body) ->
        let actual_k = expect expected_k h e Initial.typ_bool in
        Initial.typ_unit, actual_k
-    | Eforloop _ ->
-       Misc.not_yet_implemented "typing for for-loops"
+    | Elocal(b, e_body) ->
+       let _, new_h, _, actual_k = block_eq expected_k h b in
+       let ty, actual_k_e = expression expected_k h e_body in
+       ty, Kind.sup actual_k actual_k_e
     | Esizeapp _ ->
-       Misc.not_yet_implemented "typing for size functions"
-    | Elocal _ ->
-       Misc.not_yet_implemented "typing for local equation definitions" in
+     Misc.not_yet_implemented "typing for size functions"
+    | Eforloop _ ->
+       Misc.not_yet_implemented "typing for for-loops" in
   e.e_info <- Typinfo.set_type e.e_info ty;
   ty, actual_k
 
@@ -907,8 +910,8 @@ and funexp expected_k h ({ f_vkind; f_kind; f_args; f_body; f_loc } as body) =
   let expected_body_k = Interface.kindtype f_kind in
   let expected_args_v = Interface.vkindtype f_vkind in
   let actual_k, expected_body_k =
-    kind_of_funexp f_loc expected_k expected_args_v expected_body_k in
-  let h = Env.on h expected_body_k in
+   kind_of_funexp f_loc expected_k expected_args_v expected_body_k in
+  let h = Env.on h expected_k in
   let name_ty_arg_list, (h, h_args) = arg_list expected_body_k h f_args in
   body.f_env <- h_args;
   (* type the body *)
@@ -1223,14 +1226,14 @@ let implementation ff is_first { desc; loc } =
        (* update the global environment *)
        if is_first then
          Env.iter
-           (fun name { t_tys } ->
+           (fun name { t_tys; t_path } ->
              Interface.add_type_of_value ff loc
-               (Ident.source name) false t_tys) new_h
+               (Ident.source name) (Kind.is_const t_path) t_tys) new_h
        else
          Env.iter
-           (fun name { t_tys } ->
+           (fun name { t_tys; t_path } ->
              Interface.update_type_of_value ff loc
-               (Ident.source name) false t_tys) new_h
+               (Ident.source name) (Kind.is_const t_path) t_tys) new_h
     | Etypedecl { name; ty_params; ty_decl } ->
        if is_first then
          Interface.typedecl ff loc name ty_params ty_decl

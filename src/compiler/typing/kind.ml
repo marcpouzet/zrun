@@ -31,6 +31,12 @@ open Typerrors
  *- -C->                 -*|C ->                      stateful (continuous)
  *)
 
+let rec is_const path =
+  match path with
+  | Pkind(Tfun(Tconst)) -> true
+  | Pon(path, _) -> is_const path
+  | _ -> false
+
 let vkind_of_kind k = match k with | Tfun(v) -> v | Tnode _ -> Tany
 
 (* kind from const or static *)

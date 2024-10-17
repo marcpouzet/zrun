@@ -1,4 +1,6 @@
-let const node f g x =
-  let m = x in run g (m + 1), m
+let f = 1
 
-let g = fun () -> f (fun x -> x + 1) 1
+let g =
+  let y = 1 in
+  let const m = fun x -> y + 1 in
+  m, m
