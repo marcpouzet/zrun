@@ -1,6 +1,1 @@
-let f = 1
-
-let g =
-  let y = 1 in
-  let const m = fun x -> y + 1 in
-  m, m
+let hybrid g f () = run f ()

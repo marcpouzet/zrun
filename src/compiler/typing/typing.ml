@@ -835,9 +835,10 @@ and operator expected_k h loc op e_list =
         let ty = new_var () in
         Tnode(Tdiscrete), [ty; ty], ty
     | Erun _ ->
-       let ty1 = new_var () in
-       let ty2 = new_var () in
-       Tnode(Tdiscrete), [ty1], ty2
+       let ty_arg = new_var () in
+       let ty_res = new_var () in
+       let ty_f = Types.arrowtype expected_k None ty_arg ty_res in
+       expected_k, [ty_f; ty_arg], ty_res
     | Eseq ->
        let ty = new_var () in
        Tfun(Tconst), [Initial.typ_unit; ty], ty
