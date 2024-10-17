@@ -624,6 +624,7 @@ let rec automaton_handlers
       body expected_k h s_body in
     (* add the list of defined_names to the current state *)
     let source_state = Total.Automaton.statepatname statepat in
+    let l = S.to_list (Defnames.names S.empty defined_names) in
     Total.Automaton.add_state source_state defined_names t;
     let actual_k_list =
       List.map (escape source_state new_h expected_k) s_trans in

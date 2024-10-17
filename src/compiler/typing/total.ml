@@ -91,6 +91,10 @@ let merge loc h defnames_list =
     merge_defnames_list defnames_list in
   (* every partial variable must be defined as a memory or declared with *)
   (* a default value *)
+  let l1 = S.to_list dv_total in
+  let l2 = S.to_list dv_partial in
+  let l3 = S.to_list di_total in
+  let l4 = S.to_list di_partial in
   all_last loc h (S.diff dv_partial di_total);
   (* for initialized values, all branches must give a definition *)
   if not (S.is_empty di_partial) 
@@ -189,6 +193,8 @@ module Automaton =
       let defined_names_list_in_states = 
         Env.fold (fun _ { e_state = defined_names } acc -> defined_names :: acc)
           rtable [] in
+      let l = List.map (fun l -> S.to_list (Defnames.names S.empty l))
+            defined_names_list_in_states in
       (* check that variables which are defined in some state only are *)
       (* either signals or have a last value *)
       let defined_names_in_states = 
@@ -200,6 +206,8 @@ module Automaton =
           (fun _ { e_until = until; e_unless = unless } acc -> 
             (add loc until unless) :: acc)
           rtable [] in
+      let l = List.map (fun l -> S.to_list (Defnames.names S.empty l))
+            defined_names_list_in_transitions in
       let defined_names_in_transitions = 
         merge loc h 
           ((add loc entry.e_until entry.e_unless) :: 
