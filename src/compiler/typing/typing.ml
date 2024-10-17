@@ -807,7 +807,7 @@ and expression expected_k h ({ e_desc; e_loc } as e) =
        let ty, actual_k_e = expression expected_k h e_body in
        ty, Kind.sup actual_k actual_k_e
     | Esizeapp _ ->
-     Misc.not_yet_implemented "typing for size functions"
+       Misc.not_yet_implemented "typing for size functions"
     | Eforloop _ ->
        Misc.not_yet_implemented "typing for for-loops" in
   e.e_info <- Typinfo.set_type e.e_info ty;
