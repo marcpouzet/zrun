@@ -554,7 +554,7 @@ let rec automaton_handlers
   Total.Automaton.check_all_states_are_accessible loc handlers;
 
   (* global table which associate the set of defined_names for every state *)
-  let t = Total.Automaton.table handlers in
+  let t = Total.Automaton.init_table handlers in
 
   (* build the environment of states. *)
   let addname acc { s_state = statepat } =
@@ -567,12 +567,12 @@ let rec automaton_handlers
 
   (* in case [se_opt = None], checks that the initial state is a non *)
   (* parameterised state. *)
-  let { s_state = statepat } = List.hd handlers in
+  let { s_state = s_first_statepat } = List.hd handlers in
   let actual_k_init =
     match se_opt with
     | None ->
-       begin match statepat.desc with
-       | Estate1pat _ -> error statepat.loc Estate_initial
+       begin match s_first_statepat.desc with
+       | Estate1pat _ -> error s_first_statepat.loc Estate_initial
        | Estate0pat _ -> Tfun(Tconst)
        end
     | Some(se) -> state_expression h def_states true se in
@@ -599,7 +599,7 @@ let rec automaton_handlers
       (* checks that names are not defined twice in a state *)
       let state_names =
         if is_weak then S.singleton source_state
-        else Total.Automaton.statenames e_next_state in
+        else Total.Automaton.state_names e_next_state in
       Total.Automaton.add_transitions is_weak h state_names defined_names t;
       Kind.sup actual_k_e_cond
         (Kind.sup actual_k_let (Kind.sup actual_k_body actual_k_state)) in
@@ -623,11 +623,11 @@ let rec automaton_handlers
     let new_h, defined_names, actual_k_body =
       body expected_k h s_body in
     (* add the list of defined_names to the current state *)
-    let source_state = Total.Automaton.statepatname statepat in
+    let s_name = Total.Automaton.state_patname s_state in
     let l = S.to_list (Defnames.names S.empty defined_names) in
-    Total.Automaton.add_state source_state defined_names t;
+    Total.Automaton.add_state s_name defined_names t;
     let actual_k_list =
-      List.map (escape source_state new_h expected_k) s_trans in
+      List.map (escape s_name new_h expected_k) s_trans in
     let actual_k =
       Kind.sup (Kind.sup_list actual_k_list)
         (Kind.sup actual_k_let actual_k_init) in
@@ -636,6 +636,8 @@ let rec automaton_handlers
   let defined_names_k_list = List.map (typing_handler h) handlers in
   let defined_names_list, k_list = List.split defined_names_k_list in
 
+  let l = List.map (fun l -> S.to_list (Defnames.names S.empty l))
+            defined_names_list in
   (* identify variables which are partially defined in some states *)
   (* and/or transitions *)
   let defined_names = Total.Automaton.check loc h t in
@@ -643,7 +645,7 @@ let rec automaton_handlers
   List.iter2
     (fun { s_body = { b_write = _ } as b } defined_names ->
       b.b_write <- defined_names)
-    handlers (defined_names :: defined_names_list);
+    handlers defined_names_list;
 
   (* finally, indicate for every state handler if it is entered *)
   (* by reset or not *)
@@ -656,7 +658,7 @@ let rec automaton_handlers
 and mark_reset_state def_states handlers =
   let mark ({ s_state } as handler) =
     let { s_reset = r } =
-      Env.find (Total.Automaton.statepatname s_state) def_states in
+      Env.find (Total.Automaton.state_patname s_state) def_states in
     let v = match r with | None | Some(false) -> false | Some(true) -> true in
     handler.Zelus.s_reset <- v in
   List.iter mark handlers

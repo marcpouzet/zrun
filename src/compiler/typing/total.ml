@@ -3,7 +3,7 @@
 (*                                                                     *)
 (*          Zelus, a synchronous language for hybrid systems           *)
 (*                                                                     *)
-(*  (c) 2021 Inria Paris (see the AUTHORS file)                        *)
+(*  (c) 2024 Inria Paris (see the AUTHORS file)                        *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -128,16 +128,16 @@ let join loc
 (* has a definition or is a signal or its value can be implicitly kept *)
 module Automaton =
   struct
-    let statepatname statepat =
+    let state_patname statepat =
       match statepat.desc with
         | Estate0pat(n) | Estate1pat(n, _) -> n
             
-    let statenames state =
-      let rec statenames acc { desc } =
+    let state_names state =
+      let rec state_names acc { desc } =
         match desc with
         | Estate0(n) | Estate1(n, _) -> S.add n acc
-        | Estateif(_, se1, se2) -> statenames (statenames acc se1) se2 in
-      statenames S.empty state
+        | Estateif(_, se1, se2) -> state_names (state_names acc se1) se2 in
+      state_names S.empty state
             
     (* build an initial table associating set of names to every state *)
     type entry = 
@@ -154,9 +154,19 @@ module Automaton =
     (* it is only left with a weak transition *)
     type table = { t_initial: Ident.t * entry; t_remaining: entry Env.t }
 
-    let table state_handlers =
+    (* observing function; for debug *)
+    let dump { t_initial; t_remaining } =
+      let entry { e_state; e_until; e_unless } =
+        S.to_list (Defnames.names S.empty e_state),
+        S.to_list (Defnames.names S.empty e_until),
+        S.to_list (Defnames.names S.empty e_unless) in
+      let id, e = t_initial in
+      let l = entry e in
+      id, List.map (fun (id, e) -> id, entry e) (Env.to_list t_remaining)
+    
+   let init_table state_handlers =
       let add acc { s_state = statepat; s_loc = loc } =
-        Env.add (statepatname statepat)
+        Env.add (state_patname statepat)
           { e_loc = loc;
             e_state = empty;
             e_until = empty;
@@ -164,12 +174,13 @@ module Automaton =
       let { s_state = statepat; s_loc = loc } = List.hd state_handlers in
       let remaining_handlers = List.tl state_handlers in
       { t_initial = 
-          statepatname statepat,
+          state_patname statepat,
         { e_loc = loc; e_state = empty; e_until = empty; e_unless = empty };
         t_remaining = List.fold_left add Env.empty remaining_handlers }    
         
     let add_state state_name defined_names 
         { t_initial = (name, entry); t_remaining = rtable }  =
+      let l = S.to_list (Defnames.names S.empty defined_names) in
       let { e_loc = loc; e_unless = trans } as e = 
         if state_name = name then entry else Env.find state_name rtable in
       let _ = add loc defined_names trans in
@@ -189,7 +200,8 @@ module Automaton =
     let add_transitions is_until h state_names defined_names t =
       S.iter (add_transition is_until h defined_names t) state_names
         
-    let check loc h { t_initial = (name, entry); t_remaining = rtable } =
+    let check loc h ({ t_initial = (name, entry); t_remaining = rtable } as t) =
+      let l = dump t in
       let defined_names_list_in_states = 
         Env.fold (fun _ { e_state = defined_names } acc -> defined_names :: acc)
           rtable [] in
