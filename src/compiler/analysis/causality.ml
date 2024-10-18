@@ -717,6 +717,7 @@ and type_of_vardec_list env n_list =
   let tc_list = List.map type_of_vardec n_list in
   match tc_list with
   | [] -> Causal.atom(Causal.new_var ())
+  | [tc] -> tc
   | _ -> Causal.product tc_list
 
 and result env ({ r_desc } as r) =

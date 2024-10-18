@@ -588,6 +588,7 @@ and type_of_vardec_list env n_list =
   let ti_list = List.map type_of_vardec n_list in
   match ti_list with
   | [] -> Init.atom(Init.new_var ())
+  | [ti] -> ti  
   | _ -> Init.product ti_list
 
 and result env ({ r_desc; r_info } as r) =
