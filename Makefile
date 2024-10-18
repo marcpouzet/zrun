@@ -38,4 +38,15 @@ wc:
 	compiler/gencode/*.ml \
 	compiler/main/*.ml)
 
+
+# Extract the ZRun interpreter from the development
+zrun.update.git:
+	rm -r -f zrun.update.git;
+	mkdir zrun.update.git;
+	cp -r configure zrun.git;
+	cp -r config.ml zrun.git;
+	cp -r src/global zrun.git/src;
+	cp -r src/parser zrun.git/src;
+	cp -r zrun/zrun zrun.git/src	
+
 .PHONY: zeluc.exe zeluc.exe zrun.exe zwrite.exe zrun.exe.verbose tests debug clean wc
