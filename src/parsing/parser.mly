@@ -571,7 +571,7 @@ equation_desc:
   | AUTOMATON opt_bar a = automaton_handlers(equation_empty_and_list) END
     { EQautomaton(List.rev a, None) }
   | AUTOMATON opt_bar
-    a = automaton_handlers(equation_empty_and_list) INIT e = state
+       a = automaton_handlers(equation_empty_and_list) INIT e = state END
     { EQautomaton(List.rev a, Some(e)) }
   | MATCH e = seq_expression WITH opt_bar
     m = match_handlers(equation) opt_end
