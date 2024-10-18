@@ -43,10 +43,10 @@ wc:
 zrun.update.git:
 	rm -r -f zrun.update.git;
 	mkdir zrun.update.git;
-	cp -r configure zrun.git;
-	cp -r config.ml zrun.git;
-	cp -r src/global zrun.git/src;
-	cp -r src/parser zrun.git/src;
-	cp -r zrun/zrun zrun.git/src	
+	cp -r configure zrun.update.git;
+	cp -r config.ml zrun.update.git;
+	cp -r src/global zrun.update.git/src;
+	cp -r src/parser zrun.update.git/src;
+	cp -r zrun/zrun zrun.update.git/src;	
 
 .PHONY: zeluc.exe zeluc.exe zrun.exe zwrite.exe zrun.exe.verbose tests debug clean wc
