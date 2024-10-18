@@ -1,4 +1,6 @@
 all:
 
 clean:
-	rm -r -f *.zci *~
+	(cd good; rm -r -f *.zci *~)
+	(cd bad; rm -r -f *.zci *~)
+
