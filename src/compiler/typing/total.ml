@@ -91,10 +91,6 @@ let merge loc h defnames_list =
     merge_defnames_list defnames_list in
   (* every partial variable must be defined as a memory or declared with *)
   (* a default value *)
-  let l1 = S.to_list dv_total in
-  let l2 = S.to_list dv_partial in
-  let l3 = S.to_list di_total in
-  let l4 = S.to_list di_partial in
   all_last loc h (S.diff dv_partial di_total);
   (* for initialized values, all branches must give a definition *)
   if not (S.is_empty di_partial) 
@@ -140,92 +136,107 @@ module Automaton =
       state_names S.empty state
             
     (* build an initial table associating set of names to every state *)
+    (* this table is built during typing. At the end, check that all defined *)
+    (* names have one and only one definition *)
+    (* this is done by function [check] *)
     type entry = 
-        { e_loc: Location.t;(* location in the source for the current block *)
-          mutable e_state: Defnames.defnames;
-	     (* set of names defined in the current block *)
-          mutable e_until: Defnames.defnames;
-	     (* set of names defined in until transitions *)
-          mutable e_unless: Defnames.defnames; 
-	     (* set of names defined in unless transitions *)
-        }
+      { e_loc: Location.t;
+        (* location in the source for the current block *)
+        mutable e_state: Defnames.defnames;
+	(* set of names defined in the current block *)
+        mutable e_trans: (Ident.t * Defnames.defnames) list;
+	(* target state and set of names defined in the transition *)
+      }
 
-    (* the initial state is particular depending on whether or not *)
-    (* it is only left with a weak transition *)
-    type table = { t_initial: Ident.t * entry; t_remaining: entry Env.t }
+    (* the initial states are particular depending on whether or not *)
+    (* they are left on a weak transition or not *)
+    type table =
+      { t_weak: bool;
+        t_initials: entry Env.t;
+        t_remaining: entry Env.t 
+      }
 
-    (* observing function; for debug *)
-    let dump { t_initial; t_remaining } =
-      let entry { e_state; e_until; e_unless } =
-        S.to_list (Defnames.names S.empty e_state),
-        S.to_list (Defnames.names S.empty e_until),
-        S.to_list (Defnames.names S.empty e_unless) in
-      let id, e = t_initial in
-      let l = entry e in
-      id, List.map (fun (id, e) -> id, entry e) (Env.to_list t_remaining)
+    (* observing function; for debugging purposes *)
+    let dump { t_initials; t_remaining } =
+      let to_list defnames = S.to_list (Defnames.names S.empty defnames) in
+      let entry (id, { e_state; e_trans }) =
+        id, to_list e_state,
+        List.map (fun (id, defnames) -> id, to_list defnames) e_trans in
+      List.map entry (Env.to_list t_initials),
+      List.map entry (Env.to_list t_remaining)        
     
-   let init_table state_handlers =
-      let add acc { s_state = statepat; s_loc = loc } =
-        Env.add (state_patname statepat)
-          { e_loc = loc;
-            e_state = empty;
-            e_until = empty;
-            e_unless = empty } acc in
-      let { s_state = statepat; s_loc = loc } = List.hd state_handlers in
-      let remaining_handlers = List.tl state_handlers in
-      { t_initial = 
-          state_patname statepat,
-        { e_loc = loc; e_state = empty; e_until = empty; e_unless = empty };
-        t_remaining = List.fold_left add Env.empty remaining_handlers }    
-        
-    let add_state state_name defined_names 
-        { t_initial = (name, entry); t_remaining = rtable }  =
-      let l = S.to_list (Defnames.names S.empty defined_names) in
-      let { e_loc = loc; e_unless = trans } as e = 
-        if state_name = name then entry else Env.find state_name rtable in
-      let _ = add loc defined_names trans in
-      e.e_state <- defined_names
+    (* build the table *)
+    let init_table is_weak init_state_names state_handlers =
+      let add ({ t_initials; t_remaining } as acc)
+            { s_state; s_loc } =
+        let state_name = state_patname s_state in
+        let entry =
+          { e_loc = s_loc; e_state = empty; e_trans = [] } in
+        if S.mem state_name init_state_names then
+          { acc with t_initials = Env.add state_name entry t_initials }
+        else { acc with t_remaining = Env.add state_name entry t_remaining } in
+      List.fold_left
+        add { t_initials = Env.empty; t_remaining = Env.empty; t_weak = is_weak }
+        state_handlers
+                
+    (* sets the [defined_names] for [state_name] *)
+    let add_state { t_initials; t_remaining } defined_names state_name =
+      let entry =
+        try Env.find state_name t_initials
+        with Not_found -> Env.find state_name t_remaining in
+      entry.e_state <- defined_names
           
-    let add_transition is_until h defined_names 
-        { t_initial = (name, entry); t_remaining = rtable } state_name  =
-      let {e_loc = loc;e_state = state;
-           e_until = until;e_unless = unless} as e = 
-        if state_name = name then entry else Env.find state_name rtable in
-      if is_until then
-        let _ = add loc defined_names state in
-        e.e_until <- merge loc h [until; defined_names]   
-      else
-        e.e_unless <- merge loc h [unless; defined_names]
-        
-    let add_transitions is_until h state_names defined_names t =
-      S.iter (add_transition is_until h defined_names t) state_names
-        
-    let check loc h ({ t_initial = (name, entry); t_remaining = rtable } as t) =
-      let l = dump t in
-      let defined_names_list_in_states = 
-        Env.fold (fun _ { e_state = defined_names } acc -> defined_names :: acc)
-          rtable [] in
-      let l = List.map (fun l -> S.to_list (Defnames.names S.empty l))
-            defined_names_list_in_states in
-      (* check that variables which are defined in some state only are *)
-      (* either signals or have a last value *)
-      let defined_names_in_states = 
-        merge loc h (entry.e_state :: defined_names_list_in_states) in
-      
-      (* do the same for variables defined in transitions *)
-      let defined_names_list_in_transitions = 
-        Env.fold
-          (fun _ { e_until = until; e_unless = unless } acc -> 
-            (add loc until unless) :: acc)
-          rtable [] in
-      let l = List.map (fun l -> S.to_list (Defnames.names S.empty l))
-            defined_names_list_in_transitions in
-      let defined_names_in_transitions = 
-        merge loc h 
-          ((add loc entry.e_until entry.e_unless) :: 
-	      defined_names_list_in_transitions) in
-      union defined_names_in_states defined_names_in_transitions
+    (* sets the [defined_names] for one transition in [state_name] *)
+    let add_transition { t_initials; t_remaining } defined_names
+          state_name target_state_name =
+      let { e_state; e_trans } as e =
+        try Env.find state_name t_initials
+        with Not_found -> Env.find state_name t_remaining in
+      e.e_trans <- (target_state_name, defined_names) :: e_trans
+    
+    (* the names defined on a transition must not belong to the *)
+    (* source state, if the transition is weak; to the target state, if *)
+    (* the transition is strong *)
+    let check_state
+          { t_weak; t_initials; t_remaining } h
+          (state_name, { e_loc; e_state; e_trans }) =
+      let check (target_name, target_defined_names) =
+        let _ = if t_weak then
+                  add e_loc e_state target_defined_names
+                else
+                  let { e_loc; e_state } =
+                    try Env.find target_name t_initials
+                    with Not_found -> Env.find target_name t_remaining in
+                  add e_loc e_state target_defined_names in
+        () in
+      List.iter check e_trans
 
+    (* computes the set of names that are defined *)
+    (* and have a last value *)
+    let names_in_initial_states { t_weak; t_initials } loc h =
+      if t_weak then empty
+      else
+        merge loc h (List.map (fun (_, { e_state }) -> e_state)
+                       (Env.to_list t_initials))
+
+    (* computes the names defined by an automaton *)
+    (* and check that transitions do not redefine names *)
+    let check ({ t_initials; t_remaining } as table) loc h =
+      let t_initials = Env.to_list t_initials in
+      List.iter (check_state table h) t_initials;
+      let t_remaining = Env.to_list t_remaining in
+      List.iter (check_state table h) t_remaining;
+      let defined_names =
+        merge loc h
+          ((List.map (fun (_, { e_state }) -> e_state) t_initials) @
+           (List.map (fun (_, { e_state }) -> e_state) t_remaining)) in
+      let defined_names_in_transitions =
+        Env.fold
+          (fun _ { e_trans } acc ->
+            List.fold_left (fun acc (_, defnames) -> Defnames.union defnames acc)
+              acc e_trans) t_initials in
+      union defined_names defined_names_in_transitions
+       
     (* check that all states of the automaton are potentially accessible *)
     let check_all_states_are_accessible loc state_handlers = 
       (* the name defined by the state declaration *)

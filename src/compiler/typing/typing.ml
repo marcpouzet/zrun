@@ -546,15 +546,28 @@ let present_handlers scondpat body loc expected_k h h_list opt ty_res =
   Total.merge loc h defined_names_list,
   Kind.sup actual_k (Kind.sup_list k_list)
 
+(* Every variable defined in the initial states of an automaton *)
+(* do have a last value in the remaining ones provided the transition is weak *)
+let vars_with_last h { dv = dv } =
+  let add n acc =
+    let ({ t_sort } as tentry) = Env.find n h in
+    match t_sort with
+    | Sort_mem ({ m_init = No } as m) ->
+       Env.add n { tentry with t_sort = Sort_mem { m with m_init = Eq } } acc
+    | Sort_mem _ | Sort_val | Sort_var -> acc in
+  let first_h = S.fold add dv Env.empty in
+  first_h, Env.append first_h h
+
 (** Typing an automaton. Returns defined names **)
 let rec automaton_handlers
           scondpat leqs body body_escape state_expression
           is_weak loc (expected_k: Deftypes.kind) h handlers se_opt =
+
   (* check that all declared states are accessible *)
   Total.Automaton.check_all_states_are_accessible loc handlers;
-
+    
   (* global table which associate the set of defined_names for every state *)
-  let t = Total.Automaton.init_table handlers in
+  let t = Total.Automaton.init_table is_weak handlers in
 
   (* build the environment of states. *)
   let addname acc { s_state = statepat } =
@@ -631,6 +644,7 @@ let rec automaton_handlers
     let actual_k =
       Kind.sup (Kind.sup_list actual_k_list)
         (Kind.sup actual_k_let actual_k_init) in
+
     defined_names, actual_k in
 
   let defined_names_k_list = List.map (typing_handler h) handlers in
