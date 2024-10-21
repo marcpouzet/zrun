@@ -615,7 +615,7 @@ let rec automaton_handlers
       let state_names =
         if is_weak then S.singleton source_state
         else Total.Automaton.state_names e_next_state in
-      Total.Automaton.add_transitions is_weak h state_names defined_names table;
+      Total.Automaton.add_transitions table h defined_names state_names;
       Kind.sup actual_k_e_cond
         (Kind.sup actual_k_let (Kind.sup actual_k_body actual_k_state)) in
 
@@ -639,7 +639,7 @@ let rec automaton_handlers
       body expected_k h s_body in
     (* add the list of defined_names to the current state *)
     let s_name = Total.Automaton.state_patname s_state in
-    Total.Automaton.add_state s_name defined_names table;
+    Total.Automaton.add_state table defined_names s_name;
     let actual_k_list =
       List.map (escape s_name new_h expected_k) s_trans in
     let actual_k =
@@ -651,11 +651,9 @@ let rec automaton_handlers
   let defined_names_k_list = List.map (typing_handler h) handlers in
   let defined_names_list, k_list = List.split defined_names_k_list in
 
-  let l = List.map (fun l -> S.to_list (Defnames.names S.empty l))
-            defined_names_list in
   (* identify variables which are partially defined in some states *)
   (* and/or transitions *)
-  let defined_names = Total.Automaton.check loc h t in
+  let defined_names = Total.Automaton.check table loc h in
   (* write defined_names in every handler *)
   List.iter2
     (fun { s_body = { b_write = _ } as b } defined_names ->
@@ -664,7 +662,7 @@ let rec automaton_handlers
 
   (* finally, indicate for every state handler if it is entered *)
   (* by reset or not *)
-  mark_reset_state def_states handlers;
+  mark_reset_state env_of_states handlers;
   let actual_k = Kind.sup_list k_list in
   defined_names, Kind.sup actual_k_init actual_k
 
@@ -722,7 +720,6 @@ let rec vardec_list expected_k h v_list =
 
 (* [expression expected_k h e] returns the type for [e] and [actual kind] *)
 and expression expected_k h ({ e_desc; e_loc } as e) =
-  let l = Env.to_list h in
   let ty, actual_k = match e_desc with
     | Econst(i) -> immediate i, Tfun(Tconst)
     | Evar(x) ->

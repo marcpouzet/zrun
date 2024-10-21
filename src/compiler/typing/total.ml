@@ -173,38 +173,34 @@ module Automaton =
       let _ = add e_loc defined_names e_trans in
       entry.e_state <- defined_names
       
-    let add_transition is_until h state_name defined_names 
-        { t_initial = (name, entry); t_remaining = rtable }  =
-      let {e_loc = loc;e_state = state;e_until = until;e_unless = unless} as e = 
-        if state_name = name then entry else Env.find state_name rtable in
-      if is_until then
-        let _ = add loc defined_names state in
-        e.e_until <- merge loc h [until; defined_names]   
-      else
-        e.e_unless <- merge loc h [unless; defined_names]
-        
-    let check loc h { t_initial = (name, entry); t_remaining = rtable } =
-      let defined_names_list_in_states = 
-        Env.fold (fun _ { e_state = defined_names } acc -> defined_names :: acc)
-          rtable [] in
-      (* check that variables which are defined in some state only are *)
-      (* either signals or have a last value *)
-      let defined_names_in_states = 
-        merge loc h (entry.e_state :: defined_names_list_in_states) in
-      
-      (* do the same for variables defined in transitions *)
-      let defined_names_list_in_transitions = 
-        Env.fold
-          (fun _ { e_until = until; e_unless = unless } acc -> 
-            (add loc until unless) :: acc)
-          rtable [] in
-      let defined_names_in_transitions = 
-        merge loc h 
-          ((add loc entry.e_until entry.e_unless) :: 
-	      defined_names_list_in_transitions) in
-      union defined_names_in_states defined_names_in_transitions
+    let add_transition { t_initials; t_remaining } h defined_names state_name =
+      let { e_loc; e_state; e_trans } as entry =
+        try Env.find state_name t_initials
+        with Not_found -> Env.find state_name t_remaining in
+      (* check that names do not appear already in the state *)
+      let _ = add e_loc defined_names e_trans in
+      (* merge names with existing ones in transitions *)
+      entry.e_trans <- merge e_loc h [defined_names; e_trans]
+            
+    let add_transitions table h defined_names state_names =
+      S.iter (add_transition table h defined_names) state_names
 
-            (*
+    let check { t_initials; t_remaining } loc h =
+      let defnames_list =
+        Env.fold (fun _ { e_state } acc -> e_state :: acc) t_initials [] in
+      let defnames_list =
+        Env.fold
+          (fun _ { e_state } acc -> e_state :: acc) t_remaining defnames_list in
+      let defined_names = merge loc h defnames_list in
+
+      let defined_names_in_transitions =
+        Env.fold (fun _ { e_trans } acc -> union e_trans acc) t_initials empty in
+      let defined_names_in_transitions =
+        Env.fold (fun _ { e_trans } acc -> union e_trans acc) t_remaining
+          defined_names_in_transitions in
+      union defined_names defined_names_in_transitions
+
+    (*
 
               (* build an initial table associating set of names to every state *)
     (* this table is built during typing. At the end, check that all defined *)
