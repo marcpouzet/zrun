@@ -136,6 +136,77 @@ module Automaton =
       state_names S.empty state
             
     (* build an initial table associating set of names to every state *)
+    type entry = 
+        { e_loc: Location.t;(* location in the source for the current block *)
+          mutable e_state: Defnames.defnames;
+	  (* for a state [s], the set of names defined in [s] *)
+          mutable e_trans: Defnames.defnames;
+	  (* for an automaton with [until] transitions, the *)
+          (* set of names defined on an output transition *)
+          (* for an automaton with [unless] transitions, the set *)
+          (* of names defined on a transition that enters [s] *)
+        }
+
+    type table =
+      { t_weak: bool; t_initials: entry Env.t; t_remaining: entry Env.t }
+    
+    (* build the table *)
+    let init_table is_weak init_state_names state_handlers =
+      let add ({ t_initials; t_remaining } as acc)
+            { s_state; s_loc } =
+        let state_name = state_patname s_state in
+        let entry =
+          { e_loc = s_loc; e_state = empty; e_trans = empty } in
+        if S.mem state_name init_state_names then
+          { acc with t_initials = Env.add state_name entry t_initials }
+        else { acc with t_remaining = Env.add state_name entry t_remaining } in
+      List.fold_left
+        add { t_initials = Env.empty; t_remaining = Env.empty; t_weak = is_weak }
+        state_handlers
+
+    (* sets the [defined_names] for [state_name] *)
+    let add_state { t_initials; t_remaining } defined_names state_name =
+      let { e_loc; e_trans } as entry =
+        try Env.find state_name t_initials
+        with Not_found -> Env.find state_name t_remaining in
+      (* check that names do not appear already in transitions *)
+      let _ = add e_loc defined_names e_trans in
+      entry.e_state <- defined_names
+      
+    let add_transition is_until h state_name defined_names 
+        { t_initial = (name, entry); t_remaining = rtable }  =
+      let {e_loc = loc;e_state = state;e_until = until;e_unless = unless} as e = 
+        if state_name = name then entry else Env.find state_name rtable in
+      if is_until then
+        let _ = add loc defined_names state in
+        e.e_until <- merge loc h [until; defined_names]   
+      else
+        e.e_unless <- merge loc h [unless; defined_names]
+        
+    let check loc h { t_initial = (name, entry); t_remaining = rtable } =
+      let defined_names_list_in_states = 
+        Env.fold (fun _ { e_state = defined_names } acc -> defined_names :: acc)
+          rtable [] in
+      (* check that variables which are defined in some state only are *)
+      (* either signals or have a last value *)
+      let defined_names_in_states = 
+        merge loc h (entry.e_state :: defined_names_list_in_states) in
+      
+      (* do the same for variables defined in transitions *)
+      let defined_names_list_in_transitions = 
+        Env.fold
+          (fun _ { e_until = until; e_unless = unless } acc -> 
+            (add loc until unless) :: acc)
+          rtable [] in
+      let defined_names_in_transitions = 
+        merge loc h 
+          ((add loc entry.e_until entry.e_unless) :: 
+	      defined_names_list_in_transitions) in
+      union defined_names_in_states defined_names_in_transitions
+
+            (*
+
+              (* build an initial table associating set of names to every state *)
     (* this table is built during typing. At the end, check that all defined *)
     (* names have one and only one definition *)
     (* this is done by function [check] *)
@@ -194,12 +265,15 @@ module Automaton =
         with Not_found -> Env.find state_name t_remaining in
       e.e_trans <- (target_state_name, defined_names) :: e_trans
     
-    (* the names defined on a transition must not belong to the *)
-    (* source state, if the transition is weak; to the target state, if *)
-    (* the transition is strong *)
+    (* for an [until] transition, the names defined on a transition *)
+    (* belong to the source state. Hence, they must be distinct. For an *)
+    (* [unless] transition, they belong to the target state. Hence, *)
+    (* they must be distinct. *)
+    (* In Zelus (w.r.t Lucid Synchrone), all transitions in an automaton *)
+    (* are of the same sort ([until or unless]) *)
     let check_state
           { t_weak; t_initials; t_remaining } h
-          (state_name, { e_loc; e_state; e_trans }) =
+          _ { e_loc; e_state; e_trans } =
       let check (target_name, target_defined_names) =
         let _ = if t_weak then
                   add e_loc e_state target_defined_names
@@ -212,7 +286,8 @@ module Automaton =
       List.iter check e_trans
 
     (* computes the set of names that are defined *)
-    (* and have a last value *)
+    (* and have a last value. It depend on whether transitions are weak *)
+    (* ([until]) or strong ([unless]) *)
     let names_in_initial_states { t_weak; t_initials } loc h =
       if t_weak then empty
       else
@@ -222,28 +297,34 @@ module Automaton =
     (* computes the names defined by an automaton *)
     (* and check that transitions do not redefine names *)
     let check ({ t_initials; t_remaining } as table) loc h =
-      let t_initials = Env.to_list t_initials in
-      List.iter (check_state table h) t_initials;
-      let t_remaining = Env.to_list t_remaining in
-      List.iter (check_state table h) t_remaining;
-      let defined_names =
-        merge loc h
-          ((List.map (fun (_, { e_state }) -> e_state) t_initials) @
-           (List.map (fun (_, { e_state }) -> e_state) t_remaining)) in
+      Env.iter (check_state table h) t_initials;
+      Env.iter (check_state table h) t_remaining;
+      let defnames_list =
+        Env.fold (fun _ { e_state } acc -> e_state :: acc) t_initials [] in
+      let defnames_list =
+        Env.fold
+          (fun _ { e_state } acc -> e_state :: acc) t_remaining defnames_list in
+      let defined_names = merge loc h defnames_list in
       let defined_names_in_transitions =
         Env.fold
           (fun _ { e_trans } acc ->
             List.fold_left (fun acc (_, defnames) -> Defnames.union defnames acc)
-              acc e_trans) t_initials in
+              acc e_trans) t_initials empty in
+      let defined_names_in_transitions =
+        Env.fold
+          (fun _ { e_trans } acc ->
+            List.fold_left (fun acc (_, defnames) -> Defnames.union defnames acc)
+              acc e_trans) t_initials defined_names_in_transitions in
       union defined_names defined_names_in_transitions
-       
+             *)
+    
     (* check that all states of the automaton are potentially accessible *)
-    let check_all_states_are_accessible loc state_handlers = 
+    let check_all_states_are_accessible loc handlers se_opt = 
       (* the name defined by the state declaration *)
       let def_states acc { s_state = spat } =
-	let statepat { desc = desc } =
+        let statepat { desc = desc } =
 	  match desc with | Estate0pat(n) | Estate1pat(n, _) -> n in
-	S.add (statepat spat) acc in
+        S.add (statepat spat) acc in
       
       (* the name defined by the call to a state *)
       let called_states acc { s_trans = escape_list } =
@@ -254,13 +335,18 @@ module Automaton =
 	let escape acc { e_next_state = se } = sexp acc se in
 	List.fold_left escape acc escape_list in
 
-      (* the initial state is reachable *)
-      let init_state = def_states S.empty (List.hd state_handlers) in
+      let init_state_names =
+        match se_opt with
+        | None ->
+           (* the first handler gives the initial state *)
+           def_states S.empty (List.hd handlers)
+        | Some(se) -> state_names se in
       let called_states =
-	List.fold_left called_states init_state state_handlers in
-      let def_states = List.fold_left def_states S.empty state_handlers in
+	List.fold_left called_states init_state_names handlers in
+      let def_states = List.fold_left def_states S.empty handlers in
             
       let unreachable_states = S.diff def_states called_states in
       if not (S.is_empty unreachable_states)
-      then warning loc (Wunreachable_state (S.choose unreachable_states))
+      then warning loc (Wunreachable_state (S.choose unreachable_states));
+      init_state_names
   end

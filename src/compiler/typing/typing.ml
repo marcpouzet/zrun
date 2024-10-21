@@ -563,11 +563,13 @@ let rec automaton_handlers
           scondpat leqs body body_escape state_expression
           is_weak loc (expected_k: Deftypes.kind) h handlers se_opt =
 
-  (* check that all declared states are accessible *)
-  Total.Automaton.check_all_states_are_accessible loc handlers;
+  (* check that all declared states are accessible; returns the set of *)
+  (* initial states *)
+  let init_state_names =
+    Total.Automaton.check_all_states_are_accessible loc handlers se_opt in
     
   (* global table which associate the set of defined_names for every state *)
-  let t = Total.Automaton.init_table is_weak handlers in
+  let table = Total.Automaton.init_table is_weak init_state_names handlers in
 
   (* build the environment of states. *)
   let addname acc { s_state = statepat } =
@@ -576,7 +578,7 @@ let rec automaton_handlers
       | Estate1pat(s, l) ->
           Env.add s { s_reset = None;
                       s_parameters = (List.map (fun _ -> new_var ()) l)} acc in
-  let def_states = List.fold_left addname Env.empty handlers in
+  let env_of_states = List.fold_left addname Env.empty handlers in
 
   (* in case [se_opt = None], checks that the initial state is a non *)
   (* parameterised state. *)
@@ -588,7 +590,7 @@ let rec automaton_handlers
        | Estate1pat _ -> error s_first_statepat.loc Estate_initial
        | Estate0pat _ -> Tfun(Tconst)
        end
-    | Some(se) -> state_expression h def_states true se in
+    | Some(se) -> state_expression h env_of_states true se in
   
   (* the type for conditions on transitions *)
   let type_of_condition = Initial.typ_bool in
@@ -608,12 +610,12 @@ let rec automaton_handlers
       let h, defined_names, actual_k_body =
         body_escape expected_k h e_body in
       (* checks that [state] belond to the current set of [states] *)
-      let actual_k_state = state_expression h def_states e_reset e_next_state in
+      let actual_k_state = state_expression h env_of_states e_reset e_next_state in
       (* checks that names are not defined twice in a state *)
       let state_names =
         if is_weak then S.singleton source_state
         else Total.Automaton.state_names e_next_state in
-      Total.Automaton.add_transitions is_weak h state_names defined_names t;
+      Total.Automaton.add_transitions is_weak h state_names defined_names table;
       Kind.sup actual_k_e_cond
         (Kind.sup actual_k_let (Kind.sup actual_k_body actual_k_state)) in
 
@@ -623,7 +625,7 @@ let rec automaton_handlers
     begin match s_state.desc with
     | Estate0pat _ -> ()
     | Estate1pat(s, n_list) ->
-       let { s_parameters = ty_list } = Env.find s def_states in
+       let { s_parameters = ty_list } = Env.find s env_of_states in
        List.iter2
          (fun n ty ->
            unify s_state.loc
@@ -637,8 +639,7 @@ let rec automaton_handlers
       body expected_k h s_body in
     (* add the list of defined_names to the current state *)
     let s_name = Total.Automaton.state_patname s_state in
-    let l = S.to_list (Defnames.names S.empty defined_names) in
-    Total.Automaton.add_state s_name defined_names t;
+    Total.Automaton.add_state s_name defined_names table;
     let actual_k_list =
       List.map (escape s_name new_h expected_k) s_trans in
     let actual_k =
