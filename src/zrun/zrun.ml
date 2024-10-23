@@ -43,13 +43,6 @@ let doc_esterel =
 let doc_lustre =
   "\tSets the interpretation of if/then/else to be strict \n\
    \t\t(that of Lustre)"
-let doc_static_reduction =
-  "\tReduce static (compile-time) expressions"
-let doc_check =
-  "\tCheck equivalence at every program transformation \n\
-   \t\tfor the number of steps"
-and doc_inlining_level = "<n> \t Level of inlining"
-and doc_inline_all = "\t Inline all function calls"
                   
 let errmsg = "Options are:"
 
@@ -71,10 +64,6 @@ let main () =
            doc_number_of_fixpoint_iterations;
            "-esterel", Arg.Set Misc.esterel, doc_esterel;
            "-lustre", Arg.Set Misc.lustre, doc_lustre;
-           "-static", Arg.Set Misc.static_reduction, doc_static_reduction;
-           "-check", Arg.Set Misc.equivalence_checking, doc_check;
-           "-inline", Arg.Int Misc.set_inlining_level, doc_inlining_level;
-          "-inlineall", Arg.Set inline_all, doc_inline_all;
       ])
       main
       errmsg

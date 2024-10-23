@@ -94,14 +94,3 @@ let lustre = ref false
 (* no information associated to expressions *)
 type no_info = unit
 let no_info: no_info = ()
-
-(* static reduction *)
-let static_reduction = ref false
-
-(* check equivalence *)
-let equivalence_checking = ref false
-
-(* sets the inline flags *)
-let inlining_level = ref 10
-let set_inlining_level l = inlining_level := l
-let inline_all = ref false
