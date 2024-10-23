@@ -100,9 +100,6 @@ Options are:
   -esterel      Sets the interpretation of if/then/else to be constructive
   -lustre       Sets the interpretation of if/then/else to be strict 
 		(that of Lustre)
-  -reduce       Reduce compile-time expressions
-  -check        Check equivalence at every program transformation 
-		for the number of steps
   -help         Display this list of options
   --help        Display this list of options
 ```
