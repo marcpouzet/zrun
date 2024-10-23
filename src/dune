@@ -54,23 +54,8 @@
     output ; printing
     forloop ; evaluation functions for for loops
     eval ; evaluation of an expression
-    static ; static reduction
-    mapfold ; generic mapfold
-    aux ; auxiliary function for building terms
-    inline ; inlining
   )   	 
   (libraries zrun.parse_lib zrun.ast_lib))
-
-; rewriting steps
-; (library
-;  (name rewrite_lib)
-;  (public_name zrun.rewrite_lib)
-;  (wrapped false)
-;  (modules
-;    reduce ; static reduction
-;  )
-;  (libraries zrun.ast_lib zrun.zrun_lib)
-;)
 
 (executable
  (name zrun)
