@@ -12,8 +12,8 @@
 
 ; all the modules necessary to parse
 (library
-  (name parse_lib)
-  (public_name zrun.parse_lib)
+  (name parser_lib)
+  (public_name zrun.parser_lib)
   (wrapped false)
   (modules
     location ; position in the source file
@@ -39,7 +39,7 @@
     pp_tools ; pretty printer tools
     printer ; printer for the ast
   )
-  (libraries parse_lib))
+  (libraries parser_lib))
 
 ;; the ZRun interpreter
 ; all the necessary modules to make zrun except the entry modules
@@ -64,7 +64,7 @@
     forloop ; evaluation functions for for loops
     eval ; evaluation of an expression
   )   	 
-  (libraries zrun.parse_lib zrun.global_lib))
+  (libraries zrun.parser_lib zrun.global_lib))
 
 ; The ZRun interpreter
 (executable
@@ -73,7 +73,7 @@
   (modules 
     zrun; the main function
   )
-  (libraries zrun.parse_lib zrun.global_lib zrun.zrun_lib)
+  (libraries zrun.parser_lib zrun.global_lib zrun.zrun_lib)
   (promote (until-clean) (into ..)))
 
 (install
