@@ -1,0 +1,27 @@
+name: Build
+
+on:
+  - push
+  - pull_request
+  - workflow_dispatch
+    
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        ocaml-version:
+          - 5.2.0
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Install OCaml dependencies
+        run: opam install -y graphics menhir
+
+      - name: Test examples 
+        run: |
+          cd tests
+          opam exec -- dune build --root .
