@@ -10,9 +10,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
-      ocaml-version:
-          - 5.2.0
-
+     
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
