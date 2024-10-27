@@ -26,4 +26,4 @@ jobs:
       - name: Build all examples
         run: |
           cd tests
-          opam exec -- dune build --root .
+          opam exec -- dune test
