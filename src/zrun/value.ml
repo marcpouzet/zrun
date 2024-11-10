@@ -66,6 +66,17 @@ and ('info, 'ienv) pvalue =
         (* the set of mutually recursive function definitions *) 
       }
 
+  (* to do: replace the last three entries which refers to the source *)
+  (* by a functional value *)
+  (*
+          | Vnode of
+      { s: ('info, 'ienv) state;
+        step : ('info, 'ienv) state -> ('info, 'ienv) value ->
+               (('info, 'ienv) value * ('info, 'ienv) state) result }
+  | Vsizefun of { sizes: int list option;
+                   f : int -> ('info, 'ienv) value }
+   *)
+
 and 'a array =
   | Vflat : 'a Array.t -> 'a array
   | Vmap : 'a map -> 'a array
