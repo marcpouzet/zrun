@@ -50,8 +50,9 @@ let rec pvalue ff v =
        ff "@[<hov 1>%a(%a)@]" Ident.fprint_t id pvalue_list l
   | Vfun _ ->
      fprintf ff "<fun>"
-  | Vclosure { c_funexp = { f_kind } } ->
-     fprintf ff "<%s>" (Printer.kind f_kind)
+  | Vcofun _ -> fprintf ff "<fun>"
+  | Vconode { tkind } ->
+     fprintf ff "<%s>" (Printer.tkind tkind)
   | Vsizefun _ ->
      fprintf ff "<sizefun>"
   | Vsizefix { bound; name; defs } ->

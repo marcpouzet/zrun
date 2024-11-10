@@ -72,7 +72,7 @@ let test v =
 
 let get_node v =
   match v with
-  | Vclosure ({ c_funexp = { f_kind = Knode _ } } as c) -> return c
+  | Vconode(instance) -> return instance
   | _ -> None
 
 let get_record r =
@@ -222,8 +222,7 @@ let rec compare_pvalue v1 v2 =
   | Vrecord _, Vrecord _ -> none
   | Vtuple(v_list1), Vtuple(v_list2) ->
      compare_list compare_value v_list1 v_list2
-  | Vfun _, Vfun _ -> none
-  | Vclosure _, Vclosure _ -> none
+  | (Vfun _, Vfun _) | (Vcofun _, Vcofun _) | (Vconode _, Vconode _) -> none
   | _ -> none
 
 (* comparison of present/absent with one the representation of the other *)
@@ -424,7 +423,7 @@ let atomic v =
   let+ v = v in
   match v with
   | Vtuple(l) -> stuple l
-  | Vclosure _ -> 
+  | Vcofun _ | Vconode _ ->
       (* this part should be changed into [atomic(f) = lambda x.let+ x in f x] *)
       (* that is, even if [f] is not strict, make it a strict function *)
       (* this is necessary to avoid unbounded recursion with f = \x. x x and f f *)

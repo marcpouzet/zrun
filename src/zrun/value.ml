@@ -32,9 +32,9 @@ type 'a star =
   | Vbot (* bottom value *)
   | Value of 'a (* value *)
 
-type ('info, 'ienv) value = ('info, 'ienv) pvalue star
+type value = pvalue star
 
-and ('info, 'ienv) pvalue =
+and pvalue =
   | Vint of int
   | Vbool of bool
   | Vfloat of float
@@ -42,44 +42,34 @@ and ('info, 'ienv) pvalue =
   | Vstring of string
   | Vvoid 
   | Vconstr0 of Lident.t
-  | Vconstr1 of Lident.t * ('info, 'ienv) pvalue list
-  | Vrecord of ('info, 'ienv) pvalue Zelus.record list
-  | Vpresent of ('info, 'ienv) pvalue 
+  | Vconstr1 of Lident.t * pvalue list
+  | Vrecord of pvalue Zelus.record list
+  | Vpresent of pvalue 
   | Vabsent 
-  | Vstuple of ('info, 'ienv) pvalue list
-  | Vtuple of ('info, 'ienv) pvalue star list
+  | Vstuple of pvalue list
+  | Vtuple of pvalue star list
   | Vstate0 of Ident.t
-  | Vstate1 of Ident.t * ('info, 'ienv) pvalue list
-  | Varray of ('info, 'ienv) pvalue array
+  | Vstate1 of Ident.t * pvalue list
+  | Varray of pvalue array
   (* imported stateless functions; they must verify that *)
   (* f(atomic v) not= bot *)
-  | Vfun of (('info, 'ienv) pvalue -> ('info, 'ienv) pvalue option)
-  | Vclosure of ('info, 'ienv) closure
+  | Vfun of (pvalue -> pvalue option)
+  (* user defined functions and nodes *)
+  | Vcofun of (value -> value result)
+  | Vconode of instance
   (* function parameterized by sizes *)
-  | Vsizefun of ('info, 'ienv) sizefun
-  (* a representation for mutually recursive functions over sizes *)
-  (* f where rec [f1<s,...> = e1 and ... fk<s,...> = ek] *)
-  | Vsizefix of 
+  | Vsizefun of sizefun
+(* mutually recursive definition of size functions *)
+  | Vsizefix of
       { bound: int list option; (* the maximum number of iterations *)
         name: Ident.t; (* name of the defined function *)
-        defs: ('info, 'ienv) sizefun Ident.Env.t;
+        defs: sizefun Ident.Env.t;
         (* the set of mutually recursive function definitions *) 
       }
 
-  (* to do: replace the last three entries which refers to the source *)
-  (* by a functional value *)
-  (*
-          | Vnode of
-      { s: ('info, 'ienv) state;
-        step : ('info, 'ienv) state -> ('info, 'ienv) value ->
-               (('info, 'ienv) value * ('info, 'ienv) state) result }
-  | Vsizefun of { sizes: int list option;
-                   f : int -> ('info, 'ienv) value }
-   *)
-
 and 'a array =
-  | Vflat : 'a Array.t -> 'a array
-  | Vmap : 'a map -> 'a array
+  | Vflat of 'a Array.t
+  | Vmap of 'a map
 
 (* bounded maps *)
 (* [get x i = v if x.left <= i <= right then x i
@@ -87,51 +77,51 @@ and 'a array =
                                             | Some(x) -> get x i *)
 and 'a map =
   { m_length : int; m_u : int -> 'a result }
-     
-(* a size parameterized expression - f <n1,...,nk> = e *)
-and ('info, 'ienv) sizefun = 
-  { s_params: Ident.t list; 
-    s_body: ('info, 'ienv) Zelus.exp; 
-    s_genv: ('info, 'ienv) pvalue Genv.genv; 
-    s_env: ('info, 'ienv) pvalue star ientry Ident.Env.t }
-                                   
-(* a functional value - [fun|node] x1 ... xn -> e *)
-and ('info, 'ienv) closure =
-  { c_funexp : ('info, 'ienv) Zelus.funexp;
-    c_genv: ('info, 'ienv) pvalue Genv.genv;
-    c_env: ('info, 'ienv) pvalue star ientry Ident.Env.t }
-                                     
+
+and sizefun = int -> value
+
 (* instance of a node *)
-and ('info, 'ienv) instance =
-  { init : ('info, 'ienv) state; (* current state *)
-    step : ('info, 'ienv) closure; (* step function *)
+and instance =
+  { tkind: Zelus.tkind; (* discrete only or discrete/continuous-time state *)
+    init : state; (* current state *)
+    step : state -> value -> (value * state) result; (* step function *)
   }
 
-and ('info, 'ienv) state =
+and state =
   | Sbot 
   | Snil 
   | Sempty 
-  | Sval of ('info, 'ienv) value
-  | Sstatic of ('info, 'ienv) pvalue
-  | Slist of ('info, 'ienv) state list
-  | Sopt of ('info, 'ienv) value option
-  | Sinstance of ('info, 'ienv) instance
-  | Scstate of { pos : ('info, 'ienv) value; der : ('info, 'ienv) value }
-  | Szstate of { zin : bool; zout : ('info, 'ienv) value }
+  | Sval of value
+  | Sstatic of pvalue
+  | Slist of state list
+  | Sopt of value option
+  | Sinstance of instance
+  | Scstate of { pos : value; der : value }
+  | Szstate of { zin : bool; zout : value }
   | Shorizon of { zin : bool; horizon : float }
   | Speriod of
       { zin : bool; phase : float; period : float; horizon : float }
   (* environment of values *)
-  | Senv of ('info, 'ienv) value ientry Ident.Env.t
+  | Senv of value ientry Ident.Env.t
 
 (*
-type ('a, 's) costream =
+  Intuition: a expression is interpreted as a value of type:
+
+  type ('a, 's) costream =
   | CoF : { init : 's;
             step : 's -> ('a * 's) option } ->
           ('a, 's) costream
 
-type ('a, 'b, 's) node =
+  A functional value, combinatorial or stateful is interpreted as a value of type:
+
+  type ('a, 'b, 's) node =
   | CoFun : ('a list -> 'b option) -> ('a, 'b, 's) node
   | CoNode : { init : 's;
                step : 's -> 'a list -> ('b * 's) option } -> ('a, 'b, 's) node
- *)
+
+ Here, the set of values is a big bag in which all kinds of value is put; in
+ particular values that do not of bounded sizes. This could be constrained because,
+ values on streams are actually of bounded sizes. That which belong to a CPO of
+ unbounded height (e.g., functions) are computed only at "compilation time" or
+ "instanciation time".
+*)

@@ -378,8 +378,10 @@ and result ff { r_desc } =
 and kind f_kind =
   match f_kind with
   | Kfun _ -> "fun"
-  | Knode(k) ->
-     (match k with | Kdiscrete -> "node" | Kcont -> "hybrid")
+  | Knode(t_kind) -> tkind t_kind
+
+and tkind t_kind =
+  match t_kind with | Kdiscrete -> "node" | Kcont -> "hybrid"
 
 and funexp ff { f_vkind; f_kind; f_args; f_body; f_env } =
   let vkind =
