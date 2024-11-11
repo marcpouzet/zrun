@@ -55,7 +55,7 @@ and pvalue =
   (* f(atomic v) not= bot *)
   | Vifun of (pvalue -> pvalue option)
   (* user defined functions and nodes *)
-  | Vfun of { arity: int; f : value list -> value result }
+  | Vfun of vfun
   | Vnode of instance
   (* function parameterized by sizes *)
   | Vsizefun of sizefun
@@ -78,13 +78,16 @@ and 'a array =
 and 'a map =
   { m_length : int; m_u : int -> 'a result }
 
-and sizefun = { s_body: int list -> value result; }
+and sizefun = { s_f: int list -> value result; }
+
+and vfun = { f_arity: int; f : value list -> value result }
 
 (* instance of a node *)
 and instance =
   { tkind: Zelus.tkind; (* discrete only or discrete/continuous-time state *)
+    arity: int;
     init : state; (* current state *)
-    step : state -> value -> (value * state) result; (* step function *)
+    step : state -> value list -> (value * state) result; (* step function *)
   }
 
 and state =

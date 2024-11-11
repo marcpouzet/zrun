@@ -305,13 +305,13 @@ let rec size env { desc; loc } =
 
 (* mutually recursive definitions must either define *)
 (* functions parameterized by a size or stream values *)
-let sizefun_defs_or_values genv env apply l_eq =
+let sizefun_defs_or_values genv env sizeapply l_eq =
   let rec split (acc, one_value) { eq_desc; eq_loc } =
     match eq_desc with
     | EQsizefun { sf_id; sf_id_list; sf_e } ->
        if one_value then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
-       else return (Env.add sf_id { s_body = fun v_list -> apply v_list } acc,
+       else return (Env.add sf_id { s_body = fun v_list -> sizeapply v_list } acc,
                     one_value)
     | EQand { eq_list } ->
        fold split (acc, one_value) eq_list
@@ -326,8 +326,8 @@ let sizefun_defs_or_values genv env apply l_eq =
   else
     return (Either.Right(acc))
 
-let sizefun_defs genv env apply { l_eq; l_loc } =
-  let* v = sizefun_defs_or_values genv env apply l_eq in
+let sizefun_defs genv env sizeapply { l_eq; l_loc } =
+  let* v = sizefun_defs_or_values genv env sizeapply l_eq in
   match v with 
   | Right(defs) -> return defs 
   | Left _ -> error { kind = Esizefun_def_recursive; loc = l_loc }
@@ -808,24 +808,63 @@ and iresult is_fun genv env { r_desc } =
   | Exp(e) -> iexp is_fun genv env e
   | Returns(b) -> iblock is_fun genv env b
 
-(* the instance value from a node definition *)
-and instance_of_funexp genv env tkind ({ f_args; f_body; f_loc } as f) = 
-  match f_args with
-  | [ arg ] ->
-     let* s_list = map (ivardec false true genv env) arg in
-     let* s_body = iresult false genv env f_body in
-     return { tkind;
-              init = Slist (s_body :: s_list);
-              step = fun s v -> runstep genv env f s v }
-  | _ -> error { kind = Etype; loc = f_loc }
+(* the functional value of a function definition *)
+and funexp genv env ({ f_kind; f_args } as f) =
+  (* the functional value from a (combinatorial) function definition *)
+  let co_fun genv env { f_args; f_body; f_loc } v_list =
+    let* env = Match.matching_arg_in_list f_loc env f_args v_list in
+    vresult genv env f_body in
 
-and value_of_funexp genv env ({ f_kind; f_args; f_loc; f_body } as f) =
+  (* the functional value from a stateful (node) function definition *)
+  let co_step loc genv env arg_list f_body s v =
+    let match_in_list a_list s_list v_list =
+      let match_in acc vdec s v =
+        let* acc, s = svardec genv env acc vdec s v in
+        let* s = set_vardec acc vdec s in
+        return (acc, s) in
+      mapfold3 { kind = Epattern_matching_failure; loc }
+        match_in Env.empty a_list s_list v_list in
+    
+    match s with
+    | Slist (s_body :: s_arg_list) ->
+       let* v_list =
+         (* special case for a single argument *)
+         match arg_list with
+         | [_] -> let* v =
+                    Primitives.atomic v |>
+                      Opt.to_result ~none:{ kind = Etype; loc } in
+                  return [v]
+         | _ -> return (Primitives.list_of v) in
+       let* env_arg_list, s_arg_list =
+         match_in_list arg_list s_arg_list v_list in
+       let env = Env.append env_arg_list env in
+       let* r, s_body = sresult genv env f_body s_body in
+       return (r, Slist (s_body :: s_arg_list))
+    | _ ->
+       error { kind = Estate; loc } in
+
+  (* the instance value from a stateful function (node) definition *)
+  let co_node genv env tkind { f_args; f_body; f_loc } = 
+    match f_args with
+    | [ arg_list ] ->
+       (* nodes are not curried; this feature was possible in LS *)
+       (* it is not in Zelus. *)
+       let* s_list = map (ivardec false true genv env) arg_list in
+       let* s_body = iresult false genv env f_body in
+       let step = co_step f_loc genv env arg_list f_body in
+       return { tkind;
+                arity = List.length arg_list;
+                init = Slist (s_body :: s_list);
+                step }
+    | _ -> error { kind = Etype; loc = f_loc } in
+
+  (* the functional value *)
   match f_kind with
   | Zelus.Kfun _ ->
-     return (Vfun { arity = List.length f_args;
-                      f = fun v_list -> vresult genv env f_body v_list })
+     let f = co_fun genv env f in
+     return (Vfun({ f_arity = List.length f_args; f }))
   | Zelus.Knode(tkind) ->
-     let* si = instance_of_funexp genv env tkind f in
+     let* si = co_node genv env tkind f in
      return (Vnode(si))
 
 (* The main step function *)
@@ -896,7 +935,7 @@ and sexp genv env { e_desc; e_loc } s =
         (* the application of a n-ary node is of the form [f(e1,..., en)] or *)
         (* [run f (e1,...,en)]. The [ei] are non strict *)
         let* v, s = sarg genv env e s in
-        let* v, si = run e_loc si v in
+        let* v, si = run si v in
         return (v, Slist [Sinstance si; s])
      | Eatomic, [e], s ->
         (* if one of the input is bot (or nil), the output is bot (or nil); *)
@@ -1049,7 +1088,7 @@ and sexp genv env { e_desc; e_loc } s =
   | Eapp { arg_list = [e] }, Slist [Sinstance si; s] ->
      (* Here, [f (e1,..., en)] is a short-cut for [run f (e1,...,en)] *)
      let* v, s = sarg genv env e s in
-     let* v, si = run e_loc si v in
+     let* v, si = run si v in
      return (v, Slist [Sinstance si; s])
   | Eapp { f; arg_list }, Slist (s :: s_list) ->
      (* [f] must return a combinatorial function *)
@@ -1076,7 +1115,7 @@ and sexp genv env { e_desc; e_loc } s =
      let* v, s = sexp genv env e s in
      return (v, Slist [s_eq; s])
   | Efun(fe), s ->
-     let* v = value_of_funexp genv env fe in
+     let* v = funexp genv env fe in
      return (Value(v), s)
   | Ematch { e; handlers }, Slist(se :: s_list) ->
      let* ve, se = sexp genv env e se in
@@ -1456,36 +1495,9 @@ and sarg genv env ({ e_desc; e_loc } as e) s =
      sexp genv env e s
 
 (* application of a node *)
-and run loc ({ init; step } as i) v =
-  let* v, init = runstep loc init step v in
+and run ({ init; step } as i) v =
+  let* v, init = step init v in
   return (v, { i with init; step })
-
-and funstep genv env { f_args; f_body } s v =
-  let match_in_list a_list s_list v_list =
-    let match_in acc vdec s v =
-      let* acc, s = svardec c_genv c_env acc vdec s v in
-      let* s = set_vardec acc vdec s in
-      return (acc, s) in
-    mapfold3 { kind = Epattern_matching_failure; loc }
-      match_in Env.empty a_list s_list v_list in
-
-  match f_args, s with
-  | [arg_list], Slist (s_body :: s_arg_list) ->
-     let* v_list =
-       (* special case for a single argument *)
-       match arg_list with
-       | [_] -> let* v =
-                  Primitives.atomic v |>
-                    Opt.to_result ~none:{ kind = Etype; loc } in
-                return [v]
-       | _ -> return (Primitives.list_of v) in
-     let* env_arg_list, s_arg_list =
-       match_in_list arg_list s_arg_list v_list in
-     let env = Env.append env_arg_list c_env in
-     let* r, s_body = sresult c_genv env f_body s_body in
-     return (r, Slist (s_body :: s_arg_list))
-  | _ ->
-     error { kind = Etype; loc }
 
 and sexp_list loc genv env e_list s_list =
   slist loc genv env sexp e_list s_list
@@ -2282,58 +2294,26 @@ and sstate genv env { desc; loc } s =
 and apply loc fv v_list =
   match fv, v_list with
   | _, [] -> return (Value(fv))
-  | Vfun(op), v :: v_list ->
+  | Vifun(op), v :: v_list ->
      let* v =
        Primitives.atomic v |> Opt.to_result ~none:{ kind = Etype; loc } in
      let+ v = v in
      let* fv =
        op v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
      apply loc fv v_list
-  | Vcofun { arity; f }, v_list ->
-     apply_cofun loc arity f v_list
-  | _ ->
-     (* typing error *)
-     error { kind = Etype; loc = loc }
-
-and apply_cofun loc arity f v_list =
-  let actual_arity = List.length v_list in
-  if actual_arity = arity then
-    f v_list
-  else if actual_arity < arity
-  then error { kind = Etype; loc = loc }
-  else
-    (* the result is a function *)
-    return
-      (Value(Vcofun { arity = actual_arity - arity;
-                      f = fun v_list_extra -> f (v_list @ v_list_extra) }))
-
-(* apply a closure to a list of arguments *)
-and apply_closure loc genv env ({ f_kind; f_loc } as fe) f_args f_body v_list =
-  match f_args, v_list with
-  | [], _ ->
-     (* check that the kind is combinatorial *)
-     let* r =
-       match f_kind with
-       | Knode _ ->
-          error { kind = Eshould_be_combinatorial; loc }
-       | Kfun _ ->
-          match v_list with
-          | [] -> vresult genv env f_body
-          | _ -> let* fv = vresult genv env f_body in
-                 let+ fv = fv in
-                 apply loc fv v_list in
-     return r
-  | arg :: f_args, v :: v_list ->
-     (* every argument is an atomic value *)
-     let* v =
-       Primitives.atomic v |> Opt.to_result ~none: { kind = Etype; loc } in
-     let* env = Match.matching_arg_in f_loc env arg v in
-     apply_closure loc genv env fe f_args f_body v_list
-  | _, [] ->
-     return
-       (Value(Vclosure({ c_funexp = { fe with f_args = f_args };
-                         c_genv = genv; c_env = env })))
-
+  | Vfun { f_arity; f }, v_list ->
+     let actual_arity = List.length v_list in
+     if f_arity = actual_arity then f v_list
+     else
+       if f_arity < actual_arity then
+         (* typing error *)
+         error { kind = Etype; loc = loc }
+       else
+         return
+           (Value(Vfun { f_arity = actual_arity - f_arity;
+                         f = fun v_list_extra -> f (v_list @ v_list_extra) }))
+  | _ -> error { kind = Etype; loc = loc }
+       
 (* apply a function of sizes to a list of sizes *)
 and sizeapply loc fv v_list =
   (* is negative? *)
@@ -2343,23 +2323,12 @@ and sizeapply loc fv v_list =
     (* returns true if v_list1 < v_list2; lexical order of OCaml *)
     v_list1 < v_list2 in
 
-
-  let apply s_params s_body s_genv s_env =
-    if List.length s_params <> List.length v_list
-    then error { kind = Etype; loc }
-    else
-      let env = 
-        List.fold_left2 
-          (fun acc id v -> Env.add id (Match.entry (Vint v)) acc) 
-          s_env s_params v_list in
-      vexp s_genv env s_body in
   match fv with
-  | Vsizefun { s_params; s_body; s_genv; s_env } ->
-     apply s_params s_body s_genv s_env
+  | Vsizefun { s_f } -> s_f v_list
   | Vsizefix { bound; name; defs } ->
-     let { s_params; s_body; s_genv; s_env } = Env.find name defs in
+     let { s_f } = Env.find name defs in
      (* when the function is recursive, the actual value of the argument *)
-     (* must be strictly less than the bound and greater or equal than zero *)
+     (* must be strictly less than the bound and greater or equal to zero *)
      let* _ =
        match bound with
        | None -> return ()
@@ -2369,18 +2338,8 @@ and sizeapply loc fv v_list =
            error 
              { kind = Esize_in_a_recursive_call
                         { actual = v_list; expected = e_v_list }; loc } in
-     (* the body of [name] is evaluated in its closure environment *)
-     (* extended with all entries in [defs] *)
-     let s_env = 
-       Env.fold 
-         (fun f e acc -> 
-            Env.add f 
-              (Match.entry 
-                 (Vsizefix { bound = Some(v_list); name = f; defs })) acc)
-         defs s_env in
-     apply s_params s_body s_genv s_env
+     s_f v_list
   | _ -> error { kind = Etype; loc }
-
 
 (* evaluate an equation *)
 (* check that no value is bot nor nil *)
@@ -2500,18 +2459,14 @@ let eval_two_nodes loc output n_steps
 (* is a node with a void argument, execute its body for [n] steps *)
 let eval ff n_steps name v =
   match v with
-  | Vclosure({ c_funexp = { f_kind; f_loc; f_args = [[]] } } as c) ->
-     begin match f_kind with
-     | Knode _ ->
-        let si = catch (instance f_loc c) in
-        Format.fprintf ff
-          "@[val %s() for %d steps = @.@]" name n_steps;
-        eval_node Location.no_location (Output.value_flush ff) n_steps si void
-     | Kfun _ ->
-        let v = catch (apply Location.no_location v [void]) in
+  | Vnode({ arity = 0 } as si) ->
+     Format.fprintf ff
+       "@[val %s() for %d steps = @.@]" name n_steps;
+     eval_node Location.no_location (Output.value_flush ff) n_steps si []
+  | Vfun { f_arity = 0; f } ->
+        let v = catch (f []) in
         Format.fprintf ff
           "@[val %s() = %a@.@]" name Output.value v
-     end
   | _ ->
      Format.fprintf ff "@[val %s = %a@.@]" name Output.pvalue v
 
@@ -2534,22 +2489,13 @@ let check n_steps
   let check name v1 v2 =
     Debug.print_message ("Checking node " ^ name);
     match v1, v2 with
-    | Vclosure
-      ({ c_funexp = { f_kind = k1; f_loc = loc1; f_args = [[]] } } as c1),
-      Vclosure
-        ({ c_funexp = { f_kind = k2; f_loc = loc2; f_args = [[]] } } as c2) ->
-        begin match k1, k2 with
-        | Knode _, Knode _ ->
-           let si1 = catch (instance loc1 c1) in
-           let si2 = catch (instance loc2 c2) in
-           eval_two_nodes 
-             Location.no_location Output.value_flush n_steps si1 si2 void
-        | Kfun _, Kfun _ ->
-           eval_two_fun Location.no_location Output.value_flush v1 v2 [void]
-        | _ ->
-           catch (error { kind = Etype; loc = loc1 })
-        end     
-    | _ -> () in
+    | Vnode({ arity = 0 } as si1), Vnode({ arity = 0 } as si2) ->
+       eval_two_nodes 
+         Location.no_location Output.value_flush n_steps si1 si2 []
+    | Vfun({ f_arity = 0; f = f1 }), Vfun({ f_arity = 0; f = f2 }) ->
+       eval_two_fun Location.no_location Output.value_flush v1 v2 []
+    | _ ->
+       catch (error { kind = Etype; loc = Location.no_location }) in
   let check name v1 =
     let v2 = E.find name g2 in
     check name v1 v2 in

@@ -211,24 +211,31 @@ let matching_arg_in loc env arg v =
     return (Env.add var_name { empty with cur = Some(v) } acc) in
   match arg, v with
   | l, Vbot ->
-     fold2 { kind = Epattern_matching_failure; loc = loc }
+     fold2 { kind = Epattern_matching_failure; loc }
        match_in env l (List.map (fun _ -> Vbot) l)
   | l, Vnil ->
-     fold2 { kind = Epattern_matching_failure; loc = loc }
+     fold2 { kind = Epattern_matching_failure; loc }
        match_in env l (List.map (fun _ -> Vnil) l)
   | [], Value(Vvoid) -> return env
   | l, Value(Vtuple(v_list)) ->
      fold2
-       { kind = Epattern_matching_failure; loc = loc }
+       { kind = Epattern_matching_failure; loc }
        match_in env l v_list
   | l, Value(Vstuple(v_list)) ->
      fold2
-       { kind = Epattern_matching_failure; loc = loc }
+       { kind = Epattern_matching_failure; loc }
        (fun acc n pvalue -> match_in acc n (Value(pvalue))) env l v_list
   | [x], _ -> match_in env x v
   | _ ->
      (* type error *)
-     error { kind = Epattern_matching_failure; loc = loc }
+     error { kind = Epattern_matching_failure; loc }
+
+let matching_arg_in_list loc env arg_list v_list =
+  let open Result in
+  let open Error in
+  fold2
+    { kind = Epattern_matching_failure; loc }
+    (fun env arg v -> matching_arg_in loc env arg v) env arg_list v_list
 
 let matching_arg_out loc env arg =
   let open Result in
