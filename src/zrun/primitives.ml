@@ -72,7 +72,7 @@ let test v =
 
 let get_node v =
   match v with
-  | Vconode(instance) -> return instance
+  | Vnode(instance) -> return instance
   | _ -> None
 
 let get_record r =
@@ -222,7 +222,7 @@ let rec compare_pvalue v1 v2 =
   | Vrecord _, Vrecord _ -> none
   | Vtuple(v_list1), Vtuple(v_list2) ->
      compare_list compare_value v_list1 v_list2
-  | (Vfun _, Vfun _) | (Vcofun _, Vcofun _) | (Vconode _, Vconode _) -> none
+  | (Vifun _, Vifun _) | (Vfun _, Vfun _) | (Vnode _, Vnode _) -> none
   | _ -> none
 
 (* comparison of present/absent with one the representation of the other *)
@@ -423,7 +423,7 @@ let atomic v =
   let+ v = v in
   match v with
   | Vtuple(l) -> stuple l
-  | Vcofun _ | Vconode _ ->
+  | Vfun _ | Vnode _ ->
       (* this part should be changed into [atomic(f) = lambda x.let+ x in f x] *)
       (* that is, even if [f] is not strict, make it a strict function *)
       (* this is necessary to avoid unbounded recursion with f = \x. x x and f f *)
@@ -438,12 +438,12 @@ let void = Value(Vvoid)
 let max_float = Value(Vfloat(max_float))
 let zero_float = Value(Vfloat(0.0))
 
-let zerop op = Vfun (fun _ -> op ())
+let zerop op = Vifun (fun _ -> op ())
 
-let unop op = Vfun op
+let unop op = Vifun op
 
 let binop op =
-  Vfun(fun v1 -> return (Vfun (fun v2 -> op v1 v2)))
+  Vifun(fun v1 -> return (Vifun (fun v2 -> op v1 v2)))
 
 (*
 (* state processes *)

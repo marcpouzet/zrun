@@ -53,10 +53,10 @@ and pvalue =
   | Varray of pvalue array
   (* imported stateless functions; they must verify that *)
   (* f(atomic v) not= bot *)
-  | Vfun of (pvalue -> pvalue option)
+  | Vifun of (pvalue -> pvalue option)
   (* user defined functions and nodes *)
-  | Vcofun of (value -> value result)
-  | Vconode of instance
+  | Vfun of { arity: int; f : value list -> value result }
+  | Vnode of instance
   (* function parameterized by sizes *)
   | Vsizefun of sizefun
 (* mutually recursive definition of size functions *)
@@ -78,7 +78,7 @@ and 'a array =
 and 'a map =
   { m_length : int; m_u : int -> 'a result }
 
-and sizefun = int -> value
+and sizefun = { s_body: int list -> value result; }
 
 (* instance of a node *)
 and instance =
@@ -105,7 +105,7 @@ and state =
   | Senv of value ientry Ident.Env.t
 
 (*
-  Intuition: a expression is interpreted as a value of type:
+  Intuition: an expression is interpreted as a value of type:
 
   type ('a, 's) costream =
   | CoF : { init : 's;
@@ -119,9 +119,7 @@ and state =
   | CoNode : { init : 's;
                step : 's -> 'a list -> ('b * 's) option } -> ('a, 'b, 's) node
 
- Here, the set of values is a big bag in which all kinds of value is put; in
- particular values that do not of bounded sizes. This could be constrained because,
- values on streams are actually of bounded sizes. That which belong to a CPO of
- unbounded height (e.g., functions) are computed only at "compilation time" or
- "instanciation time".
+  Here, the set of values contains all the possible value; those that are
+  produced at every step and those that are produced only at "compile time"
+  or "instancitation time". They could be separated into two distinct sets
 *)

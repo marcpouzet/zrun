@@ -305,16 +305,14 @@ let rec size env { desc; loc } =
 
 (* mutually recursive definitions must either define *)
 (* functions parameterized by a size or stream values *)
-let sizefun_defs_or_values genv env l_eq =
+let sizefun_defs_or_values genv env apply l_eq =
   let rec split (acc, one_value) { eq_desc; eq_loc } =
     match eq_desc with
     | EQsizefun { sf_id; sf_id_list; sf_e } ->
        if one_value then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
-       else return (Env.add sf_id { s_params = sf_id_list; 
-                                    s_body = sf_e; s_genv = genv; 
-                                    s_env = env } acc,
-                 one_value)
+       else return (Env.add sf_id { s_body = fun v_list -> apply v_list } acc,
+                    one_value)
     | EQand { eq_list } ->
        fold split (acc, one_value) eq_list
     | EQempty -> 
@@ -328,8 +326,8 @@ let sizefun_defs_or_values genv env l_eq =
   else
     return (Either.Right(acc))
 
-let sizefun_defs genv env { l_eq; l_loc } =
-  let* v = sizefun_defs_or_values genv env l_eq in
+let sizefun_defs genv env apply { l_eq; l_loc } =
+  let* v = sizefun_defs_or_values genv env apply l_eq in
   match v with 
   | Right(defs) -> return defs 
   | Left _ -> error { kind = Esizefun_def_recursive; loc = l_loc }
@@ -426,9 +424,8 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
           let* v =
             Primitives.get_node v |>
             Opt.to_result ~none: { kind = Eshould_be_a_node; loc = e_loc1} in
-          let* si = instance e_loc1 v in
           let* s2 = iexp is_fun genv env e2 in
-          return (Slist [Sinstance(si); s2])
+          return (Slist [Sinstance(v); s2])
      | (Eatomic | Etest), [e] -> iexp is_fun genv env e
      | Edisc, [e] -> 
        if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
@@ -468,12 +465,11 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
      let* se = iexp is_fun genv env e in
      let* s =
        match v with
-       | Vclosure ({ c_funexp = { f_kind = Knode _; f_args = [_] } } as c) ->
+       | Vnode(si) ->
           (* [f e] with [f] a node is a short-cut for [run f e] *)
           if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
-          else let* si = instance l_loc c in
-            return (Sinstance(si))
-       | Vclosure _ | Vfun _ -> return Sempty
+          else return (Sinstance(si))
+       | Vifun _ | Vfun _ -> return Sempty
        | _ -> error { kind = Etype; loc = e_loc } in
      return (Slist [s; se])
   | Eapp { f; arg_list } ->
@@ -812,14 +808,25 @@ and iresult is_fun genv env { r_desc } =
   | Exp(e) -> iexp is_fun genv env e
   | Returns(b) -> iblock is_fun genv env b
 
-(* an instance of a node *)
-and instance loc ({ c_funexp = { f_args; f_body }; c_genv; c_env } as c) =
+(* the instance value from a node definition *)
+and instance_of_funexp genv env tkind ({ f_args; f_body; f_loc } as f) = 
   match f_args with
   | [ arg ] ->
-     let* s_list = map (ivardec false true c_genv c_env) arg in
-     let* s_body = iresult false c_genv c_env f_body in
-     return { init = Slist (s_body :: s_list); step = c }
-  | _ -> error { kind = Etype; loc }
+     let* s_list = map (ivardec false true genv env) arg in
+     let* s_body = iresult false genv env f_body in
+     return { tkind;
+              init = Slist (s_body :: s_list);
+              step = fun s v -> runstep genv env f s v }
+  | _ -> error { kind = Etype; loc = f_loc }
+
+and value_of_funexp genv env ({ f_kind; f_args; f_loc; f_body } as f) =
+  match f_kind with
+  | Zelus.Kfun _ ->
+     return (Vfun { arity = List.length f_args;
+                      f = fun v_list -> vresult genv env f_body v_list })
+  | Zelus.Knode(tkind) ->
+     let* si = instance_of_funexp genv env tkind f in
+     return (Vnode(si))
 
 (* The main step function *)
 (* the value of an expression [e] in a global environment [genv] and local *)
@@ -1069,7 +1076,8 @@ and sexp genv env { e_desc; e_loc } s =
      let* v, s = sexp genv env e s in
      return (v, Slist [s_eq; s])
   | Efun(fe), s ->
-     return (Value(Vclosure { c_funexp = fe; c_genv = genv; c_env = env }), s)
+     let* v = value_of_funexp genv env fe in
+     return (Value(v), s)
   | Ematch { e; handlers }, Slist(se :: s_list) ->
      let* ve, se = sexp genv env e se in
      let* v, s_list =
@@ -1326,7 +1334,7 @@ and vleq genv env ({ l_rec; l_eq } as leq) =
   (* for the moment, only recursive definitions of *)
   (* functions of sizes are allowed *)
   if l_rec then
-    let* defs = sizefun_defs genv env leq in
+    let* defs = sizefun_defs genv env apply leq in
     return (Fix.sizefixpoint defs)
   else let* s = ieq true genv env l_eq in
     let* env, _ = seq genv env l_eq s in
@@ -1448,11 +1456,11 @@ and sarg genv env ({ e_desc; e_loc } as e) s =
      sexp genv env e s
 
 (* application of a node *)
-and run loc { init; step } v =
+and run loc ({ init; step } as i) v =
   let* v, init = runstep loc init step v in
-  return (v, { init; step })
+  return (v, { i with init; step })
 
-and runstep loc s { c_funexp = { f_args; f_body }; c_genv; c_env } v =
+and funstep genv env { f_args; f_body } s v =
   let match_in_list a_list s_list v_list =
     let match_in acc vdec s v =
       let* acc, s = svardec c_genv c_env acc vdec s v in
@@ -1493,7 +1501,7 @@ and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
      if l_rec then
        (* Either it is a collection of mutually recursive functions *)
        (* parameterized by a size or stream values *)
-       let* defs = sizefun_defs_or_values genv env l_eq in
+       let* defs = sizefun_defs_or_values genv env apply l_eq in
        let* (env_eq, s_eq) =
          match defs with
          | Either.Right(defs) ->
@@ -2281,12 +2289,23 @@ and apply loc fv v_list =
      let* fv =
        op v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
      apply loc fv v_list
-  | Vclosure { c_funexp = { f_kind; f_args; f_body } as fe;
-               c_genv; c_env }, _ ->
-     apply_closure loc c_genv c_env fe f_args f_body v_list
+  | Vcofun { arity; f }, v_list ->
+     apply_cofun loc arity f v_list
   | _ ->
      (* typing error *)
      error { kind = Etype; loc = loc }
+
+and apply_cofun loc arity f v_list =
+  let actual_arity = List.length v_list in
+  if actual_arity = arity then
+    f v_list
+  else if actual_arity < arity
+  then error { kind = Etype; loc = loc }
+  else
+    (* the result is a function *)
+    return
+      (Value(Vcofun { arity = actual_arity - arity;
+                      f = fun v_list_extra -> f (v_list @ v_list_extra) }))
 
 (* apply a closure to a list of arguments *)
 and apply_closure loc genv env ({ f_kind; f_loc } as fe) f_args f_body v_list =

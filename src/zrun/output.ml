@@ -48,10 +48,10 @@ let rec pvalue ff v =
   | Vstate1(id, l) ->
      fprintf
        ff "@[<hov 1>%a(%a)@]" Ident.fprint_t id pvalue_list l
-  | Vfun _ ->
+  | Vifun _ ->
      fprintf ff "<fun>"
-  | Vcofun _ -> fprintf ff "<fun>"
-  | Vconode { tkind } ->
+  | Vfun _ -> fprintf ff "<fun>"
+  | Vnode { tkind } ->
      fprintf ff "<%s>" (Printer.tkind tkind)
   | Vsizefun _ ->
      fprintf ff "<sizefun>"
