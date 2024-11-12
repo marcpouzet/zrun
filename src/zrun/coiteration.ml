@@ -303,16 +303,19 @@ let rec size env { desc; loc } =
      | Size_minus -> return (v1 - v2)
      | Size_mult -> return (v1 * v2)
 
-(* mutually recursive definitions must either define *)
-(* functions parameterized by a size or stream values *)
-let sizefun_defs_or_values genv env sizeapply l_eq =
+(* mutually recursive definitions are of two form. Either they *)
+(* define functions parameterized by a size or stream values *)
+let sizefun_defs_or_values genv env sizefun l_eq =
   let rec split (acc, one_value) { eq_desc; eq_loc } =
     match eq_desc with
     | EQsizefun { sf_id; sf_id_list; sf_e } ->
        if one_value then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
-       else return (Env.add sf_id { s_body = fun v_list -> sizeapply v_list } acc,
-                    one_value)
+       else (* returns a functional value *)
+         return
+           (Env.add sf_id
+              { s_f = sizefun eq_loc genv env sf_id_list sf_e } acc,
+            one_value)
     | EQand { eq_list } ->
        fold split (acc, one_value) eq_list
     | EQempty -> 
@@ -326,8 +329,8 @@ let sizefun_defs_or_values genv env sizeapply l_eq =
   else
     return (Either.Right(acc))
 
-let sizefun_defs genv env sizeapply { l_eq; l_loc } =
-  let* v = sizefun_defs_or_values genv env sizeapply l_eq in
+let sizefun_defs genv env sizefun { l_eq; l_loc } =
+  let* v = sizefun_defs_or_values genv env sizefun l_eq in
   match v with 
   | Right(defs) -> return defs 
   | Left _ -> error { kind = Esizefun_def_recursive; loc = l_loc }
@@ -808,7 +811,7 @@ and iresult is_fun genv env { r_desc } =
   | Exp(e) -> iexp is_fun genv env e
   | Returns(b) -> iblock is_fun genv env b
 
-(* the functional value of a function definition *)
+(* the functional value of a function definition [fun|node|hybrid x... -> e] *)
 and funexp genv env ({ f_kind; f_args } as f) =
   (* the functional value from a (combinatorial) function definition *)
   let co_fun genv env { f_args; f_body; f_loc } v_list =
@@ -816,7 +819,21 @@ and funexp genv env ({ f_kind; f_args } as f) =
     vresult genv env f_body in
 
   (* the functional value from a stateful (node) function definition *)
-  let co_step loc genv env arg_list f_body s v =
+  let rec co_node genv env tkind { f_args; f_body; f_loc } = 
+    match f_args with
+    | [ arg_list ] ->
+       (* nodes are not curried; this feature was possible in LS *)
+       (* but not in Zelus. *)
+       let* s_list = map (ivardec false true genv env) arg_list in
+       let* s_body = iresult false genv env f_body in
+       let step = co_step f_loc genv env arg_list f_body in
+       return { tkind;
+                arity = List.length arg_list;
+                init = Slist (s_body :: s_list);
+                step }
+    | _ -> error { kind = Etype; loc = f_loc }
+
+  and co_step loc genv env arg_list f_body s v =
     let match_in_list a_list s_list v_list =
       let match_in acc vdec s v =
         let* acc, s = svardec genv env acc vdec s v in
@@ -827,14 +844,7 @@ and funexp genv env ({ f_kind; f_args } as f) =
     
     match s with
     | Slist (s_body :: s_arg_list) ->
-       let* v_list =
-         (* special case for a single argument *)
-         match arg_list with
-         | [_] -> let* v =
-                    Primitives.atomic v |>
-                      Opt.to_result ~none:{ kind = Etype; loc } in
-                  return [v]
-         | _ -> return (Primitives.list_of v) in
+       let v_list = Primitives.list_of v in
        let* env_arg_list, s_arg_list =
          match_in_list arg_list s_arg_list v_list in
        let env = Env.append env_arg_list env in
@@ -842,21 +852,6 @@ and funexp genv env ({ f_kind; f_args } as f) =
        return (r, Slist (s_body :: s_arg_list))
     | _ ->
        error { kind = Estate; loc } in
-
-  (* the instance value from a stateful function (node) definition *)
-  let co_node genv env tkind { f_args; f_body; f_loc } = 
-    match f_args with
-    | [ arg_list ] ->
-       (* nodes are not curried; this feature was possible in LS *)
-       (* it is not in Zelus. *)
-       let* s_list = map (ivardec false true genv env) arg_list in
-       let* s_body = iresult false genv env f_body in
-       let step = co_step f_loc genv env arg_list f_body in
-       return { tkind;
-                arity = List.length arg_list;
-                init = Slist (s_body :: s_list);
-                step }
-    | _ -> error { kind = Etype; loc = f_loc } in
 
   (* the functional value *)
   match f_kind with
@@ -1373,7 +1368,7 @@ and vleq genv env ({ l_rec; l_eq } as leq) =
   (* for the moment, only recursive definitions of *)
   (* functions of sizes are allowed *)
   if l_rec then
-    let* defs = sizefun_defs genv env apply leq in
+    let* defs = sizefun_defs genv env sizefun leq in
     return (Fix.sizefixpoint defs)
   else let* s = ieq true genv env l_eq in
     let* env, _ = seq genv env l_eq s in
@@ -1495,8 +1490,8 @@ and sarg genv env ({ e_desc; e_loc } as e) s =
      sexp genv env e s
 
 (* application of a node *)
-and run ({ init; step } as i) v =
-  let* v, init = step init v in
+and run ({ init; step } as i) v_list =
+  let* v, init = step init v_list in
   return (v, { i with init; step })
 
 and sexp_list loc genv env e_list s_list =
@@ -1513,7 +1508,7 @@ and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
      if l_rec then
        (* Either it is a collection of mutually recursive functions *)
        (* parameterized by a size or stream values *)
-       let* defs = sizefun_defs_or_values genv env apply l_eq in
+       let* defs = sizefun_defs_or_values genv env sizefun l_eq in
        let* (env_eq, s_eq) =
          match defs with
          | Either.Right(defs) ->
@@ -1555,8 +1550,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      return (env_p, s)
   | EQsizefun { sf_id; sf_id_list; sf_e }, s ->
      let v =
-       { s_params = sf_id_list; s_body = sf_e; 
-         s_genv = genv; s_env = env } in
+       { s_f = sizefun eq_loc genv env sf_id_list sf_e } in
      return (Env.singleton sf_id (Match.entry (Vsizefun v)), s)
   | EQder { id; e; e_opt; handlers },
     Slist (Scstate({ pos } as sc) :: s :: Sopt(x0_opt) :: s0 :: s_list) ->
@@ -2314,6 +2308,17 @@ and apply loc fv v_list =
                          f = fun v_list_extra -> f (v_list @ v_list_extra) }))
   | _ -> error { kind = Etype; loc = loc }
        
+(* making a function from the definition of a function of a size *)
+and sizefun loc genv env sf_id_list sf_body i_list =
+  if List.length sf_id_list <> List.length i_list
+    then error { kind = Etype; loc }
+    else
+      let env = 
+        List.fold_left2 
+          (fun acc id i -> Env.add id (Match.entry (Vint i)) acc) 
+          env sf_id_list i_list in
+      vexp genv env sf_body
+
 (* apply a function of sizes to a list of sizes *)
 and sizeapply loc fv v_list =
   (* is negative? *)
@@ -2422,7 +2427,7 @@ let eval_n n_steps init step v_list =
 let eval_node loc output n_steps { init; step } v  =
   let step s v =
     Debug.print_state "State before:" s;
-    let* v, s = runstep loc s step v in
+    let* v, s = step s v in
     Debug.print_state "State after:" s;
     output v; return s in
   eval_n n_steps init step v
@@ -2444,10 +2449,10 @@ let eval_two_nodes loc output n_steps
       { init = init1; step = step1 } { init = init2; step = step2 } v =
   let step (s1, s2) v =
     Debug.print_state "State before (first node):" s1;
-    let* v1, s1 = runstep loc s1 step1 v in
+    let* v1, s1 = step1 s1 v in
     Debug.print_state "State after (first node):" s1;
     Debug.print_state "State before (second node):" s2;
-    let* v2, s2 = runstep loc s2 step2 v in
+    let* v2, s2 = step2 s2 v in
     Debug.print_state "State after (second node):" s2;
     let* v = check_equality loc v1 v2 in
     if v then return (s1, s2) else
@@ -2462,7 +2467,7 @@ let eval ff n_steps name v =
   | Vnode({ arity = 0 } as si) ->
      Format.fprintf ff
        "@[val %s() for %d steps = @.@]" name n_steps;
-     eval_node Location.no_location (Output.value_flush ff) n_steps si []
+     eval_node Location.no_location (Output.value_flush ff) n_steps si void
   | Vfun { f_arity = 0; f } ->
         let v = catch (f []) in
         Format.fprintf ff
@@ -2491,7 +2496,7 @@ let check n_steps
     match v1, v2 with
     | Vnode({ arity = 0 } as si1), Vnode({ arity = 0 } as si2) ->
        eval_two_nodes 
-         Location.no_location Output.value_flush n_steps si1 si2 []
+         Location.no_location Output.value_flush n_steps si1 si2 void
     | Vfun({ f_arity = 0; f = f1 }), Vfun({ f_arity = 0; f = f2 }) ->
        eval_two_fun Location.no_location Output.value_flush v1 v2 []
     | _ ->

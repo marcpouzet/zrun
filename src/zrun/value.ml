@@ -59,7 +59,7 @@ and pvalue =
   | Vnode of instance
   (* function parameterized by sizes *)
   | Vsizefun of sizefun
-(* mutually recursive definition of size functions *)
+  (* mutually recursive definition of size functions *)
   | Vsizefix of
       { bound: int list option; (* the maximum number of iterations *)
         name: Ident.t; (* name of the defined function *)
@@ -87,7 +87,7 @@ and instance =
   { tkind: Zelus.tkind; (* discrete only or discrete/continuous-time state *)
     arity: int;
     init : state; (* current state *)
-    step : state -> value list -> (value * state) result; (* step function *)
+    step : state -> value -> (value * state) result; (* step function *)
   }
 
 and state =
