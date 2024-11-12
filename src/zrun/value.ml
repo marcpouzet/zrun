@@ -56,7 +56,7 @@ and pvalue =
   | Vifun of (pvalue -> pvalue option)
   (* user defined functions and nodes *)
   | Vfun of vfun
-  | Vnode of instance
+  | Vnode of vnode
   (* function parameterized by sizes *)
   | Vsizefun of sizefun
   (* mutually recursive definition of size functions *)
@@ -83,12 +83,14 @@ and sizefun = { s_f: int list -> value result; }
 and vfun = { f_arity: int; f : value list -> value result }
 
 (* instance of a node *)
-and instance =
+and vnode =
   { tkind: Zelus.tkind; (* discrete only or discrete/continuous-time state *)
     arity: int;
     init : state; (* current state *)
     step : state -> value -> (value * state) result; (* step function *)
   }
+
+and instance = vnode
 
 and state =
   | Sbot 
