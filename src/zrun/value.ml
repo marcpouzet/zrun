@@ -85,7 +85,7 @@ and vfun = { f_arity: int; f : value list -> value result }
 (* instance of a node *)
 and vnode =
   { tkind: Zelus.tkind; (* discrete only or discrete/continuous-time state *)
-    arity: int;
+    arity: int; (* [0] means [step s () = ...] *)
     init : state; (* current state *)
     step : state -> value -> (value * state) result; (* step function *)
   }

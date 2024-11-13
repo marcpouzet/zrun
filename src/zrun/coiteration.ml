@@ -2343,6 +2343,15 @@ and sizeapply loc fv v_list =
            error 
              { kind = Esize_in_a_recursive_call
                         { actual = v_list; expected = e_v_list }; loc } in
+     (* the body of [name] is evaluated in an environment *)
+     (* extended with all entries in [defs] *)
+     (* let s_env = 
+       Env.fold 
+         (fun f e acc -> 
+            Env.add f 
+              (Match.entry 
+                 (Vsizefix { bound = Some(v_list); name; defs })) acc)
+         defs s_env in *)
      s_f v_list
   | _ -> error { kind = Etype; loc }
 
@@ -2379,8 +2388,9 @@ let implementation genv { desc; loc } =
      let* f_pvalue_list =
        map
          (fun (n, id) ->
-           let* v = Env.find_opt id env |>
-                      Opt.to_result ~none:{ kind = Eunbound_ident(id); loc = loc }
+           let* v =
+             Env.find_opt id env |>
+               Opt.to_result ~none:{ kind = Eunbound_ident(id); loc = loc }
            in return (n, v)) d_names in
      (* debug info (a bit of imperative code here!) *)
      if !print_values then Output.letdecl Format.std_formatter f_pvalue_list;
