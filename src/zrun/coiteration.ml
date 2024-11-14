@@ -305,32 +305,30 @@ let rec size env { desc; loc } =
 
 (* mutually recursive definitions are of two form. Either they *)
 (* define functions parameterized by a size or stream values *)
-let sizefun_defs_or_values genv env sizefun l_eq =
+let sizefun_defs_or_values genv env l_eq =
   let rec split (acc, one_value) { eq_desc; eq_loc } =
     match eq_desc with
     | EQsizefun { sf_id; sf_id_list; sf_e } ->
        if one_value then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
        else (* returns a functional value *)
-         return
-           (Env.add sf_id
-              { s_f = sizefun eq_loc genv env sf_id_list sf_e } acc,
-            one_value)
+         return ((sf_id, (sf_id_list, sf_e, genv, env)) :: acc,
+                 one_value)
     | EQand { eq_list } ->
        fold split (acc, one_value) eq_list
     | EQempty -> 
        return (acc, one_value)
     | _ -> 
-      if Env.is_empty acc then return (acc, true)
+      if List.is_empty acc then return (acc, true)
       else error { kind = Esizefun_def_recursive; loc = eq_loc } in
-  let* acc, one_value = split (Env.empty, false) l_eq in
+  let* acc, one_value = split ([], false) l_eq in
   if one_value then
     return (Either.Left(l_eq))
   else
     return (Either.Right(acc))
 
-let sizefun_defs genv env sizefun { l_eq; l_loc } =
-  let* v = sizefun_defs_or_values genv env sizefun l_eq in
+let sizefun_defs genv env { l_eq; l_loc } =
+  let* v = sizefun_defs_or_values genv env l_eq in
   match v with 
   | Right(defs) -> return defs 
   | Left _ -> error { kind = Esizefun_def_recursive; loc = l_loc }
@@ -1368,11 +1366,26 @@ and vleq genv env ({ l_rec; l_eq } as leq) =
   (* for the moment, only recursive definitions of *)
   (* functions of sizes are allowed *)
   if l_rec then
-    let* defs = sizefun_defs genv env sizefun leq in
-    return (Fix.sizefixpoint defs)
+    let* defs = sizefun_defs genv env leq in
+    return (sizefixpoint defs)
   else let* s = ieq true genv env l_eq in
     let* env, _ = seq genv env l_eq s in
     return env
+
+(* builds an environment from a set of size function definitions *)
+and sizefixpoint defs =
+  let rec sizefixpoint defs s_bound =
+    match defs with
+    | [] -> Env.empty
+    | (sf_id, (sf_id_list, sf_e, genv, env)) :: defs ->
+       let rec s_fun i_list =
+         (* all recursive call must be on a size less than [i_list] *)
+         sizefun genv (env_ext (Some(i_list))) sf_id_list sf_e i_list
+       and
+         env_ext s_bound = Env.append (sizefixpoint defs s_bound) env in
+       Env.add sf_id
+         (Match.entry (Vsizefun { s_fun; s_bound })) (env_ext s_bound) in
+  sizefixpoint defs None
 
 (* computing the value of a result combinatorial expression *)
 and vresult genv env r =
@@ -1508,11 +1521,11 @@ and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
      if l_rec then
        (* Either it is a collection of mutually recursive functions *)
        (* parameterized by a size or stream values *)
-       let* defs = sizefun_defs_or_values genv env sizefun l_eq in
+       let* defs = sizefun_defs_or_values genv env l_eq in
        let* (env_eq, s_eq) =
          match defs with
          | Either.Right(defs) ->
-            let env = Fix.sizefixpoint defs in
+            let env = sizefixpoint defs in
             return (env, s_eq)
          | Either.Left(l_eq) ->
             (* compute a bounded fix-point in [n] steps *)
@@ -1550,7 +1563,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      return (env_p, s)
   | EQsizefun { sf_id; sf_id_list; sf_e }, s ->
      let v =
-       { s_f = sizefun eq_loc genv env sf_id_list sf_e } in
+       { s_fun = sizefun genv env sf_id_list sf_e; s_bound = None } in
      return (Env.singleton sf_id (Match.entry (Vsizefun v)), s)
   | EQder { id; e; e_opt; handlers },
     Slist (Scstate({ pos } as sc) :: s :: Sopt(x0_opt) :: s0 :: s_list) ->
@@ -2309,9 +2322,9 @@ and apply loc fv v_list =
   | _ -> error { kind = Etype; loc = loc }
        
 (* making a function from the definition of a function of a size *)
-and sizefun loc genv env sf_id_list sf_body i_list =
+and sizefun genv env sf_id_list sf_body i_list =
   if List.length sf_id_list <> List.length i_list
-    then error { kind = Etype; loc }
+    then error { kind = Etype; loc = sf_body.e_loc }
     else
       let env = 
         List.fold_left2 
@@ -2320,39 +2333,29 @@ and sizefun loc genv env sf_id_list sf_body i_list =
       vexp genv env sf_body
 
 (* apply a function of sizes to a list of sizes *)
-and sizeapply loc fv v_list =
+and sizeapply loc fv i_list =
   (* is negative? *)
-  let negative v_list = List.for_all (fun x -> x < 0) v_list in
+  let negative i_list = List.for_all (fun x -> x < 0) i_list in
   (* strictly less than - lexical order *)
-  let lt v_list1 v_list2 =
-    (* returns true if v_list1 < v_list2; lexical order of OCaml *)
-    v_list1 < v_list2 in
+  let lt i_list1 i_list2 =
+    (* returns true if i_list1 < i_list2; lexical order of OCaml *)
+    i_list1 < i_list2 in
 
   match fv with
-  | Vsizefun { s_f } -> s_f v_list
-  | Vsizefix { bound; name; defs } ->
-     let { s_f } = Env.find name defs in
-     (* when the function is recursive, the actual value of the argument *)
+  | Vsizefun { s_fun; s_bound } ->
+     (* in case the function is recursive, the actual value of the size arguments *)
      (* must be strictly less than the bound and greater or equal to zero *)
      let* _ =
-       match bound with
+       match s_bound with
        | None -> return ()
-       | Some(e_v_list) ->
-         if lt v_list e_v_list && not (negative v_list) then return ()
-         else
+       | Some(e_i_list) ->
+          if lt i_list e_i_list && not (negative i_list) then return ()
+          else
            error 
              { kind = Esize_in_a_recursive_call
-                        { actual = v_list; expected = e_v_list }; loc } in
-     (* the body of [name] is evaluated in an environment *)
-     (* extended with all entries in [defs] *)
-     (* let s_env = 
-       Env.fold 
-         (fun f e acc -> 
-            Env.add f 
-              (Match.entry 
-                 (Vsizefix { bound = Some(v_list); name; defs })) acc)
-         defs s_env in *)
-     s_f v_list
+                        { actual = i_list; expected = e_i_list }; loc } in
+     (* then call the function *)
+     s_fun i_list
   | _ -> error { kind = Etype; loc }
 
 (* evaluate an equation *)

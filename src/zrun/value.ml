@@ -59,13 +59,6 @@ and pvalue =
   | Vnode of vnode
   (* function parameterized by sizes *)
   | Vsizefun of sizefun
-  (* mutually recursive definition of size functions *)
-  | Vsizefix of
-      { bound: int list option; (* the maximum number of iterations *)
-        name: Ident.t; (* name of the defined function *)
-        defs: sizefun Ident.Env.t;
-        (* the set of mutually recursive function definitions *) 
-      }
 
 and 'a array =
   | Vflat of 'a Array.t
@@ -78,7 +71,8 @@ and 'a array =
 and 'a map =
   { m_length : int; m_u : int -> 'a result }
 
-and sizefun = { s_f: int list -> value result; }
+and sizefun =
+  { s_fun: int list -> value result; s_bound: int list option }
 
 and vfun = { f_arity: int; f : value list -> value result }
 
