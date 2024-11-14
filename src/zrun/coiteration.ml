@@ -1382,9 +1382,10 @@ and sizefixpoint defs =
          (* all recursive call must be on a size less than [i_list] *)
          sizefun genv (env_ext (Some(i_list))) sf_id_list sf_e i_list
        and
-         env_ext s_bound = Env.append (sizefixpoint defs s_bound) env in
-       Env.add sf_id
-         (Match.entry (Vsizefun { s_fun; s_bound })) (env_ext s_bound) in
+         env_ext s_bound =
+         Env.add sf_id (Match.entry (Vsizefun { s_fun; s_bound }))
+           (Env.append (sizefixpoint defs s_bound) env) in
+       env_ext s_bound in
   sizefixpoint defs None
 
 (* computing the value of a result combinatorial expression *)
