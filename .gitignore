@@ -6,3 +6,4 @@
 *.output
 .merlin
 _build/
+.config.ml
