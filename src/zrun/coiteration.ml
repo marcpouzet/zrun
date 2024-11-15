@@ -812,35 +812,22 @@ and iresult is_fun genv env { r_desc } =
 (* the functional value of a function definition [fun|node|hybrid x... -> e] *)
 and funexp genv env ({ f_kind; f_args } as f) =
   (* the functional value from a (combinatorial) function definition *)
-  let co_fun genv env { f_args; f_body; f_loc } v_list =
-    let* env = Match.matching_arg_in_list f_loc env f_args v_list in
-    vresult genv env f_body in
+  let co_fun genv env { f_args; f_body; f_loc } =
+    let f_fun v_list =
+      let* env = Match.matching_arg_in_list f_loc env f_args v_list in
+      vresult genv env f_body in
+    return (Vfun { f_arity = List.length f_args; f_fun }) in
 
-  (* the functional value from a stateful (node) function definition *)
-  let rec co_node genv env tkind { f_args; f_body; f_loc } = 
-    match f_args with
-    | [ arg_list ] ->
-       (* nodes are not curried; this feature was possible in LS *)
-       (* but not in Zelus. *)
-       let* s_list = map (ivardec false true genv env) arg_list in
-       let* s_body = iresult false genv env f_body in
-       let step = co_step f_loc genv env arg_list f_body in
-       return { tkind;
-                arity = List.length arg_list;
-                init = Slist (s_body :: s_list);
-                step }
-    | _ -> error { kind = Etype; loc = f_loc }
-
-  and co_step loc genv env arg_list f_body s v =
+  let co_step f_loc genv env arg_list f_body =
     let match_in_list a_list s_list v_list =
       let match_in acc vdec s v =
         let* acc, s = svardec genv env acc vdec s v in
         let* s = set_vardec acc vdec s in
         return (acc, s) in
-      mapfold3 { kind = Epattern_matching_failure; loc }
+      mapfold3 { kind = Epattern_matching_failure; loc = f_loc }
         match_in Env.empty a_list s_list v_list in
     
-    match s with
+    fun s v -> match s with
     | Slist (s_body :: s_arg_list) ->
        let v_list = Primitives.list_of v in
        let* env_arg_list, s_arg_list =
@@ -849,16 +836,36 @@ and funexp genv env ({ f_kind; f_args } as f) =
        let* r, s_body = sresult genv env f_body s_body in
        return (r, Slist (s_body :: s_arg_list))
     | _ ->
-       error { kind = Estate; loc } in
+       error { kind = Estate; loc = f_loc } in
 
+  (* the functional value from a stateful (node) function definition *)
+  let co_node f_loc genv env tkind arg_list f_body =
+    let* s_list = map (ivardec false true genv env) arg_list in
+    let* s_body = iresult false genv env f_body in
+    let step = co_step f_loc genv env arg_list f_body in
+    let si = { tkind; arity = List.length arg_list;
+               init = Slist (s_body :: s_list); step } in
+    return (Vnode(si)) in
+
+  let n_arry_co_node genv env tkind { f_loc; f_args; f_body } = 
+    (* nodes are not curried; this feature was possible in LS *)
+    (* but not in Zelus. *)
+    (* That is: [node a1 ... an -> e] is a short-cut for *)
+    (* [fun a1 ...an-1 -> node an -> e] *)
+    let f_args, arg_list = Util.firsts f_args in
+    match f_args with
+    | [] -> co_node f_loc genv env tkind arg_list f_body
+    | _ ->
+       let f_fun v_list =
+         let* env = Match.matching_arg_in_list f_loc env f_args v_list in
+         let* v = co_node f_loc genv env tkind arg_list f_body in
+         return (Value(v)) in
+       return (Vfun { f_arity = List.length f_args; f_fun }) in
+    
   (* the functional value *)
   match f_kind with
-  | Zelus.Kfun _ ->
-     let f = co_fun genv env f in
-     return (Vfun({ f_arity = List.length f_args; f }))
-  | Zelus.Knode(tkind) ->
-     let* si = co_node genv env tkind f in
-     return (Vnode(si))
+  | Zelus.Kfun _ -> co_fun genv env f
+  | Zelus.Knode(tkind) -> n_arry_co_node genv env tkind f
 
 (* The main step function *)
 (* the value of an expression [e] in a global environment [genv] and local *)
@@ -1379,7 +1386,7 @@ and sizefixpoint defs =
     | [] -> Env.empty
     | (sf_id, (sf_id_list, sf_e, genv, env)) :: defs ->
        let rec s_fun i_list =
-         (* all recursive call must be on a size less than [i_list] *)
+         (* all recursive calls must be on a size that is less than [i_list] *)
          sizefun genv (env_ext (Some(i_list))) sf_id_list sf_e i_list
        and
          env_ext s_bound =
@@ -2309,17 +2316,19 @@ and apply loc fv v_list =
      let* fv =
        op v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
      apply loc fv v_list
-  | Vfun { f_arity; f }, v_list ->
+  | Vfun { f_arity; f_fun }, v_list ->
      let actual_arity = List.length v_list in
-     if f_arity = actual_arity then f v_list
+     if f_arity = actual_arity then f_fun v_list
      else
        if f_arity < actual_arity then
          (* typing error *)
          error { kind = Etype; loc = loc }
        else
          return
-           (Value(Vfun { f_arity = actual_arity - f_arity;
-                         f = fun v_list_extra -> f (v_list @ v_list_extra) }))
+           (Value(Vfun
+                    { f_arity = actual_arity - f_arity;
+                      f_fun = fun v_list_extra ->
+                              f_fun (v_list @ v_list_extra) }))
   | _ -> error { kind = Etype; loc = loc }
        
 (* making a function from the definition of a function of a size *)
@@ -2482,8 +2491,8 @@ let eval ff n_steps name v =
      Format.fprintf ff
        "@[val %s() for %d steps = @.@]" name n_steps;
      eval_node Location.no_location (Output.value_flush ff) n_steps si void
-  | Vfun { f_arity = 0; f } ->
-        let v = catch (f []) in
+  | Vfun { f_arity = 0; f_fun } ->
+        let v = catch (f_fun []) in
         Format.fprintf ff
           "@[val %s() = %a@.@]" name Output.value v
   | _ ->
@@ -2511,7 +2520,7 @@ let check n_steps
     | Vnode({ arity = 0 } as si1), Vnode({ arity = 0 } as si2) ->
        eval_two_nodes 
          Location.no_location Output.value_flush n_steps si1 si2 void
-    | Vfun({ f_arity = 0; f = f1 }), Vfun({ f_arity = 0; f = f2 }) ->
+    | Vfun({ f_arity = 0; f_fun = f1 }), Vfun({ f_arity = 0; f_fun = f2 }) ->
        eval_two_fun Location.no_location Output.value_flush v1 v2 []
     | _ ->
        catch (error { kind = Etype; loc = Location.no_location }) in

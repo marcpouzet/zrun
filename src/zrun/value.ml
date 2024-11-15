@@ -74,7 +74,7 @@ and 'a map =
 and sizefun =
   { s_fun: int list -> value result; s_bound: int list option }
 
-and vfun = { f_arity: int; f : value list -> value result }
+and vfun = { f_arity: int; f_fun : value list -> value result }
 
 (* instance of a node *)
 and vnode =
