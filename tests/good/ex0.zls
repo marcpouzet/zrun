@@ -1,3 +1,9 @@
+let node from_() = o where
+  rec o = 0 -> pre o + 1
+
+let node from_2() = o where
+  rec o = if from_() < 4 then 42 else o
+
 let node f1() returns (o init 42)
   o = last o + 1
 
