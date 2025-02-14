@@ -1,0 +1,31 @@
+let node main() returns o
+  local u
+  do
+   o = 0 ->
+      if pre u then pre o + 1
+      else pre o - 1
+  and
+   u = (o <= 5) ->
+        if pre u then not (o >= 5)
+        else o <= 0
+  and
+   assert ((0 <= o) & (o <= 5))
+  done
+
+let node main2() returns (o init -1)
+   automaton
+   | Up -> do o = last o + 1 unless (last o >= 5) then Down
+   | Down -> do o = last o - 1 unless (last o <= 0) then Up
+   end
+
+(*
+let node main3() returns (o init 0)
+   automaton
+   | Up -> do next o = o + 1 unless (o >= 5) then Down
+   | Down -> do next o = o - 1 unless (o <= 0) then Up
+   end
+*)
+
+let node eq() returns ()
+  assert (main() = main2())
+  
