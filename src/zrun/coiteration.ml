@@ -2320,7 +2320,7 @@ and sizeapply loc fv v_list =
      (* extended with all entries in [defs] *)
      let s_env = 
        Env.fold 
-         (fun f e acc -> 
+         (fun f _ acc -> 
             Env.add f 
               (Match.entry 
                  (Vsizefix { bound = Some(v_list); name; defs })) acc)

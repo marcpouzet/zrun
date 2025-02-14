@@ -1,0 +1,13 @@
+let node () returns o
+  local up
+  do
+   o = 0 ->
+      if pre up then pre o + 1
+      else pre o - 1
+  and
+   up = (o <= 5) ->
+        if pre up then not (o >= 5)
+        else o >= 0
+  and
+   assert ((0 <= o) & (o <= 5))
+  done
