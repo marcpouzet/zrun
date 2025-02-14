@@ -27,13 +27,15 @@ let node main() returns o
   done
 
 let node main2() returns (o init -1)
-   automaton
+ do
+  automaton
    | Up -> do o = last o + 1 unless (last o >= 5) then Down
    | Down -> do o = last o - 1 unless (last o <= 0) then Up
    end
  and
-   assert ((0 <= o) & (o <= 5))
-  
+  assert ((0 <= o) & (o <= 5))
+ done
+ 
 (*
 let node main3() returns (o init 0)
    automaton
