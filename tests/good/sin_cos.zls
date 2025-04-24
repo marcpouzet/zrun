@@ -1,5 +1,6 @@
 (* sinus/cosinus *)
 (* file sin_cos.zls *)
+(* test with zrun.exe -s main -n 100 *)
 
 (* forward Euler *)
 let node euler_forward(h, x0, xprime) returns (x)
