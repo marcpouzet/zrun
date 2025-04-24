@@ -25,6 +25,12 @@ let node sin_cos() returns (sin, cos)
   do sin = euler_forward(h, 0.0, cos)
   and cos = euler_backward(h, 1.0, -. sin) done
 
+(* Note that if euler_forward is used twice, then, the assertion fails! This *)
+(* is because floatting point errors do not compensate with each others. *)
+(* If euler_backward is used twice, the program contains an instantaneous algebraic *)
+(* loop (a causality loop) and zrun complains with a run-time errors *)
+(* Said diffently, there should be at least a pre and at most one *)
+
 let b = 0.1
 
 let node main() returns
