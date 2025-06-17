@@ -90,6 +90,8 @@ type operator =
   (* period *)
   | Ehorizon : operator
   (* generate an event at a given horizon *)
+  | Einitial
+  (* true at the very first instant *)
   | Edisc : operator
   (* generate an event whenever x <> last x outside of integration *)
   | Earray : array_operator -> operator
@@ -151,6 +153,7 @@ and pattern_desc =
   | Eorpat : pattern * pattern -> pattern_desc
   | Erecordpat : (longname * pattern) list -> pattern_desc
   | Etypeconstraintpat : pattern * type_expression -> pattern_desc
+  | Earraypat : pattern list -> pattern_desc
 
 type statepatdesc =
   | Estate0pat : name -> statepatdesc
@@ -200,11 +203,13 @@ and exp_desc =
   | Erecord_with : exp * (longname * exp) list -> exp_desc
   | Etypeconstraint : exp * type_expression -> exp_desc
   | Efun : funexp -> exp_desc
-  | Ematch : exp * (exp, exp) match_handler list -> exp_desc
+  | Ematch : is_size * exp * (exp, exp) match_handler list -> exp_desc
   | Epresent : (scondpat, exp) present_handler list * exp default -> exp_desc
   | Ereset : exp * exp -> exp_desc
   | Eassert : exp -> exp_desc
   | Eforloop : for_exp forloop -> exp_desc
+
+and is_size = bool
 
 and is_copy = bool
 
@@ -246,7 +251,7 @@ and eq_desc =
   | EQautomaton : (exp, eq) block automaton_handler list *
         exp state option -> eq_desc
   (* automaton ... *)
-  | EQmatch : exp * (exp, eq) match_handler list -> eq_desc
+  | EQmatch : is_size * exp * (exp, eq) match_handler list -> eq_desc
   | EQpresent :
       (scondpat, eq) present_handler list * eq default -> eq_desc
   | EQempty : eq_desc

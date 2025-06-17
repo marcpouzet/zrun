@@ -1,4 +1,4 @@
-let version = "z0"
+let version = "Zrun.2025"
 let subversion = "dev"
-let stdlib = "/Users/pouzet/article/paper/lustre/hybrid/zelus_git/github/zrun.work/_build/install/default/share/zelus"
-let date = "2024-11-11-15:57"
+let stdlib = "/Users/pouzet/article/paper/lustre/hybrid/zelus_git/github/zrun.work-match-size/_build/install/default/share/zrun"
+let date = "2025-06-17-10:28"

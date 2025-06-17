@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2025 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -95,12 +95,14 @@ type operator =
   (* the argument is atomic - arity = 1 *)
   | Etest 
   (* testing the presence of a signal - arity = 1 *)
-  | Eup 
+  | Eup of { is_zero: bool} (* when [is_zero], [up: _ -> zero], [up: _ -> bool] otherwise *)
   (* zero-crossing detection - arity = 1 *)
   | Eperiod 
   (* period - arity = 2 *)
   | Ehorizon 
   (* generate an event at a given horizon - arity = 1 *)
+  | Einitial
+  (* true at the very first instant - arity = 0 *)
   | Edisc 
   (* generate an event whenever x <> last x outside of integration *)
   | Earray of array_operator
@@ -166,7 +168,8 @@ and 'info pattern_desc =
   | Ealiaspat of 'info pattern * Ident.t 
   | Eorpat of 'info pattern * 'info pattern 
   | Erecordpat of 'info pattern record list 
-  | Etypeconstraintpat of 'info pattern * type_expression 
+  | Etypeconstraintpat of 'info pattern * type_expression
+  | Earraypat of 'info pattern list
 
 type ('info, 'ienv, 'exp, 'eq) block =
   { b_vars: ('info, 'exp) vardec list;
@@ -196,7 +199,7 @@ type ('ienv, 'pattern, 'body) match_handler =
     m_body: 'body;
     m_loc: Location.t;
     m_reset: bool; (* the handler is reset on entry *)
-    m_zero: bool; (* the handler is done at a zero-crossing instant *)
+    mutable m_zero: bool; (* the handler is done at a zero-crossing instant *)
     mutable m_env: 'ienv Ident.Env.t;
   }
 
@@ -206,7 +209,7 @@ type ('ienv, 'scondpat, 'body) present_handler =
     p_body: 'body;
     p_loc: Location.t;
     mutable p_env: 'ienv Ident.Env.t;
-    p_zero: bool;
+    mutable p_zero: bool;
   }
 
 type ('ienv, 'scondpat, 'exp, 'leq, 'body) escape =
@@ -225,7 +228,7 @@ type is_weak = bool
 type ('info, 'ienv) exp =
   { e_desc: ('info, 'ienv) exp_desc; (* descriptor *)
     e_loc: Location.t; (* location *)
-    mutable e_info: 'info; (* information *)
+    mutable e_info: 'info; (* type information *)
   }
 
 and ('info, 'ienv) exp_desc =
@@ -251,7 +254,9 @@ and ('info, 'ienv) exp_desc =
   | Erecord_with of ('info, 'ienv) exp * ('info, 'ienv) exp record list
   | Etypeconstraint of ('info, 'ienv) exp * type_expression 
   | Efun of ('info, 'ienv) funexp 
-  | Ematch of { mutable is_total : bool; e : ('info, 'ienv) exp;
+  | Ematch of { is_size: bool; (* is-it a match of a size expression? *)
+                mutable is_total : bool; (* the pattern matching is total *)
+                e : ('info, 'ienv) exp; (* expression to be matched *)
                 handlers : ('ienv, 'info pattern, ('info, 'ienv) exp)
                              match_handler list } 
   | Epresent of
@@ -270,8 +275,27 @@ and ('info, 'ienv, 'size, 'body) forloop =
     for_input : ('info, 'ienv) exp for_input list;
     for_body : 'body;
     for_resume : bool; (* resume or restart *)
-    for_env : 'ienv Ident.Env.t; (* names (index and inputs) *)
+    mutable for_env : 'ienv Ident.Env.t; (* names (index and inputs) *)
   }
+
+and ('info, 'ienv) for_eq =
+  { for_out : ('info, 'ienv) for_out list; (* outputs *)
+    (* loop body *)
+    for_block : ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) eq) block; 
+    mutable for_out_env: 'ienv Ident.Env.t; (* names in output *)
+  }
+
+and 'exp for_kind =
+  | Kforeach
+  (* parallel loop *)
+  | Kforward of 'exp for_exit option 
+(* iteration during one instant. The argument is the stoping condition *)
+
+and 'exp for_exit = 
+  { for_exit : 'exp;
+    for_exit_kind : for_exit_kind }
+
+and for_exit_kind = | Ewhile | Euntil | Eunless
 
 (* result expression of a loop *)
 and ('info, 'ienv) for_exp =
@@ -283,7 +307,7 @@ and ('info, 'ienv) for_returns =
   { r_returns : ('info, 'ienv) for_vardec list; (* return *)
     r_block : ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) eq) block;
     (* body *)
-    r_env : 'ienv Ident.Env.t; (* environment for the return *)
+    mutable r_env : 'ienv Ident.Env.t; (* environment for the return *)
     (* [for[each|ward] ... returns (...) local ... do eq ... done] *)
   }
 
@@ -298,7 +322,7 @@ and ('info, 'ienv) for_vardec_desc =
 and is_rec = bool
 
 and ('info, 'ienv) leq =
-  { l_kind: vkind;
+  { mutable l_kind: vkind;
     l_rec: is_rec;
     l_eq: ('info, 'ienv) eq;
     l_loc : Location.t;
@@ -346,7 +370,7 @@ and ('info, 'ienv) eq_desc =
       { handlers : ('ienv, ('info, 'ienv) scondpat, ('info, 'ienv) eq)
                      present_handler list;
         default_opt : ('info, 'ienv) eq default } 
-  | EQmatch of { mutable is_total : bool; e : ('info, 'ienv) exp;
+  | EQmatch of { is_size: bool; mutable is_total : bool; e : ('info, 'ienv) exp;
                  handlers : ('ienv, 'info pattern, ('info, 'ienv) eq)
                               match_handler list }
   | EQempty
@@ -356,25 +380,6 @@ and ('info, 'ienv) eq_desc =
 (* [foreach [e]* [id in e [by e],]* returns (vardec_list) do eq] *)
 (* [forward [resume] [e]* [id in e [by e],]* returns (vardec_list) *)
 (*  do eq [while/unless/until e] e done]  *)
-
-and ('info, 'ienv) for_eq =
-  { for_out : ('info, 'ienv) for_out list; (* outputs *)
-    (* loop body *)
-    for_block : ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) eq) block; 
-    mutable for_out_env: 'ienv Ident.Env.t; (* names in output *)
-  }
-
-and 'exp for_kind =
-  | Kforeach
-  (* parallel loop *)
-  | Kforward of 'exp for_exit option 
-(* iteration during one instant. The argument is the stoping condition *)
-
-and 'exp for_exit = 
-  { for_exit : 'exp;
-    for_exit_kind : for_exit_kind }
-
-and for_exit_kind = | Ewhile | Euntil | Eunless
 
 (* input definition for a loop *)
 and 'exp for_input = 'exp for_input_desc localized
@@ -394,6 +399,7 @@ and ('info, 'ienv) for_out_desc =
     for_out_name : Ident.t option; (* [xi out x] *)
     for_init : ('info, 'ienv) exp option;
     for_default : ('info, 'ienv) exp option;
+    mutable for_info: 'info; (* type information *)
   }
 
 (* signal patterns *)

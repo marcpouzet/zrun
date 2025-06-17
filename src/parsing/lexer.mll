@@ -41,6 +41,7 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
   "const", CONST;
   "default", DEFAULT;
   "der", DER;
+  "disc", DISC;
   "do", DO;
   "done", DONE;
   "downto", DOWNTO;
@@ -83,6 +84,7 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
   "to", TO;
   "true", BOOL(true); 
   "type", TYPE;
+  "size", SIZE;
   "static", STATIC;
   "unless", UNLESS;
   "until", UNTIL;
@@ -162,6 +164,7 @@ rule main = parse
   | "}"  { RBRACE }
   | "*"  { STAR }
   | ":"  { COLON }
+  | "::"  { COLONCOLON }
   | "="  { EQUAL }
   | "==" { EQUALEQUAL }
   | "&"  { AMPERSAND }
@@ -171,7 +174,7 @@ rule main = parse
   | ","  { COMMA }
   | ";"  { SEMI }
   | "->" { MINUSGREATER }
-  | "-V->" { VFUN }
+  | "-SC->" { VFUN }
   | "-S->" { SFUN }
   | "-A->" { AFUN }
   | "-D->" { DFUN }

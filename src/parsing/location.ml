@@ -1,7 +1,6 @@
 (* Printing a location in the source program *)
 (* taken from the source of the Caml Light 0.73 compiler *)
 
-
 open Format
 
 (* two important global variables: [input_name] and [input_chan] *)
@@ -9,19 +8,21 @@ type t =
     Loc of int     (* Position of the first character *)
          * int     (* Position of the next character following the last one *)
 
+type ft = { f_iname: string; f_loc: t } (* input file name and location *)
 
+let start_end (Loc(s, e)) = s, e
 
 let input_name = ref ""                 (* Input file name. *)
 
 let input_chan = ref stdin
 
+let current_iname loc = { f_iname = !input_name; f_loc = loc }
+
 let initialize iname =
   input_name := iname;
   input_chan := open_in iname
 
-
 let no_location =  Loc(0,0)
-
 
 let error_prompt = ">"
 
@@ -149,3 +150,16 @@ let output_location ff loc =
 let output_input_name ff =
   fprintf ff "File \"%s\", line 1:\n" !input_name
 
+
+(* add-on to the original Caml Light code *)
+let output_location_list ff f_loc_list =
+  let rec output current_iname f_loc_list =
+    match f_loc_list with
+    | [] -> ()
+    | { f_iname; f_loc } :: f_loc_list ->
+       let current_iname =
+         if current_iname = f_iname then current_iname else
+           (initialize f_iname; f_iname) in
+       output_location ff f_loc;
+       output current_iname f_loc_list in
+  output !input_name f_loc_list
