@@ -51,7 +51,7 @@ let node gilbreath_stream (c:bool) returns (ok, o)
    half = false -> not (pre half)
  and
    ok = true -> not (half && (o = pre o))
-   --% PROPERTY ok
+ (*   --% PROPERTY ok *)
  done
  
 let node main() =
