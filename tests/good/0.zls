@@ -1,0 +1,3 @@
+let main45() returns (o)
+  let m = foreach(15) returns ([|xi|]) do xi = false done in
+  do o = m done

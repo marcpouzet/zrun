@@ -50,6 +50,10 @@ let main5() returns ()
   assert
     (or_n<<8>>([|true; false; false; false; true; false; false; false |]))
 
+let main45() returns (o)
+  let m = foreach(15) returns ([|xi|]) do xi = false done in
+  do o = m done
+
 let main55() returns (o)
   let m = foreach(15) returns ([|xi|]) do xi = false done in
   do o = or_n<<15>>(m) done
