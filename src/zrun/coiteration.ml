@@ -335,6 +335,8 @@ let sizefun_defs genv env { l_eq; l_loc } =
   | Left _ -> error { kind = Esizefun_def_recursive; loc = l_loc }
 
 (* Present handler *)
+(* In the code below, [is_fun] is a boolean flag. When true, the expression *)
+(* is expected to be combinational. If it is not, an error is raised *)
 let ipresent_handler is_fun iscondpat ibody genv env { p_cond; p_body } =
   let* sc = iscondpat is_fun genv env p_cond in
   let* sb = ibody is_fun genv env p_body in
@@ -517,21 +519,17 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
        let* s_res = iexp is_fun genv env e_res in
        (* TODO: double the state; an idea from Louis Mandel *)
        (* in case of a reset, simply restart from this copy *)
-       (* alternatively, the current solution recalls [iexp] *)
-       (* in the actual, imperative implementation, generated code is *)
-       (* statically scheduled and reset is obtained *)
-       (* by executing a reset method which puts the state *)
-       (* to its initial value *)
+       (* The alternative (and current) solution recalls function [iexp] *)
+       (* In the generated code produced by a compiler, this code is *)
+       (* statically scheduled. The reset is obtained by calling a reset method *)
+    (* which set state variable to their initial value *)
        return (Slist[s_body; s_res])
   | Eassert(e_body) ->
      let* s_body = iexp is_fun genv env e_body in
      return s_body
   | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
-     (* a forward loop with resume is allowed only in a statefull expression *)
-     if is_fun && for_resume 
-     then error { kind = Eshould_be_combinatorial; loc = e_loc }
-     else let* si_list = map (ifor_input is_fun genv env) for_input in
-       let* s_body, sr_list = 
+     let* si_list = map (ifor_input is_fun genv env) for_input in
+     let* s_body, sr_list = 
          ifor_exp is_fun for_resume genv env for_body in
        let* s_size, s_body =
          ifor_kind genv env for_size for_kind s_body in
@@ -578,8 +576,7 @@ and ifor_input is_fun genv env { desc; loc } =
      let* s2 = iexp is_fun genv env e_right in
      return (Slist [s1; s2])
 
-and ifor_output is_fun is_resume genv env
-  { desc = { for_init; for_default }; loc } =
+and ifor_output is_fun is_resume genv env { desc = { for_init; for_default }; loc } =
   let* s_init =
     match for_init with
     | None -> return Sempty
@@ -597,6 +594,9 @@ and ifor_output is_fun is_resume genv env
 and ifor_vardec is_fun is_resume genv env { desc = { for_vardec } } =
   ivardec is_fun is_resume genv env for_vardec
 
+(* if the for loop is a forward iteration that is reset *)
+(* the overal code is considered to be combinational whereas the body *)
+(* can be stateful *)
 and ifor_exp is_fun is_resume genv env r =
   match r with
   | Forexp { exp } ->
@@ -688,15 +688,18 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
                 for_body = { for_out; for_block }; for_resume }) ->
      (* if the size is not given there should be at least one input *)
      match for_size, for_input with
-       | None, [] -> error { kind = Eloop_cannot_determine_size; loc = eq_loc }
-       | _ ->
-         let* s_input_list = map (ifor_input is_fun genv env) for_input in
-         let* so_list = 
-           map (ifor_output (is_fun && for_resume) for_resume genv env) for_out in
-         let* s_body = iblock (is_fun && for_resume) genv env for_block in
-         let* s_size, s_body =
-           ifor_kind genv env for_size for_kind s_body in
-         return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
+     | None, [] -> error { kind = Eloop_cannot_determine_size; loc = eq_loc }
+     | _ ->
+        (* if the for loop is a forward iteration that is reset *)
+        (* the overal code is considered to be combinational whereas the body *)
+        (* can be stateful *)
+        let* s_input_list = map (ifor_input is_fun genv env) for_input in
+        let* so_list = 
+          map (ifor_output is_fun for_resume genv env) for_out in
+        let* s_body = iblock (is_fun && for_resume) genv env for_block in
+        let* s_size, s_body =
+          ifor_kind genv env for_size for_kind s_body in
+        return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
 
 and iblock is_fun genv env { b_vars; b_body } =
   let* s_b_vars = map (ivardec is_fun true genv env) b_vars in
