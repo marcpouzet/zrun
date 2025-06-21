@@ -13,36 +13,43 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* This file defines an operational (executable) semantics for a
+(* This file defines a functional (executable) semantics for a
  *- synchronous language like Lustre, Scade, Lucid Synchrone and Zelus.
  *- It is based on a companion file and working notes on the co-iterative
  *- semantics presented at the SYNCHRON workshop, December 2019,
  *- the class on "Advanced Functional Programming" given at Bamberg
- *- Univ. in June-July 2019 and the Master MPRI - M2, Fall 2019, 2020, 2021
- *- The original version of this code is taken from the GitHub Zrun repo:
+ *- Univ. in June-July 2019 and slides for Master MPRI - M2, Fall 2019, 2020, 2021
+ *- The original version of this code is taken from the GitHub ZRun repo:
  *- https://github.com/marcpouzet/zrun
  *- ZRun was programmed right after the COVID confinment, in May-June 2020
  *- This second version includes some of the Zelus constructs:
  *- ODEs and zero-crossing; higher order functions;
  *- the implem. was done in 2021 and updated since then;
- *- first update during summer 2022 with array constructs inspired by that
- *- of the beautiful SISAL language; a restricted form was already
- *- implemented in Zelus V2 in 2017.
- *- w.r.t SISAL, for-loops can contain stateful (stream) functions;
- *- two style of for loop constructs are provided:
- *- 1/ the foreach loop iteration runs several instances of a stream
- *- function; in operational terms, every application has it own state;
- *- 2/ the forward loop is an "hyper-serial" loop iteration: a stream
- *- function to an input array taken as a input sequence; the sequence of
- *- outputs can be stored into an output array or only the last value is
- *- return. This construction is similar to the "clock domains" construct
- *- presented at PPDP'13/SCP'15 (Louis Mandel, Cedric Pasteur and Marc Pouzet)
- *- and temporal refinement by Caspi and Mikac because it performs several
- *- synchronous reactions as if it were a single one.
- *- The size of arrays and thenumber of iterations must be known statically.
+ *- first update during summer 2022 with array constructs inspired by the
+ *- loop construct from SISAL language expressed in a purely-functional form;
+ *- a first version of loop iteration (the "foreach" was named "forall" and was
+ *- implemented in Zelus V2 in 2017).
+ *- Two style of loop iterations are provided:
+ *- 1/ The "foreach" loop iteration runs several instances of a stream
+ *- function (say f); in operational terms, every application has it own state; it
+ *- corresponds to the classical "map" operation:
+ *- the input is an array of streams and the output is an array of streams.
+ *- 2/ The forward loop is an "hyper-serial" loop iteration: the array of input
+ *- stream is interpreted as a faster stream passed to [f] and whose result
+ *- is converted back into an array of streams. In this form, it is possible
+ *- to reset [f] for every new array coming in or not. And it is possible to
+ *- return the array of successive computation or only the very last one.
+ *- This construction is the data-flow version of the "clock domains" construct
+ *- of ReactiveML (PPDP'13 and SCP'15; by L. Mandel, C. Pasteur and M. Pouzet)
+ *- and the work on temporal refinement studied by Caspi and Mikac. It
+ *- performs several successive synchronous reactions but a single one is
+ *- observable. In term of generated code, it generated a for loop.
+ *- In this work, the size of arrays and maximum number of iterations must 
+ *- be known statically.
  *-
- *- If you find this work useful for your research, please cite
- *- the [EMSOFT'2023] paper and send a mail: [Marc.Pouzet@ens.fr]
+ *- If you find the work on ZRun work useful for your research, please cite
+ *- the [EMSOFT'2023] paper. Do not hesitate to send us a mail: 
+ *- [Marc.Pouzet@ens.fr]
  *)
 
 open Misc
