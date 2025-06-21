@@ -26,7 +26,7 @@
  *- ODEs and zero-crossing; higher order functions;
  *- the implem. was done in 2021 and updated since then;
  *- first update during summer 2022 with array constructs inspired by that
- *- of the (beautiful) SISAL language; a restricted form was already
+ *- of the beautiful SISAL language; a restricted form was already
  *- implemented in Zelus V2 in 2017.
  *- w.r.t SISAL, for-loops can contain stateful (stream) functions;
  *- two style of for loop constructs are provided:
@@ -172,6 +172,25 @@ let smatch_handler_list loc sbody genv env ve m_h_list s_list =
        return (r, s)
     | _ -> error { kind = Estate; loc = loc } in
   smatch_rec m_h_list s_list
+
+(* the argument [ve] is static and [s] is the state of the selected branch *)
+let static_match_handler_list loc sbody genv env ve m_h_list s =
+  let rec smatch_rec m_h_list =
+    match m_h_list with
+    | [] -> error { kind = Epattern_matching_failure; loc = loc }
+    | { m_pat; m_body } :: m_h_list ->
+       let r = Match.pmatch ve m_pat in
+       let* r, s =
+         match r with
+         | None ->
+            (* this is not the good handler; try an other one *)
+            smatch_rec m_h_list
+         | Some(env_pat) ->
+            let env_pat = liftv env_pat in
+            let env = Env.append env_pat env in
+            sbody genv env m_body s in
+       return (r, s) in
+  smatch_rec m_h_list
 
 (* an iterator *)
 let slist loc genv env sexp e_list s_list =
@@ -503,9 +522,20 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
      return (Slist(se :: s_list))
   | Etypeconstraint(e, _) -> iexp is_fun genv env e
   | Efun _ -> return Sempty
-  | Ematch { e; handlers } ->
+  | Ematch { is_size; e; handlers } ->
+     (* if [is_size] then evaluate the corresponding branch *)
+     (* the initial state is that of the selected branch *)
      let* se = iexp is_fun genv env e in
-     let* s_handlers = map (imatch_handler is_fun iexp genv env) handlers in
+     if is_size then
+       (* evaluate the size; the result must be an integer *)
+       let* ve = vsexp genv env e se in
+       let* v = is_int e.e_loc ve in
+       let* sm =
+         Match.match_handler_list 
+           e_loc (iexp is_fun) genv env (Vint(v)) handlers in
+       return (Slist [Sstatic(Vint(v)); sm])
+     else
+       let* s_handlers = map (imatch_handler is_fun iexp genv env) handlers in
      return (Slist (se :: s_handlers))
   | Epresent { handlers; default_opt } ->
      let* s_handlers =
@@ -676,10 +706,22 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
        let* i, si = initial_state_of_automaton is_fun genv env a_h state_opt in
        (* two state variables: initial state of the automaton and reset bit *)
        return (Slist(i :: Sval(Value(Vbool(false))) :: si :: s_list))
-  | EQmatch { e; handlers } ->
+  | EQmatch { is_size; e; handlers } ->
+     (* if [is_size] then evaluate the corresponding branch *)
+     (* the initial state is that of the selected branch *)
      let* se = iexp is_fun genv env e in
-     let* sm_list = map (imatch_handler is_fun ieq genv env) handlers in
-     return (Slist (se :: sm_list))
+     if is_size then
+       (* evaluate the size; the result must be an integer *)
+       let* ve = vsexp genv env e se in
+       let* v = is_int e.e_loc ve in
+       let* sm =
+         Match.match_handler_list 
+           eq_loc (ieq is_fun) genv env (Vint(v)) handlers in
+       return (Slist [Sstatic(Vint(v)); sm])
+     else
+       (* the state is a list of states - one per hander *)
+       let* sm_list = map (imatch_handler is_fun ieq genv env) handlers in
+       return (Slist (se :: sm_list))
   | EQempty -> return Sempty
   | EQassert(e) ->
      let* se = iexp is_fun genv env e in
@@ -1073,6 +1115,11 @@ and sexp genv env { e_desc; e_loc } s =
      return (v, Slist [s_eq; s])
   | Efun(fe), s ->
      return (Value(Vclosure { c_funexp = fe; c_genv = genv; c_env = env }), s)
+  | Ematch { is_size = true; handlers }, Slist [Sstatic(v_size); s] ->
+     (* [match size e with | P1 -> ... | ...] *)
+     let* v, s =
+       static_match_handler_list e_loc sexp genv env v_size handlers s in
+     return (v, Slist [Sstatic(v_size); s])
   | Ematch { e; handlers }, Slist(se :: s_list) ->
      let* ve, se = sexp genv env e se in
      let* v, s_list =
@@ -1674,6 +1721,13 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
           sautomaton_handler_list eq_loc
             is_weak genv env eq_write handlers ps pr s_list in
      return (env, Slist (Sval(ns) :: Sval(nr) :: si :: s_list))
+  | EQmatch { is_size = true; e; handlers }, Slist [Sstatic(v_size); s] ->
+     (* [match size e with | P1 -> ... | ...] *)
+     let* env_handler, s =
+       static_match_handler_list eq_loc seq genv env v_size handlers s in
+     (* complete missing entries in the environment *)
+     let* env_handler = Fix.by eq_loc env env_handler (names eq_write) in
+     return (env_handler, Slist [Sstatic(v_size); s])
   | EQmatch { e; handlers }, Slist (se :: s_list) ->
      let* ve, se = sexp genv env e se in
      let* env, s_list =
