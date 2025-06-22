@@ -16,7 +16,7 @@ let f4 () =
     fff<<10>>(0)
 
 let rec node buff<<n>>(x0, x) returns (o)
-  match n with | 0 -> o = x | _ -> o = x0 fby (run (buff<<n-1>>)(x0, x))
+  match size n with | 0 -> o = x | _ -> o = x0 fby (run (buff<<n-1>>)(x0, x))
 
 (* this one is not correct. Unbounded recursion *)
 let rec node buff2<<n>>(x0, x) returns (o)
