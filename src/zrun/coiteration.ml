@@ -1728,7 +1728,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
           sautomaton_handler_list eq_loc
             is_weak genv env eq_write handlers ps pr s_list in
      return (env, Slist (Sval(ns) :: Sval(nr) :: si :: s_list))
-  | EQmatch { is_size = true; e; handlers }, Slist [Sstatic(v_size); s] ->
+  | EQmatch { is_size = true; handlers }, Slist [Sstatic(v_size); s] ->
      (* [match size e with | P1 -> ... | ...] *)
      let* env_handler, s =
        static_match_handler_list eq_loc seq genv env v_size handlers s in
