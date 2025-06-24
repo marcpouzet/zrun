@@ -41,12 +41,12 @@ type 'v genv =
 
 let findfile filename =
   if Sys.file_exists filename then filename
-  else if not(Filename.is_implicit filename) then
-    raise(Cannot_find_file filename)
+  else if not (Filename.is_implicit filename) then
+    raise (Cannot_find_file filename)
   else
     let rec find = function
       | [] ->
-         raise(Cannot_find_file filename)
+         raise (Cannot_find_file filename)
       | a :: rest ->
          let b = Filename.concat a filename in
          if Sys.file_exists b then b else find rest
