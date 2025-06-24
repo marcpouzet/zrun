@@ -1,50 +1,73 @@
 # The ZRun Synchronous Language Interpreter
 
-ZRun is an executable reference semantics for a synchronous data-flow language. It takes the form of an interpreted expressed in a purely functional manner and is implemented in OCaml. The input of
-Zrun is a large subset of the language [Zélus](https://zelus.di.ens.fr). Only the discrete-time (synchronous) subset is considered for the moment, that is, signals are infinite streams and systems are stream functions. The basic primitives and the semantics principles are the ones of [Lustre](https://www-verimag.imag.fr/The-Lustre-Programming-Language-and?lang=en) (e.g., the non initialized unit delay (pre), initialization operator (->)). The language provides richer
-programming constructs that were introduced in [Lucid Synchrone](https://www.di.ens.fr/~pouzet/lucid-synchrone/index.html) and
-[Scade 6](https://www.college-de-france.fr/media/gerard-berry/UPL9185028255611736393_BP_CollegeDeFrance_23_avril_2013.pdf,https://www.di.ens.fr/~pouzet/bib/tase17.pdf): by-case definitions of streams and pattern matching; an operator "last" which refers to the previous value of a stream, hierarchical automata and array
-operations. Functions can take as argument values that can be specified to be statically known, at compile-time or instanciation time. The language provides a more experimental features like higher-order an functional recursion parameterized by a size.
+ZRun is an executable reference semantics for a synchronous data-flow
+language. It takes the form of an interpreted expressed in a purely
+functional manner and is implemented in OCaml. The input of Zrun is a
+large subset of the language [Zélus](https://zelus.di.ens.fr). Only
+the discrete-time (synchronous) subset is considered for the moment,
+that is, signals are infinite streams and systems are stream
+functions. The basic primitives and the semantics principles of the language are those
+of [Lustre](https://www-verimag.imag.fr/The-Lustre-Programming-Language-and?lang=en)
+(e.g., the non initialized unit delay (pre), initialization operator
+(->)). The language provides richer programming constructs that were
+introduced in [Lucid Synchrone](https://www.di.ens.fr/~pouzet/lucid-synchrone/index.html)
+and [Scade
+6](https://www.college-de-france.fr/media/gerard-berry/UPL9185028255611736393_BP_CollegeDeFrance_23_avril_2013.pdf):
+by-case definitions of streams and pattern matching; an operator
+"last" which refers to the previous value of a stream, hierarchical
+automata and array operations. Functions can take as argument values
+that can be specified to be statically known, at compile-time or
+instanciation time. The language provides a more experimental features
+like higher-order an functional recursion parameterized by a size.
 
 The goal of this prototype is to define a reference executable
-semantics. Its first intension is to be used independently of a compiler, for example, as an oracle for testing a compiler. It can serve to specify
-correctness properties on the verification step make by a synchronous compiler, e.g., that a well typed, well causal, well clocked, and well initialized program
-does not lead to an error; to prove semantics preservation of
-source-to-source transformations (static scheduling or the
-compilation of automata, etc.). Because source program taken by ZRun do not need to pass the static checks of a compiler, it is execute "unfinished programs" or programs
-that are semantically correct but are statically rejected by the
-compiler. The interpreter makes no a priori hypothesis on typing and
-other type-based static analyses performed by a synchronous language compiler. ZRun illustrates key differences in the treatment of
-causality between Lustre, Lucid Synchrone/Scade/Zelus and
-Esterel. The differences can be observed on the same program by a simple command-line option. Lustre is the more restrictive in term of feed-back loops while
-Esterel is the more permissive; the three languages
-Lucid Synchrone/Scade/Zelus define an analysis which exploits by-case
-definitions of streams. Examples of correct but rejected programs are those with
-cyclic circuits that accepted by an Esterel compiler (the so-called
-"constructively causal" programs) but that are rejected by Lustre (and
-also Lucid Synchrone, Scade and Zélus) because the compiler imposes
-stronger causality constraints. Finally, being independent of a
-compiler, this semantics can be used to prototype new language
-constructs before considering their compilation.
+semantics. Its first intension is to be used independently of a
+compiler to serve as an oracle for compiler testing. It serves to specify what
+are the correctness properties on the various dedicated type systems
+done by the compiler, that is, that a well typed/causal/clocked/initialized
+program does not lead to an error; to
+prove semantics preservation of source-to-source transformations
+performed by the compiler (static scheduling or the compilation of automata, etc.).
 
-The long term objective is to define an executable semantics
-that deal with all the language features of Zélus. For the moment, the so-called "hybrid" nodes where continuous-time signals are defined by Ordinary Differential Equations (ODEs) and zero-crossing events are forbidden. We are not yet at this point! 
+The ZRun interpreter makes no a priori hypothesis on typing and other
+type-based static analyses performed by a synchronous language
+compiler. Hence, ZRun can execute "unfinished programs" or programs that are
+semantically correct but are statically rejected by the compiler.
 
-ZRun was inspired by several works. The
-PhD. thesis of Gonthier 1/ "Sémantiques et modèles d'exécution des
-langages réactifs synchrones : application à Esterel", 1988; 2/ "The
-Constructive Semantics of Pure Esterel (Draft Version 3), by Berry; 3/ "The semantics and execution of a synchronous
-block-diagram language", by Edwards and Lee, Science of Computer
-Programming 2003. 4/ "A Coiterative Characterization of Synchronous Stream
-Functions", by Caspi and Pouzet, CMCS, 1998 (VERIMAG tech. report,
-1997); All are based on the fix-point computation of a
-monotone function on a domain with bounded height that is done at
-every reaction. The present work builds directly on 4/, reformulating
-the semantics so that it can be implemented in a statically typed, call-by-value and purely functional language that has strong normalization property
-(e.g., the programming language of Coq). In comparison, the original
-version in 4/ was a shallow embedding in a language with call-by-need (precisely Haskell). You can read the companion paper "[A Constructive State-based
-Semantics and Interpreter for a Synchronous Data-flow Language with
-State
+ZRun illustrates key differences in the treatment of
+causality between Lustre, Lucid Synchrone/Scade/Zelus and Esterel. Those
+differences can be observed on the same program with a simple
+command-line option (-lustre and -esterel). Lustre is the most restrictive in term of
+feed-back loops while Esterel is the most permissive; the languages Lucid Synchrone, Scade 6 and Zelus are
+in between, with a particular treatment of by-case definitions of streams.
+
+Finally, being independent of a compiler, this semantics
+can be used to prototype new language constructs before considering
+their compilation.
+
+The long term objective is to define an executable semantics that deal
+with all the language features of Zélus. For the moment, 
+"hybrid" nodes where continuous-time signals are defined by Ordinary
+Differential Equations (ODEs) and zero-crossing events are
+not treated.
+
+ZRun was inspired by several works. The PhD. thesis of Gonthier 1/
+"Sémantiques et modèles d'exécution des langages réactifs synchrones :
+application à Esterel", 1988; 2/ "The Constructive Semantics of Pure
+Esterel (Draft Version 3), by Berry; 3/ "The semantics and execution
+of a synchronous block-diagram language", by Edwards and Lee, Science
+of Computer Programming 2003. 4/ "A Coiterative Characterization of
+Synchronous Stream Functions", by Caspi and Pouzet, CMCS, 1998
+(VERIMAG tech. report, 1997); All are based on the fix-point
+computation of a monotone function on a domain with bounded height
+that is done at every reaction. The present work builds directly on
+4/, reformulating the semantics so that it can be implemented in a
+statically typed, call-by-value and purely functional language that
+has strong normalization property (e.g., the programming language of
+Coq). In comparison, the original version in 4/ was a shallow
+embedding in a language with call-by-need (precisely Haskell). You can
+read the companion paper "[A Constructive State-based Semantics and
+Interpreter for a Synchronous Data-flow Language with State
 machines](https://www.di.ens.fr/~pouzet/bib/emsoft23b-extended.pdf)"
 presented at EMSOFT'2023.
 
