@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2025 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -95,3 +95,9 @@ let lustre = ref false
 
 (* static reduction *)
 let static_reduction = ref false
+
+let apply_with_close_out f o =
+  try
+    f o;
+    close_out o
+  with x -> close_out o; raise x

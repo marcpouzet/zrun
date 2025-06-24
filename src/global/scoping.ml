@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2025 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -88,7 +88,12 @@ module Env =
       S.fold (fun s acc -> let m = fresh s in add s m acc) defnames env
   end
 
-module type INFO = sig type info val no_info : info end
+module type INFO =
+  sig
+    type info
+    val no_info : info
+    val print: Format.formatter -> info -> unit
+  end
 
 module Make (Info: INFO) =
   struct
@@ -148,7 +153,8 @@ module Make (Info: INFO) =
       | Erun(i) -> Zelus.Erun(i)
       | Eatomic -> Zelus.Eatomic  
       | Etest -> Zelus.Etest
-      | Eup -> Zelus.Eup
+      | Eup -> Zelus.Eup { is_zero = true }
+      | Einitial -> Zelus.Einitial
       | Edisc -> Zelus.Edisc
       | Eperiod -> Zelus.Eperiod
       | Ehorizon -> Zelus.Ehorizon
@@ -207,7 +213,7 @@ module Make (Info: INFO) =
       let rec build acc { desc } =
         match desc with
         | Ewildpat | Econstpat _ | Econstr0pat _ -> acc
-        | Econstr1pat(_, p_list) | Etuplepat(p_list) ->
+        | Econstr1pat(_, p_list) | Etuplepat(p_list) | Earraypat(p_list) ->
            build_list acc p_list
         | Evarpat(n) ->
 	   if S.mem n acc then 
@@ -267,7 +273,7 @@ module Make (Info: INFO) =
       | EQif(_, eq1, eq2) ->
          let defnames = buildeq defnames eq1 in
          buildeq defnames eq2
-      | EQmatch(_, h_list) ->
+      | EQmatch(_, _, h_list) ->
          List.fold_left build_match_handler defnames h_list
       | EQpresent(p_h_list, b_opt) ->
          let defnames = 
@@ -367,7 +373,9 @@ module Make (Info: INFO) =
              (List.map (fun (lname, p) ->
                   { Zelus.label = longname lname;
                     Zelus.arg = pattern_translate env p })
-	        l_p_list) in
+	        l_p_list)
+        | Earraypat(p_list) ->
+           Zelus.Earraypat(pattern_translate_list env p_list) in
       { Zelus.pat_desc = desc; Zelus.pat_loc = loc;
         Zelus.pat_info = Info.no_info }
     
@@ -407,10 +415,13 @@ module Make (Info: INFO) =
         | EQsizefun(x, x_list, e) ->
            let x = name loc env_pat x in
            (* build the renaming *)
-           let x_list, env = 
+           let x_list, x_env = 
              Util.mapfold 
                (fun acc n ->
-                 let m = fresh n in m, Env.add n m acc) env x_list in
+                 if Env.mem n acc 
+                 then Error.error loc (Error.Enon_linear_pat(n))
+                 else let m = fresh n in m, Env.add n m acc) Env.empty x_list in
+           let env = Env.append x_env env in
            Zelus.EQsizefun
              { sf_id = x; sf_id_list = x_list; sf_e = expression env e;
                sf_loc = loc; sf_env = Ident.Env.empty }
@@ -446,11 +457,11 @@ module Make (Info: INFO) =
            let eq_true = equation env_pat env eq_true in
            let eq_false = equation env_pat env eq_false in
            Zelus.EQif { e; eq_true; eq_false }
-        | EQmatch(e, m_h_list) ->
+        | EQmatch(is_size, e, m_h_list) ->
            let e = expression env e in
            let m_h_list =
              List.map (match_handler (equation env_pat) env) m_h_list in
-           Zelus.EQmatch { is_total = false; e; handlers = m_h_list }
+           Zelus.EQmatch { is_size; is_total = false; e; handlers = m_h_list }
         | EQautomaton(a_h_list, st_opt) ->
            let is_weak, is_strong =
              List.fold_left
@@ -542,7 +553,8 @@ module Make (Info: INFO) =
         { Zelus.desc =
             { Zelus.for_name = for_name; Zelus.for_init = for_init;
               Zelus.for_default = for_default;
-              Zelus.for_out_name = for_out_name };
+              Zelus.for_out_name = for_out_name;
+              Zelus.for_info = Info.no_info  };
           Zelus.loc = loc },
         local_out_env in
       Util.mapfold for_out_one Env.empty for_out
@@ -804,11 +816,11 @@ module Make (Info: INFO) =
         | Etypeconstraint(e, texp) ->
            Zelus.Etypeconstraint(expression env e, types env texp)
         | Efun(fd) -> Zelus.Efun(funexp env fd)
-        | Ematch(e, m_h_list) ->
+        | Ematch(is_size, e, m_h_list) ->
            let e = expression env e in
            let m_h_list =
              List.map (match_handler expression env) m_h_list in
-           Zelus.Ematch { is_total = false; e; handlers = m_h_list }
+           Zelus.Ematch { is_size; is_total = false; e; handlers = m_h_list }
         | Epresent(p_h_list, eq_opt) ->
            let handlers =
              List.map (present_handler scondpat expression env) p_h_list in
