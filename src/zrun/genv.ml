@@ -39,14 +39,22 @@ type 'v genv =
       modules: 'v env E.t;  (* tables loaded in memory *)
     }
 
+(* debug info *)
+let show { current; opened; modules } =
+  let show_env { name; values } =
+    (name, E.to_list values) in
+  "current", show_env current,
+  "opened", List.map show_env opened,
+  "modules", List.map (fun (m, env) -> (m, show_env env)) (E.to_list modules)
+
 let findfile filename =
   if Sys.file_exists filename then filename
-  else if not (Filename.is_implicit filename) then
-    raise (Cannot_find_file filename)
+  else if not(Filename.is_implicit filename) then
+    raise(Cannot_find_file filename)
   else
     let rec find = function
       | [] ->
-         raise (Cannot_find_file filename)
+         raise(Cannot_find_file filename)
       | a :: rest ->
          let b = Filename.concat a filename in
          if Sys.file_exists b then b else find rest
@@ -102,7 +110,8 @@ let find where qualname ({ current; opened } as genv) =
             
 (* exported functions *)
 let add_module genv m =
-  { genv with opened = m :: genv.opened }
+  { genv with opened = m :: genv.opened;
+              modules = E.add m.name m genv.modules }
 
 let open_module genv modname =
   let m, genv = find_module modname genv in
