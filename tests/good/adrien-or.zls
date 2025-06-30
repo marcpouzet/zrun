@@ -1,0 +1,9 @@
+let node h x = o where
+  rec y1 = if true fby y1 then true else y1
+  and y2 = if y2 then true else true fby y2
+  and o = if x then y1 else y2
+
+let node main () =
+  let rec i = true fby not i in
+  h i
+  
