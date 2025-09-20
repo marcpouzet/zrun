@@ -561,8 +561,8 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
        (* statically scheduled. The reset is obtained by calling a reset method *)
     (* which set state variable to their initial value *)
        return (Slist[s_body; s_res])
-  | Eassert(e_body) ->
-     let* s_body = iexp is_fun genv env e_body in
+  | Eassert { a_body } ->
+     let* s_body = iexp is_fun genv env a_body in
      return s_body
   | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
      let* si_list = map (ifor_input is_fun genv env) for_input in
@@ -730,8 +730,8 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
        let* sm_list = map (imatch_handler is_fun ieq genv env) handlers in
        return (Slist (se :: sm_list))
   | EQempty -> return Sempty
-  | EQassert(e) ->
-     let* se = iexp is_fun genv env e in
+  | EQassert { a_body } ->
+     let* se = iexp is_fun genv env a_body in
      return se
   | EQforloop({ for_size; for_kind; for_input;
                 for_body = { for_out; for_block }; for_resume }) ->
@@ -969,7 +969,7 @@ and sexp genv env { e_desc; e_loc } s =
         return
           (Value(Vbool(zin)),
            Speriod { p with horizon })
-     | Ehorizon, [e], Slist [Shorizon ({ zin; horizon } as h); s] ->
+     | Ehorizon _, [e], Slist [Shorizon ({ zin; horizon } as h); s] ->
         if zin then
           let* horizon, s = sexp genv env e s in
           match horizon with
@@ -1174,8 +1174,8 @@ and sexp genv env { e_desc; e_loc } s =
           (* a reset is possible for all expressions - combinatorial or not *)
           reset (iexp false) sexp genv env e_body s_body v in
      return (v_body, Slist [s_body; s_res])
-  | Eassert(e_body), s ->
-     let* v, s = sexp genv env e_body s in
+  | Eassert { a_body }, s ->
+     let* v, s = sexp genv env a_body s in
      let* r = check_assertion e_loc v void in
      return (r, s)
   | Eforloop ({ for_kind; for_index; for_input; for_body; for_resume }),
@@ -1728,7 +1728,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
           sautomaton_handler_list eq_loc
             is_weak genv env eq_write handlers ps pr s_list in
      return (env, Slist (Sval(ns) :: Sval(nr) :: si :: s_list))
-  | EQmatch { is_size = true; handlers }, Slist [Sstatic(v_size); s] ->
+  | EQmatch { is_size = true; e; handlers }, Slist [Sstatic(v_size); s] ->
      (* [match size e with | P1 -> ... | ...] *)
      let* env_handler, s =
        static_match_handler_list eq_loc seq genv env v_size handlers s in
@@ -1772,8 +1772,8 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* env_handler = Fix.by eq_loc env env_handler (names eq_write) in
      return (env_handler, Slist (s :: s_list))
   | EQempty, s -> return (Env.empty, s)
-  | EQassert(e), s ->
-     let* ve, s = sexp genv env e s in
+  | EQassert { a_body }, s ->
+     let* ve, s = sexp genv env a_body s in
      let* r = check_assertion eq_loc ve Env.empty in
      return (r, s)
   | EQforloop({ for_kind; for_index; for_input; for_body; for_resume }),

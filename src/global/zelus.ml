@@ -15,8 +15,8 @@
 
 (* The mais ast. types are parameterized by two types variables *)
 (* ['info] and ['env]; the first is the information attached to expressions *)
-(* the second is the containt of an environment (an environment associate *)
-(* a value to a name *)
+(* the second is the containt of an environment (a map from *)
+(* names to values *)
 
 type 'a localized = { desc: 'a; loc: Location.t }
 
@@ -95,18 +95,20 @@ type operator =
   (* the argument is atomic - arity = 1 *)
   | Etest 
   (* testing the presence of a signal - arity = 1 *)
-  | Eup of { is_zero: bool} (* when [is_zero], [up: _ -> zero], [up: _ -> bool] otherwise *)
+  | Eup of is_zero (* when [is_zero], [up: _ -> zero], [up: _ -> bool] otherwise *)
   (* zero-crossing detection - arity = 1 *)
   | Eperiod 
   (* period - arity = 2 *)
-  | Ehorizon 
+  | Ehorizon of is_zero 
   (* generate an event at a given horizon - arity = 1 *)
-  | Einitial
+  | Einitial 
   (* true at the very first instant - arity = 0 *)
   | Edisc 
   (* generate an event whenever x <> last x outside of integration *)
   | Earray of array_operator
 
+and is_zero = { is_zero: bool}
+ 
 and array_operator =
   | Earray_list 
   (* [| e1;...;en |] *)
@@ -126,6 +128,8 @@ and array_operator =
   (* [e.F] *)
   | Ereverse 
   (* [e.R] *)
+  | Emake
+  (* [e^e] *)
 
 and is_inline = bool
 
@@ -264,9 +268,20 @@ and ('info, 'ienv) exp_desc =
                      present_handler list;
         default_opt : ('info, 'ienv) exp default } 
   | Ereset of ('info, 'ienv) exp * ('info, 'ienv) exp 
-  | Eassert of ('info, 'ienv) exp
+  | Eassert of ('info, 'ienv) assertion
   | Eforloop of
       ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) for_exp) forloop 
+
+(* assertions *)
+and ('info, 'ienv) assertion =
+  { a_body: ('info, 'ienv) exp; (* the body of the assertion *)
+    (* an auxiliary mapping for hidden state variables; this appears only *)
+    (* in continuous-time models. It is empty in the surface language (Zelus) *)
+    (* and is generated during some of the rewriting steps *)
+    (* only useful for transparent assertions *)
+    mutable a_hidden_env: 'ienv Ident.Env.t;
+    mutable a_free_vars: Ident.S.t; (* its free variables in [a_body] *)
+  }
 
 and ('info, 'ienv, 'size, 'body) forloop =
   { for_size : 'size option;
@@ -374,7 +389,7 @@ and ('info, 'ienv) eq_desc =
                  handlers : ('ienv, 'info pattern, ('info, 'ienv) eq)
                               match_handler list }
   | EQempty
-  | EQassert of ('info, 'ienv) exp 
+  | EQassert of ('info, 'ienv) assertion
   | EQforloop of
       ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) for_eq) forloop 
 (* [foreach [e]* [id in e [by e],]* returns (vardec_list) do eq] *)
@@ -432,10 +447,15 @@ and ('info, 'ienv) funexp =
   { f_vkind: vkind; (* the kind of arguments *)
     f_kind: kind; (* the kind of the body *)
     f_atomic: is_atomic; (* when true, outputs depend strictly on all inputs *)
+    f_inline: is_inline; (* when true, the function application is inlined *)
     f_args: ('info, 'ienv) arg list; (* list of arguments *)
     f_body: ('info, 'ienv) result;
     f_loc: Location.t;
-    mutable f_env: 'ienv Ident.Env.t;
+    mutable f_env: 'ienv Ident.Env.t; (* the environment for input variables *)
+    (* an auxiliary mapping for hidden state variables; this appears only *)
+    (* in continuous-time models. It is empty in the surface language (Zelus) *)
+    (* and is generated during some of the rewriting steps *)
+    mutable f_hidden_env: 'ienv Ident.Env.t;
   }
 
 and ('info, 'ienv) sizefun =

@@ -157,7 +157,7 @@ module Make (Info: INFO) =
       | Einitial -> Zelus.Einitial
       | Edisc -> Zelus.Edisc
       | Eperiod -> Zelus.Eperiod
-      | Ehorizon -> Zelus.Ehorizon
+      | Ehorizon -> Zelus.Ehorizon { is_zero = true }
       | Earray(op) -> Zelus.Earray(array_operator op)
     
     and array_operator op =
@@ -171,6 +171,7 @@ module Make (Info: INFO) =
       | Etranspose -> Zelus.Etranspose
       | Ereverse -> Zelus.Ereverse
       | Eflatten -> Zelus.Eflatten
+      | Emake -> Zelus.Emake
     
     (* translate types. [env] is used to renames dependent variables *)
     let rec types env { desc; loc } =
@@ -487,7 +488,11 @@ module Make (Info: INFO) =
              Zelus.EQautomaton({ is_weak; handlers; state_opt })
         | EQempty ->
            Zelus. EQempty
-        | EQassert(e) -> Zelus.EQassert(expression env e)
+        | EQassert(e_body) ->
+           Zelus.EQassert
+             { Zelus.a_body = expression env e_body;
+               Zelus.a_hidden_env = Ident.Env.empty;
+               Zelus.a_free_vars = Ident.S.empty }
         | EQpresent(p_h_list, eq_opt) ->
            let handlers =
              List.map
@@ -833,7 +838,10 @@ module Make (Info: INFO) =
         | Ereset(e_body, e_res) ->
            Zelus.Ereset(expression env e_body, expression env e_res)
         | Eassert(e_body) ->
-           Zelus.Eassert(expression env e_body)
+           Zelus.Eassert
+             { Zelus.a_body = expression env e_body;
+               Zelus.a_hidden_env = Ident.Env.empty;
+               Zelus.a_free_vars = Ident.S.empty }
         | Eforloop(f) ->
            Zelus.Eforloop(forloop_exp env f)
       in
@@ -893,13 +901,16 @@ module Make (Info: INFO) =
       recordrec S.empty label_e_list
     
     and funexp env
-          { desc = { f_vkind; f_kind; f_atomic; f_args; f_body }; loc } =
+           { desc = { f_vkind; f_kind; f_atomic; f_inline; f_args; f_body };
+             loc } =
       let f_args, env = Util.mapfold arg env f_args in
       let f_body = result env f_body in
       { Zelus.f_vkind = vkind f_vkind;
-        Zelus.f_kind = kind f_kind; Zelus.f_atomic = f_atomic;
+        Zelus.f_kind = kind f_kind;
+        Zelus.f_inline = f_inline; Zelus.f_atomic = f_atomic;
         Zelus.f_args = f_args; Zelus.f_body = f_body; Zelus.f_loc = loc;
-        Zelus.f_env = Ident.Env.empty }
+        Zelus.f_env = Ident.Env.empty;
+        Zelus.f_hidden_env = Ident.Env.empty }
     
     and arg env v_list =
       let v_list, env_v_list = vardec_list env v_list in

@@ -18,6 +18,8 @@
 open Misc
 open Lident
    
+let suffix = ".zlo"
+
 type 'a info = { qualid : Lident.qualident; info : 'a }
 
 module E = Map.Make (struct type t = string let compare = compare end)
@@ -27,7 +29,7 @@ exception Cannot_find_file of string
 exception Already_defined of string
 
 (* The current global environment *)
-type 'v env =
+type 'v  env =
   { name: string; (* the name of the module *)
     values: 'v E.t; (* the symbol table [name, entry] - values *)
   }
@@ -38,6 +40,9 @@ type 'v genv =
       opened: 'v env list;  (* opened tables *)
       modules: 'v env E.t;  (* tables loaded in memory *)
     }
+
+let current_empty = { name = ""; values = E.empty }
+let empty = { current = current_empty; opened = []; modules = E.empty }
 
 (* debug info *)
 let show { current; opened; modules } =
@@ -63,7 +68,7 @@ let findfile filename =
 let load_module modname =
   let name = String.uncapitalize_ascii modname in
   try
-    let filename = findfile (name ^ ".zlo") in
+    let filename = findfile (name ^ suffix) in
     let ic = open_in_bin filename in
     try
       let m = Marshal.from_channel ic in
@@ -121,7 +126,7 @@ let try_to_open_module genv modname =
   let exists modname =
   try
     let name = String.uncapitalize_ascii modname in
-    let _ = findfile (name ^ ".zlo") in true
+    let _ = findfile (name ^ suffix) in true
   with
   | Cannot_find_file _ -> false in
   if exists modname then 
@@ -131,8 +136,8 @@ let try_to_open_module genv modname =
       
 let initialize modname default_used_modules =
   let genv =
-    { current = { name = modname; values = E.empty };
-    opened = []; modules = E.empty } in
+    { current = { current_empty with name = modname };
+      opened = []; modules = E.empty } in
   List.fold_left open_module genv default_used_modules  
   
 let add f pvalue ({ current } as genv) =
@@ -149,6 +154,3 @@ let current { current } = current
 
 let shortname { id = n } = n
 
-let empty =
-  let c_empty = { name = ""; values = E.empty } in
-  { current = c_empty; opened = []; modules = E.empty }
