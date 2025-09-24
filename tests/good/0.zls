@@ -1,3 +1,12 @@
+(* simple examples of for loops *)
+let node g x returns (y, z)
+    do y = x and z = x done
+
+let node main___0 () =
+  let v1 = g 1 in
+  let v2 = g v1 in
+  assert ((=) v2 ((1, 1),(1,1)))
+
 let main45() returns (o)
   let m = foreach(15) returns ([|xi|]) do xi = false done in
   do o = m done
