@@ -189,9 +189,3 @@ let local genv env sem eq n s_eq bot_x =
   Debug.print_state "After fixpoint: state = " s_eq;
   return ((env_eq_not_x, env_eq_x), s_eq)
 
-(* fixpoint for mutually recursive definitions of size parameterized functions *)
-(* [defs = [f1\Vsfun ...; fk\Vsfun ...]] *)
-let sizefixpoint defs =
-  Ident.Env.mapi 
-    (fun f entry -> Match.entry (Vsizefix { bound = None; name = f; defs })) 
-    defs

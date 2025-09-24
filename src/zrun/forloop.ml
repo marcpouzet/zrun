@@ -38,9 +38,9 @@ let (and+) v1 v2 =
   | Value(v1), Value(v2) -> Value(v1, v2)
 
 (* index in a loop body *)
-type ('info, 'ienv) index =
+type index =
   (* [xi in e by e'] means that in the i-th iteration, xi = e.(e' * i) *)
-  | Vinput of { ve : ('info, 'ienv) pvalue array; by : int option }
+  | Vinput of { ve : pvalue array; by : int option }
   (* [j in e0 to e1 or j in e0 downto e1] means that in the i-th iteration *)
   (* j = i + e0 in the first case; j = e1 - i in the second with i in [0..n-1] *)
   | Vindex of { ve_left : int; ve_right : int; dir : bool }

@@ -230,6 +230,13 @@ let matching_arg_in loc env arg v =
      (* type error *)
      error { kind = Epattern_matching_failure; loc = loc }
 
+let matching_arg_in_list loc env arg_list v_list =
+  let open Result in
+  let open Error in
+  fold2
+    { kind = Epattern_matching_failure; loc }
+    (fun env arg v -> matching_arg_in loc env arg v) env arg_list v_list
+
 let matching_arg_out loc env arg =
   let open Result in
   let open Error in
