@@ -901,7 +901,7 @@ and funexp genv env ({ f_kind; f_args } as f) =
     (* nodes are not curried; this feature was possible in LS *)
     (* but not in Zelus. *)
     (* That is: [node a1 ... an -> e] is a short-cut for *)
-    (* [fun a1 ...an-1 -> node an -> e] *)
+    (* [fun a1 ...an-1 -> node an -> e]. [ai] is itself a list of arguments *)
     let f_args, arg_list = Util.firsts f_args in
     match f_args with
     | [] -> co_node f_loc genv env tkind arg_list f_body
@@ -1568,8 +1568,8 @@ and sarg genv env ({ e_desc; e_loc } as e) s =
      sexp genv env e s
 
 (* application of a node *)
-and run ({ init; step } as i) v_list =
-  let* v, init = step init v_list in
+and run ({ init; step } as i) v =
+  let* v, init = step init v in
   return (v, { i with init; step })
 
 and sexp_list loc genv env e_list s_list =

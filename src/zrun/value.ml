@@ -76,21 +76,9 @@ and 'a map =
 and sizefun =
   { s_arity: int; (* expected number of size arguments *)
     s_fun: int list -> value result;
-    (* [f_fun] take an environment [sf_env] of size function; it is *)
-    (* used to deal with (mutually) recursive function(s) *)
-    (* because the size argument must decrease at every call *)
     s_bound: int list option; (* the maximum number of iterations *)
   }
-    (*
-    s_rec: is_rec; (* the size function is recursive or not *)
-    s_defs: sizefun Ident.Env.t;
-    (* the set of mutually recursive function definitions to which the *)
-    (* current function belongs. When the function is not recursive, the map is empty *)
-   
 
-and is_rec = bool
-
-     *)
 and vfun = { f_arity: int; f_fun : value list -> value result }
 
 (* instance of a node *)
@@ -133,9 +121,11 @@ and state =
   type ('a, 'b, 's) node =
   | CoFun : ('a list -> 'b option) -> ('a, 'b, 's) node
   | CoNode : { init : 's;
-               step : 's -> 'a list -> ('b * 's) option } -> ('a, 'b, 's) node
+               step : 's -> 'a -> ('b * 's) option } -> ('a, 'b, 's) node
 
-  Here, the set of values contains all the possible value; those that are
-  produced at every step and those that are produced only at "compile time"
-  or "instancitation time". They could be separated into two distinct sets
+  Here, the set of values ('a value) contains all the possible
+  values; those that are produced at compile time or instanciation time; and
+  those that are produced at every reaction time. The two could be separated,
+  in particular dynamic values (e.g., functions) could be allowed only
+  at compilation and instantiation time; not at execution time.
 *)
