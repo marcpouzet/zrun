@@ -217,6 +217,7 @@ let matching_arg_in loc env arg v =
      fold2 { kind = Epattern_matching_failure; loc = loc }
        match_in env l (List.map (fun _ -> Vnil) l)
   | [], Value(Vvoid) -> return env
+  | [x], _ -> match_in env x v
   | l, Value(Vtuple(v_list)) ->
      fold2
        { kind = Epattern_matching_failure; loc = loc }
@@ -225,7 +226,6 @@ let matching_arg_in loc env arg v =
      fold2
        { kind = Epattern_matching_failure; loc = loc }
        (fun acc n pvalue -> match_in acc n (Value(pvalue))) env l v_list
-  | [x], _ -> match_in env x v
   | _ ->
      (* type error *)
      error { kind = Epattern_matching_failure; loc = loc }

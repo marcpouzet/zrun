@@ -222,6 +222,11 @@ let rec compare_pvalue v1 v2 =
   | Vrecord _, Vrecord _ -> none
   | Vtuple(v_list1), Vtuple(v_list2) ->
      compare_list compare_value v_list1 v_list2
+  (* | Vstuple(v_list1), Vtuple(v_list2) ->
+     compare_list compare_pvalue_with_value v_list1 v_list2
+  | Vtuple(v_list1), Vstuple(v_list2) ->
+     let* v = compare_list compare_pvalue_with_value v_list2 v_list1 in
+     return (-v) *)
   | (Vifun _, Vifun _) | (Vfun _, Vfun _) | (Vnode _, Vnode _) -> none
   | _ -> none
 
@@ -262,9 +267,14 @@ and compare_array compare a1 a2 =
 and compare_value v1 v2 =
   match v1, v2 with
   | (Vbot, Vbot) | (Vnil, Vnil) -> return 0
-  | (Value(v1), Value(v2)) -> compare_pvalue v1 v2
+  | (Value(pv1), Value(pv2)) -> compare_pvalue pv1 pv2
   | _ -> none
-                                
+
+(* and compare_pvalue_with_value pv1 v2 =
+  match v2 with
+  | Value(pv2) -> compare_pvalue pv1 pv2
+  | Vbot | Vnil -> none *)
+  
 let eq_op v1 v2 =
   let* v = compare_pvalue v1 v2 in
   return (Vbool(v = 0))
@@ -373,14 +383,16 @@ let sapp op v1 v2 =
 
 let lift2 op v1 v2 = return (sapp op v1 v2)
 
-(* convert a value into a list *)
-let list_of v =
-  match v with
+(* convert a value into a list of size n *)
+let list_of n v =
+  if n = 1 then [v]
+  else match v with
   | Value(Vvoid) -> []
   | Value(Vtuple(v_list)) -> v_list
   | Value(Vstuple(v_list)) ->
      List.map (fun v -> Value(v)) v_list
-  | Vbot | Vnil | Value _ -> [v]
+  | Vbot | Vnil -> Util.list_of n v
+  | Value _ -> [v]
 
 (* gets the value *)
 let pvalue v =
@@ -424,13 +436,42 @@ let atomic v =
   match v with
   | Vtuple(l) -> stuple l
   | Vfun _ | Vnode _ -> 
-      (* this part should be changed into [atomic(f) = lambda x.let+ x in f x] *)
-      (* that is, even if [f] is not strict, make it a strict function *)
-      (* this is necessary to avoid unbounded recursion with f = \x. x x and f f *)
-      (* this is because Zrun applies to untyped programs *)
+     (* this part should be changed into [atomic(f) = lambda x.let+ x in f x] *)
+     (* that is, even if [f] is not strict, make it a strict function *)
+     (* this is necessary to avoid unbounded recursion *)
+     (* e.g., take f = \x. x x and f f *)
+     (* this is because Zrun applies to untyped programs *)
     return (Value v)
   | _ -> return (Value v)
 
+                (*
+                  let atomic v =
+  let rec atomic v =
+    let (let** ) v f = match v with | Vnil | Vbot -> None | Value(v) -> f v in
+    let** v = v in
+    match v with
+    | Vtuple(l) ->
+       let* l = atomic_list l in
+       return (Vstuple(l))
+    | Vfun _ | Vnode _ ->
+       (* this part should be changed into [atomic(f) = lambda x.let+ x in f x] *)
+       (* that is, even if [f] is not strict, make it a strict function *)
+       (* this is necessary to avoid unbounded recursion *)
+       (* e.g., take f = \x. x x and f f *)
+       (* this is because Zrun applies to untyped programs *)
+       return v
+    | _ -> return v
+  and atomic_list l =
+    match l with
+    | [] -> return []
+    | v :: l ->
+       let* v = atomic v in
+       let* l = atomic_list l in
+       Monad.Opt.return (v :: l) in
+  let+ v = v in
+  let v = atomic v in
+  return (Value v)
+                 *)
 (* void *)
 let void = Value(Vvoid)
 

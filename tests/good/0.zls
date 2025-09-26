@@ -1,8 +1,10 @@
 (* simple examples of for loops *)
-let node g x returns (y, z)
+let g x returns (y, z)
     do y = x and z = x done
 
 let node main___0 () =
-  let v1 = run g 1 in
-  let v2 = run g v1 in
-  v1, v2
+  let v1 = g 1 in
+  let v2 = g v1 in
+  v2 = ((1, 1), (1, 1))
+
+(* 22; bad/1; bad/forward2 *)

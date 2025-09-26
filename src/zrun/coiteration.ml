@@ -868,7 +868,7 @@ and funexp genv env ({ f_kind; f_args } as f) =
       vresult genv env f_body in
     return (Vfun { f_arity = List.length f_args; f_fun }) in
 
-  let co_step f_loc genv env arg_list f_body =
+  let co_step f_loc genv env n_arity arg_list f_body =
     let match_in_list a_list s_list v_list =
       let match_in acc vdec s v =
         let* acc, s = svardec genv env acc vdec s v in
@@ -879,7 +879,7 @@ and funexp genv env ({ f_kind; f_args } as f) =
     
     fun s v -> match s with
     | Slist (s_body :: s_arg_list) ->
-       let v_list = Primitives.list_of v in
+       let v_list = Primitives.list_of n_arity v in
        let* env_arg_list, s_arg_list =
          match_in_list arg_list s_arg_list v_list in
        let env = Env.append env_arg_list env in
@@ -889,12 +889,13 @@ and funexp genv env ({ f_kind; f_args } as f) =
        error { kind = Estate; loc = f_loc } in
 
   (* the functional value from a stateful (node) function definition *)
-  let co_node f_loc genv env tkind arg_list f_body =
+  let co_node f_loc genv env n_tkind arg_list f_body =
     let* s_list = map (ivardec false true genv env) arg_list in
     let* s_body = iresult false genv env f_body in
-    let step = co_step f_loc genv env arg_list f_body in
-    let si = { tkind; arity = List.length arg_list;
-               init = Slist (s_body :: s_list); step } in
+    let n_arity = List.length arg_list in
+    let n_step = co_step f_loc genv env n_arity arg_list f_body in
+    let si = { n_tkind; n_arity;
+               n_init = Slist (s_body :: s_list); n_step } in
     return (Vnode(si)) in
 
   let n_arry_co_node genv env tkind { f_loc; f_args; f_body } = 
@@ -1568,9 +1569,9 @@ and sarg genv env ({ e_desc; e_loc } as e) s =
      sexp genv env e s
 
 (* application of a node *)
-and run ({ init; step } as i) v =
-  let* v, init = step init v in
-  return (v, { i with init; step })
+and run ({ n_init; n_step } as i) v =
+  let* v, n_init = n_step n_init v in
+  return (v, { i with n_init; n_step })
 
 and sexp_list loc genv env e_list s_list =
   slist loc genv env sexp e_list s_list
@@ -2519,13 +2520,13 @@ let eval_n n_steps init step v_list =
          apply_rec s (i+1) in
   let _ = apply_rec init 0 in ()
 
-let eval_node loc output n_steps { init; step } v  =
+let eval_node loc output n_steps { n_init; n_step } v  =
   let step s v =
     Debug.print_state "State before:" s;
-    let* v, s = step s v in
+    let* v, s = n_step s v in
     Debug.print_state "State after:" s;
     output v; return s in
-  eval_n n_steps init step v
+  eval_n n_steps n_init step v
 
 let print ff (v1, v2) =
      Format.eprintf "@[The two values are not equal\n\
@@ -2541,7 +2542,7 @@ let eval_two_fun loc output fv1 fv2 v_list =
        { kind = Eunexpected_failure { print; arg = (v1, v2) }; loc }) |> catch
 
 let eval_two_nodes loc output n_steps
-      { init = init1; step = step1 } { init = init2; step = step2 } v =
+      { n_init = init1; n_step = step1 } { n_init = init2; n_step = step2 } v =
   let step (s1, s2) v =
     Debug.print_state "State before (first node):" s1;
     let* v1, s1 = step1 s1 v in
@@ -2559,7 +2560,7 @@ let eval_two_nodes loc output n_steps
 (* is a node with a void argument, execute its body for [n] steps *)
 let eval ff n_steps name v =
   match v with
-  | Vnode({ arity = 0 } as si) ->
+  | Vnode({ n_arity = 0 } as si) ->
      Format.fprintf ff
        "@[val %s() for %d steps = @.@]" name n_steps;
      eval_node Location.no_location (Output.value_flush ff) n_steps si void
@@ -2589,11 +2590,11 @@ let check n_steps
   let check name v1 v2 =
     Debug.print_message ("Checking node " ^ name);
     match v1, v2 with
-    | Vnode({ arity = 0 } as si1), Vnode({ arity = 0 } as si2) ->
+    | Vnode({ n_arity = 0 } as si1), Vnode({ n_arity = 0 } as si2) ->
        eval_two_nodes 
          Location.no_location Output.value_flush n_steps si1 si2 void
     | Vfun({ f_arity = 0; f_fun = f1 }), Vfun({ f_arity = 0; f_fun = f2 }) ->
-       eval_two_fun Location.no_location Output.value_flush v1 v2 [void]
+       eval_two_fun Location.no_location Output.value_flush v1 v2 []
     | _ -> () in
   let check name v1 =
     let v2 = E.find name g2 in

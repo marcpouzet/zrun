@@ -5,7 +5,7 @@ let node make2(n)() =
   foreach(n)(i in 0 to n-1) returns ([|oi|]) do oi = i done
 
 let node main1() returns ()
-  assert ((run make1(4))() = (run make2(4)) ())
+  assert (run (make1 4)() = run (make2 4) ())
 
 let node f x = x.(4 .. 5)
 

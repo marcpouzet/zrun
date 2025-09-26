@@ -53,8 +53,8 @@ let rec pvalue ff v =
   | Vifun _ ->
      fprintf ff "<fun>"
   | Vfun _ -> fprintf ff "<fun>"
-  | Vnode { tkind } ->
-     fprintf ff "<%s>" (Printer.tkind tkind)
+  | Vnode { n_tkind } ->
+     fprintf ff "<%s>" (Printer.tkind n_tkind)
   | Vsizefun _ ->
      fprintf ff "<sizefun>"
   | Vrecord(l) ->
@@ -102,8 +102,8 @@ let rec pstate ff s =
       (Pp_tools.print_list_l pstate "[" ";" "]") ff s_list
   | Sopt(None) -> 
      fprintf ff "none" | Sopt(Some(v)) -> fprintf ff "(some %a)" value v
-  | Sinstance { init } ->
-     fprintf ff "@[<hov2>(instance@ %a)@]" pstate init
+  | Sinstance { n_init } ->
+     fprintf ff "@[<hov2>(instance@ %a)@]" pstate n_init
   | Scstate { pos; der } -> 
      fprintf ff "@[{ pos = %a; der = %a }@]" value pos value der
   | Szstate { zin; zout } ->

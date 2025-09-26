@@ -79,14 +79,21 @@ and sizefun =
     s_bound: int list option; (* the maximum number of iterations *)
   }
 
-and vfun = { f_arity: int; f_fun : value list -> value result }
+(* application is curried; of the form [f e1 ... en] *)
+(* combinatorial function *)
+and vfun =
+  { f_arity: int;
+    f_fun : value list -> value result (* [f e1 ... en] *)
+  }
 
-(* instance of a node *)
+(* node *)
+(* application is uncurried; of the form [f (e1,...,en)] *)
 and vnode =
-  { tkind: Zelus.tkind; (* discrete only or discrete/continuous-time state *)
-    arity: int; (* [0] means [step s () = ...] *)
-    init : state; (* current state *)
-    step : state -> value -> (value * state) result; (* step function *)
+  { n_tkind: Zelus.tkind; (* discrete only or discrete/continuous-time state *)
+    n_arity: int; (* [0] means [step s () = ...] *)
+    n_init : state; (* current state *)
+    (* step function *)
+    n_step : state -> value -> (value * state) result; (* [f (e1,..., en)] *)
   }
 
 and instance = vnode
