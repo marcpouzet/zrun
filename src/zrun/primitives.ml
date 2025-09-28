@@ -195,11 +195,11 @@ let absent_name = Lident.Modname(stdlib_name "A")
 
 let rec compare_pvalue v1 v2 =
   match v1, v2 with
-  | Vint i1, Vint i2 -> return (compare i1 i2)
-  | Vbool b1, Vbool b2 -> return (compare b1 b2)
-  | Vfloat f1, Vfloat f2 -> return (compare f1 f2)
-  | Vchar c1, Vchar c2 -> return (compare c1 c2)
-  | Vstring s1, Vstring s2 -> return (compare s1 s2)
+  | Vint i1, Vint i2 -> return (Stdlib.compare i1 i2)
+  | Vbool b1, Vbool b2 -> return (Stdlib.compare b1 b2)
+  | Vfloat f1, Vfloat f2 -> return (Stdlib.compare f1 f2)
+  | Vchar c1, Vchar c2 -> return (Stdlib.compare c1 c2)
+  | Vstring s1, Vstring s2 -> return (Stdlib.compare s1 s2)
   | Vvoid, Vvoid -> return 0
   | Vconstr0(id1), Vconstr0(id2) -> return (Lident.compare id1 id2)
   | Vconstr1(id1, p_list1), Vconstr1(id2, p_list2) ->
@@ -222,11 +222,6 @@ let rec compare_pvalue v1 v2 =
   | Vrecord _, Vrecord _ -> none
   | Vtuple(v_list1), Vtuple(v_list2) ->
      compare_list compare_value v_list1 v_list2
-  (* | Vstuple(v_list1), Vtuple(v_list2) ->
-     compare_list compare_pvalue_with_value v_list1 v_list2
-  | Vtuple(v_list1), Vstuple(v_list2) ->
-     let* v = compare_list compare_pvalue_with_value v_list2 v_list1 in
-     return (-v) *)
   | (Vifun _, Vifun _) | (Vfun _, Vfun _) | (Vnode _, Vnode _) -> none
   | _ -> none
 
@@ -270,11 +265,6 @@ and compare_value v1 v2 =
   | (Value(pv1), Value(pv2)) -> compare_pvalue pv1 pv2
   | _ -> none
 
-(* and compare_pvalue_with_value pv1 v2 =
-  match v2 with
-  | Value(pv2) -> compare_pvalue pv1 pv2
-  | Vbot | Vnil -> none *)
-  
 let eq_op v1 v2 =
   let* v = compare_pvalue v1 v2 in
   return (Vbool(v = 0))
@@ -374,15 +364,6 @@ let lift1 op v =
   let* v = op v in
   return (Value v)
 
-(* lift a binary operator: [op bot _ = bot]; [op _ bot = bot]; same for nil *)
-let sapp op v1 v2 =
-  match v1, v2 with
-  | (Vbot, _) | (_, Vbot) -> Vbot
-  | (Vnil, _) | (_, Vnil) -> Vnil
-  | Value(v1), Value(v2) -> Value(op v1 v2)
-
-let lift2 op v1 v2 = return (sapp op v1 v2)
-
 (* convert a value into a list of size n *)
 let list_of n v =
   if n = 1 then [v]
@@ -399,6 +380,15 @@ let pvalue v =
   match v with
   | Vnil | Vbot -> None
   | Value(v) -> return v
+
+(* lift a binary operator: [op bot _ = bot]; [op _ bot = bot]; same for nil *)
+let sapp op v1 v2 =
+  match v1, v2 with
+  | (Vbot, _) | (_, Vbot) -> Vbot
+  | (Vnil, _) | (_, Vnil) -> Vnil
+  | Value(v1), Value(v2) -> Value(op v1 v2)
+
+let lift2 op v1 v2 = return (sapp op v1 v2)
 
 (* if one is bot, return bot; if one is nil, return nil *)
 let rec slist v_list =
@@ -444,8 +434,20 @@ let atomic v =
     return (Value v)
   | _ -> return (Value v)
 
-                (*
-                  let atomic v =
+(* let rec atomic v =
+  match v with
+  | Vbot -> Vbot
+  | Vnil -> Vnil
+  | Value(v) -> p_atomic v
+
+and p_atomic v =
+  match v with
+  | Vtuple(v_list) -> 
+     let+ v_list = stuple v_list in
+     Vtuple(v_list)
+  | _ -> Value(v) *)
+
+let atomic v =
   let rec atomic v =
     let (let** ) v f = match v with | Vnil | Vbot -> None | Value(v) -> f v in
     let** v = v in
@@ -471,7 +473,7 @@ let atomic v =
   let+ v = v in
   let v = atomic v in
   return (Value v)
-                 *)
+
 (* void *)
 let void = Value(Vvoid)
 
