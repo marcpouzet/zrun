@@ -41,8 +41,8 @@ let doc_number_of_fixpoint_iterations =
 let doc_esterel =
   "\tSets the interpretation of if/then/else to be constructive"
 let doc_lustre =
-  "\tSets the interpretation of if/then/else to be strict \n\
-   \t\t(that of Lustre)"
+  "\tSets the interpretation of if/then/else to be strict w.r.t any argument \n\
+   \t\t(by default, it is lazy, i.e., strict w.r.t the first argument)"
 let doc_static_reduction =
   "\tReduce static (compile-time) expressions"
 let doc_check =
@@ -50,7 +50,7 @@ let doc_check =
    \t\tfor the number of steps"
 and doc_inlining_level = "<n> \t Level of inlining"
 and doc_inline_all = "\t Inline all function calls"
-                  
+
 let errmsg = "Options are:"
 
 

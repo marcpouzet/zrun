@@ -992,9 +992,7 @@ and sexp genv env { e_desc; e_loc } s =
         (* if one of the input is bot (or nil), the output is bot (or nil); *)
         (* that is, [e] is considered to be strict *)
         let* v, s = sexp genv env e s in
-        let* v =
-          Primitives.atomic v |>
-            Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
+        let v = Primitives.atomic v in
         return (v, s)
      | Etest, [e], s ->
         let* v, s = sexp genv env e s in
@@ -2377,8 +2375,7 @@ and apply loc fv v_list =
   match fv, v_list with
   | _, [] -> return (Value(fv))
   | Vifun(op), v :: v_list ->
-     let* v =
-       Primitives.atomic v |> Opt.to_result ~none:{ kind = Etype; loc } in
+     let v = Primitives.atomic v in
      let+ v = v in
      let* fv =
        op v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
