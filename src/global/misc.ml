@@ -87,11 +87,19 @@ let no_assert = ref false
 (* remove the check that fix-point equation produce non bottom values *)
 let no_causality = ref false
 
-(* sets the interpretation of the if/then/else to Esterel *)
-let esterel = ref false
-
-(* sets the interpretation of the if/then/else to Lustre *)
+(* sets the interpretation of the if/then/else to be strict w.r.t the first argument *)
+(* this is how the if/then/else is interpreted in Lustre *)
+(* if v1 then v2 else v3 = bot if (v1 = bot) or (v2 = bot) or (v3 = bot) *)
 let lustre = ref false
+
+(* the default mode for the conditional is lazy w.r.t the first argument *)
+(* if v1 then v2 else v3 = bot if v1 = bot *)
+let lazy_ifthenelse = ref false
+
+(* sets the interpretation of the if/then/else to be such that *)
+(* if _ then v1 else v2 = v1 if v1 = v2 *)
+(* this is used to implement the constructive causality of Esterel *)
+let esterel = ref false
 
 (* static reduction *)
 let static_reduction = ref false
