@@ -1,3 +1,4 @@
 let fff (x) returns (o init 42)
   o = 2 + last o
 
+let node main() = fff(0) + 1
