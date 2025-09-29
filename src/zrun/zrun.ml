@@ -41,8 +41,8 @@ let doc_number_of_fixpoint_iterations =
 let doc_esterel =
   "\tSets the interpretation of if/then/else to be constructive"
 let doc_lustre =
-  "\tSets the interpretation of if/then/else to be strict \n\
-   \t\t(that of Lustre)"
+  "\tSets the interpretation of if/then/else to be strict w.r.t any argument \n\
+   \t\t(by default, it is lazy, i.e., strict w.r.t the first argument)"
 let doc_static_reduction =
   "\tReduce static (compile-time) expressions"
 let doc_check =
@@ -69,8 +69,8 @@ let main () =
            "-nocausality", Arg.Set Misc.no_causality, doc_nocausality;
            "-fix", Arg.Set Misc.print_number_of_fixpoint_iterations,
            doc_number_of_fixpoint_iterations;
-           "-esterel", Arg.Set Misc.esterel, doc_esterel;
            "-lustre", Arg.Set Misc.lustre, doc_lustre;
+           "-esterel", Arg.Set Misc.esterel, doc_esterel;           
       ])
       main
       errmsg
