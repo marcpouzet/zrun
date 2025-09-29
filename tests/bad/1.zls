@@ -1,2 +1,3 @@
-let fff () returns (o init 42)
+let fff (x) returns (o init 42)
   o = 2 + last o
+
