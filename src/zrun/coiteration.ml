@@ -2562,7 +2562,7 @@ let eval ff n_steps name v =
        "@[val %s() for %d steps = @.@]" name n_steps;
      eval_node Location.no_location (Output.value_flush ff) n_steps si void
   | Vfun { f_arity = 0; f_fun } ->
-     let v = catch (f_fun []) in
+     let v = catch (f_fun [void]) in
      Format.fprintf ff
        "@[val %s() = %a@.@]" name Output.value v
   | _ ->
