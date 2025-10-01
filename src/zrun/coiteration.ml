@@ -332,31 +332,35 @@ let rec size env { desc; loc } =
 (* mutually recursive definitions must either define *)
 (* functions parameterized by a size or stream values *)
 let sizefun_defs_or_values l_eq =
-  let rec split (acc, one_value) { eq_desc; eq_loc } =
+  let rec extract_sizefun_defs (acc, one_value) { eq_desc; eq_loc } =
     match eq_desc with
     | EQsizefun ({ sf_id; sf_id_list; sf_e } as sizefun) ->
        if one_value then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
        else return (sizefun :: acc, one_value)
     | EQand { eq_list } ->
-       fold split (acc, one_value) eq_list
+       fold extract_sizefun_defs (acc, one_value) eq_list
     | EQempty -> 
        return (acc, one_value)
     | _ -> 
-      if List.is_empty acc then return (acc, true)
+       if List.is_empty acc then
+         (* no size function definition was in the list *)
+         return (acc, true)
       else error { kind = Esizefun_def_recursive; loc = eq_loc } in
-  let* acc, one_value = split ([], false) l_eq in
+  let* acc, one_value = extract_sizefun_defs ([], false) l_eq in
   if one_value then
+    (* the equation *)
     return (Either.Left(l_eq))
   else
+    (* the list of size fun definitions *)
     return (Either.Right(acc))
 
 let sizefun_defs { l_eq; l_loc } =
   let* v = sizefun_defs_or_values l_eq in
   match v with 
-  | Right(defs) -> return defs 
   | Left _ -> error { kind = Esizefun_def_recursive; loc = l_loc }
-
+  | Right(defs) -> return defs 
+  
 (* Present handler *)
 (* In the code below, [is_fun] is a boolean flag. When true, the expression *)
 (* is expected to be combinational. If it is not, an error is raised *)
@@ -866,7 +870,8 @@ and funexp genv env ({ f_kind; f_args } as f) =
     let f_fun v_list =
       let* env = Match.matching_arg_in_list f_loc env f_args v_list in
       vresult genv env f_body in
-    return (Vfun { f_arity = List.length f_args; f_fun }) in
+    let f_no_input = f_args = [[]] in
+    return (Vfun { f_arity = List.length f_args; f_no_input; f_fun }) in
 
   let co_step f_loc genv env n_arity arg_list f_body =
     let match_in_list a_list s_list v_list =
@@ -894,7 +899,8 @@ and funexp genv env ({ f_kind; f_args } as f) =
     let* s_body = iresult false genv env f_body in
     let n_arity = List.length arg_list in
     let n_step = co_step f_loc genv env n_arity arg_list f_body in
-    let si = { n_tkind; n_arity;
+    let n_no_input = arg_list = [] in
+    let si = { n_tkind; n_arity; n_no_input;
                n_init = Slist (s_body :: s_list); n_step } in
     return (Vnode(si)) in
 
@@ -911,7 +917,7 @@ and funexp genv env ({ f_kind; f_args } as f) =
          let* env = Match.matching_arg_in_list f_loc env f_args v_list in
          let* v = co_node f_loc genv env tkind arg_list f_body in
          return (Value(v)) in
-       return (Vfun { f_arity = List.length f_args; f_fun }) in
+       return (Vfun { f_arity = List.length f_args; f_no_input = false; f_fun }) in
     
   (* the functional value *)
   match f_kind with
@@ -1449,7 +1455,29 @@ and sizefixpoint genv env size_defs =
                                       s_fun; s_bound }))
              (Env.append (sizefixpoint s_bound size_defs) env) in
        env_ext s_bound in
-  sizefixpoint None size_defs
+  let env = sizefixpoint None size_defs in
+  env
+
+(*
+and sizefixpoint genv env size_defs =
+  let rec sizefixpoint env_of_sizefun s_bound size_defs =
+    match size_defs with
+    | [] -> Env.empty
+    | { sf_id; sf_id_list; sf_e } :: size_defs ->
+       let rec s_fun i_list =
+         (* all recursive calls must be on a size that is less than [i_list] *)
+         sizefun genv (env_ext (Some(i_list))) sf_id_list sf_e i_list
+       and
+         entry = lazy (Match.entry (Vsizefun { s_arity = List.length sf_id_list;
+                                               s_fun; s_bound }))
+       and
+         env_ext s_bound =
+           Env.add sf_id (Lazy.force entry)
+             (Env.append (sizefixpoint env_of_sizefun s_bound size_defs) env) in
+       env_ext s_bound in
+  let env = sizefixpoint None size_defs in
+  env
+ *)
 
 (* computing the value of a result combinatorial expression *)
 and vresult genv env r =
@@ -2385,12 +2413,16 @@ and apply loc fv v_list =
      if f_arity = actual_arity then f_fun v_list
      else
        if f_arity < actual_arity then
-         (* typing error *)
-         error { kind = Etype; loc = loc }
+         (* take the first [f_arity] arguments *)
+         let v_list, v_right_list = Util.split_n f_arity v_list in
+         let* fv = f_fun v_list in
+         let+ fv = fv in
+         apply loc fv v_right_list
        else
          return
            (Value(Vfun
                     { f_arity = actual_arity - f_arity;
+                      f_no_input = false;
                       f_fun = fun v_list_extra ->
                               f_fun (v_list @ v_list_extra) }))
   | _ -> error { kind = Etype; loc = loc }
@@ -2404,6 +2436,7 @@ and sizefun genv env sf_id_list sf_body i_list =
         List.fold_left2 
           (fun acc id i -> Env.add id (Match.entry (Vint i)) acc) 
           env sf_id_list i_list in
+      let l_ = Env.to_list env in
       vexp genv env sf_body
 
 (* apply a function of sizes to a list of sizes *)
@@ -2443,6 +2476,7 @@ and sizeapply loc fv i_list =
 (* check that no value is bot nor nil *)
 let vleq genv env ({ l_loc } as leq) =
   let* env = vleq genv env leq in
+  let l = Env.to_list env in
   let* env = no_bot_no_nil_env l_loc env in
   return env
 
@@ -2557,14 +2591,14 @@ let eval_two_nodes loc output n_steps
 (* is a node with a void argument, execute its body for [n] steps *)
 let eval ff n_steps name v =
   match v with
-  | Vnode({ n_arity = 0 } as si) ->
+  | Vnode({ n_no_input = true } as si) ->
      Format.fprintf ff
-       "@[val %s() for %d steps = @.@]" name n_steps;
+       "@[val %s() for %d steps is: @.@]" name n_steps;
      eval_node Location.no_location (Output.value_flush ff) n_steps si void
-  | Vfun { f_arity = 0; f_fun } ->
+  | Vfun { f_no_input = true; f_fun } ->
      let v = catch (f_fun [void]) in
      Format.fprintf ff
-       "@[val %s() = %a@.@]" name Output.value v
+       "@[val %s() for one step is %a@.@]" name Output.value v
   | _ ->
      Format.fprintf ff "@[val %s = %a@.@]" name Output.pvalue v
 
@@ -2587,10 +2621,11 @@ let check n_steps
   let check name v1 v2 =
     Debug.print_message ("Checking node " ^ name);
     match v1, v2 with
-    | Vnode({ n_arity = 0 } as si1), Vnode({ n_arity = 0 } as si2) ->
+    | Vnode({ n_no_input = true } as si1), Vnode({ n_no_input = true } as si2) ->
        eval_two_nodes 
          Location.no_location Output.value_flush n_steps si1 si2 void
-    | Vfun({ f_arity = 0; f_fun = f1 }), Vfun({ f_arity = 0; f_fun = f2 }) ->
+    | Vfun({ f_no_input = true; f_fun = f1 }),
+      Vfun({ f_no_input = true; f_fun = f2 }) ->
        eval_two_fun Location.no_location Output.value_flush v1 v2 []
     | _ -> () in
   let check name v1 =

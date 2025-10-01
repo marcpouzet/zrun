@@ -1,10 +1,25 @@
-(* simple examples of for loops *)
-let g x returns (y, z)
-    do y = x and z = x done
+(*
+(* recursive functions defined at top level *)
+let rec f<<n>>(x) returns o
+  match size n with
+  | 0 -> do o = x done
+  | _ -> do o = f<<n-1>>(x+1) done
+  
+let main () = f<<5>> (0)
+*)
 
-let node main___0 () =
-  let v1 = g 1 in
-  let v2 = g v1 in
-  v2 = ((1, 1), (1, 1))
+(* recursive functions defined at top level *)
+let rec f<<n>>(x) returns o
+  match size n with
+  | 0 -> do o = x done
+  | _ -> do o = g<<n-1>>(x+1) done
+and g<<n>>(x) = f<<n-1>>(x)
 
-(* 22; bad/1; bad/forward2 *)
+let main () =
+  let rec f<<n>>(x) returns o
+  match size n with
+  | 0 -> do o = x done
+  | _ -> do o = g<<n-1>>(x+1) done
+  and g<<n>>(x) = f<<n-1>>(x) in
+  f<<20>> (0)
+
