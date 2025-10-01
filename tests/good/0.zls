@@ -9,11 +9,11 @@ let main () = f<<5>> (0)
 *)
 
 (* recursive functions defined at top level *)
-let rec f<<n>>(x) returns o
+(* let rec f<<n>>(x) returns o
   match size n with
   | 0 -> do o = x done
   | _ -> do o = g<<n-1>>(x+1) done
-and g<<n>>(x) = f<<n-1>>(x)
+and g<<n>>(x) = f<<n-1>>(x) *)
 
 let main () =
   let rec f<<n>>(x) returns o

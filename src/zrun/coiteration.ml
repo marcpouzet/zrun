@@ -1441,43 +1441,31 @@ and vleq genv env ({ l_rec; l_eq } as leq) =
 
 (* builds an environment from a set of size function definitions *)
 and sizefixpoint genv env size_defs =
-  let rec sizefixpoint s_bound size_defs =
+  let l_ = Env.to_list env in
+  let entry s_arity s_fun s_bound =
+    Match.entry (Vsizefun { s_arity; s_fun; s_bound }) in
+                 
+  let rec sizefixpoint env_of_sizefun size_defs =
+    let l_ = Env.to_list env_of_sizefun in
     match size_defs with
     | [] -> Env.empty
     | { sf_id; sf_id_list; sf_e } :: size_defs ->
+       let s_arity = List.length sf_id_list in
+       
        let rec s_fun i_list =
          (* all recursive calls must be on a size that is less than [i_list] *)
-         sizefun genv (env_ext (Some(i_list))) sf_id_list sf_e i_list
+         sizefun genv 
+           (Env.append (env_ext (Some(i_list))) env) sf_id_list sf_e i_list
        and
          env_ext s_bound =
-           Env.add sf_id
-             (Match.entry (Vsizefun { s_arity = List.length sf_id_list;
-                                      s_fun; s_bound }))
-             (Env.append (sizefixpoint s_bound size_defs) env) in
-       env_ext s_bound in
-  let env = sizefixpoint None size_defs in
-  env
+           let entry = entry s_arity s_fun s_bound in
+           Env.add sf_id entry
+             (sizefixpoint (Env.add sf_id entry env_of_sizefun) size_defs) in
+       env_ext None in
+  let env_of_sizefun = sizefixpoint Env.empty size_defs in
+  let l_ = Env.to_list env_of_sizefun in
+  env_of_sizefun
 
-(*
-and sizefixpoint genv env size_defs =
-  let rec sizefixpoint env_of_sizefun s_bound size_defs =
-    match size_defs with
-    | [] -> Env.empty
-    | { sf_id; sf_id_list; sf_e } :: size_defs ->
-       let rec s_fun i_list =
-         (* all recursive calls must be on a size that is less than [i_list] *)
-         sizefun genv (env_ext (Some(i_list))) sf_id_list sf_e i_list
-       and
-         entry = lazy (Match.entry (Vsizefun { s_arity = List.length sf_id_list;
-                                               s_fun; s_bound }))
-       and
-         env_ext s_bound =
-           Env.add sf_id (Lazy.force entry)
-             (Env.append (sizefixpoint env_of_sizefun s_bound size_defs) env) in
-       env_ext s_bound in
-  let env = sizefixpoint None size_defs in
-  env
- *)
 
 (* computing the value of a result combinatorial expression *)
 and vresult genv env r =
@@ -1617,8 +1605,9 @@ and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
        let* (env_eq, s_eq) =
          match defs with
          | Either.Right(defs) ->
-            let env = sizefixpoint genv env defs in
-            return (env, s_eq)
+            let env_eq = sizefixpoint genv env defs in
+            let l_ = Env.to_list env_eq in
+            return (env_eq, s_eq)
          | Either.Left(l_eq) ->
             (* compute a bounded fix-point in [n] steps *)
             let bot = Match.bot_env eq_write in
