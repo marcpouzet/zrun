@@ -332,23 +332,23 @@ let rec size env { desc; loc } =
 (* mutually recursive definitions must either define *)
 (* functions parameterized by a size or stream values *)
 let sizefun_defs_or_values l_eq =
-  let rec extract_sizefun_defs (acc, one_value) { eq_desc; eq_loc } =
+  let rec extract_sizefun_defs (acc, one) { eq_desc; eq_loc } =
     match eq_desc with
     | EQsizefun ({ sf_id; sf_id_list; sf_e } as sizefun) ->
-       if one_value then
+       if one then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
-       else return (sizefun :: acc, one_value)
+       else return (sizefun :: acc, one)
     | EQand { eq_list } ->
-       fold extract_sizefun_defs (acc, one_value) eq_list
+       fold extract_sizefun_defs (acc, one) eq_list
     | EQempty -> 
-       return (acc, one_value)
+       return (acc, one)
     | _ -> 
        if List.is_empty acc then
          (* no size function definition was in the list *)
          return (acc, true)
       else error { kind = Esizefun_def_recursive; loc = eq_loc } in
-  let* acc, one_value = extract_sizefun_defs ([], false) l_eq in
-  if one_value then
+  let* acc, one = extract_sizefun_defs ([], false) l_eq in
+  if one then
     (* the equation *)
     return (Either.Left(l_eq))
   else
@@ -360,7 +360,7 @@ let sizefun_defs { l_eq; l_loc } =
   match v with 
   | Left _ -> error { kind = Esizefun_def_recursive; loc = l_loc }
   | Right(defs) -> return defs 
-  
+
 (* Present handler *)
 (* In the code below, [is_fun] is a boolean flag. When true, the expression *)
 (* is expected to be combinational. If it is not, an error is raised *)
@@ -1441,14 +1441,12 @@ and vleq genv env ({ l_rec; l_eq } as leq) =
 
 (* builds an environment from a set of size function definitions *)
 and sizefixpoint genv env size_defs =
-  let l_ = Env.to_list env in
   let entry s_arity s_fun s_bound =
     Match.entry (Vsizefun { s_arity; s_fun; s_bound }) in
                  
   let rec sizefixpoint env_of_sizefun size_defs =
-    let l_ = Env.to_list env_of_sizefun in
     match size_defs with
-    | [] -> Env.empty
+    | [] -> env_of_sizefun
     | { sf_id; sf_id_list; sf_e } :: size_defs ->
        let s_arity = List.length sf_id_list in
        
@@ -1459,11 +1457,9 @@ and sizefixpoint genv env size_defs =
        and
          env_ext s_bound =
            let entry = entry s_arity s_fun s_bound in
-           Env.add sf_id entry
-             (sizefixpoint (Env.add sf_id entry env_of_sizefun) size_defs) in
+           sizefixpoint (Env.add sf_id entry env_of_sizefun) size_defs in
        env_ext None in
   let env_of_sizefun = sizefixpoint Env.empty size_defs in
-  let l_ = Env.to_list env_of_sizefun in
   env_of_sizefun
 
 
@@ -1606,7 +1602,6 @@ and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
          match defs with
          | Either.Right(defs) ->
             let env_eq = sizefixpoint genv env defs in
-            let l_ = Env.to_list env_eq in
             return (env_eq, s_eq)
          | Either.Left(l_eq) ->
             (* compute a bounded fix-point in [n] steps *)
@@ -2425,7 +2420,6 @@ and sizefun genv env sf_id_list sf_body i_list =
         List.fold_left2 
           (fun acc id i -> Env.add id (Match.entry (Vint i)) acc) 
           env sf_id_list i_list in
-      let l_ = Env.to_list env in
       vexp genv env sf_body
 
 (* apply a function of sizes to a list of sizes *)
@@ -2465,7 +2459,6 @@ and sizeapply loc fv i_list =
 (* check that no value is bot nor nil *)
 let vleq genv env ({ l_loc } as leq) =
   let* env = vleq genv env leq in
-  let l = Env.to_list env in
   let* env = no_bot_no_nil_env l_loc env in
   return env
 

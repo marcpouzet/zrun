@@ -1,25 +1,3 @@
-(*
-(* recursive functions defined at top level *)
-let rec f<<n>>(x) returns o
-  match size n with
-  | 0 -> do o = x done
-  | _ -> do o = f<<n-1>>(x+1) done
-  
-let main () = f<<5>> (0)
-*)
+let g h x = h x
 
-(* recursive functions defined at top level *)
-(* let rec f<<n>>(x) returns o
-  match size n with
-  | 0 -> do o = x done
-  | _ -> do o = g<<n-1>>(x+1) done
-and g<<n>>(x) = f<<n-1>>(x) *)
-
-let main () =
-  let rec f<<n>>(x) returns o
-  match size n with
-  | 0 -> do o = x done
-  | _ -> do o = g<<n-1>>(x+1) done
-  and g<<n>>(x) = f<<n-1>>(x) in
-  f<<20>> (0)
-
+let main7() = g(g(fun x -> x)) 0
