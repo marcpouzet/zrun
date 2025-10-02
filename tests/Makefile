@@ -3,5 +3,5 @@ all:
 
 clean:
 	dune clean;
-	(cd good/; rm -f *.zlo);
-	(cd bad/; rm -f *.zlo)
+	(cd good/; rm -f *.zlo *.zci);
+	(cd bad/; rm -f *.zlo *.zci)

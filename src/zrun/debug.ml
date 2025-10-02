@@ -50,3 +50,9 @@ let print_program p =
   if !verbose then Printer.program Format.err_formatter p
 
 let print_nothing _ = ()
+
+let counter = ref 0
+
+let incr_counter() = counter := !counter + 1
+
+let print_counter() = Format.eprintf "Counter = %d\n" !counter

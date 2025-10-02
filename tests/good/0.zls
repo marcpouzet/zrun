@@ -1,3 +1,7 @@
-let g h x = h x
+let rec g<<n>>(x) =
+  match size n with
+  | 0 -> 0
+  | _ -> 1 + f<<n-1>>(x+1)
+and f<<n>>(x) = g<<n-1>>(x)
 
-let main7() = g(g(fun x -> x)) 0
+let main1() = g<<100>>(1)

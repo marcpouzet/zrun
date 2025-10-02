@@ -2384,6 +2384,7 @@ and sstate genv env { desc; loc } s =
 
 (* application of a combinatorial function *)
 and apply loc fv v_list =
+  Debug.incr_counter ();
   match fv, v_list with
   | _, [] -> return (Value(fv))
   | Vifun(op), v :: v_list ->
@@ -2572,7 +2573,7 @@ let eval_two_nodes loc output n_steps
 (* If [v] is a function with a void argument, execute its body; if [v] *)
 (* is a node with a void argument, execute its body for [n] steps *)
 let eval ff n_steps name v =
-  match v with
+  (match v with
   | Vnode({ n_no_input = true } as si) ->
      Format.fprintf ff
        "@[val %s() for %d steps is: @.@]" name n_steps;
@@ -2582,7 +2583,8 @@ let eval ff n_steps name v =
      Format.fprintf ff
        "@[val %s() for one step is %a@.@]" name Output.value v
   | _ ->
-     Format.fprintf ff "@[val %s = %a@.@]" name Output.pvalue v
+     Format.fprintf ff "@[val %s = %a@.@]" name Output.pvalue v);
+  Debug.print_counter ()
 
 (* evaluate all entries in the environment *)
 let all ff n_steps { values } = E.iter (eval ff n_steps) values
