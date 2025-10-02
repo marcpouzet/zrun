@@ -52,7 +52,6 @@ let print_program p =
 let print_nothing _ = ()
 
 let counter = ref 0
-
+let init_counter() = counter := 0
 let incr_counter() = counter := !counter + 1
-
 let print_counter() = Format.eprintf "Counter = %d\n" !counter
