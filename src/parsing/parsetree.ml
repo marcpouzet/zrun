@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2025 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -28,7 +28,7 @@ and vkind =
 
 and tkind =
   | Kdiscrete (* only discrete-time state variables *)
-  | Khybrid (* discrete-time and continuous-time state variables *)
+  | Kcont (* discrete-time and continuous-time state variables *)
 
 type longname =
   | Name : name -> longname
@@ -43,7 +43,19 @@ and type_expression_desc =
   | Etypevar : name -> type_expression_desc
   | Etypeconstr : longname * type_expression list -> type_expression_desc
   | Etypetuple : type_expression list -> type_expression_desc
-  | Etypefun : kind * type_expression * type_expression -> type_expression_desc
+  | Etypefun : kind * name option * type_expression * type_expression ->
+               type_expression_desc
+  | Etypevec : type_expression * size -> type_expression_desc
+
+and size = size_desc localized
+
+and size_desc =
+  | Size_int of int
+  | Size_var of name
+  | Size_frac of size * int
+  | Size_op of op * size * size
+
+and op = Size_plus | Size_minus | Size_mult
 
 (* constants *)
 type immediate =
@@ -78,6 +90,8 @@ type operator =
   (* period *)
   | Ehorizon : operator
   (* generate an event at a given horizon *)
+  | Einitial
+  (* true at the very first instant *)
   | Edisc : operator
   (* generate an event whenever x <> last x outside of integration *)
   | Earray : array_operator -> operator
@@ -101,6 +115,8 @@ and array_operator =
   (* [flatten e] *)
   | Ereverse : array_operator
   (* [reverse e] *)
+  | Emake : array_operator
+  (* [e^e] *)
 
 and is_inline = bool
 
@@ -139,6 +155,7 @@ and pattern_desc =
   | Eorpat : pattern * pattern -> pattern_desc
   | Erecordpat : (longname * pattern) list -> pattern_desc
   | Etypeconstraintpat : pattern * type_expression -> pattern_desc
+  | Earraypat : pattern list -> pattern_desc
 
 type statepatdesc =
   | Estate0pat : name -> statepatdesc
@@ -169,16 +186,6 @@ and ('scondpat, 'body) present_handler =
 
 type is_weak = bool
 
-type size = size_desc localized
-
-and size_desc =
-  | Sint : int -> size_desc
-  | Sfrac : size * int  -> size_desc
-  | Sident : name -> size_desc
-  | Splus: size * size -> size_desc
-  | Sminus : size * size -> size_desc
-  | Smult: size * size -> size_desc
-  
 type exp = exp_desc localized
 
 and exp_desc =
@@ -186,7 +193,7 @@ and exp_desc =
   | Econstr0 : longname -> exp_desc
   | Econstr1 : longname * exp list -> exp_desc
   | Evar : longname -> exp_desc
-  | Elast : name -> exp_desc
+  | Elast : is_copy * name -> exp_desc
   | Eop : operator * exp list -> exp_desc
   | Etuple : exp list -> exp_desc
   | Eapp : is_inline * exp *  exp list -> exp_desc
@@ -198,12 +205,15 @@ and exp_desc =
   | Erecord_with : exp * (longname * exp) list -> exp_desc
   | Etypeconstraint : exp * type_expression -> exp_desc
   | Efun : funexp -> exp_desc
-  | Ematch : exp * (exp, exp) match_handler list -> exp_desc
+  | Ematch : is_size * exp * (exp, exp) match_handler list -> exp_desc
   | Epresent : (scondpat, exp) present_handler list * exp default -> exp_desc
   | Ereset : exp * exp -> exp_desc
   | Eassert : exp -> exp_desc
   | Eforloop : for_exp forloop -> exp_desc
 
+and is_size = bool
+
+and is_copy = bool
 
 and is_rec = bool
 
@@ -243,7 +253,7 @@ and eq_desc =
   | EQautomaton : (exp, eq) block automaton_handler list *
         exp state option -> eq_desc
   (* automaton ... *)
-  | EQmatch : exp * (exp, eq) match_handler list -> eq_desc
+  | EQmatch : is_size * exp * (exp, eq) match_handler list -> eq_desc
   | EQpresent :
       (scondpat, eq) present_handler list * eq default -> eq_desc
   | EQempty : eq_desc
@@ -267,7 +277,8 @@ and for_exp =
   | Forexp : { exp : exp; default : exp option } -> for_exp
   (* [for[each|ward] ... do e done] *)
   | Forreturns :
-      { returns : for_vardec_desc localized list; body : (exp, eq) block } -> for_exp
+      { r_returns : for_vardec_desc localized list;
+        r_block : (exp, eq) block } -> for_exp
   (* [for[each|ward] ... returns (...) local ... do eq ... done] *)
 
 and for_vardec_desc =
@@ -357,6 +368,7 @@ and funexp_desc =
   { f_vkind: vkind; (* the kind for the arguments *)
     f_kind: kind; (* the kind for the body *)
     f_atomic: is_atomic;
+    f_inline: is_inline;
     f_args: arg list;
     f_body: result
   }
@@ -381,8 +393,7 @@ type interface = interface_desc localized
 and interface_desc =
   | Einter_open : name -> interface_desc
   | Einter_typedecl :
-      { name: name; ty_params: name list; size_params: name list;
-        ty_decl: type_decl } -> interface_desc
+      { name: name; ty_params: name list; ty_decl: type_decl } -> interface_desc
   | Einter_constdecl :
       { name: name; const: bool; ty: type_expression; info: name list }
       -> interface_desc
@@ -407,7 +418,7 @@ and implementation_desc =
   | Eopen : name -> implementation_desc
   | Eletdecl : leq -> implementation_desc
   | Etypedecl :
-      { name: name; ty_params: name list; size_params: name list;
-        ty_decl: type_decl } -> implementation_desc
+      { name: name; ty_params: name list; ty_decl: type_decl } ->
+      implementation_desc
 
 type program = implementation list

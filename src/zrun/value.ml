@@ -18,50 +18,53 @@
 (* noinitialized and non causal values *)
 
 (* an input entry in the environment *)
-type 'a ientry = { cur: 'a; last : 'a option; default : 'a option }
+type 'a ientry =
+  { cur: 'a option; (* the current value of [x] *)
+    last : 'a option; (* the value of [last x] *)
+    default : 'a option; (* the default value of [x] *)
+    reinit : bool; (* [last x] is defined by an equation [init x = ...] *)
+  }
+
+type 'a env = 'a ientry Ident.Env.t
 
 type 'a result = ('a, Error.error) Result.t
 
 type 'a star =
-  | Vnil : 'a star (* non initialized value *)
-  | Vbot : 'a star (* bottom value *)
-  | Value : 'a -> 'a star (* value *)
-  
-type pvalue =
-  | Vint : int -> pvalue
-  | Vbool : bool -> pvalue
-  | Vfloat : float -> pvalue
-  | Vchar : char -> pvalue
-  | Vstring : string -> pvalue
-  | Vvoid : pvalue
-  | Vconstr0 : Lident.t -> pvalue
-  | Vconstr1 : Lident.t * pvalue list -> pvalue
-  | Vrecord : pvalue Zelus.record list -> pvalue
-  | Vpresent : pvalue -> pvalue
-  | Vabsent : pvalue
-  | Vstuple : pvalue list -> pvalue
-  | Vtuple : pvalue star list -> pvalue
-  | Vstate0 : Ident.t -> pvalue
-  | Vstate1 : Ident.t * pvalue list -> pvalue
-  | Varray : pvalue array -> pvalue
+  | Vnil (* non initialized value *)
+  | Vbot (* bottom value *)
+  | Value of 'a (* value *)
+
+type value = pvalue star
+
+and pvalue =
+  | Vint of int
+  | Vbool of bool
+  | Vfloat of float
+  | Vchar of char
+  | Vstring of string
+  | Vvoid 
+  | Vconstr0 of Lident.t
+  | Vconstr1 of Lident.t * pvalue list
+  | Vrecord of pvalue Zelus.record list
+  | Vpresent of pvalue 
+  | Vabsent 
+  | Vstuple of pvalue list
+  | Vtuple of pvalue star list
+  | Vstate0 of Ident.t
+  | Vstate1 of Ident.t * pvalue list
+  | Varray of pvalue array
   (* imported stateless functions; they must verify that *)
   (* f(atomic v) not= bot *)
-  | Vfun : (pvalue -> pvalue option) -> pvalue
-  | Vclosure : pvalue closure -> pvalue
+  | Vifun of (pvalue -> pvalue option)
+  (* user defined functions and nodes *)
+  | Vfun of vfun
+  | Vnode of vnode
   (* function parameterized by sizes *)
-  | Vsizefun : pvalue sizefun -> pvalue
-  (* a representation for mutually recursive functions over sizes *)
-  (* f where rec [f1<s,...> = e1 and ... fk<s,...> = ek] *)
-  | Vsizefix : 
-      { bound: int list option; (* the maximum number of iterations *)
-        name: Ident.t; (* name of the defined function *)
-        defs: pvalue sizefun Ident.Env.t; (* the set of mutually recursive
-                                                function definitions *) 
-      } -> pvalue
+  | Vsizefun of sizefun
 
 and 'a array =
-  | Vflat : 'a Array.t -> 'a array
-  | Vmap : 'a map -> 'a array
+  | Vflat of 'a Array.t
+  | Vmap of 'a map
 
 (* bounded maps *)
 (* [get x i = v if x.left <= i <= right then x i
@@ -69,54 +72,69 @@ and 'a array =
                                             | Some(x) -> get x i *)
 and 'a map =
   { m_length : int; m_u : int -> 'a result }
-     
-(* a size parameterized expression - f <n1,...,nk> = e *)
-and 'a sizefun = 
-  { s_params: Ident.t list; 
-    s_body: Misc.no_info Zelus.exp; 
-    s_genv: 'a Genv.genv; 
-    s_env: 'a star ientry Ident.Env.t }
-                                   
-(* a functional value - [fun|node] x1 ... xn -> e *)
-and 'a closure =
-  { c_funexp : Misc.no_info Zelus.funexp;
-    c_genv: 'a Genv.genv;
-    c_env: 'a star ientry Ident.Env.t }
-                                     
-and 'a state =
-  | Sbot : 'a state
-  | Snil : 'a state
-  | Sempty : 'a state
-  | Sval : 'a star -> 'a state
-  | Sstatic : 'a -> 'a state
-  | Slist : 'a state list -> 'a state
-  | Sopt : 'a star option -> 'a state
-  | Sinstance : 'a instance -> 'a state
-  | Scstate : { pos : 'a star; der : 'a star } -> 'a state 
-  | Szstate : { zin : bool; zout : 'a star } -> 'a state
-  | Shorizon : { zin : bool; horizon : float } -> 'a state
-  | Speriod :
-      { zin : bool; phase : float; period : float; horizon : float } -> 
-      'a state
-  (* environment of values *)
-  | Senv : 'a star ientry Ident.Env.t -> 'a state
 
-(* instance of a node *)
-and 'a instance =
-  { init : 'a state; (* current state *)
-    step : 'a closure; (* step function *)
+and sizefun =
+  { s_arity: int; (* expected number of size arguments *)
+    s_fun: int list -> value result;
+    s_bound: int list option; (* the maximum number of iterations *)
   }
 
-type value = pvalue star
+(* abstraction is curried; of the form [fun (x1,...) ... (xn,...) -> e] *)
+(* combinatorial function *)
+and vfun =
+  { f_arity: int;
+    f_no_input: bool; (* [fun () -> e] *)
+    f_fun : value list -> value result (* [f (e1,...) ... (en,...)] *)
+  }
+
+(* abstraction is uncurried; of the form [node|hybrid (x1,...,xn) -> e] *)
+(* stateful function (called "node") *)
+and vnode =
+  { n_tkind: Zelus.tkind; (* discrete only or discrete/continuous-time state *)
+    n_arity: int;
+    n_no_input: bool; (* [node|hybrid () -> e] *)
+    n_init : state; (* current state *)
+    (* step function *)
+    n_step : state -> value -> (value * state) result; (* [f (e1,..., en)] *)
+  }
+
+and instance = vnode
+
+and state =
+  | Sbot 
+  | Snil 
+  | Sempty 
+  | Sval of value
+  | Sstatic of pvalue
+  | Slist of state list
+  | Sopt of value option
+  | Sinstance of instance
+  | Scstate of { pos : value; der : value }
+  | Szstate of { zin : bool; zout : value }
+  | Shorizon of { zin : bool; horizon : float }
+  | Speriod of
+      { zin : bool; phase : float; period : float; horizon : float }
+  (* environment of values *)
+  | Senv of value ientry Ident.Env.t
 
 (*
-type ('a, 's) costream =
+  An expression is interpreted as a value of type:
+
+  type ('a, 's) costream =
   | CoF : { init : 's;
             step : 's -> ('a * 's) option } ->
           ('a, 's) costream
 
-type ('a, 'b, 's) node =
+  A functional value, combinatorial or stateful is interpreted as a value of type:
+
+  type ('a, 'b, 's) node =
   | CoFun : ('a list -> 'b option) -> ('a, 'b, 's) node
   | CoNode : { init : 's;
-               step : 's -> 'a list -> ('b * 's) option } -> ('a, 'b, 's) node
- *)
+               step : 's -> 'a -> ('b * 's) option } -> ('a, 'b, 's) node
+
+  Here, the set of values ('a value) contains all the possible
+  values; those that are produced at compile time or instanciation time; and
+  those that are produced at every reaction time. The two could be separated,
+  in particular dynamic values (e.g., functions) could be allowed only
+  at compilation and instantiation time; not at execution time.
+*)

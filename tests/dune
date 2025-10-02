@@ -6,5 +6,5 @@
  (deps (glob_files good/*.zls) (glob_files bad/*.zls))
  ; files dependencies
  (libraries
-   zrun.ast_lib zrun.zrun_lib alcotest))
+   zrun.global_lib zrun.zrun_lib alcotest))
  ; libraries dependencies

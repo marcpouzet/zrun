@@ -29,6 +29,8 @@ let node f1(r init 0) returns (m init 0)
   and m = s + (0 -> last m)
   done
 
+let node main_f1() = f1(1)
+
 let node f1_same(r) returns (m)
   local s init r, r_i init 0, m_i init 0
   do s = last s + last r_i
@@ -50,7 +52,7 @@ let node f1_same2(r) returns (m)
   and last_s = r fby s
   and last_r_i = 0 fby r_i
   and last_m_i = 0 fby m_i
-  and m_i = m
+  and m_i = m + 3
   and r_i = r done
 
 let node main_f1_same2() returns (o)

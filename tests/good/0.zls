@@ -1,0 +1,11 @@
+(* recursive functions defined at top level *)
+let rec f<<n>>(x) returns o
+  match size n with
+  | 0 -> do o = x done
+  | _ -> do o = g<<n-1>>(x+1) done
+  
+and g<<n>> (x) = f<<n>> (x-1)
+
+let h = f
+
+let main1 () = f<<4>>(0)

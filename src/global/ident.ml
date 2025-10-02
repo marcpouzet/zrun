@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -49,19 +49,33 @@ module Env =
     let append env0 env =
       fold (fun x v acc -> update x (function _ -> Some(v)) acc)
         env0 env
+
+    let mapfold f acc env =
+      fold (fun x v (env, acc) -> let v, acc = f acc v in
+                                  add x v env, acc)
+        env (empty, acc)
     
     let fprint_t fprint_v ff env =
       Format.fprintf ff "@[<hov 2>{@ ";
-      iter (fun k v -> Format.fprintf ff "@[%a: %a@]@ " M.fprint k fprint_v v) 
+      iter (fun k v ->
+          Format.fprintf ff "@[%a = %a,@]@ " M.fprint k fprint_v v) 
         env;
       Format.fprintf ff "}@]"
+
+    let find_stop_if_unbound message x env =
+      try
+        find x env
+      with | Not_found -> 
+              Format.eprintf "%s: unbound variable %s\n"
+                message (name x);
+              raise Misc.Error
   end
 
 module S = struct
   include (Set.Make(M))
   let fprint_t ff s =
     Format.fprintf ff "@[<hov>{@ ";
-    iter (fun e -> Format.fprintf ff "%a@ " M.fprint e) s;
+    iter (fun e -> Format.fprintf ff "%a,@ " M.fprint e) s;
     Format.fprintf ff "}@]"
 
   let fresh s ss =

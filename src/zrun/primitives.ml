@@ -30,8 +30,9 @@ let (let+) v f =
 
 let (let-) v f =
   match v with
-  | Vbot -> return Vbot
-  | _ -> f v
+  | Vbot -> Vbot
+  | Vnil -> Vnil
+  | Value(v) -> f v
 
 let (and+) v1 v2 =
   match v1, v2 with
@@ -72,7 +73,7 @@ let test v =
 
 let get_node v =
   match v with
-  | Vclosure ({ c_funexp = { f_kind = Knode _ } } as c) -> return c
+  | Vnode(instance) -> return instance
   | _ -> None
 
 let get_record r =
@@ -181,13 +182,25 @@ let length_op v =
   | Varray(a) -> return (Vint(length a))
   | _ -> none
 
+let rec compare_list compare p_list1 p_list2 =
+  match p_list1, p_list2 with
+  | [], [] -> return 0
+  | p1 :: p_list1, p2 :: p_list2 ->
+     let* v = compare p1 p2 in
+     if v = 0 then compare_list compare p_list1 p_list2 else return v
+  | _ -> none
+    
+let stdlib_name id = { qual = name_of_stdlib_module; id }
+let present_name = Lident.Modname(stdlib_name "P")
+let absent_name = Lident.Modname(stdlib_name "A")
+
 let rec compare_pvalue v1 v2 =
   match v1, v2 with
-  | Vint i1, Vint i2 -> return (compare i1 i2)
-  | Vbool b1, Vbool b2 -> return (compare b1 b2)
-  | Vfloat f1, Vfloat f2 -> return (compare f1 f2)
-  | Vchar c1, Vchar c2 -> return (compare c1 c2)
-  | Vstring s1, Vstring s2 -> return (compare s1 s2)
+  | Vint i1, Vint i2 -> return (Stdlib.compare i1 i2)
+  | Vbool b1, Vbool b2 -> return (Stdlib.compare b1 b2)
+  | Vfloat f1, Vfloat f2 -> return (Stdlib.compare f1 f2)
+  | Vchar c1, Vchar c2 -> return (Stdlib.compare c1 c2)
+  | Vstring s1, Vstring s2 -> return (Stdlib.compare s1 s2)
   | Vvoid, Vvoid -> return 0
   | Vconstr0(id1), Vconstr0(id2) -> return (Lident.compare id1 id2)
   | Vconstr1(id1, p_list1), Vconstr1(id2, p_list2) ->
@@ -196,6 +209,9 @@ let rec compare_pvalue v1 v2 =
        compare_list compare_pvalue p_list1 p_list2 else return v
   | Vpresent(v1), Vpresent(v2) -> compare_pvalue v1 v2
   | Vabsent, Vabsent -> return 0
+  (* or one is the lower-level internal representation of the other *)
+  | (Vpresent(v1), v2) | (v2, Vpresent(v1)) -> compare_present v1 v2
+  | (Vabsent, v) | (v, Vabsent) when is_absent v -> return 0
   | Vstuple(p_list1), Vstuple(p_list2) -> 
      compare_list compare_pvalue p_list1 p_list2
   | Vstate0(id1), Vstate0(id2) -> return (Ident.compare id1 id2)
@@ -205,18 +221,20 @@ let rec compare_pvalue v1 v2 =
   | Varray(v1), Varray(v2) -> 
      if length v1 = length v2 then compare_array compare_pvalue v1 v2 else none
   | Vrecord _, Vrecord _ -> none
-  | Vtuple _, Vtuple _ -> none
-  | Vfun _, Vfun _ -> none
-  | Vclosure _, Vclosure _ -> none
+  | Vtuple(v_list1), Vtuple(v_list2) ->
+     compare_list compare_value v_list1 v_list2
+  | (Vifun _, Vifun _) | (Vfun _, Vfun _) | (Vnode _, Vnode _) -> none
   | _ -> none
 
-and compare_list compare p_list1 p_list2 =
-  match p_list1, p_list2 with
-  | [], [] -> return 0
-  | p1 :: p_list1, p2 :: p_list2 ->
-     let* v = compare p1 p2 in
-     if v = 0 then compare_list compare p_list1 p_list2 else return v
+(* comparison of present/absent with one the representation of the other *)
+and compare_present v1 v2 =
+  match v2 with
+  | Vconstr1(ln, [v2]) when ln = present_name -> compare_pvalue v1 v2
   | _ -> none
+
+and is_absent v = 
+  match v with 
+  | Vconstr0(ln) when ln = absent_name -> true | _ -> false
 
 and compare_array compare a1 a2 =
   (* compare the elements of two arrays, from left to right *)
@@ -242,6 +260,12 @@ and compare_array compare a1 a2 =
   | Vmap({ m_u = a1 }), Vmap({ m_u = a2 }) -> 
     compare_array_n n (get_i, a1) (get_i, a2)
 
+and compare_value v1 v2 =
+  match v1, v2 with
+  | (Vbot, Vbot) | (Vnil, Vnil) -> return 0
+  | (Value(pv1), Value(pv2)) -> compare_pvalue pv1 pv2
+  | _ -> none
+
 let eq_op v1 v2 =
   let* v = compare_pvalue v1 v2 in
   return (Vbool(v = 0))
@@ -265,6 +289,10 @@ let gte_op v1 v2 =
        
 (* ifthenelse. this one is strict w.r.t all arguments *)
 let lustre_ifthenelse v1 v2 v3 =
+  let (let-) v f =
+  match v with
+  | Vbot -> return Vbot
+  | _ -> f v in
   let+ v1 = v1 in
   let- v2 = v2 in
   let- v3 = v3 in
@@ -341,6 +369,23 @@ let lift1 op v =
   let* v = op v in
   return (Value v)
 
+(* convert a value into a list of size n *)
+let list_of n v =
+  if n = 1 then [v]
+  else match v with
+  | Value(Vvoid) -> []
+  | Value(Vtuple(v_list)) -> v_list
+  | Value(Vstuple(v_list)) ->
+     List.map (fun v -> Value(v)) v_list
+  | Vbot | Vnil -> Util.list_of n v
+  | Value _ -> [v]
+
+(* gets the value *)
+let pvalue v =
+  match v with
+  | Vnil | Vbot -> None
+  | Value(v) -> return v
+
 (* lift a binary operator: [op bot _ = bot]; [op _ bot = bot]; same for nil *)
 let sapp op v1 v2 =
   match v1, v2 with
@@ -350,21 +395,6 @@ let sapp op v1 v2 =
 
 let lift2 op v1 v2 = return (sapp op v1 v2)
 
-(* convert a value into a list *)
-let list_of v =
-  match v with
-  | Value(Vvoid) -> []
-  | Value(Vtuple(v_list)) -> v_list
-  | Value(Vstuple(v_list)) ->
-     List.map (fun v -> Value(v)) v_list
-  | Vbot | Vnil | Value _ -> [v]
-
-(* gets the value *)
-let pvalue v =
-  match v with
-  | Vnil | Vbot -> None
-  | Value(v) -> return v
-
 (* if one is bot, return bot; if one is nil, return nil *)
 let rec slist v_list =
   match v_list with
@@ -373,7 +403,20 @@ let rec slist v_list =
      let v_r = slist v_list in
      sapp (fun x xs -> x :: xs) v v_r
 
-let stuple v_list =
+let rec atomic v =
+  let- p_value = v in
+  match p_value with
+  | Vtuple(v_list) ->
+     let- v_list = slist (List.map atomic v_list) in
+     Value(Vstuple(v_list))
+  | Vfun _ | Vnode _ -> v
+     (* we should make the function strict, that is *)
+     (* [atomic(f) = \v. f(atomic v)] *)
+     (* otherwise, the computation of [f f] with [f = \x.x] diverges *)
+     (* remind that the semantics applies to untyped or typed programs *)
+  | _ -> v
+
+and stuple v_list =
   let+ v_list = slist v_list in
   return (Value(Vstuple(v_list)))
 
@@ -396,18 +439,6 @@ let array v_list =
 let lift f v =
   match v with | Vbot -> Vbot | Vnil -> Vnil | Value(v) -> Value(f v)
 
-let atomic v =
-  let+ v = v in
-  match v with
-  | Vtuple(l) -> stuple l
-  | Vclosure _ -> 
-      (* this part should be changed into [atomic(f) = lambda x.let+ x in f x] *)
-      (* that is, even if [f] is not strict, make it a strict function *)
-      (* this is necessary to avoid unbounded recursion with f = \x. x x and f f *)
-      (* this is because Zrun applies to untyped programs *)
-    return (Value v)
-  | _ -> return (Value v)
-
 (* void *)
 let void = Value(Vvoid)
 
@@ -415,12 +446,9 @@ let void = Value(Vvoid)
 let max_float = Value(Vfloat(max_float))
 let zero_float = Value(Vfloat(0.0))
 
-let zerop op = Vfun (fun _ -> op ())
-
-let unop op = Vfun op
-
-let binop op =
-  Vfun(fun v1 -> return (Vfun (fun v2 -> op v1 v2)))
+let zerop op = Vifun (fun _ -> op ())
+let unop op = Vifun op
+let binop op = Vifun(fun v1 -> return (Vifun (fun v2 -> op v1 v2)))
 
 (*
 (* state processes *)
@@ -451,7 +479,7 @@ let random_float_op v =
 
 
 (* The initial Stdlib *)
-let list_of_primitives =
+let list_of_primitives () =
   ["+", binop add_op;
    "-", binop minus_op;
    "~-", unop uminus_op;
@@ -482,7 +510,7 @@ let list_of_primitives =
    ">=", binop gte_op;
    "length", unop length_op]
 
-let list_of_random_primitives =
+let list_of_random_primitives () =
   ["random_bool", zerop random_bool_op;
    "random_int", unop random_int_op;
    "random_float", unop random_float_op]
@@ -492,8 +520,9 @@ let to_env acc l = List.fold_left (fun acc (n, v) -> Genv.E.add n v acc) acc l
 let list_of_esterel_primitives =
   if !esterel then ["or", esterel_or_op; "&", esterel_and_op] else []
 
-let stdlib_env =
+let stdlib_env () =
   { Genv.name = "Stdlib";
     Genv.values =
-      to_env (to_env Genv.E.empty list_of_primitives) list_of_random_primitives }
+      to_env (to_env Genv.E.empty (list_of_primitives ()))
+        (list_of_random_primitives ()) }
 

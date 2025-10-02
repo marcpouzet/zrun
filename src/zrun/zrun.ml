@@ -34,16 +34,23 @@ let doc_verbose = "\tVerbose mode"
 let doc_vverbose = "\t Set even more verbose mode"
 let doc_debug = "\t Set debug mode"
 let doc_no_assert = "\tNo check of assertions"
-let doc_nocausality = "\tTurn off the check that are variables are non bottom"
+let doc_nocausality = "\tTurn off the check that all variables are non bottom"
 let doc_print_values = "\tPrint values"
 let doc_number_of_fixpoint_iterations =
   "\tPrint the number of steps for fixpoints"
 let doc_esterel =
   "\tSets the interpretation of if/then/else to be constructive"
 let doc_lustre =
-  "\tSets the interpretation of if/then/else to be strict \n\
-   \t\t(that of Lustre)"
-                  
+  "\tSets the interpretation of if/then/else to be strict w.r.t any argument \n\
+   \t\t(by default, it is lazy, i.e., strict w.r.t the first argument)"
+let doc_static_reduction =
+  "\tReduce static (compile-time) expressions"
+let doc_check =
+  "\tCheck equivalence at every program transformation \n\
+   \t\tfor the number of steps"
+and doc_inlining_level = "<n> \t Level of inlining"
+and doc_inline_all = "\t Inline all function calls"
+
 let errmsg = "Options are:"
 
 

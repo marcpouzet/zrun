@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2024 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -18,24 +18,39 @@
 open Misc
 open Lident
    
+let suffix = ".zlo"
+
 type 'a info = { qualid : Lident.qualident; info : 'a }
 
 module E = Map.Make (struct type t = string let compare = compare end)
 
 exception Cannot_find_file of string
+    
+exception Already_defined of string
 
 (* The current global environment *)
-type 'a env =
+type 'v  env =
   { name: string; (* the name of the module *)
-    values: 'a E.t; (* the symbol table [name, entry] *)
+    values: 'v E.t; (* the symbol table [name, entry] - values *)
   }
       
 (* The current global environment and list of already opened modules *)
-type 'a genv =
-    { current: 'a env;      (* associated symbol table *)
-      opened: 'a env list;  (* opened tables *)
-      modules: 'a env E.t;  (* tables loaded in memory *)
+type 'v genv =
+    { current: 'v env;      (* associated symbol table *)
+      opened: 'v env list;  (* opened tables *)
+      modules: 'v env E.t;  (* tables loaded in memory *)
     }
+
+let current_empty = { name = ""; values = E.empty }
+let empty = { current = current_empty; opened = []; modules = E.empty }
+
+(* debug info *)
+let show { current; opened; modules } =
+  let show_env { name; values } =
+    (name, E.to_list values) in
+  "current", show_env current,
+  "opened", List.map show_env opened,
+  "modules", List.map (fun (m, env) -> (m, show_env env)) (E.to_list modules)
 
 let findfile filename =
   if Sys.file_exists filename then filename
@@ -53,7 +68,7 @@ let findfile filename =
 let load_module modname =
   let name = String.uncapitalize_ascii modname in
   try
-    let filename = findfile (name ^ ".zlo") in
+    let filename = findfile (name ^ suffix) in
     let ic = open_in_bin filename in
     try
       let m = Marshal.from_channel ic in
@@ -76,12 +91,12 @@ let find_module modname genv =
     E.find modname genv.modules, genv
   with
     Not_found ->
-    let m = load_module modname in
-    m, { genv with modules = E.add modname m genv.modules }
+     let m = load_module modname in
+     m, { genv with modules = E.add modname m genv.modules }
             
 (* Find the associated value of [qualname] in the list of currently *)
 (* opened modules *)
-let find qualname ({ current; opened } as genv) =
+let find where qualname ({ current; opened } as genv) =
   let rec findrec ident = function
     | [] -> raise Not_found
     | { name; values } :: l ->
@@ -92,23 +107,37 @@ let find qualname ({ current; opened } as genv) =
   match qualname with
   | Modname({ qual; id } as q) -> 
      let current, genv =
-       if current.name = qual then current, genv else find_module qual genv in
-     let info = E.find id current.values in
+       if current.name = qual then current, genv 
+       else find_module qual genv in
+     let info = where id current in
      { qualid = q; info = info }, genv
   | Name(ident) -> findrec ident (current :: opened)
             
 (* exported functions *)
 let add_module genv m =
-  { genv with opened = m :: genv.opened }
+  { genv with opened = m :: genv.opened;
+              modules = E.add m.name m genv.modules }
 
 let open_module genv modname =
   let m, genv = find_module modname genv in
   { genv with opened = m :: genv.opened }
+
+let try_to_open_module genv modname =
+  let exists modname =
+  try
+    let name = String.uncapitalize_ascii modname in
+    let _ = findfile (name ^ suffix) in true
+  with
+  | Cannot_find_file _ -> false in
+  if exists modname then 
+     let m, genv = find_module modname genv in
+     { genv with opened = m :: genv.opened }
+  else genv
       
 let initialize modname default_used_modules =
   let genv =
-    { current = { name = modname; values = E.empty };
-    opened = []; modules = E.empty } in
+    { current = { current_empty with name = modname };
+      opened = []; modules = E.empty } in
   List.fold_left open_module genv default_used_modules  
   
 let add f pvalue ({ current } as genv) =
@@ -116,21 +145,12 @@ let add f pvalue ({ current } as genv) =
     { current with values = E.add f pvalue current.values } in
   { genv with current = current }
 
-let add_list f_pvalue_list ({ current } as genv) =
-  let values =
-    List.fold_left (fun acc (f, pvalue) -> E.add f pvalue acc)
-      current.values f_pvalue_list in
-  let current = { current with values } in
-  { genv with current = current }
+let find_value qualname genv =
+  let v, _ = find (fun ident m -> E.find ident m.values) qualname genv in v
 
-let find qualname genv =
-  let v, _ = find qualname genv in
-  v
-  
 let write { current } oc = Marshal.to_channel oc current [Marshal.Closures]
-
+    
 let current { current } = current
 
-let empty = 
-  let current = { name = ""; values = E.empty } in
-  { current; opened = []; modules = E.empty }
+let shortname { id = n } = n
+

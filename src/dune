@@ -12,8 +12,8 @@
 
 ; all the modules necessary to parse
 (library
-  (name parse_lib)
-  (public_name zrun.parse_lib)
+  (name parser_lib)
+  (public_name zrun.parser_lib)
   (wrapped false)
   (modules
     location ; position in the source file
@@ -21,27 +21,36 @@
   )
   (libraries menhirLib))
 
-; all the modules necessary to generate an ast
+; all the modules necessary for building the ast after parsing
 (library
-  (name ast_lib)
-  (public_name zrun.ast_lib)
+  (name global_lib)
+  (public_name zrun.global_lib)
   (wrapped false)
   (modules
     config misc ; general configuration and common global variables
-    ident lident defnames util
-    zelus
-    write scoping pp_tools printer)
-  (libraries parse_lib))
+    ident ; idents
+    lident ; long idents
+    defnames ; defined names by an equation
+    util ; useful functions
+    zelus ; the ast
+    noinfo ; no information to be attached to patterns, expressions and eqs
+    write ; computes defined variables for equations
+    scoping ; associate unique names
+    pp_tools ; pretty printer tools
+    printer ; printer for the ast
+  )
+  (libraries parser_lib))
 
-; all the necessary modules to make zrun except the entry module
+;; the ZRun interpreter
+; all the necessary modules to make zrun except the entry modules
 (library
   (name zrun_lib)
   (public_name zrun.zrun_lib)
   (wrapped false)
   (modules
-    genv  ; the type of a gloval environment
     error ; error messages
     value ; the type of values
+    genv ; the type of a global environment
     debug ; all the information for debuging
     primitives ; the value of primitives
     find ; find the current value and the last value of a variable
@@ -55,15 +64,18 @@
     forloop ; evaluation functions for for loops
     eval ; evaluation of an expression
   )   	 
-  (libraries zrun.parse_lib zrun.ast_lib))
+  (libraries zrun.parser_lib zrun.global_lib))
 
+; The ZRun interpreter
 (executable
  (name zrun)
   (modes (byte exe))
-  (modules zrun)
-  (libraries zrun.parse_lib zrun.ast_lib zrun.zrun_lib)
+  (modules 
+    zrun; the main function
+  )
+  (libraries zrun.parser_lib zrun.global_lib zrun.zrun_lib)
   (promote (until-clean) (into ..)))
-  
+
 (install
  (package zrun)
  (section bin)

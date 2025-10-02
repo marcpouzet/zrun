@@ -17,7 +17,9 @@
 open Format
 open Lident
 open Value
-   
+
+module Printer = Printer.Make(Noinfo)
+
 let lident ff lid =
   match lid with
   | Name(s) -> fprintf ff "%s" s
@@ -48,21 +50,13 @@ let rec pvalue ff v =
   | Vstate1(id, l) ->
      fprintf
        ff "@[<hov 1>%a(%a)@]" Ident.fprint_t id pvalue_list l
-  | Vfun _ ->
+  | Vifun _ ->
      fprintf ff "<fun>"
-  | Vclosure { c_funexp = { f_kind } } ->
-     fprintf ff "<%s>" (Printer.kind f_kind)
+  | Vfun _ -> fprintf ff "<fun>"
+  | Vnode { n_tkind } ->
+     fprintf ff "<%s>" (Printer.tkind n_tkind)
   | Vsizefun _ ->
      fprintf ff "<sizefun>"
-  | Vsizefix { bound; name; defs } ->
-     let n_list = Ident.Env.to_list defs in
-     fprintf ff "<sizefix <%a>%a with %a>"
-       (Pp_tools.print_opt
-          (fun ff i_list -> 
-             Pp_tools.print_list_l (fun ff i -> fprintf ff "%d" i)
-               "(" "," "" ff i_list)) bound Ident.fprint_t name
-       (Pp_tools.print_list_r 
-          (fun ff (name, _) -> Ident.fprint_t ff name) "" "," "") n_list
   | Vrecord(l) ->
      let one ff { Zelus.arg; Zelus.label } =
        fprintf ff "@[<hov2>%a =@ %a@]"
@@ -108,8 +102,8 @@ let rec pstate ff s =
       (Pp_tools.print_list_l pstate "[" ";" "]") ff s_list
   | Sopt(None) -> 
      fprintf ff "none" | Sopt(Some(v)) -> fprintf ff "(some %a)" value v
-  | Sinstance { init } ->
-     fprintf ff "@[<hov2>(instance@ %a)@]" pstate init
+  | Sinstance { n_init } ->
+     fprintf ff "@[<hov2>(instance@ %a)@]" pstate n_init
   | Scstate { pos; der } -> 
      fprintf ff "@[{ pos = %a; der = %a }@]" value pos value der
   | Szstate { zin; zout } ->

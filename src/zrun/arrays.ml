@@ -101,6 +101,9 @@ let get_with_default loc v i default =
   | Varray(a), Vint(i) -> get a i
   | _ -> error { kind = Etype; loc }
 
+(* x.(i1 .. i2) returns a slices of [x] between index [i1] and [i2] *)
+(* if [i2 < i1], the result array is empty, that is, [||] *)
+(* if [x: [n]a] then x.(i1 .. i2) : [i2-i1+1]a *)
 let slice loc v i1 i2 =
   let slice v i1 i2 = match v with
     | Vflat(a) ->
@@ -108,6 +111,28 @@ let slice loc v i1 i2 =
        if i1 < n then
          if i2 < n then
            return (Value(Varray(Vflat(Array.sub a i1 (i2 - i1 + 1)))))
+         else error { kind = Earray_size { size = n; index = i2 }; loc }
+       else error { kind = Earray_size { size = n; index = i1 }; loc }
+    | Vmap { m_length; m_u } ->
+       if i1 < m_length then
+         if i2 < m_length then
+           return (Value(Varray(Vmap { m_length = i2 - i1 + 1; m_u })))
+         else
+           error { kind = Earray_size { size = m_length; index = i2 }; loc }
+       else error { kind = Earray_size { size = m_length; index = i1 }; loc } in
+  let+ v = v and+ i1 = i1 and+ i2 = i2 in
+  match v, i1, i2 with
+  | Varray(v), Vint(i1), Vint(i2) -> slice v i1 i2
+  | _ -> error { kind = Etype; loc }
+
+let slice loc v i1 i2 =
+  let slice v i1 i2 = match v with
+    | Vflat(a) ->
+       let n = Array.length a in
+       if i1 >= 0 then
+         let len = i2 - i1 + 1 in
+         if (len >= 0) && (i1 + len <= n) then
+           return (Value(Varray(Vflat(Array.sub a i1 len))))
          else error { kind = Earray_size { size = n; index = i2 }; loc }
        else error { kind = Earray_size { size = n; index = i1 }; loc }
     | Vmap { m_length; m_u } ->
@@ -154,26 +179,25 @@ let rec update_list loc v i_list w =
      update loc v i w
 
 (* conversion between a flat array and a map *)
-let map_o_flat loc v =
+let map_of_flat v =
   match v with
   | Vflat(f) ->
-     return
-       (Vmap { m_length = Array.length f; m_u = fun i -> return (f.(i)) })
-  | Vmap _ -> return v
-let flat_of_map_array loc v =
+     return { m_length = Array.length f; m_u = fun i -> return (f.(i)) }
+  | Vmap(v) -> return v
+let flat_of_map v =
   let fill length a m_u =
     let rec fillrec length =
       if length = 0 then return a
       else let* v = m_u length in a.(length) <- v; fillrec (length - 1) in
     fillrec length in
   match v with
-    | Vflat _ -> return v
+    | Vflat(f) -> return f
     | Vmap { m_length; m_u } ->
-       if m_length = 0 then return (Vflat([||]))
+       if m_length = 0 then return ([||])
        else let* v = m_u 0 in
             let a = Array.make m_length v in
             let* v = fill m_length a m_u in
-            return (Vflat v)
+            return (v)
 
 let dim loc v =
   match v with

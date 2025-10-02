@@ -41,6 +41,7 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
   "const", CONST;
   "default", DEFAULT;
   "der", DER;
+  "disc", DISC;
   "do", DO;
   "done", DONE;
   "downto", DOWNTO;
@@ -48,7 +49,6 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
   "emit", EMIT;
   "end", END;
   "every", EVERY;
-  "exception", EXCEPTION;
   "exception", EXCEPTION;
   "external", EXTERNAL;
   "false", BOOL(false); 
@@ -84,6 +84,7 @@ List.iter (fun (str,tok) -> Hashtbl.add keyword_table str tok) [
   "to", TO;
   "true", BOOL(true); 
   "type", TYPE;
+  "size", SIZE;
   "static", STATIC;
   "unless", UNLESS;
   "until", UNTIL;
@@ -163,6 +164,7 @@ rule main = parse
   | "}"  { RBRACE }
   | "*"  { STAR }
   | ":"  { COLON }
+  | "::"  { COLONCOLON }
   | "="  { EQUAL }
   | "==" { EQUALEQUAL }
   | "&"  { AMPERSAND }
@@ -172,7 +174,7 @@ rule main = parse
   | ","  { COMMA }
   | ";"  { SEMI }
   | "->" { MINUSGREATER }
-  | "-V->" { VFUN }
+  | "-SC->" { VFUN }
   | "-S->" { SFUN }
   | "-A->" { AFUN }
   | "-D->" { DFUN }
@@ -190,6 +192,7 @@ rule main = parse
   | "<"  { LESSER }
   | "<<"  { LLESSER }
   | ">>"  { GGREATER }
+  | "last*" { LAST_STAR }
   | (['A'-'Z']('_' ? ['A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 
       {CONSTRUCTOR id}
   | (['A'-'Z' 'a'-'z'](['_' 'A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 

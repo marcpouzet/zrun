@@ -94,26 +94,34 @@ let scond_true start_pos end_pos =
 (* building a function *)
 (* [let node (const x1 ... xn) (static y1 ... ym) m1 mk = e in ... ] *)
 (* is represented as *)
-(* [let f = fun (const x1...xn) -> fun (static y1...ym) -> fun m1...mk -> e in ...]*)
-let fun_one_desc is_atomic kind vkind p_list result startpos endpos =
-  Efun(make { f_atomic = is_atomic; f_vkind = vkind;
+(* [let f = fun (const x1...xn) -> fun (static y1...ym) ->
+                   node m1... mk -> e ...] *)
+(* [fun (const x_...) (static y_...) a1 ... am -> e] is represented *)
+(* [fun (const x_...) -> fun (static y_...) -> node a1 ... am -> e] *)
+let fun_one_desc is_inline is_atomic kind vkind p_list result startpos endpos =
+  Efun(make { f_atomic = is_atomic; f_inline = is_inline; f_vkind = vkind;
               f_kind = kind; f_args = p_list;
 	      f_body = result }
 	    startpos endpos)
 
-let rec funexp_desc is_atomic kind v_p_list_list result startpos endpos =
+let rec funexp_desc
+	  is_inline is_atomic kind v_p_list_list result startpos endpos =
   match v_p_list_list with
   | [] -> assert false
   | [vkind, p_list] ->
-       fun_one_desc is_atomic kind vkind p_list result startpos endpos
+       fun_one_desc is_inline is_atomic kind vkind p_list result startpos endpos
   | (vkind, p_list) :: v_p_list_list ->
-       fun_one_desc is_atomic (Kfun(Kany)) vkind p_list
-               (make (Exp (funexp is_atomic kind v_p_list_list result startpos endpos))
-		     startpos endpos)
-               startpos endpos
-and funexp is_atomic kind v_p_list_list result startpos endpos =
-  make (funexp_desc is_atomic kind v_p_list_list result startpos endpos)
-       startpos endpos
+       fun_one_desc is_atomic is_inline (Kfun(Kany)) vkind p_list
+		    (make (Exp
+			     (funexp is_inline is_atomic kind v_p_list_list
+				     result startpos endpos))
+			  startpos endpos)
+		    startpos endpos
+and funexp is_inline is_atomic kind v_p_list_list result startpos endpos =
+  make
+    (funexp_desc is_inline is_atomic kind v_p_list_list result startpos endpos)
+    startpos endpos
+
 
 (* building a for loop *)
 let forward_loop resume (size_opt, index_opt, input_list, opt_cond, body) =
@@ -132,6 +140,11 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
     for_body = body;
     for_resume = resume }
 
+let annotate_with_type t_opt ({ desc; loc = Loc(start_pos, _) } as e) =
+  match t_opt with
+  | None -> e
+  | Some({ desc; loc = Loc(_, end_pos) } as ty) ->
+     { desc = Etypeconstraint(e, ty); loc = Loc(start_pos, end_pos) }
 %}
 
 %token <string> CONSTRUCTOR
@@ -154,6 +167,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token BY             /* "by" */
 %token CLOCK          /* "clock" */
 %token COLON          /* ":" */
+%token COLONCOLON     /* "::" */
 %token COMMA          /* "," */
 %token CONST          /* "const" */
 %token CONTINUE       /* "continue" */
@@ -164,6 +178,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token DOTDOT         /* ".." */
 %token DOWNTO         /* "downto" */
 %token DER            /* "der" */
+%token DISC           /* "disc" */
 %token DIV            /* "/" */
 %token ELSE           /* "else" */
 %token EMIT           /* "emit" */
@@ -186,6 +201,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token INIT           /* "init" */
 %token INLINE         /* "inline" */
 %token LAST           /* "last" */
+%token LAST_STAR      /* "last*" */
 %token LBRACE         /* "{" */
 %token LESSER         /* "<" */
 %token LLESSER        /* "<<" */
@@ -205,7 +221,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token AFUN           /* "-A->" */
 %token DFUN           /* "-D->" */
 %token SFUN           /* "-S->" */
-%token VFUN           /* "-V->" */
+%token VFUN           /* "-SC->" */
 %token CFUN           /* "-C->" */
 %token NODE           /* "node" */
 %token OF             /* "of" */
@@ -226,6 +242,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token RUN            /* "run" */
 %token SEMI           /* ";" */
 %token STAR           /* "*" */
+%token SIZE           /* "size" */
 %token STATIC         /* "static" */
 %token TEST           /* "?" */
 %token THEN           /* "then" */
@@ -252,6 +269,8 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %token <string> INFIX4
 %token EOF
 
+%right MINUSGREATER VFUN SFUN DFUN CFUN AFUN
+%nonassoc RBRACKET
 %nonassoc prec_result
 %left WHERE AND
 %nonassoc EMIT
@@ -260,12 +279,13 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %right SEMI
 %nonassoc prec_der_with_reset
 %nonassoc prec_present
+%left THEN
+%left prec_automaton prec_automaton_handler_list
 %nonassoc prec_ident
 %right prec_list
 %left EVERY
 %nonassoc PRESENT
-%nonassoc THEN
-%nonassoc ELSE
+%left ELSE
 %nonassoc WITH
 %left  AS
 %left  BAR
@@ -276,12 +296,12 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %left RPAREN
 %nonassoc prec_minus_greater
 %nonassoc FBY
-%right MINUSGREATER VFUN SFUN DFUN CFUN AFUN 
 %left OR BARBAR
 %left AMPERSAND AMPERAMPER
 %left INFIX0 LESSER GREATER EQUAL
 %nonassoc RESET
 %right INFIX1
+%right COLONCOLON
 %left INFIX2 PLUS SUBTRACTIVE MINUS PLUSPLUS
 %left DIV
 %left STAR INFIX3
@@ -289,7 +309,7 @@ let foreach_loop resume (size_opt, index_opt, input_list, body) =
 %left ON
 %right prec_uminus
 %right PREFIX
-%right PRE TEST UP
+%right PRE TEST UP DISC
 %left TRANSPOSE FLATTEN REVERSE
 %left DOT
 %left INIT DEFAULT
@@ -362,10 +382,10 @@ interface_file:
 interface:
   | OPEN c = CONSTRUCTOR
       { Einter_open(c) }
-  | TYPE tp = type_params i = IDENT sp = size_params
+  | TYPE tp = type_params i = IDENT
     td = localized(type_declaration_desc)
     { Einter_typedecl
-	{ name = i; ty_params = tp; size_params = sp; ty_decl = td } }
+	{ name = i; ty_params = tp; ty_decl = td } }
   | v = val_or_const i = ide COLON t = type_expression
       { Einter_constdecl { name = i; const = v; ty = t; info = [] } }
 ;
@@ -382,7 +402,7 @@ scalar_interface :
   | OPEN c = CONSTRUCTOR
       { [make (Einter_open(c)) $startpos $endpos] }
   | TYPE tp = type_params i = IDENT td = localized(type_declaration_desc)
-    { [make (Einter_typedecl { name = i; ty_params = tp; size_params = [];
+    { [make (Einter_typedecl { name = i; ty_params = tp;
 			       ty_decl = td }) $startpos $endpos] }
   | v = val_or_const i = ide COLON t = type_expression
     { [make (Einter_constdecl { name = i; const = v; ty = t; info = [] })
@@ -411,20 +431,11 @@ type_declaration_desc:
 
 val_or_const :
   | VAL { false }
-  | CONST { true }
+  | VAL CONST { true }
 ;
 
 type_params :
   | LPAREN tvl = list_of(COMMA, type_var) RPAREN
-      { tvl }
-  | tv = type_var
-      { [tv] }
-  |
-      { [] }
-;
-
-size_params :
-  | LBRACKET tvl = list_of(COMMA, type_var) RBRACKET
       { tvl }
   | tv = type_var
       { [tv] }
@@ -470,10 +481,10 @@ decl_list(X):
 implementation:
   | OPEN c = CONSTRUCTOR
     { Eopen c }
-  | TYPE tp = type_params id = IDENT sp = size_params
+  | TYPE tp = type_params id = IDENT
     td = localized(type_declaration_desc)
     { Etypedecl
-	{ name = id; ty_params = tp; size_params = sp; ty_decl = td } }
+	{ name = id; ty_params = tp; ty_decl = td } }
   | LET v = vkind_opt i = is_rec let_eq = equation_and_list
     { Eletdecl(make 
                  { l_rec = i; l_kind = v; l_eq = let_eq } $startpos $endpos) }
@@ -492,7 +503,7 @@ vkind_opt:
 fun_kind:
   | FUN    { Kfun(Kany) }
   | NODE   { Knode(Kdiscrete) }
-  | HYBRID { Knode(Khybrid) }
+  | HYBRID { Knode(Kcont) }
 ;
 
 %inline fun_kind_opt:
@@ -505,16 +516,23 @@ fun_kind:
   | { false }
 ;
 
+%inline opt_size:
+  | { false }
+  | SIZE { true }
+;
 
 result:
   | RETURNS p = param eq = equation
     { make (Returns(p, eq)) $startpos $endpos }
-  | EQUAL seq = seq_expression %prec prec_result
-    { make (Exp(seq)) $startpos(seq) $endpos(seq) }
-  | EQUAL seq = seq_expression WHERE 
+  | t_opt = optional(colon_type_expression)
+    EQUAL seq = seq_expression %prec prec_result
+    { make (Exp(annotate_with_type t_opt seq)) $startpos(seq) $endpos(seq) }
+  | t_opt = optional(colon_type_expression)
+    EQUAL seq = seq_expression WHERE 
       v = vkind_opt i = is_rec eq = where_equation_and_list %prec prec_result
     { make (Exp(make (Elet(make { l_rec = i; l_kind = v; l_eq = eq }
-			  $startpos(eq) $endpos(eq), seq))
+			   $startpos(eq) $endpos(eq),
+			   annotate_with_type t_opt seq))
 		$startpos(seq) $endpos(eq)))
       $startpos $endpos }
 ;
@@ -533,7 +551,7 @@ where_equation_and_list_aux:
     { eq :: eq_list }
 ;
 
-for_return:
+for_returns:
   | fv = for_vardec
     { [fv] }
   | LPAREN l = optional(list_of(COMMA, for_vardec)) RPAREN
@@ -559,12 +577,23 @@ equation_empty_and_list:
 		       | Some(l) -> make (EQand(l)) $startpos $endpos }
 ;
 
+/* An equation is either an equation on stream values; the definition */
+/* of a size function; or a function */
 equation:
-   eq = localized(equation_desc) { eq }
+  | eq = stream_equation
+    { eq }
+  | eq = sizefun_definition
+    { eq }
+  | eq = fun_definition
+    { eq }
 ;
 
-/* a single equation; either ended by a terminal or an expression */
-equation_desc:
+stream_equation:
+   eq = localized(stream_equation_desc) { eq }
+;
+
+/* an equation; either ended by a terminal or an expression */
+stream_equation_desc:
   | LOCAL v_list = vardec_comma_list IN eq = equation
     { EQlocal(v_list, eq) } 
   | LOCAL v_list = vardec_comma_list DO eq = equation_empty_and_list DONE
@@ -576,25 +605,24 @@ equation_desc:
   | LET v = vkind_opt i = is_rec let_eq = equation_and_list IN eq = equation
     { EQlet(make { l_rec = i; l_kind = v; l_eq = let_eq}
 	    $startpos $endpos(let_eq), eq) }
-  | AUTOMATON opt_bar a = automaton_handlers(equation_empty_and_list) END
-    { EQautomaton(List.rev a, None) }
+  | AUTOMATON opt_bar a = automaton_handlers(equation_empty_and_list) opt_end
+    { EQautomaton(List.rev a, None) } 
+    %prec prec_automaton
   | AUTOMATON opt_bar
-    a = automaton_handlers(equation_empty_and_list) INIT e = state
+      a = automaton_handlers(equation_empty_and_list)
+      INIT e = state_expression
     { EQautomaton(List.rev a, Some(e)) }
-  | MATCH e = seq_expression WITH opt_bar
+  | MATCH s = opt_size e = seq_expression WITH opt_bar
     m = match_handlers(equation) opt_end
-    { EQmatch(e, List.rev m) }
-  | IF e = seq_expression THEN eq1 = equation
-    ELSE eq2 = equation opt_end
-    { EQif(e, eq1, eq2) }
+    { EQmatch(s, e, List.rev m) }
   | IF e = seq_expression THEN eq1 = equation opt_end
-      { EQif(e, eq1, no_eq $startpos $endpos) }
-  | IF e = seq_expression ELSE eq2 = equation opt_end
-      { EQif(e, no_eq $startpos $endpos, eq2) }
-  | PRESENT opt_bar p = present_handlers(equation) opt_end
+    { EQif(e, eq1, no_eq $endpos $endpos) }
+  | IF e = seq_expression THEN eq1 = equation ELSE eq2 = equation opt_end
+    { EQif(e, eq1, eq2) }
+  | PRESENT opt_bar p = present_handlers(equation) opt_end %prec prec_present
     { EQpresent(List.rev p, NoDefault) }
-  | PRESENT opt_bar p = present_handlers(equation)
-    ELSE eq = equation opt_end
+  | PRESENT opt_bar p = present_handlers(equation) 
+    ELSE eq = equation opt_end %prec prec_present
     { EQpresent(List.rev p, Else(eq)) }
   | ASSERT e = expression
     { EQassert(e) }
@@ -604,31 +632,45 @@ equation_desc:
       { EQemit(i, Some(e)) }
   | INIT i = ide EQUAL e = seq_expression
       { EQinit(i, e) }
-  | p = pattern EQUAL e = seq_expression
+  | p = pattern_with_type_expression EQUAL e = seq_expression
       { EQeq(p, e) }
-  | ide = ide LLESSER ide_list = list_of(COMMA, ide) GGREATER EQUAL 
-        e = seq_expression
-    { EQsizefun(ide, ide_list, e) }
-  | a = is_atomic k = fun_kind_opt ide = ide 
-       LLESSER ide_list = list_of(COMMA, ide) GGREATER 
-       v_p_list_list = param_list_list r = result
-    { EQsizefun(ide, ide_list, funexp a k v_p_list_list r 
-                                   $startpos(v_p_list_list) $endpos) }
-  | a = is_atomic k = fun_kind_opt ide = ide v_p_list_list = param_list_list 
-    r = result
-    { EQeq(make (Evarpat ide) $startpos(ide) $endpos(ide),
-	   funexp a k v_p_list_list r $startpos $endpos) }
   | DER i = ide EQUAL e = seq_expression opt = optional(init_expression)
       { EQder(i, e, opt, []) }
   | DER i = ide EQUAL e = seq_expression opt = optional(init_expression)
     RESET p = present_handlers(expression) %prec prec_der_with_reset
     { EQder(i, e, opt, p) }
   | FOREACH f = foreach_loop_eq
-    { EQforloop (foreach_loop false f) }
+    { EQforloop (foreach_loop true f) }
   | FORWARD f = forward_loop_eq
     { EQforloop (forward_loop false f) }
   | FORWARD RESUME f = forward_loop_eq
     { EQforloop (forward_loop true f) }
+;
+
+sizefun_definition:
+   eq = localized(sizefun_definition_desc) { eq }
+;
+
+sizefun_definition_desc:
+  | ide = ide LLESSER ide_list = list_of(COMMA, ide) GGREATER EQUAL 
+        e = seq_expression
+    { EQsizefun(ide, ide_list, e) }
+  | i = is_inline a = is_atomic k = fun_kind_opt ide = ide 
+        LLESSER ide_list = list_of(COMMA, ide) GGREATER 
+       v_p_list_list = param_list_list r = result
+    { EQsizefun(ide, ide_list, funexp i a k v_p_list_list r 
+			       $startpos(v_p_list_list) $endpos) }
+;
+
+fun_definition:
+   eq = localized(fun_definition_desc) { eq }
+;
+
+fun_definition_desc:
+  | i = is_inline a = is_atomic k = fun_kind_opt ide = ide
+       v_p_list_list = param_list_list r = result
+    { EQeq(make (Evarpat ide) $startpos(ide) $endpos(ide),
+	   funexp i a k v_p_list_list r $startpos $endpos) }
 ;
 
 /* states of an automaton in an equation*/
@@ -662,11 +704,11 @@ automaton_handler(X):
 		       e_next_state = st_e } $endpos(b) $endpos(e)];
 	   s_unless = [] } $startpos $endpos }
   | sp = state_pat MINUSGREATER l = let_list b = block(X)
-    UNTIL el = list_of(UNTIL, escape(X))
+    UNTIL el = list_of(ELSE, escape(X)) %prec prec_automaton_handler_list
     { make { s_state = sp; s_let = l; s_body = b;
 	     s_until = el; s_unless = [] } $startpos $endpos }
   | sp = state_pat MINUSGREATER l = let_list b = block(X)
-    UNLESS el = list_of(UNLESS, escape(X))
+    UNLESS el = list_of(ELSE, escape(X)) %prec prec_automaton_handler_list
     { make { s_state = sp; s_let = l; s_body = b;
 	     s_until = []; s_unless = el } $startpos $endpos }
 ;
@@ -684,14 +726,14 @@ escape(X) :
       $startpos $endpos }
 ;
 
-state :
+state_expression :
   | c = CONSTRUCTOR
       { make (Estate0(c)) $startpos $endpos }
   | c = CONSTRUCTOR LPAREN e = expression RPAREN
       { make (Estate1(c, [e])) $startpos $endpos }
   | c = CONSTRUCTOR LPAREN l = expression_comma_list RPAREN
     { make (Estate1(c, List.rev l)) $startpos $endpos }
-  | IF e = expression THEN s1 = state ELSE s2 = state
+  | IF e = expression THEN s1 = state_expression ELSE s2 = state_expression
     { make (Estateif(e, s1, s2)) $startpos $endpos }
 ;
 
@@ -712,6 +754,8 @@ scondpat_desc :
       { Econdpat(e, p) }
   | e = simple_expression
       { Econdexp(e) }
+  | UP e = simple_expression
+      { Econdexp (make (Eop(Eup, [e])) $startpos $endpos) }
   | scpat1 = scondpat AMPERSAND scpat2 = scondpat
       { Econdand(scpat1, scpat2) }
   | scpat1 = scondpat BAR scpat2 = scondpat
@@ -722,15 +766,15 @@ scondpat_desc :
 
 /* Block */
 block(X):
-  | lo = local_list DO x = X
+  | lo = local_list opt_in DO x = X
       { make { b_vars = lo; b_body = x } $startpos $endpos }
 ;
 
 emission(X):
-  | s = state
+  | s = state_expression
     { make { b_vars = []; b_body = no_eq $startpos $endpos }
       $startpos $endpos, s }
-  | b = block(X) IN s = state
+  | b = block(X) IN s = state_expression
     { b, s }
 ;
 
@@ -772,14 +816,6 @@ param_list_list:
   | lp = list_no_sep_of(vkind_param_list) l = list_no_sep_of(param)
     { lp @ [Kany, l] }
 ;
-
-/* %inline vkind_param_list_opt:
-  | v = vkind_param_list
-    { v }
-  | l = list_no_sep_of(param)
-    { Kany, l }
-;
-*/
 
 vkind_param_list:
   | LPAREN v = vkind l = param_list RPAREN
@@ -886,16 +922,20 @@ simple_pattern:
       { make (Evarpat i) $startpos $endpos }
   | LPAREN p = pattern RPAREN
       { p }
-  | LPAREN p = pattern_comma_list RPAREN
-      { make (Etuplepat (List.rev p)) $startpos $endpos }
+  | LPAREN l = pattern_comma_list RPAREN
+      { make (Etuplepat (List.rev l)) $startpos $endpos }
   | LPAREN RPAREN
       { make (Econstpat(Evoid)) $startpos $endpos }
   | UNDERSCORE
       { make Ewildpat $startpos $endpos }
   | LPAREN p = pattern COLON t = type_expression RPAREN
       { make (Etypeconstraintpat(p, t)) $startpos $endpos }
-  | LBRACE p = pattern_label_list RBRACE
-      { make (Erecordpat(p)) $startpos $endpos }
+  | LBRACE l = pattern_label_list RBRACE
+    { make (Erecordpat(l)) $startpos $endpos }
+  | LBRACKETBAR RBRACKETBAR
+    { make (Earraypat []) $startpos $endpos }
+  | LBRACKETBAR l = list_of(SEMI, pattern) RBRACKETBAR
+    { make (Earraypat(l)) $startpos $endpos }
 ;
 
 pattern_comma_list:
@@ -904,6 +944,13 @@ pattern_comma_list:
   | pc = pattern_comma_list COMMA p = pattern
       { p :: pc }
 ;
+
+/* Patterns with a type expression */
+pattern_with_type_expression:
+  | p = pattern { p }
+  | p = pattern t = colon_type_expression 
+      { make (Etypeconstraintpat(p, t)) $startpos $endpos }
+
 
 pattern_label_list :
   | p = pattern_label SEMI pl = pattern_label_list
@@ -917,8 +964,8 @@ pattern_label_list :
 ;
 
 pattern_label :
-  | ei = ext_ident EQUAL p = pattern
-      { (ei, p) }
+  | ei = ext_ident EQUAL p = pattern_with_type_expression
+    { (ei, p) }
 ;
 
 /* Expressions */
@@ -953,7 +1000,9 @@ simple_expression_desc:
   | LBRACKET l = list_of(SEMI, expression) RBRACKET
       { cons_list_desc l ($startpos($1)) ($endpos($3)) }
   | LAST i = ide
-      { Elast(i) }
+      { Elast(true, i) }
+  | LAST_STAR i = ide
+      { Elast(false, i) }
   | a = atomic_constant
       { Econst a }
   | LPAREN RPAREN
@@ -997,17 +1046,17 @@ size_expression:
 
 size_expression_desc:
   | i = ide
-    { Sident(i) }
+    { Size_var(i) }
   | i = INT
-    { Sint(i) }
+    { Size_int(i) }
   | num = size_expression DIV denom = INT
-    { Sfrac(num, denom) }
+    { Size_frac(num, denom) }
   | e1 = size_expression PLUS e2 = size_expression
-    { Splus(e1, e2) }
+    { Size_op(Size_plus, e1, e2) }
   | e1 = size_expression MINUS e2 = size_expression
-    { Sminus(e1, e2) }
+    { Size_op(Size_minus, e1, e2) }
   | e1 = size_expression STAR e2 = size_expression
-    { Smult(e1, e2) }
+    { Size_op(Size_mult, e1, e2) }
 ;
 
 /* [| e with e1,...,en <- e' |] */
@@ -1036,30 +1085,36 @@ expression_desc:
       { e }
   | e = expression_comma_list %prec prec_list
       { Etuple(List.rev e) }
+  | e1 = simple_expression COLONCOLON e2 = expression
+      { cons_desc e1 e2 ($startpos(e1)) ($endpos(e2)) }
   | e1 = simple_expression FBY e2 = expression
       { Eop(Efby, [e1; e2]) }
   | i = is_inline RUN f = simple_expression e = simple_expression
       { Eop(Erun(i), [f; e]) }
   | i = is_inline f = simple_expression arg_list = simple_expression_list
       { app i f arg_list }
-  | a = is_atomic k = fun_kind p_list_list = param_list_list
+  | i = is_inline a = is_atomic k = fun_kind p_list_list = param_list_list
     MINUSGREATER e = expression
-    { funexp_desc a k p_list_list (make (Exp(e)) $startpos(e) $endpos)
+    { funexp_desc i a k p_list_list (make (Exp(e)) $startpos(e) $endpos)
       $startpos(p_list_list) $endpos }
-  | a = is_atomic k = fun_kind p_list_list = param_list_list
+  | i = is_inline a = is_atomic k = fun_kind p_list_list = param_list_list
     RETURNS p = param eq = equation
-    { funexp_desc a k p_list_list (make (Returns(p, eq)) $startpos(p) $endpos)
+    { funexp_desc i a k p_list_list (make (Returns(p, eq)) $startpos(p) $endpos)
          $startpos(p_list_list) $endpos }
   | ATOMIC e = simple_expression
     { Eop(Eatomic, [e]) }
   | PRE e = expression
       { Eop(Eunarypre, [e]) }
-  | e1 = expression MINUSGREATER e2 = expression %prec prec_minus_greater
+  | e1 = simple_expression MINUSGREATER e2 = expression %prec prec_minus_greater
       { Eop(Eminusgreater, [e1; e2]) }
+  | INIT
+      { Eop(Einitial, []) }
   | UP e = expression
       { Eop(Eup, [e]) }
   | TEST e = expression
       { Eop(Etest, [e]) }
+  | DISC e = expression
+      { Eop(Edisc, [e]) }
   | IF e1 = seq_expression THEN e2 = seq_expression ELSE e3 = seq_expression
       { Eop(Eifthenelse, [e1; e2; e3]) }
   | MINUS e = expression  %prec prec_uminus
@@ -1104,18 +1159,19 @@ expression_desc:
       { unop p e ($startpos(p)) ($endpos(p)) }
   | LET v = vkind_opt i = is_rec eq = equation_and_list IN e = seq_expression
     { Elet(make { l_rec = i; l_kind = v; l_eq = eq } $startpos $endpos(eq), e) }
-  | LOCAL v_list = vardec_comma_list DO eq = equation_and_list IN e = seq_expression
+  | LOCAL v_list = vardec_comma_list
+    DO eq = equation_and_list IN e = seq_expression
     { Elocal(v_list, eq, e) }  
-  | MATCH e = seq_expression WITH
+  | MATCH s = opt_size e = seq_expression WITH
       opt_bar m = match_handlers(expression) opt_end
-      { Ematch(e, List.rev m) }
-  | PRESENT opt_bar pe = present_handlers(expression) opt_end %prec prec_present
+      { Ematch(s, e, List.rev m) }
+  | PRESENT opt_bar pe = present_handlers(expression) opt_end
     { Epresent(List.rev pe, NoDefault) }
   | PRESENT opt_bar pe = present_handlers(expression)
-    INIT e = expression opt_end %prec prec_present
+    INIT e = expression
     { Epresent(List.rev pe, Init(e)) }
   | PRESENT opt_bar pe = present_handlers(expression)
-    ELSE e = seq_expression opt_end %prec prec_present
+    ELSE e = seq_expression opt_end
       { Epresent(List.rev pe, Else(e)) }
   | RESET e = seq_expression EVERY r = expression
     { Ereset(e, r) }
@@ -1126,7 +1182,7 @@ expression_desc:
   | ASSERT e = simple_expression
     { Eassert(e) }
   | FOREACH f = foreach_loop_exp
-    { Eforloop (foreach_loop false f) }
+    { Eforloop (foreach_loop true f) }
   | FORWARD f = forward_loop_exp
     { Eforloop (forward_loop false f) }
   | FORWARD RESUME f = forward_loop_exp
@@ -1141,7 +1197,7 @@ expression_desc:
   | e = expression FLATTEN
       { Eop(Earray(Eflatten), [e]) }
   | e = expression REVERSE
-      { Eop(Earray(Ereverse), [e]) }
+    { Eop(Earray(Ereverse), [e]) }
 ;
 
 %inline opt_end:
@@ -1150,12 +1206,19 @@ expression_desc:
   | END {}
 ;
 
+%inline opt_in:
+/* empty */
+    {}
+  | IN {}
+;
+
+
 /* Loops for equations */
 foreach_loop_exp:
   /* foreach (size) [i] (xi in ei,...) do e [default e] */
   | s_opt = optional_size_expression
     i_opt = optional(index)
-    li = empty(input_list)
+    li = input_list
     DO e = expression
     d_opt = optional(default_expression)
     DONE
@@ -1164,18 +1227,18 @@ foreach_loop_exp:
        eq done */
     s_opt = optional_size_expression
     i_opt = optional(index)
-    li = empty(input_list)
-    RETURNS p = for_return
+    li = input_list
+    RETURNS p = for_returns
     b = block(equation_empty_and_list)
     DONE
-    { (s_opt, i_opt, li, Forreturns { returns = p; body = b }) }
+    { (s_opt, i_opt, li, Forreturns { r_returns = p; r_block = b }) }
 ;
 
 forward_loop_exp:
   /* forward (size) [i] (xi in ei,...) do e [default e] [while/unless/until e] done */
   | s_opt = optional_size_expression
     i_opt = optional(index)
-    li = empty(input_list)
+    li = input_list
     DO e = expression
     d_opt = optional(default_expression)
     o_opt = optional(loop_exit_condition)
@@ -1185,18 +1248,18 @@ forward_loop_exp:
        eq [while/unless/until e] done */
     s_opt = optional_size_expression
     i_opt = optional(index)
-    li = empty(input_list)
-    RETURNS p = for_return
+    li = input_list
+    RETURNS p = for_returns
     b = block(equation_empty_and_list)
     o_opt = optional(loop_exit_condition)
     DONE
-    { (s_opt, i_opt, li, o_opt, Forreturns { returns = p; body = b }) }
+    { (s_opt, i_opt, li, o_opt, Forreturns { r_returns = p; r_block = b }) }
 ;
 
 /* Loops for equations */
 foreach_loop_eq:
   s_opt = optional_size_expression i_opt = optional(index)
-    li = empty(input_list) RETURNS 
+    li = input_list RETURNS 
     lo = output_list f = block(equation_empty_and_list)
     DONE
     { (s_opt, i_opt, li, { for_out = lo; for_block = f }) }
@@ -1204,14 +1267,14 @@ foreach_loop_eq:
 
 forward_loop_eq:
   | s_opt = optional_size_expression i_opt = optional(index)
-    li = empty(input_list) RETURNS 
+    li = input_list RETURNS 
     lo = output_list 
     f = block(equation_empty_and_list)
     o_opt = optional(loop_exit_condition)
     DONE
     { (s_opt, i_opt, li, o_opt, { for_out = lo; for_block = f }) }
 ;
-
+ 
 %inline optional_size_expression:
   | { None }
   | LPAREN e = expression RPAREN { Some(e) }
@@ -1223,8 +1286,8 @@ index:
 
 /* input in a for loop */
 input_list:
-  | LPAREN l = list_of(COMMA, localized(input_desc)) RPAREN { l }
-  | l = list_of(COMMA, localized(input_desc)) { l }
+  | LPAREN l = empty(list_of(COMMA, localized(input_desc))) RPAREN { l }
+  | { [] }
 ;
 
 input_desc:
@@ -1382,9 +1445,14 @@ type_expression:
   | t = simple_type
       { t }
   | tl = type_star_list
-      { make(Etypetuple(List.rev tl)) $startpos $endpos}
+      { make(Etypetuple(List.rev tl)) $startpos $endpos }
   | t_arg = type_expression a = arrow t_res = type_expression
-      { make(Etypefun(a, t_arg, t_res)) $startpos $endpos}
+      { make(Etypefun(a, None, t_arg, t_res)) $startpos $endpos }
+  | LPAREN id = IDENT COLON t_arg = type_expression RPAREN
+			    a = arrow t_res = type_expression
+    { make(Etypefun(a, Some(id), t_arg, t_res)) $startpos $endpos }
+  | LBRACKET s = size_expression RBRACKET t = type_expression
+    { make(Etypevec(t, s)) $startpos $endpos }
 ;
 
 simple_type:
@@ -1396,6 +1464,8 @@ simple_type:
       { make (Etypeconstr(i, [t])) $startpos $endpos }
   | LPAREN t = type_expression COMMA tl = type_comma_list RPAREN i = ext_ident
       { make (Etypeconstr(i, t :: tl)) $startpos $endpos }
+  | t_arg = simple_type LBRACKET s = size_expression RBRACKET
+      { make(Etypevec(t_arg, s)) $startpos $endpos}
   | LPAREN t = type_expression RPAREN
       { t }
 ;
@@ -1431,5 +1501,5 @@ type_comma_list :
   | DFUN
        { Knode(Kdiscrete) }
   | CFUN
-       { Knode(Khybrid) }
+       { Knode(Kcont) }
 ;

@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2025 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -13,33 +13,44 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* This work defines an operational (executable) semantics for a *)
-(* synchronous language like Lustre, Lucid Synchrone and Zelus. *)
-(* It is based on a companion file and working notes on the co-iterative *)
-(* semantics presented at the SYNCHRON workshop, December 2019, *)
-(* the class on "Advanced Functional Programming" given at Bamberg
-   Univ. in June-July 2019 and the Master MPRI - M2, Fall 2019, 2020, 2021 *)
-(* The original version of this code is taken from the GitHub Zrun repo: *)
-(* https://github.com/marcpouzet/zrun *)
-(* zrun was programmed right after the COVID confinment, in Mai-June 2020 *)
-(* This second version includes some of the Zelus constructs:
- *- ODEs and zero-crossing;
- *- higher order functions;
- *- the implem. was done in 2021 and updated in 2022;
- *- update during summer 2022 with array constructs inspired by that
- *- of the (beautiful!) SISAL language; they were implemented in Zelus
- *- v2 (2017).
- *- w.r.t SISAL, for loops can contain stateful (stream) functions;
- *- and two style of for loop constructs are provided:
- *- 1/ foreach loop : a parallel composition - every iteration has its
- *- own state;
- *- 2/ forward loop is an "hyper-serial" loop; iteration is done on the
- *- very same state. It is a form of bounded "clock domain" (PPDP'13) by
- *- Louis Mandel, Cedric Pasteur et Marc Pouzet.
- *- 3/ the size of arrays/number of iterations must be known statically.
- *- It is yet very experimental work. If you find it useful
- *- for your own work, please cite the [EMSOFT'2023] paper and send 
- *- a mail: [Marc.Pouzet@ens.fr] *)
+(* This file defines a functional (executable) semantics for a
+ *- synchronous language like Lustre, Scade, Lucid Synchrone and Zelus.
+ *- It is based on a companion file and working notes on the co-iterative
+ *- semantics presented at the SYNCHRON workshop, December 2019,
+ *- the class on "Advanced Functional Programming" given at Bamberg
+ *- Univ. in June-July 2019 and slides for Master MPRI - M2, Fall 2019, 2020, 2021
+ *- The original version of this code is taken from the GitHub ZRun repo:
+ *- https://github.com/marcpouzet/zrun
+ *- ZRun was programmed right after the COVID confinment, in May-June 2020
+ *- This second version includes some of the Zelus constructs:
+ *- ODEs and zero-crossing; higher order functions;
+ *- the implem. was done in 2021 and updated since then;
+ *- first update during summer 2022 with array constructs inspired by the
+ *- loop construct from SISAL language expressed in a purely-functional form;
+ *- a first version of loop iteration (the "foreach" was named "forall" and was
+ *- implemented in Zelus V2 in 2017).
+ *- Two style of loop iterations are provided:
+ *- 1/ The "foreach" loop iteration runs several instances of a stream
+ *- function (say f); in operational terms, every application has it own state; it
+ *- corresponds to the classical "map" operation:
+ *- the input is an array of streams and the output is an array of streams.
+ *- 2/ The forward loop is an "hyper-serial" loop iteration: the array of input
+ *- stream is interpreted as a faster stream passed to [f] and whose result
+ *- is converted back into an array of streams. In this form, it is possible
+ *- to reset [f] for every new array coming in or not. And it is possible to
+ *- return the array of successive computation or only the very last one.
+ *- This construction is the data-flow version of the "clock domains" construct
+ *- of ReactiveML (PPDP'13 and SCP'15; by L. Mandel, C. Pasteur and M. Pouzet)
+ *- and the work on temporal refinement studied by Caspi and Mikac. It
+ *- performs several successive synchronous reactions but a single one is
+ *- observable. In term of generated code, it generated a for loop.
+ *- In this work, the size of arrays and maximum number of iterations must 
+ *- be known statically.
+ *-
+ *- If you find the work on ZRun work useful for your research, please cite
+ *- the [EMSOFT'2023] paper. Do not hesitate to send us a mail: 
+ *- [Marc.Pouzet@ens.fr]
+ *)
 
 open Misc
 open Error
@@ -69,12 +80,6 @@ let (and+) v1 v2 =
   | (Vnil, _) | (_, Vnil) -> Vnil
   | Value(v1), Value(v2) -> Value(v1, v2)
 
-(* [let*+ x = e in e'] composes [let*] and [let+] *)
-let (let*+) v f =
-  let* v = v in
-  let+ v = v in
-  f v
-
 (* check that a value is neither bot nor nil *)
 let no_bot_no_nil loc v =
   match v with
@@ -86,18 +91,32 @@ let no_bot_no_nil_env loc env =
   let seq_env = Env.to_seq env in
   seqfold 
     (fun acc (f, { cur }) -> 
-      let* v = no_bot_no_nil loc cur in
-      return (Env.add f v acc)) Env.empty seq_env
+      match cur with
+      | None -> return acc
+      | Some(v) -> let* v = no_bot_no_nil loc v in return (Env.add f v acc))
+    Env.empty seq_env
 
-(* evaluation functions *)
 (* merge two environments provided they do not overlap *)
 let merge loc env1 env2 =
-  let s = Env.to_seq env1 in
-  seqfold
-    (fun acc (x, entry) ->
-      if Env.mem x env2 then error { kind = Emerge_env; loc = loc }
-      else return (Env.add x entry acc))
-    env2 s
+  let merge init x v1 v2 = match v1, v2 with
+    | Some _, Some _ -> error { kind = Emerge_env { init; id = x }; loc }
+    | Some _, _ -> return v1
+    | None, _ -> return v2 in
+  let env2_in_1, env2 = Env.partition (fun x _ -> Env.mem x env1) env2 in
+  if Env.is_empty env2_in_1 then
+    return (Env.append env1 env2)
+  else 
+    let s1 = Env.to_seq env1 in
+    seqfold
+      (fun acc (x, ({ cur = cur1; last = last1; reinit = r1 } as entry)) ->
+        if Env.mem x env2_in_1 then
+          let { cur = cur2; last = last2; reinit = r2 } = 
+            Env.find x env2_in_1 in
+          let* cur = merge false x cur1 cur2 in
+          let* last = merge true x last1 last2 in
+          return (Env.add x { empty with cur; last; reinit = r1 || r2 } acc)
+        else return (Env.add x entry acc))
+      env2 s1
 
 (* check assertion *)
 let check_assertion loc ve ret =
@@ -116,7 +135,8 @@ let check_equality loc v0 v1 =
   | (Vbot, Vnil) | (Vnil, Vbot) -> return false
   | Value(v0), Value(v1) ->
      let* v =
-       Primitives.compare_pvalue v0 v1 |> Opt.to_result ~none: { kind = Etype; loc } in
+       Primitives.compare_pvalue v0 v1 |> 
+         Opt.to_result ~none: { kind = Etype; loc } in
      return (v = 0)
   | (Value _, Vnil) | (Vnil, Value _) -> error { kind = Enil; loc }
   | (Value _, Vbot) | (Vbot, Value _) -> error { kind = Ebot; loc }
@@ -159,6 +179,25 @@ let smatch_handler_list loc sbody genv env ve m_h_list s_list =
        return (r, s)
     | _ -> error { kind = Estate; loc = loc } in
   smatch_rec m_h_list s_list
+
+(* the argument [ve] is static and [s] is the state of the selected branch *)
+let static_match_handler_list loc sbody genv env ve m_h_list s =
+  let rec smatch_rec m_h_list =
+    match m_h_list with
+    | [] -> error { kind = Epattern_matching_failure; loc = loc }
+    | { m_pat; m_body } :: m_h_list ->
+       let r = Match.pmatch ve m_pat in
+       let* r, s =
+         match r with
+         | None ->
+            (* this is not the good handler; try an other one *)
+            smatch_rec m_h_list
+         | Some(env_pat) ->
+            let env_pat = liftv env_pat in
+            let env = Env.append env_pat env in
+            sbody genv env m_body s in
+       return (r, s) in
+  smatch_rec m_h_list
 
 (* an iterator *)
 let slist loc genv env sexp e_list s_list =
@@ -252,11 +291,11 @@ let for_env_out missing env_list acc_env loc for_out =
          let* v =
            Find.find_last_opt for_name acc_env |>
              Opt.to_result ~none:{ kind = Eunbound_last_ident(for_name); loc } in
-         return (Env.add for_name { cur = v; last = None; default = None } acc)
+         return (Env.add for_name { empty with cur = Some v } acc)
       | Some(x) ->
          let* v = Forloop.array_of missing loc
                     (for_name, for_init, for_default) acc_env env_list in
-         return (Env.add x { cur = v; last = None; default = None } acc))
+         return (Env.add x { empty with cur = Some v } acc))
     Env.empty for_out
 
 (* value of an immediate constant *)
@@ -272,61 +311,59 @@ let immediate v =
 (* sizes *)
 let rec size env { desc; loc } =
   match desc with
-  | Sint(i) -> return i
-  | Sfrac { num; denom} ->
+  | Size_int(i) -> return i
+  | Size_frac { num; denom} ->
       let* v = size env num in
       return (v / denom)
-  | Sident(x) ->
+  | Size_var(x) ->
       let* v =
        find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc } in
       let* v = is_int loc v in
       return v
-  | Splus(s1, s2) ->
+  | Size_op(op, s1, s2) ->
      let* v1 = size env s1 in
      let* v2 = size env s2 in
-     return (v1 + v2)
-  | Sminus(s1, s2) ->
-     let* v1 = size env s1 in
-     let* v2 = size env s2 in
-     return (v1 - v2)
-  | Smult(s1, s2) ->
-     let* v1 = size env s1 in
-     let* v2 = size env s2 in
-     return (v1 * v2)
+     match op with
+     | Size_plus -> return (v1 + v2)
+     | Size_minus -> return (v1 - v2)
+     | Size_mult -> return (v1 * v2)
 
 (* mutually recursive definitions must either define *)
 (* functions parameterized by a size or stream values *)
-let sizefun_defs_or_values genv env l_eq =
-  let rec split (acc, one_value) { eq_desc; eq_loc } =
+let sizefun_defs_or_values l_eq =
+  let rec extract_sizefun_defs (acc, one) { eq_desc; eq_loc } =
     match eq_desc with
-    | EQsizefun { sf_id; sf_id_list; sf_e } ->
-       if one_value then
+    | EQsizefun ({ sf_id; sf_id_list; sf_e } as sizefun) ->
+       if one then
          error { kind = Esizefun_def_recursive; loc = eq_loc }
-       else return (Env.add sf_id { s_params = sf_id_list; 
-                              s_body = sf_e; s_genv = genv; 
-                              s_env = env } acc,
-                 one_value)
-    | EQand(eq_list) ->
-       fold split (acc, one_value) eq_list
+       else return (sizefun :: acc, one)
+    | EQand { eq_list } ->
+       fold extract_sizefun_defs (acc, one) eq_list
     | EQempty -> 
-       return (acc, one_value)
+       return (acc, one)
     | _ -> 
-      if Env.is_empty acc then return (acc, true)
+       if List.is_empty acc then
+         (* no size function definition was in the list *)
+         return (acc, true)
       else error { kind = Esizefun_def_recursive; loc = eq_loc } in
-  let* acc, one_value = split (Env.empty, false) l_eq in
-  if one_value then
+  let* acc, one = extract_sizefun_defs ([], false) l_eq in
+  if one then
+    (* the equation *)
     return (Either.Left(l_eq))
   else
+    (* the list of size fun definitions *)
     return (Either.Right(acc))
 
-let sizefun_defs genv env { l_eq; l_loc } =
-  let* v = sizefun_defs_or_values genv env l_eq in
+let sizefun_defs { l_eq; l_loc } =
+  let* v = sizefun_defs_or_values l_eq in
   match v with 
-  | Right(defs) -> return defs 
   | Left _ -> error { kind = Esizefun_def_recursive; loc = l_loc }
+  | Right(defs) -> return defs 
 
 (* Present handler *)
+(* In the code below, [is_fun] is a boolean flag. When true, the expression *)
+(* is expected to be combinational. If it is not, an error is raised *)
 let ipresent_handler is_fun iscondpat ibody genv env { p_cond; p_body } =
   let* sc = iscondpat is_fun genv env p_cond in
   let* sb = ibody is_fun genv env p_body in
@@ -418,14 +455,13 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
           let* v =
             Primitives.get_node v |>
             Opt.to_result ~none: { kind = Eshould_be_a_node; loc = e_loc1} in
-          let* si = instance e_loc1 v in
           let* s2 = iexp is_fun genv env e2 in
-          return (Slist [Sinstance(si); s2])
+          return (Slist [Sinstance(v); s2])
      | (Eatomic | Etest), [e] -> iexp is_fun genv env e
      | Edisc, [e] -> 
        if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
        else iexp is_fun genv env e
-     | Eup, [e] ->
+     | Eup _, [e] ->
         if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
         else let* s = iexp is_fun genv env e in
           return
@@ -460,12 +496,11 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
      let* se = iexp is_fun genv env e in
      let* s =
        match v with
-       | Vclosure ({ c_funexp = { f_kind = Knode _; f_args = [_] } } as c) ->
+       | Vnode(si) ->
           (* [f e] with [f] a node is a short-cut for [run f e] *)
           if is_fun then error { kind = Eshould_be_combinatorial; loc = e_loc }
-          else let* si = instance l_loc c in
-            return (Sinstance(si))
-       | Vclosure _ | Vfun _ -> return Sempty
+          else return (Sinstance(si))
+       | Vifun _ | Vfun _ -> return Sempty
        | _ -> error { kind = Etype; loc = e_loc } in
      return (Slist [s; se])
   | Eapp { f; arg_list } ->
@@ -493,9 +528,20 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
      return (Slist(se :: s_list))
   | Etypeconstraint(e, _) -> iexp is_fun genv env e
   | Efun _ -> return Sempty
-  | Ematch { e; handlers } ->
+  | Ematch { is_size; e; handlers } ->
+     (* if [is_size] then evaluate the corresponding branch *)
+     (* the initial state is that of the selected branch *)
      let* se = iexp is_fun genv env e in
-     let* s_handlers = map (imatch_handler is_fun iexp genv env) handlers in
+     if is_size then
+       (* evaluate the size; the result must be an integer *)
+       let* ve = vsexp genv env e se in
+       let* v = is_int e.e_loc ve in
+       let* sm =
+         Match.match_handler_list 
+           e_loc (iexp is_fun) genv env (Vint(v)) handlers in
+       return (Slist [Sstatic(Vint(v)); sm])
+     else
+       let* s_handlers = map (imatch_handler is_fun iexp genv env) handlers in
      return (Slist (se :: s_handlers))
   | Epresent { handlers; default_opt } ->
      let* s_handlers =
@@ -509,21 +555,17 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
        let* s_res = iexp is_fun genv env e_res in
        (* TODO: double the state; an idea from Louis Mandel *)
        (* in case of a reset, simply restart from this copy *)
-       (* alternatively, the current solution recalls [iexp] *)
-       (* in the actual, imperative implementation, generated code is *)
-       (* statically scheduled and reset is obtained *)
-       (* by executing a reset method which puts the state *)
-       (* to its initial value *)
+       (* The alternative (and current) solution recalls function [iexp] *)
+       (* In the generated code produced by a compiler, this code is *)
+       (* statically scheduled. The reset is obtained by calling a reset method *)
+    (* which set state variable to their initial value *)
        return (Slist[s_body; s_res])
-  | Eassert(e_body) ->
-     let* s_body = iexp is_fun genv env e_body in
+  | Eassert { a_body } ->
+     let* s_body = iexp is_fun genv env a_body in
      return s_body
   | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
-     (* a forward loop with resume is allowed only in a statefull expression *)
-     if is_fun && for_resume 
-     then error { kind = Eshould_be_combinatorial; loc = e_loc }
-     else let* si_list = map (ifor_input is_fun genv env) for_input in
-       let* s_body, sr_list = 
+     let* si_list = map (ifor_input is_fun genv env) for_input in
+     let* s_body, sr_list = 
          ifor_exp is_fun for_resume genv env for_body in
        let* s_size, s_body =
          ifor_kind genv env for_size for_kind s_body in
@@ -570,8 +612,7 @@ and ifor_input is_fun genv env { desc; loc } =
      let* s2 = iexp is_fun genv env e_right in
      return (Slist [s1; s2])
 
-and ifor_output is_fun is_resume genv env
-  { desc = { for_init; for_default }; loc } =
+and ifor_output is_fun is_resume genv env { desc = { for_init; for_default }; loc } =
   let* s_init =
     match for_init with
     | None -> return Sempty
@@ -589,14 +630,17 @@ and ifor_output is_fun is_resume genv env
 and ifor_vardec is_fun is_resume genv env { desc = { for_vardec } } =
   ivardec is_fun is_resume genv env for_vardec
 
+(* if the for loop is a forward iteration that is reset *)
+(* the overal code is considered to be combinational whereas the body *)
+(* can be stateful *)
 and ifor_exp is_fun is_resume genv env r =
   match r with
   | Forexp { exp } ->
      let* s = iexp (is_fun && is_resume) genv env exp in
      return (s, [])
-  | Forreturns { returns; body } ->
-     let* sr_list = map (ifor_vardec is_fun is_resume genv env) returns in
-     let* s_b = iblock (is_fun && is_resume) genv env body in
+  | Forreturns { r_returns; r_block } ->
+     let* sr_list = map (ifor_vardec is_fun is_resume genv env) r_returns in
+     let* s_b = iblock (is_fun && is_resume) genv env r_block in
      return (s_b, sr_list)
 
 (* initial state of an equation *)
@@ -637,7 +681,7 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
           else let* seq_false = ieq is_fun genv env eq_false in
           return (Slist [Sstatic(Vbool(false)); Sempty; seq_false]) in
      return s
-  | EQand(eq_list) ->
+  | EQand { eq_list } ->
      let* seq_list = map (ieq is_fun genv env) eq_list in
      return (Slist seq_list)
   | EQlocal(b_eq) ->
@@ -668,27 +712,42 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
        let* i, si = initial_state_of_automaton is_fun genv env a_h state_opt in
        (* two state variables: initial state of the automaton and reset bit *)
        return (Slist(i :: Sval(Value(Vbool(false))) :: si :: s_list))
-  | EQmatch { e; handlers } ->
+  | EQmatch { is_size; e; handlers } ->
+     (* if [is_size] then evaluate the corresponding branch *)
+     (* the initial state is that of the selected branch *)
      let* se = iexp is_fun genv env e in
-     let* sm_list = map (imatch_handler is_fun ieq genv env) handlers in
-     return (Slist (se :: sm_list))
+     if is_size then
+       (* evaluate the size; the result must be an integer *)
+       let* ve = vsexp genv env e se in
+       let* v = is_int e.e_loc ve in
+       let* sm =
+         Match.match_handler_list 
+           eq_loc (ieq is_fun) genv env (Vint(v)) handlers in
+       return (Slist [Sstatic(Vint(v)); sm])
+     else
+       (* the state is a list of states - one per hander *)
+       let* sm_list = map (imatch_handler is_fun ieq genv env) handlers in
+       return (Slist (se :: sm_list))
   | EQempty -> return Sempty
-  | EQassert(e) ->
-     let* se = iexp is_fun genv env e in
+  | EQassert { a_body } ->
+     let* se = iexp is_fun genv env a_body in
      return se
   | EQforloop({ for_size; for_kind; for_input;
                 for_body = { for_out; for_block }; for_resume }) ->
      (* if the size is not given there should be at least one input *)
      match for_size, for_input with
-       | None, [] -> error { kind = Eloop_cannot_determine_size; loc = eq_loc }
-       | _ ->
-         let* s_input_list = map (ifor_input is_fun genv env) for_input in
-         let* so_list = 
-           map (ifor_output (is_fun && for_resume) for_resume genv env) for_out in
-         let* s_body = iblock (is_fun && for_resume) genv env for_block in
-         let* s_size, s_body =
-           ifor_kind genv env for_size for_kind s_body in
-         return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
+     | None, [] -> error { kind = Eloop_cannot_determine_size; loc = eq_loc }
+     | _ ->
+        (* if the for loop is a forward iteration that is reset *)
+        (* the overal code is considered to be combinational whereas the body *)
+        (* can be stateful *)
+        let* s_input_list = map (ifor_input is_fun genv env) for_input in
+        let* so_list = 
+          map (ifor_output is_fun for_resume genv env) for_out in
+        let* s_body = iblock (is_fun && for_resume) genv env for_block in
+        let* s_size, s_body =
+          ifor_kind genv env for_size for_kind s_body in
+        return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
 
 and iblock is_fun genv env { b_vars; b_body } =
   let* s_b_vars = map (ivardec is_fun true genv env) b_vars in
@@ -705,8 +764,8 @@ and ivardec is_fun is_resume genv env
     match var_init with
     | None -> 
        (* [last x] is only allowed *)
-      (* when [is_fun = false] or [is_resume = false] *)
-      if var_is_last then
+       (* when [is_fun = false] or [is_resume = false] *)
+       if var_is_last then
          if is_fun && is_resume then 
            error { kind = Eshould_be_combinatorial; loc = var_loc }
          else return (Sval(Vnil)) else return Sempty
@@ -804,14 +863,66 @@ and iresult is_fun genv env { r_desc } =
   | Exp(e) -> iexp is_fun genv env e
   | Returns(b) -> iblock is_fun genv env b
 
-(* an instance of a node *)
-and instance loc ({ c_funexp = { f_args; f_body }; c_genv; c_env } as c) =
-  match f_args with
-  | [ arg ] ->
-     let* s_list = map (ivardec false true c_genv c_env) arg in
-     let* s_body = iresult false c_genv c_env f_body in
-     return { init = Slist (s_body :: s_list); step = c }
-  | _ -> error { kind = Etype; loc }
+(* the functional value of a function definition [fun|node|hybrid x... -> e] *)
+and funexp genv env ({ f_kind; f_args } as f) =
+  (* the functional value from a (combinatorial) function definition *)
+  let co_fun genv env { f_args; f_body; f_loc } =
+    let f_fun v_list =
+      let* env = Match.matching_arg_in_list f_loc env f_args v_list in
+      vresult genv env f_body in
+    let f_no_input = f_args = [[]] in
+    return (Vfun { f_arity = List.length f_args; f_no_input; f_fun }) in
+
+  let co_step f_loc genv env n_arity arg_list f_body =
+    let match_in_list a_list s_list v_list =
+      let match_in acc vdec s v =
+        let* acc, s = svardec genv env acc vdec s v in
+        let* s = set_vardec acc vdec s in
+        return (acc, s) in
+      mapfold3 { kind = Epattern_matching_failure; loc = f_loc }
+        match_in Env.empty a_list s_list v_list in
+    
+    fun s v -> match s with
+    | Slist (s_body :: s_arg_list) ->
+       let v_list = Primitives.list_of n_arity v in
+       let* env_arg_list, s_arg_list =
+         match_in_list arg_list s_arg_list v_list in
+       let env = Env.append env_arg_list env in
+       let* r, s_body = sresult genv env f_body s_body in
+       return (r, Slist (s_body :: s_arg_list))
+    | _ ->
+       error { kind = Estate; loc = f_loc } in
+
+  (* the functional value from a stateful (node) function definition *)
+  let co_node f_loc genv env n_tkind arg_list f_body =
+    let* s_list = map (ivardec false true genv env) arg_list in
+    let* s_body = iresult false genv env f_body in
+    let n_arity = List.length arg_list in
+    let n_step = co_step f_loc genv env n_arity arg_list f_body in
+    let n_no_input = arg_list = [] in
+    let si = { n_tkind; n_arity; n_no_input;
+               n_init = Slist (s_body :: s_list); n_step } in
+    return (Vnode(si)) in
+
+  let n_arry_co_node genv env tkind { f_loc; f_args; f_body } = 
+    (* nodes are not curried; this feature was possible in LS *)
+    (* but not in Zelus. *)
+    (* That is: [node a1 ... an -> e] is a short-cut for *)
+    (* [fun a1 ...an-1 -> node an -> e]. [ai] is itself a list of arguments *)
+    let f_args, arg_list = Util.firsts f_args in
+    match f_args with
+    | [] -> co_node f_loc genv env tkind arg_list f_body
+    | _ ->
+       let f_fun v_list =
+         let* env = Match.matching_arg_in_list f_loc env f_args v_list in
+         let* v = co_node f_loc genv env tkind arg_list f_body in
+         return (Value(v)) in
+       return (Vfun { f_arity = List.length f_args; f_no_input = false; f_fun }) in
+    
+  (* the functional value *)
+  match f_kind with
+  | Zelus.Kfun _ -> co_fun genv env f
+  | Zelus.Knode(tkind) -> n_arry_co_node genv env tkind f
 
 (* The main step function *)
 (* the value of an expression [e] in a global environment [genv] and local *)
@@ -836,10 +947,10 @@ and sexp genv env { e_desc; e_loc } s =
        find_gvalue_opt lname genv |>
          Opt.to_result ~none:{ kind = Eunbound_lident(lname); loc = e_loc } in
      return (Value(v), s)
-  | Elast x, Sempty ->
+  | Elast { id }, Sempty ->
      let* v =
-       find_last_opt x env  |>
-         Opt.to_result ~none:{ kind = Eunbound_last_ident(x); loc = e_loc } in
+       find_last_opt id env  |>
+         Opt.to_result ~none:{ kind = Eunbound_last_ident(id); loc = e_loc } in
      return (v, s)
   | Eop(op, e_list), s ->
      begin match op, e_list, s with
@@ -881,15 +992,13 @@ and sexp genv env { e_desc; e_loc } s =
         (* the application of a n-ary node is of the form [f(e1,..., en)] or *)
         (* [run f (e1,...,en)]. The [ei] are non strict *)
         let* v, s = sarg genv env e s in
-        let* v, si = run e_loc si v in
+        let* v, si = run si v in
         return (v, Slist [Sinstance si; s])
      | Eatomic, [e], s ->
         (* if one of the input is bot (or nil), the output is bot (or nil); *)
         (* that is, [e] is considered to be strict *)
         let* v, s = sexp genv env e s in
-        let* v =
-          Primitives.atomic v |>
-            Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
+        let v = Primitives.atomic v in
         return (v, s)
      | Etest, [e], s ->
         let* v, s = sexp genv env e s in
@@ -897,7 +1006,7 @@ and sexp genv env { e_desc; e_loc } s =
           Primitives.lift1 Primitives.test v |>
             Opt.to_result ~none:{ kind = Etype; loc = e_loc } in
         return (v, s)
-     | Eup, [e], Slist [Szstate { zin }; s] ->
+     | Eup _, [e], Slist [Szstate { zin }; s] ->
        (* [zin]: set to true when the solver detect a zero-crossing; *)
        (* [zout]: output to be followed for zero-crossing detection *)
         let* zout, s = sexp genv env e s in
@@ -909,7 +1018,7 @@ and sexp genv env { e_desc; e_loc } s =
         return
           (Value(Vbool(zin)),
            Speriod { p with horizon })
-     | Ehorizon, [e], Slist [Shorizon ({ zin; horizon } as h); s] ->
+     | Ehorizon _, [e], Slist [Shorizon ({ zin; horizon } as h); s] ->
         if zin then
           let* horizon, s = sexp genv env e s in
           match horizon with
@@ -1034,7 +1143,7 @@ and sexp genv env { e_desc; e_loc } s =
   | Eapp { arg_list = [e] }, Slist [Sinstance si; s] ->
      (* Here, [f (e1,..., en)] is a short-cut for [run f (e1,...,en)] *)
      let* v, s = sarg genv env e s in
-     let* v, si = run e_loc si v in
+     let* v, si = run si v in
      return (v, Slist [Sinstance si; s])
   | Eapp { f; arg_list }, Slist (s :: s_list) ->
      (* [f] must return a combinatorial function *)
@@ -1061,7 +1170,13 @@ and sexp genv env { e_desc; e_loc } s =
      let* v, s = sexp genv env e s in
      return (v, Slist [s_eq; s])
   | Efun(fe), s ->
-     return (Value(Vclosure { c_funexp = fe; c_genv = genv; c_env = env }), s)
+     let* v = funexp genv env fe in
+     return (Value(v), s)
+  | Ematch { is_size = true; handlers }, Slist [Sstatic(v_size); s] ->
+     (* [match size e with | P1 -> ... | ...] *)
+     let* v, s =
+       static_match_handler_list e_loc sexp genv env v_size handlers s in
+     return (v, Slist [Sstatic(v_size); s])
   | Ematch { e; handlers }, Slist(se :: s_list) ->
      let* ve, se = sexp genv env e se in
      let* v, s_list =
@@ -1109,8 +1224,8 @@ and sexp genv env { e_desc; e_loc } s =
           (* a reset is possible for all expressions - combinatorial or not *)
           reset (iexp false) sexp genv env e_body s_body v in
      return (v_body, Slist [s_body; s_res])
-  | Eassert(e_body), s ->
-     let* v, s = sexp genv env e_body s in
+  | Eassert { a_body }, s ->
+     let* v, s = sexp genv env a_body s in
      let* r = check_assertion e_loc v void in
      return (r, s)
   | Eforloop ({ for_kind; for_index; for_input; for_body; for_resume }),
@@ -1218,7 +1333,7 @@ and sforloop_exp
                return (ve, s_for_body)
             | _ -> error { kind = Estate; loc } in
           return (ve, s_for_body, sr_list)
-       | Forreturns { returns; body } ->
+       | Forreturns { r_returns; r_block } ->
           (* 1/ computes the environment from the [returns] *)
           (* environment [env_v + acc_env]. Vars in [acc_env] *)
           (* are accumulated values such that *)
@@ -1226,49 +1341,24 @@ and sforloop_exp
           (* iteration index. *)
           let* acc_env, sr_list =
             mapfold3 { kind = Estate; loc }
-              (sfor_vardec genv env) Env.empty returns sr_list
-              (bot_list returns) in
+              (sfor_vardec genv env) Env.empty r_returns sr_list
+              (bot_list r_returns) in
           (* 2/ runs the body *)
           let* missing, env_list, acc_env, s_for_body =
             match for_kind, s_for_body with
             | Kforeach, Slist(s_list) ->
-               let sbody env s =
-                 let* _, local_env, s = sblock genv env body s in
-                 return (local_env, s) in
+               let sbody env acc_env s =
+                 sforblock genv env acc_env r_block None s in
                let* env_list, acc_env, s_list =
-                 Forloop.foreach_with_accumulation_i loc
+                 Forloop.foreach_eq loc
                    sbody env i_env acc_env s_list in
                return (0, env_list, acc_env, Slist(s_list))
-            | Kforward(None), _ ->
-               let sbody env s =
-                 let* _, local_env, s = sblock genv env body s in
-                 return (local_env, s) in
+            | Kforward(exit), _ ->
+               let sbody env acc_env s =
+                 sforblock genv env acc_env r_block exit s in
                let* env_list, acc_env, s_for_body_new =
-                 Forloop.forward_i_without_exit_condition loc
+                 Forloop.forward_eq loc
                    sbody env i_env acc_env for_size s_for_body in
-               let s_for_body =
-                 if for_resume then s_for_body_new else s_for_body in
-               return (0, env_list, acc_env, s_for_body)
-            | Kforward(Some { for_exit; for_exit_kind }), _ ->
-               (* for the moment, the exit condition must be combinatorial *)
-               let sbody env s =
-                 let* _, local_env, s = sblock genv env body s in
-                 return (local_env, s) in
-               let cond env = vexp genv env for_exit in
-               let* env_list, acc_env, s_for_body_new =
-                  match for_exit_kind with
-                    | Ewhile ->
-                      Forloop.forward_i_with_while_condition 
-                        for_exit.e_loc body.b_write
-                        sbody cond env i_env acc_env for_size s_for_body
-                  | Eunless ->
-                    Forloop.forward_i_with_unless_condition 
-                      for_exit.e_loc body.b_write
-                      sbody cond env i_env acc_env for_size s_for_body
-                  | Euntil ->
-                    Forloop.forward_i_with_until_condition 
-                      for_exit.e_loc body.b_write
-                      sbody cond env i_env acc_env for_size s_for_body in
                (* was-it a complete iteration? *)
                let missing = for_size - List.length env_list in
                let s_for_body =
@@ -1280,10 +1370,10 @@ and sforloop_exp
           let* sr_list = 
             if for_resume then
               map2 { kind = Estate; loc } 
-                (set_forexp_out acc_env) returns sr_list
+                (set_forexp_out acc_env) r_returns sr_list
             else return sr_list in
           (* return the result of the for loop *)
-          let* v = for_matching_out missing env_list acc_env returns in
+          let* v = for_matching_out missing env_list acc_env r_returns in
           return (v, s_for_body, sr_list) in
      return (v, s_for_body, sr_list)
 
@@ -1340,14 +1430,38 @@ and vexp genv env e =
 (* computing the environment defined by a local definition *)
 (* the expression [l_eq] is expected to be combinational *)
 and vleq genv env ({ l_rec; l_eq } as leq) =
-  (* for the moment, only recursive definitions of *)
-  (* functions of sizes are allowed *)
+  (* for the moment, recursive functions are only allowed when they *)
+  (* are size functions *)
   if l_rec then
-    let* defs = sizefun_defs genv env leq in
-    return (Fix.sizefixpoint defs)
+    let* size_defs = sizefun_defs leq in
+    return (sizefixpoint genv env size_defs)
   else let* s = ieq true genv env l_eq in
     let* env, _ = seq genv env l_eq s in
     return env
+
+(* builds an environment from a set of size function definitions *)
+and sizefixpoint genv env size_defs =
+  let entry s_arity s_fun s_bound =
+    Match.entry (Vsizefun { s_arity; s_fun; s_bound }) in
+                 
+  let rec sizefixpoint env_of_sizefun size_defs =
+    match size_defs with
+    | [] -> env_of_sizefun
+    | { sf_id; sf_id_list; sf_e } :: size_defs ->
+       let s_arity = List.length sf_id_list in
+       
+       let rec s_fun i_list =
+         (* all recursive calls must be on a size that is less than [i_list] *)
+         sizefun genv 
+           (Env.append (env_ext (Some(i_list))) env) sf_id_list sf_e i_list
+       and
+         env_ext s_bound =
+           let entry = entry s_arity s_fun s_bound in
+           sizefixpoint (Env.add sf_id entry env_of_sizefun) size_defs in
+       env_ext None in
+  let env_of_sizefun = sizefixpoint Env.empty size_defs in
+  env_of_sizefun
+
 
 (* computing the value of a result combinatorial expression *)
 and vresult genv env r =
@@ -1371,12 +1485,12 @@ and sfor_out genv env acc_env
      let* last, s_init = sexp_init_opt loc genv env for_init s_init in
      let* default, s_default = sexp_opt genv env for_default s_default in
      return
-       (Env.add for_name { cur = Vbot; last; default } acc_env,
+       (Env.add for_name { empty with cur = Some Vbot; last; default } acc_env,
         Slist [s_init; s_default])
   | _ -> error { kind = Estate; loc}
 
 (* evaluate an index returns a local environment *)
-and sfor_input size genv env (i_env: Forloop.index Env.t) { desc; loc } s =
+and sfor_input size genv env i_env { desc; loc } s =
   let open Forloop in
   match desc, s with
   | Einput { id; e; by = None }, Slist [se; se_opt] ->
@@ -1465,36 +1579,9 @@ and sarg genv env ({ e_desc; e_loc } as e) s =
      sexp genv env e s
 
 (* application of a node *)
-and run loc { init; step } v =
-  let* v, init = runstep loc init step v in
-  return (v, { init; step })
-
-and runstep loc s { c_funexp = { f_args; f_body }; c_genv; c_env } v =
-  let match_in_list a_list s_list v_list =
-    let match_in acc vdec s v =
-      let* acc, s = svardec c_genv c_env acc vdec s v in
-      let* s = set_vardec acc vdec s in
-      return (acc, s) in
-    mapfold3 { kind = Epattern_matching_failure; loc }
-      match_in Env.empty a_list s_list v_list in
-
-  match f_args, s with
-  | [arg_list], Slist (s_body :: s_arg_list) ->
-     let* v_list =
-       (* special case for a single argument *)
-       match arg_list with
-       | [_] -> let* v =
-                  Primitives.atomic v |>
-                    Opt.to_result ~none:{ kind = Etype; loc } in
-                return [v]
-       | _ -> return (Primitives.list_of v) in
-     let* env_arg_list, s_arg_list =
-       match_in_list arg_list s_arg_list v_list in
-     let env = Env.append env_arg_list c_env in
-     let* r, s_body = sresult c_genv env f_body s_body in
-     return (r, Slist (s_body :: s_arg_list))
-  | _ ->
-     error { kind = Etype; loc }
+and run ({ n_init; n_step } as i) v =
+  let* v, n_init = n_step n_init v in
+  return (v, { i with n_init; n_step })
 
 and sexp_list loc genv env e_list s_list =
   slist loc genv env sexp e_list s_list
@@ -1510,15 +1597,15 @@ and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
      if l_rec then
        (* Either it is a collection of mutually recursive functions *)
        (* parameterized by a size or stream values *)
-       let* defs = sizefun_defs_or_values genv env l_eq in
+       let* defs = sizefun_defs_or_values l_eq in
        let* (env_eq, s_eq) =
          match defs with
          | Either.Right(defs) ->
-            let env = Fix.sizefixpoint defs in
-            return (env, s_eq)
+            let env_eq = sizefixpoint genv env defs in
+            return (env_eq, s_eq)
          | Either.Left(l_eq) ->
             (* compute a bounded fix-point in [n] steps *)
-            let bot = bot_env eq_write in
+            let bot = Match.bot_env eq_write in
             let n = (Fix.size l_eq) + 1 in
             let* env_eq, s_eq = Fix.eq genv env seq l_eq n s_eq bot in
             (* a dynamic check of causality: all defined names in [eq] *)
@@ -1540,9 +1627,9 @@ and slets loc genv env leq_list s_list =
 and seq genv env { eq_desc; eq_write; eq_loc } s =
   match eq_desc, s with
   | _, Sbot ->
-     return (bot_env eq_write, s)
+     return (Match.bot_env eq_write, s)
   | _, Snil ->
-     return (nil_env eq_write, s)
+     return (Match.nil_env eq_write, s)
   | EQeq(p, e), s ->
      let* v, s = sexp genv env e s in
      let* env_p =
@@ -1552,8 +1639,9 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      return (env_p, s)
   | EQsizefun { sf_id; sf_id_list; sf_e }, s ->
      let v =
-       { s_params = sf_id_list; s_body = sf_e; 
-         s_genv = genv; s_env = env } in
+       { s_arity = List.length sf_id_list;
+         s_fun = sizefun genv env sf_id_list sf_e;
+         s_bound = None } in
      return (Env.singleton sf_id (Match.entry (Vsizefun v)), s)
   | EQder { id; e; e_opt; handlers },
     Slist (Scstate({ pos } as sc) :: s :: Sopt(x0_opt) :: s0 :: s_list) ->
@@ -1588,31 +1676,31 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        | Some(cx) ->
           (* otherwise the value returned by the handler *)
           cx in
-     return (Env.singleton id { entry with cur },
+     return (Env.singleton id { entry with cur = Some(cur) },
              Slist (Scstate({ sc with der }) :: Sopt(x0_opt) :: s0 :: s_list))
   | EQinit(x, e), Slist [Sopt(None); se] ->
      (* first step *)
      let* v, se = sexp genv env e se in
-     let* ({ cur } as entry) =
-       Env.find_opt x env |>
+     let* cur =
+       find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
-     return (Env.singleton x { entry with last = Some(v) },
+     return (Env.singleton x { empty with last = Some(v); reinit = true },
              Slist [Sopt(Some(cur)); se])
   | EQinit(x, e), Slist [Sopt(Some(v)); se] ->
      (* remaining steps *)
-     let* ({ cur } as entry) =
-       Env.find_opt x env |>
+     let* cur =
+       find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
-     return (Env.singleton x { entry with last = Some(v) },
+     return (Env.singleton x { empty with last = Some(v); reinit = true },
              Slist [Sopt(Some(cur)); se])
   | EQif { e; eq_true; eq_false }, Slist [se; s_eq_true; s_eq_false] ->
       let* v, se = sexp genv env e se in
       let* env_eq, s_list =
         match v with
         (* if the condition is bot/nil then all variables have value bot/nil *)
-        | Vbot -> return (bot_env eq_write, [Sbot; Sbot])
+        | Vbot -> return (Match.bot_env eq_write, [Sbot; Sbot])
         (* Slist [se; s_eq1; s_eq2]) *)
-        | Vnil -> return (nil_env eq_write, [Snil; Snil])
+        | Vnil -> return (Match.nil_env eq_write, [Snil; Snil])
         (* Slist [se; s_eq1; s_eq2]) *)
         | Value(b) ->
            let* v =
@@ -1631,7 +1719,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
                Fix.by eq_loc env env_false (names eq_write) in
              return (env_false, [s_eq_true; s_eq_false]) in
       return (env_eq, Slist (se :: s_list))
-  | EQand(eq_list), Slist(s_list) ->
+  | EQand { eq_list }, Slist(s_list) ->
      let seq genv env acc eq s =
        let* env_eq, s = seq genv env eq s in
        let* acc = merge eq_loc env_eq acc in
@@ -1645,8 +1733,8 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* env_eq, s_eq =
        match v with
        (* if the condition is bot/nil then all variables have value bot/nil *)
-       | Vbot -> return (bot_env eq_write, Slist [s_eq; se])
-       | Vnil -> return (nil_env eq_write, Slist [s_eq; se])
+       | Vbot -> return (Match.bot_env eq_write, Slist [s_eq; se])
+       | Vnil -> return (Match.nil_env eq_write, Slist [s_eq; se])
        | Value(v) ->
           let* v =
             is_bool v |> Opt.to_result ~none:{ kind = Etype; loc = e.e_loc } in
@@ -1654,8 +1742,8 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
           reset (ieq false) seq genv env eq s_eq v in
      return (env_eq, Slist [s_eq; se])
   | EQlocal(b_eq), s_eq ->
-     let* _, env_local, s_eq = sblock genv env b_eq s_eq in
-     return (env_local, s_eq)
+     let* _, env_visible, s_eq = sblock genv env b_eq s_eq in
+     return (env_visible, s_eq)
   | EQlet(leq, eq), Slist [s_leq; s_eq] ->
      let* env_eq, s_leq = sleq genv env leq s_leq in
      let env = Env.append env_eq env in
@@ -1679,22 +1767,29 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* env, ns, nr, s_list =
        match ps, pr with
        | (Vbot, _) | (_, Vbot) ->
-          return (bot_env eq_write, ps, pr, s_list)
+          return (Match.bot_env eq_write, ps, pr, s_list)
        | (Vnil, _) | (_, Vnil) ->
-          return (nil_env eq_write, ps, pr, s_list)
+          return (Match.nil_env eq_write, ps, pr, s_list)
        | Value(ps), Value(pr) ->
           let* pr =
             is_bool pr |> Opt.to_result ~none:{ kind = Etype; loc = eq_loc } in
           sautomaton_handler_list eq_loc
             is_weak genv env eq_write handlers ps pr s_list in
      return (env, Slist (Sval(ns) :: Sval(nr) :: si :: s_list))
+  | EQmatch { is_size = true; e; handlers }, Slist [Sstatic(v_size); s] ->
+     (* [match size e with | P1 -> ... | ...] *)
+     let* env_handler, s =
+       static_match_handler_list eq_loc seq genv env v_size handlers s in
+     (* complete missing entries in the environment *)
+     let* env_handler = Fix.by eq_loc env env_handler (names eq_write) in
+     return (env_handler, Slist [Sstatic(v_size); s])
   | EQmatch { e; handlers }, Slist (se :: s_list) ->
      let* ve, se = sexp genv env e se in
      let* env, s_list =
        match ve with
        (* if the condition is bot/nil then all variables have value bot/nil *)
-       | Vbot -> return (bot_env eq_write, s_list)
-       | Vnil -> return (nil_env eq_write, s_list)
+       | Vbot -> return (Match.bot_env eq_write, s_list)
+       | Vnil -> return (Match.nil_env eq_write, s_list)
        | Value(ve) ->
           let* env_handler, s_list =
             smatch_handler_list eq_loc seq genv env ve handlers s_list in
@@ -1706,7 +1801,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      (* present z1 -> eq1 | ... | zn -> eqn [else eq] *)
      let* env_handler_opt, s_list =
        spresent_handler_list eq_loc
-         sscondpat (bot_env eq_write) (nil_env eq_write)
+         sscondpat (Match.bot_env eq_write) (Match.nil_env eq_write)
          seq genv env handlers s_list in
      let* env_handler, s =
        match env_handler_opt, default_opt, s with
@@ -1725,8 +1820,8 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* env_handler = Fix.by eq_loc env env_handler (names eq_write) in
      return (env_handler, Slist (s :: s_list))
   | EQempty, s -> return (Env.empty, s)
-  | EQassert(e), s ->
-     let* ve, s = sexp genv env e s in
+  | EQassert { a_body }, s ->
+     let* ve, s = sexp genv env a_body s in
      let* r = check_assertion eq_loc ve Env.empty in
      return (r, s)
   | EQforloop({ for_kind; for_index; for_input; for_body; for_resume }),
@@ -1762,9 +1857,11 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
     let* r, s_size, s_for_body, so_list, si, si_list =
       match size_i_env with
       | Vbot ->
-         return (bot_env eq_write, None, s_for_block, so_list, si, si_list)
+         return 
+           (Match.bot_env eq_write, None, s_for_block, so_list, si, si_list)
       | Vnil ->
-         return (nil_env eq_write, None, s_for_block, so_list, si, si_list)
+         return 
+           (Match.nil_env eq_write, None, s_for_block, so_list, si, si_list)
       | Value(size, i_env) ->
          (* allocate the memory if the loop is a foreach loop *)
           let s_for_body = ialloc_foreach_loop size for_kind s_for_block in
@@ -1790,14 +1887,19 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
     return (r, Slist (Sopt(s_size) :: Slist(s_for_block :: so_list) ::
                         si :: si_list))
   | EQemit(x, e_opt), s ->
-     let* cur, s =
+     let* v, s =
        match e_opt with
        | None -> return (Value(Vpresent(Vvoid)), s)
-       | Some(e) -> sexp genv env e s in
-     let* entry =
+       | Some(e) ->
+          let* v, s = sexp genv env e s in
+          let* v =
+            let+ v = v in
+            return (Value(Vpresent(v))) in
+          return (v, s) in
+     let* _ =
        Env.find_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
-     return (Env.singleton x { entry with cur }, s)
+     return (Env.singleton x { empty with cur = Some(v) }, s)
   | _ -> error { kind = Estate; loc = eq_loc }
 
 (* how the size must be kept or not from one reaction to the other *)
@@ -1812,8 +1914,8 @@ and sforloop_eq
   loc genv env size for_kind for_resume { for_out; for_block }
   i_env s_for_block so_list =
   match i_env with
-  | Vbot -> return (bot_env for_block.b_write, s_for_block, so_list)
-  | Vnil -> return (nil_env for_block.b_write, s_for_block, so_list)
+  | Vbot -> return (Match.bot_env for_block.b_write, s_for_block, so_list)
+  | Vnil -> return (Match.nil_env for_block.b_write, s_for_block, so_list)
   | Value(i_env) ->
      (* 1/ computes the environment from the [returns] *)
      (* environment [env_v + acc_env]. Vars in [acc_env] *)
@@ -1827,43 +1929,18 @@ and sforloop_eq
      let* missing, env_list, acc_env, s_for_block =
        match for_kind, s_for_block with
        | Kforeach, Slist(s_list) ->
-          let sbody env s =
-            let* _, local_env, s = sblock genv env for_block s in
-            return (local_env, s) in
+          let sbody env acc_env s =
+            sforblock genv env acc_env for_block None s in
           let* env_list, acc_env, s_list =
-            Forloop.foreach_with_accumulation_i loc
+            Forloop.foreach_eq loc
               sbody env i_env acc_env s_list in
           return (0, env_list, acc_env, Slist(s_list))
-       | Kforward(None), _ ->
-          let sbody env s =
-            let* _, local_env, s = sblock genv env for_block s in
-            return (local_env, s) in
+       | Kforward(exit), _ ->
+          let sbody env acc_env s =
+            sforblock genv env acc_env for_block exit s in
           let* env_list, acc_env, s_for_block_new =
-            Forloop.forward_i_without_exit_condition loc
+            Forloop.forward_eq loc
               sbody env i_env acc_env size s_for_block in
-          let s_for_block =
-            if for_resume then s_for_block_new else s_for_block in
-          return (0, env_list, acc_env, s_for_block)
-       | Kforward(Some { for_exit; for_exit_kind }), _ ->
-          (* for the moment, the exit condition must be combinatorial *)
-          let sbody env s =
-            let* _, local_env, s = sblock genv env for_block s in
-            return (local_env, s) in
-          let cond env = vexp genv env for_exit in
-          let* env_list, acc_env, s_for_block_new =
-            match for_exit_kind with
-             | Ewhile ->
-               Forloop.forward_i_with_while_condition 
-                 for_exit.e_loc for_block.b_write
-               sbody cond env i_env acc_env size s_for_block
-             |  Eunless ->
-               Forloop.forward_i_with_unless_condition 
-                 for_exit.e_loc for_block.b_write
-                 sbody cond env i_env acc_env size s_for_block
-             |  Euntil ->
-               Forloop.forward_i_with_until_condition 
-                 for_exit.e_loc for_block.b_write
-                 sbody cond env i_env acc_env size s_for_block in
           (* was-it a complete iteration? *)
           let missing = size - List.length env_list in
           let s_for_block =
@@ -1921,35 +1998,35 @@ and sresult genv env { r_desc; r_loc } s =
   | Exp(e) -> sexp genv env e s
   | Returns(b) ->
      Debug.print_ienv "Return (env): before" env;
-     let* env, local_env, s = sblock genv env b s in
+     let* env, env_visible, s = sblock genv env b s in
      Debug.print_ienv "Return (env): after" env;
-     Debug.print_ienv "Return (local env): after" local_env;
+     Debug.print_ienv "Return (env visible): after" env_visible;
      let* v = matching_out env b in
      return (v, s)
 
 (* block [local x1 [init e1 | default e1 | ],..., xn [...] do eq done *)
-and sblock genv env { b_vars; b_body = ({ eq_write } as eq); b_loc } s_b =
+and sblock genv env { b_vars; b_body; b_loc } s_b =
   match s_b with
   | Slist (s_eq :: s_list) ->
-     let* env_v, s_list =
+     let* bot_x, s_list =
        mapfold3 { kind = Estate; loc = b_loc }
          (svardec genv env) Env.empty b_vars s_list (bot_list b_vars) in
-     let bot = Fix.complete env env_v (names eq_write) in
-     let n = (Fix.size eq) + 1 in
-     let* env_eq, s_eq = Fix.eq genv env seq eq n s_eq bot in
+     let names = Match.names_env bot_x in
+     (* double the number of iterations because a variable [x] *)
+     (* can be defined by an equation [x = ...] and [init x = ...] *)
+     let n = 2 * Env.cardinal bot_x + 1 in
+     let* (env_eq_not_x, env_eq_x), s_eq = 
+       Fix.local genv env seq b_body n s_eq bot_x in
      (* a dynamic check of causality: all locally defined names *)
-     (* [x1,...,xn] must be non bottom provided that all free vars *)
-     (* are non bottom *)
-     let* _ =
-       Fix.causal b_loc env env_eq (Match.names_env env_v) in
+     (* [x1,...,xn] must be non bottom provided that the value of *)
+     (* all free variables is not bottom *)
+     let* _ = Fix.causal b_loc env env_eq_x names in
      (* store the next last value for [svardec] *)
      let* s_list = map2 { kind = Estate; loc = b_loc }
-                     (set_vardec env_eq) b_vars s_list in
-     (* remove all local variables from [env_eq] *)
-     let env = Env.append env_eq env in
-     (* compute variables that are visible - distinct from [x1,...,xn] *)
-     let env_visible_eq = remove env_v env_eq in
-     return (env, env_visible_eq, Slist (s_eq :: s_list))
+                     (set_vardec env_eq_x) b_vars s_list in
+     (* add local variables to [env] *)
+     let env = Env.append env_eq_x (Env.append env_eq_not_x env) in
+     return (env, env_eq_not_x, Slist (s_eq :: s_list))
   | _ ->
      error { kind = Estate; loc = b_loc }
 
@@ -1964,21 +2041,86 @@ and sblock_with_reset genv env b_eq s_eq r =
       return s_eq in
   sblock genv env b_eq s_eq
 
+(* computes one step for the body of a for loop *)
+(* for[ward|each] [resume] (n)[i](...) returns (acc_env)
+     local x1,...,xm do eq [[while|until|unless] c] *)
+and sforblock genv env acc_env b for_exit s_b =
+  (* the semantics for a block [local x1,...,xn do eq] *)
+  let sbody genv env b s_b acc_env =
+    let sem s_b env_in =
+      let* env, env_eq_not_x, s_b =
+        sblock genv (Env.append env_in env) b s_b in
+      let new_env_in = Fix.complete env_in env_eq_not_x in
+      return ((env, new_env_in), s_b) in
+    let* _, (env, new_acc_env), s_b =
+      Fix.fixpoint b.b_loc (Env.cardinal acc_env + 1) Fix.stop sem s_b acc_env
+    in
+    return (env, new_acc_env, s_b) in
+  (* evaluation function for the exit condition; the condition *)
+  (* must be stateless. *)
+  let cond env e = vexp genv env e in
+  (* tell wheither a condition is true or not *)
+  let exit_condition loc v =
+    match v with
+    | Vbot -> return false
+    | Vnil -> return false
+    | Value(v) ->
+       let* v = Opt.to_result ~none:{ kind = Etype; loc } (is_bool v) in
+       return v in
+  (* main entry *)
+  match for_exit with
+  | None ->
+     let* env, new_acc_env, s_b = sbody genv env b s_b acc_env in
+     return (false, new_acc_env, s_b)
+  | Some { for_exit; for_exit_kind } ->
+     match for_exit_kind with
+     | Ewhile ->
+        let* v = cond (Env.append acc_env env) for_exit in
+        let* c = exit_condition for_exit.e_loc v in
+        if c then
+          let* _, new_acc_env, s_b = sbody genv env b s_b acc_env in
+          return (false, new_acc_env, s_b)
+        else
+          (* otherwise, [x = last x] for every [x] in [Dom(acc_env)] *)
+          let acc_env = Forloop.lastx_to_x acc_env in
+          return (true, acc_env, s_b)
+     | Eunless ->
+        let* v = cond (Env.append acc_env env) for_exit in
+        let* c = exit_condition for_exit.e_loc v in
+        if c then
+          (* otherwise, [x = last x] for every [x] in [Dom(acc_env)] *)
+          let acc_env = Forloop.lastx_to_x acc_env in
+          return (true, acc_env, s_b)
+        else
+          let* _, new_acc_env, s_b = sbody genv env b s_b acc_env in
+          return (false, new_acc_env, s_b)
+     | Euntil ->
+        let* env, new_acc_env, s_b = sbody genv env b s_b acc_env in
+        let env = Env.append new_acc_env env in
+        let* v = cond env for_exit in
+        let* c = exit_condition for_exit.e_loc v in
+        return (c, new_acc_env, s_b)
+
 (* [v] is the returned value for [var_name] *)
 and svardec genv env acc
-  { var_name; var_init; var_default; var_loc; var_is_last } s v =
+  { var_name; var_init; var_default; var_loc; var_is_last; var_init_in_eq } s v =
   match s with
   | Slist [s_init;s_default] ->
      let* default, s_default = sexp_opt genv env var_default s_default in
      let* last, s_init =
-       match var_init, s_init with
-       | None, Sval(v) ->
-         if var_is_last then
-         (* [x] is a state variable but it is not initialized *)
-         return (Some(v), s_init) (* this value is nil at the first instant *)
-         else error { kind = Estate; loc = var_loc }
-       | _ -> sexp_init_opt var_loc genv env var_init s_init in
-     let entry = { cur = v; last = last; default = default } in
+       if var_init_in_eq then
+         (* the value of [last x] is defined by the block of equations *)
+         return (Some(Vbot), s_init)
+       else
+         match var_init, s_init with
+         | None, Sval(v) ->
+            if var_is_last then
+              (* [x] is a state variable but it is not initialized *)
+              (* this value is nil at the first instant *)
+              return (Some(v), s_init)
+            else error { kind = Estate; loc = var_loc }
+         | _ -> sexp_init_opt var_loc genv env var_init s_init in
+     let entry = { empty with cur = Some(v); last = last; default = default } in
      return (Env.add var_name entry acc, Slist [s_init; s_default])
   | _ ->
      error { kind = Estate; loc = var_loc }
@@ -1986,14 +2128,18 @@ and svardec genv env acc
 (* store the next value for [last x] in the state of [vardec] declarations *)
 (* the state is organised in [s_init; s_default] *)
 and set_vardec env_eq { var_name; var_loc } s =
-  let* v =
-    find_value_opt var_name env_eq |>
+  let* v, eq =
+    find_value_i_opt var_name env_eq |>
       Opt.to_result ~none:{ kind = Eundefined_ident(var_name); loc = var_loc } in
   match s with
   | Slist [Sempty; _] -> return s
   | Slist [Slist [Sopt _; s_init]; s_default] ->
      (* store the current value of [var_name] into the state *)
-     return (Slist [Slist [Sopt(Some(v)); s_init]; s_default])
+     (* when [eq = true], this means that the value of [last x] is *)
+     (* defined by an equation [init x = ...] *)
+     if eq then
+       error { kind = Emerge_env { init = true; id = var_name }; loc = var_loc }
+     else return (Slist [Slist [Sopt(Some(v)); s_init]; s_default])
   | Slist [_; s_default] ->
      (* store the current value of [var_name] into the state *)
      return (Slist [Sval(v); s_default])
@@ -2098,9 +2244,9 @@ and sautomaton_handler_list
     (* execute the current state *)
     match ns, nr with
     | (Vbot, _) | (_, Vbot) ->
-       return (bot_env eq_write, ns, nr, s_list)
+       return (Match.bot_env eq_write, ns, nr, s_list)
     | (Vnil, _) | (_, Vnil) ->
-       return (bot_env eq_write, ns, nr, s_list)
+       return (Match.bot_env eq_write, ns, nr, s_list)
     | Value(vns), Value(vnr) ->
        let* vnr =
          is_bool vnr |>
@@ -2129,11 +2275,11 @@ and sescape_list loc genv env escape_list s_list ps pr =
        match v with
        (* if [v = bot/nil] the state and reset bit are also bot/nil *)
        | Vbot ->
-          return (bot_env e_body.b_write,
+          return (Match.bot_env e_body.b_write,
                   (Vbot, Vbot), Slist [s_cond; Slist(ss_let);
                                         s_body; s_next_state] :: s_list)
        | Vnil ->
-          return (nil_env e_body.b_write,
+          return (Match.nil_env e_body.b_write,
                   (Vnil, Vnil), Slist [s_cond; Slist(ss_let);
                                         s_body; s_next_state] :: s_list)
        | Value(v) ->
@@ -2159,8 +2305,7 @@ and sescape_list loc genv env escape_list s_list ps pr =
   | _ ->
      error { kind = Estate; loc = loc }
 
-and sscondpat
-  (genv : 'a genv) (env : 'a star ientry Env.t ) { desc; loc } s =
+and sscondpat genv env { desc; loc } s =
   match desc, s with
   | Econdand(sc1, sc2), Slist [s1; s2] ->
      let* (v1, env_sc1), s1 = sscondpat genv env sc1 s1 in
@@ -2241,91 +2386,72 @@ and sstate genv env { desc; loc } s =
 and apply loc fv v_list =
   match fv, v_list with
   | _, [] -> return (Value(fv))
-  | Vfun(op), v :: v_list ->
-     let* v =
-       Primitives.atomic v |> Opt.to_result ~none:{ kind = Etype; loc } in
+  | Vifun(op), v :: v_list ->
+     let v = Primitives.atomic v in
      let+ v = v in
      let* fv =
        op v |> Opt.to_result ~none:{ kind = Etype; loc = loc } in
      apply loc fv v_list
-  | Vclosure { c_funexp = { f_kind; f_args; f_body } as fe;
-               c_genv; c_env }, _ ->
-     apply_closure loc c_genv c_env fe f_args f_body v_list
-  | _ ->
-     (* typing error *)
-     error { kind = Etype; loc = loc }
-
-(* apply a closure to a list of arguments *)
-and apply_closure loc genv env ({ f_kind; f_loc } as fe) f_args f_body v_list =
-  match f_args, v_list with
-  | [], _ ->
-     (* check that the kind is combinatorial *)
-     let* r =
-       match f_kind with
-       | Knode _ ->
-          error { kind = Eshould_be_combinatorial; loc }
-       | Kfun _ ->
-          match v_list with
-          | [] -> vresult genv env f_body
-          | _ -> let* fv = vresult genv env f_body in
-                 let+ fv = fv in
-                 apply loc fv v_list in
-     return r
-  | arg :: f_args, v :: v_list ->
-     (* every argument is an atomic value *)
-     let* v =
-       Primitives.atomic v |> Opt.to_result ~none: { kind = Etype; loc } in
-     let* env = Match.matching_arg_in f_loc env arg v in
-     apply_closure loc genv env fe f_args f_body v_list
-  | _, [] ->
-     return
-       (Value(Vclosure({ c_funexp = { fe with f_args = f_args };
-                         c_genv = genv; c_env = env })))
-
-(* apply a function of sizes to a list of sizes *)
-and sizeapply loc fv v_list =
-  (* is negative? *)
-  let negative v_list = List.for_all (fun x -> x < 0) v_list in
-  (* strictly less than - lexical order *)
-  let lt v_list1 v_list2 =
-    (* returns true if v_list1 < v_list2; lexical order of OCaml *)
-    v_list1 < v_list2 in
-
-
-  let apply s_params s_body s_genv s_env =
-    if List.length s_params <> List.length v_list
-    then error { kind = Etype; loc }
+  | Vfun { f_arity; f_fun }, v_list ->
+     let actual_arity = List.length v_list in
+     if f_arity = actual_arity then f_fun v_list
+     else
+       if f_arity < actual_arity then
+         (* take the first [f_arity] arguments *)
+         let v_list, v_right_list = Util.split_n f_arity v_list in
+         let* fv = f_fun v_list in
+         let+ fv = fv in
+         apply loc fv v_right_list
+       else
+         return
+           (Value(Vfun
+                    { f_arity = f_arity - actual_arity;
+                      f_no_input = false;
+                      f_fun = fun v_list_extra ->
+                              f_fun (v_list @ v_list_extra) }))
+  | _ -> error { kind = Etype; loc = loc }
+       
+(* making a function from the definition of a function of a size *)
+and sizefun genv env sf_id_list sf_body i_list =
+  if List.length sf_id_list <> List.length i_list
+    then error { kind = Etype; loc = sf_body.e_loc }
     else
       let env = 
         List.fold_left2 
-          (fun acc id v -> Env.add id (Match.entry (Vint v)) acc) 
-          s_env s_params v_list in
-      vexp s_genv env s_body in
+          (fun acc id i -> Env.add id (Match.entry (Vint i)) acc) 
+          env sf_id_list i_list in
+      vexp genv env sf_body
+
+(* apply a function of sizes to a list of sizes *)
+and sizeapply loc fv i_list =
+  (* is negative? *)
+  let negative i_list = List.for_all (fun x -> x < 0) i_list in
+  (* strictly less than - lexical order *)
+  let lt i_list1 i_list2 =
+    (* returns true if i_list1 < i_list2; lexical order of OCaml *)
+    i_list1 < i_list2 in
+
   match fv with
-  | Vsizefun { s_params; s_body; s_genv; s_env } ->
-     apply s_params s_body s_genv s_env
-  | Vsizefix { bound; name; defs } ->
-     let { s_params; s_body; s_genv; s_env } = Env.find name defs in
-     (* when the function is recursive, the actual value of the argument *)
-     (* must be strictly less than the bound and greater or equal than zero *)
-     let* _ =
-       match bound with
-       | None -> return ()
-       | Some(exp_v_list) ->
-         if lt v_list exp_v_list && not (negative v_list) then return ()
-         else
-           error 
-             { kind = Esize_in_a_recursive_call(v_list, exp_v_list); loc } in
-     (* the body of [name] is evaluated in its closure environment *)
-     (* extended with all entries in [defs] *)
-     let s_env = 
-       Env.fold 
-         (fun f _ acc -> 
-            Env.add f 
-              (Match.entry 
-                 (Vsizefix { bound = Some(v_list); name; defs })) acc)
-         defs s_env in
-     apply s_params s_body s_genv s_env
+  | Vsizefun { s_arity; s_fun; s_bound } ->
+     (* check the arity *)
+     let n = List.length i_list in
+     if s_arity = n then
+       (* the actual value of the size arguments *)
+       (* must be strictly less than the bound and greater or equal to zero *)
+       let* _ =
+         match s_bound with
+         | None -> return ()
+         | Some(e_i_list) ->
+            if lt i_list e_i_list && not (negative i_list) then return ()
+            else
+              error 
+                { kind = Esize_in_a_recursive_call
+                           { actual = i_list; expected = e_i_list }; loc } in
+       (* then call the function *)
+       s_fun i_list
+     else
+       (* typing error *)
+       error { kind = Etype; loc = loc }
   | _ -> error { kind = Etype; loc }
 
 
@@ -2359,8 +2485,12 @@ let implementation genv { desc; loc } =
   | Eletdecl { d_names; d_leq } -> 
      (* evaluate the set of equations *)
      let* env = vleq genv Env.empty d_leq in
-     let f_pvalue_list =
-       List.map (fun (n, id) -> (n, Env.find id env)) d_names in
+     let* f_pvalue_list =
+       map
+         (fun (n, id) ->
+           let* v = Env.find_opt id env |>
+                      Opt.to_result ~none:{ kind = Eunbound_ident(id); loc = loc }
+           in return (n, v)) d_names in
      (* debug info (a bit of imperative code here!) *)
      if !print_values then Output.letdecl Format.std_formatter f_pvalue_list;
      (* add all entries in the current global environment *)
@@ -2385,8 +2515,8 @@ let catch e =
 
 (* The main functions *)
 
-let program genv { p_impl_list } = catch (fold implementation genv p_impl_list)
-
+let program genv { p_impl_list } = 
+  catch (fold implementation genv p_impl_list)
 
 (* run a unit process for [n_steps] steps *)
 let eval_n n_steps init step v_list =
@@ -2403,13 +2533,13 @@ let eval_n n_steps init step v_list =
          apply_rec s (i+1) in
   let _ = apply_rec init 0 in ()
 
-let eval_node loc output n_steps { init; step } v  =
+let eval_node loc output n_steps { n_init; n_step } v  =
   let step s v =
     Debug.print_state "State before:" s;
-    let* v, s = runstep loc s step v in
+    let* v, s = n_step s v in
     Debug.print_state "State after:" s;
     output v; return s in
-  eval_n n_steps init step v
+  eval_n n_steps n_init step v
 
 let print ff (v1, v2) =
      Format.eprintf "@[The two values are not equal\n\
@@ -2425,13 +2555,13 @@ let eval_two_fun loc output fv1 fv2 v_list =
        { kind = Eunexpected_failure { print; arg = (v1, v2) }; loc }) |> catch
 
 let eval_two_nodes loc output n_steps
-      { init = init1; step = step1 } { init = init2; step = step2 } v =
+      { n_init = init1; n_step = step1 } { n_init = init2; n_step = step2 } v =
   let step (s1, s2) v =
     Debug.print_state "State before (first node):" s1;
-    let v1, s1 = catch (runstep loc s1 step1 v) in
+    let* v1, s1 = step1 s1 v in
     Debug.print_state "State after (first node):" s1;
     Debug.print_state "State before (second node):" s2;
-    let v2, s2 = catch (runstep loc s2 step2 v) in
+    let* v2, s2 = step2 s2 v in
     Debug.print_state "State after (second node):" s2;
     let* v = check_equality loc v1 v2 in
     if v then return (s1, s2) else
@@ -2443,18 +2573,14 @@ let eval_two_nodes loc output n_steps
 (* is a node with a void argument, execute its body for [n] steps *)
 let eval ff n_steps name v =
   match v with
-  | Vclosure({ c_funexp = { f_kind; f_loc; f_args = [[]] } } as c) ->
-     begin match f_kind with
-     | Knode _ ->
-        let si = catch (instance f_loc c) in
-        Format.fprintf ff
-          "@[val %s() for %d steps = @.@]" name n_steps;
-        eval_node Location.no_location (Output.value_flush ff) n_steps si void
-     | Kfun _ ->
-        let v = catch (apply Location.no_location v [void]) in
-        Format.fprintf ff
-          "@[val %s() = %a@.@]" name Output.value v
-     end
+  | Vnode({ n_no_input = true } as si) ->
+     Format.fprintf ff
+       "@[val %s() for %d steps is: @.@]" name n_steps;
+     eval_node Location.no_location (Output.value_flush ff) n_steps si void
+  | Vfun { f_no_input = true; f_fun } ->
+     let v = catch (f_fun [void]) in
+     Format.fprintf ff
+       "@[val %s() for one step is %a@.@]" name Output.value v
   | _ ->
      Format.fprintf ff "@[val %s = %a@.@]" name Output.pvalue v
 
@@ -2472,24 +2598,17 @@ let eval_list ff n_steps genv l_names =
   List.iter eval l_names
 
 (* check that all [for all n in Dom(g1), value(n) = value(g2(n))] *)
-let check ff n_steps { values = g1 } { values = g2 } =
+let check n_steps
+      { current = { values = g1 } } { current = { values = g2 } } =
   let check name v1 v2 =
+    Debug.print_message ("Checking node " ^ name);
     match v1, v2 with
-    | Vclosure
-      ({ c_funexp = { f_kind = k1; f_loc = loc1; f_args = [[]] } } as c1),
-      Vclosure
-        ({ c_funexp = { f_kind = k2; f_loc = loc2; f_args = [[]] } } as c2) ->
-        begin match k1, k2 with
-        | Knode _, Knode _ ->
-           let si1 = catch (instance loc1 c1) in
-           let si2 = catch (instance loc2 c2) in
-           eval_two_nodes 
-             Location.no_location Output.value_flush n_steps si1 si2 void
-        | Kfun _, Kfun _ ->
-           eval_two_fun Location.no_location Output.value_flush v1 v2 [void]
-        | _ ->
-           catch (error { kind = Etype; loc = loc1 })
-        end     
+    | Vnode({ n_no_input = true } as si1), Vnode({ n_no_input = true } as si2) ->
+       eval_two_nodes 
+         Location.no_location Output.value_flush n_steps si1 si2 void
+    | Vfun({ f_no_input = true; f_fun = f1 }),
+      Vfun({ f_no_input = true; f_fun = f2 }) ->
+       eval_two_fun Location.no_location Output.value_flush v1 v2 []
     | _ -> () in
   let check name v1 =
     let v2 = E.find name g2 in

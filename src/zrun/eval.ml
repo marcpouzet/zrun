@@ -53,34 +53,15 @@ let parse parsing_fun lexing_fun source_name =
 let parse_implementation_file source_name =
   parse Parser.implementation_file Lexer.main source_name
                
-           
-let apply_with_close_out f o =
-  try
-    f o;
-    close_out o
-  with x -> close_out o; raise x
-
 let do_step comment output step input = 
   let o = step input in
   Debug.print_message comment;
   output o;
   o
 
-let do_optional_stop is_stop p =
-  if is_stop then raise Stop else p
-  
-let do_optional_step is_step comment output step p = 
-  if is_step then do_step comment output step p else p
-
-(* Equivalence checking *)
-let check ff genv0 n_steps (genv_before, p) =
-  let genv_after = Coiteration.program genv0 p in
-  Coiteration.check ff n_steps
-    (Genv.current genv_before) (Genv.current genv_after);
-  (genv_after, p)
 
 (* Evaluate all the definition in a file, store values *)
-let eval_definitions_in_file modname filename n_steps =
+let main modname filename n_steps is_all l_names =
   let open Genv in
   (* output file in which values are stored *)
   let obj_name = filename ^ ".zlo" in
@@ -97,10 +78,12 @@ let eval_definitions_in_file modname filename n_steps =
   (* defines the initial global environment for values *)
   let genv0 = Genv.initialize modname [] in
   (* Add Stdlib *)
-  let genv0 = Genv.add_module genv0 Primitives.stdlib_env in
+  let genv0 = Genv.add_module genv0 (Primitives.stdlib_env ()) in
   
+  let module Scoping = Scoping.Make(Noinfo) in
   (* Associate unique index to variables *)
   let p = do_step "Scoping done" Debug.print_program Scoping.program p in
+  let module Write = Write.Make(Noinfo) in
   (* Write defined variables for equations *)
   let p = do_step "Write done" Debug.print_program Write.program p in
 
@@ -111,13 +94,6 @@ let eval_definitions_in_file modname filename n_steps =
   (* Write the values into a file *)
   apply_with_close_out (Genv.write genv) otc;
 
-  genv
-     
- (* evaluate the body of a list of main nodes *)    
- let main modname filename n_steps is_all l_names =
-   let ff = Format.std_formatter in
-   let genv = eval_definitions_in_file modname filename n_steps in
-     
-   (* evaluate a list of main function/nodes *)
-   if is_all then Coiteration.all ff n_steps (Genv.current genv)
-   else Coiteration.eval_list ff n_steps genv l_names
+  (* evaluate a list of main function/nodes *)
+  if is_all then Coiteration.all ff n_steps (Genv.current genv)
+  else Coiteration.eval_list ff n_steps genv l_names

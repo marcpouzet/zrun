@@ -1,0 +1,20 @@
+(* This example is due to Adrien Guatto *)
+(* It is not causally correct in Lustre because *)
+(* the mux (if/then/else) is strict in all branch *)
+(* Neither it is correct with a lazy interpretation of the mux *)
+(* It is correct with the Esterel semantics *)
+(* where:
+*-  mux(x, y, z) = (x & y) || (not x & y)
+*- of
+*- mux(x, y, z) = if y = z then y else mux_lazy(x, y, z) *)
+
+(* to compute 10 steps, type: zrun.exe -n 10 -esterel -s main *)
+let node h x = o where
+  rec y1 = if true fby y1 then true else y1
+  and y2 = if y2 then true else true fby y2
+  and o = if x then y1 else y2
+
+let node main () =
+  let rec i = true fby not i in
+  h i
+  

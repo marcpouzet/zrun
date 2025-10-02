@@ -1,9 +1,10 @@
-all: build tests
+## Build zrun, compiler and libraries
+all: zrun.exe
 
-build:
+zrun.exe:
 	(cd src; dune build -- zrun.exe)
 
-buildv:
+zrun.exe.verbose:
 	(cd src; dune build --verbose -- zrun.exe)
 
 tests:
@@ -18,7 +19,9 @@ clean:
 	(cd tests/bad/; rm -f *.zlo)
 
 wc:
-	(cd src; wc global/*.ml \
+	(cd src;
+	wc global/*.ml \
 	parsing/parsetree.ml parsing/*.mll \
 	zrun/*.ml)
 
+.PHONY: zeluc.exe zeluc.exe zrun.exe zwrite.exe zrun.exe.verbose tests debug clean wc

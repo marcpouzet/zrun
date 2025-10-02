@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2025 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -13,14 +13,19 @@
 (*                                                                     *)
 (* *********************************************************************)
 
+(* The mais ast. types are parameterized by two types variables *)
+(* ['info] and ['env]; the first is the information attached to expressions *)
+(* the second is the containt of an environment (a map from *)
+(* names to values *)
+
 type 'a localized = { desc: 'a; loc: Location.t }
 
 type name = String.t
 
 (** kinds *)
 type kind =
-  | Knode : tkind -> kind (* stateful *)
-  | Kfun : vkind -> kind (* combinatorial *)
+  | Knode of tkind (* stateful *)
+  | Kfun of vkind (* combinatorial *)
 
 and vkind =
   | Kconst (* constant; known at compilation time *)
@@ -29,73 +34,102 @@ and vkind =
 
 and tkind =
   | Kdiscrete (* only discrete-time state variables *)
-  | Khybrid (* discrete-time and continuous-time state variables *)
+  | Kcont (* discrete-time and continuous-time state variables *)
 
 (** Types *)
 type type_expression = type_expression_desc localized
 
 and type_expression_desc =
-  | Etypevar : name -> type_expression_desc
-  | Etypeconstr : Lident.t * type_expression list -> type_expression_desc
-  | Etypetuple : type_expression list -> type_expression_desc
-  | Etypefun : kind * type_expression * type_expression -> type_expression_desc
+  | Etypevar of name
+  | Etypeconstr of Lident.t * type_expression list
+  | Etypetuple of type_expression list
+  | Etypefun of
+      { ty_kind: kind; ty_name_opt: Ident.t option;
+        ty_arg : type_expression; ty_res : type_expression }
+  (* array: [size]t defines an array of size [t] with values of type [t] *)
+  | Etypevec of type_expression * size_expression
+
+and is_singleton = bool
+
+(* sizes for arrays and bounded recursions - only multivariate polynomials *)
+and size_expression = size_expression_desc localized
+
+and size_expression_desc =
+  | Size_int of int
+  | Size_var of Ident.t
+  | Size_frac of { num: size_expression; denom: int }
+  | Size_op of op * size_expression * size_expression 
+
+and op = | Size_plus | Size_minus | Size_mult 
+
+(* the two forms of [last]; [last x] and [last* x] *)
+type last =
+  { copy: bool; (* [copy = false] (that is, [last* x] *)
+    id: Ident.t; (* means that [x] and [last* x] share the same location *)
+    }
 
 (* constants *)
 type immediate =
-| Eint : int -> immediate
-| Ebool : bool -> immediate
-| Efloat : float -> immediate
-| Evoid : immediate
-| Echar : char -> immediate
-| Estring : string -> immediate
+| Eint of int
+| Ebool of bool
+| Efloat of float
+| Evoid
+| Echar of char
+| Estring of string
 
 (* synchronous operators *)
 type operator =
-  | Efby : operator
-  (* unit delay *)
-  | Eunarypre : operator
-  (* unit delay *)
-  | Eifthenelse : operator
+  | Efby
+  (* unit delay - arity = 2 *)
+  | Eunarypre
+  (* unit delay - arity = 1 *)
+  | Eifthenelse
   (* mux *)
-  | Eminusgreater : operator
-  (* initialization *)
-  | Eseq : operator
-  (* sequence *)
-  | Erun : is_inline -> operator
-  (* application of a statefull function *)
-  | Eatomic : operator
-  (* the argument is atomic *)
-  | Etest : operator
-  (* testing the presence of a signal *)
-  | Eup : operator
-  (* zero-crossing detection *)
-  | Eperiod : operator
-  (* period *)
-  | Ehorizon : operator
-  (* generate an event at a given horizon *)
-  | Edisc : operator
+  | Eminusgreater
+  (* initialization - arity = 2 *)
+  | Eseq
+  (* sequence - arity = n *)
+  | Erun of is_inline 
+  (* application of a statefull function - arity = 1 *)
+  | Eatomic 
+  (* the argument is atomic - arity = 1 *)
+  | Etest 
+  (* testing the presence of a signal - arity = 1 *)
+  | Eup of is_zero (* when [is_zero], [up: _ -> zero], [up: _ -> bool] otherwise *)
+  (* zero-crossing detection - arity = 1 *)
+  | Eperiod 
+  (* period - arity = 2 *)
+  | Ehorizon of is_zero 
+  (* generate an event at a given horizon - arity = 1 *)
+  | Einitial 
+  (* true at the very first instant - arity = 0 *)
+  | Edisc 
   (* generate an event whenever x <> last x outside of integration *)
-  | Earray : array_operator -> operator
+  | Earray of array_operator
 
+and is_zero = { is_zero: bool}
+ 
 and array_operator =
-  | Earray_list : array_operator
+  | Earray_list 
   (* [| e1;...;en |] *)
-  | Econcat : array_operator
+  | Econcat 
   (* [ e1 ++ e2] *)
-  | Eget : array_operator
+  | Eget 
   (* [e.(e)] *)
-  | Eget_with_default : array_operator
+  | Eget_with_default 
   (* [e.(e) default e] *)
-  | Eslice : array_operator
+  | Eslice 
   (* [e.(e .. e)] *)
-  | Eupdate : array_operator
+  | Eupdate 
   (* [| e with e <- e |] *)
-  | Etranspose : array_operator
+  | Etranspose 
   (* [e.T] *)
-  | Eflatten : array_operator
+  | Eflatten 
   (* [e.F] *)
-  | Ereverse : array_operator
+  | Ereverse 
   (* [e.R] *)
+  | Emake
+  (* [e^e] *)
 
 and is_inline = bool
 
@@ -103,7 +137,12 @@ type pateq = pateq_desc localized
 
 and pateq_desc = Ident.t list
 
-type 'exp vardec =
+type 'a init =
+  | Init of 'a (* the variable is declared with an initial value *)
+  | InitEq (* the initialization is deferred to the body *)
+  | Last (* [last x] is allowed but not initialization is given *)
+
+type ('info, 'exp) vardec =
   { var_name: Ident.t; (* its name *)
     var_default: 'exp option; (* possible default value *)
     var_init: 'exp option; (* possible initial value for [last x] *)
@@ -111,6 +150,8 @@ type 'exp vardec =
     var_loc: Location.t;
     var_typeconstraint: type_expression option;
     var_is_last: bool; (* is-there an access to [last x] ? *)
+    var_init_in_eq: bool; (* the initialization is later in the body *)
+    mutable var_info : 'info; (* information *)
   }
 
 type 'a record = { mutable label: Lident.t; arg: 'a }
@@ -118,327 +159,359 @@ type 'a record = { mutable label: Lident.t; arg: 'a }
 type 'info pattern =
   { mutable pat_desc: 'info pattern_desc; (* descriptor *)
     pat_loc: Location.t; (* its location in the source file *)
-    pat_info: 'info; (* info *)
+    mutable pat_info: 'info; (* info *)
   }
 
 and 'info pattern_desc = 
-  | Etuplepat : 'info pattern list -> 'info pattern_desc 
-  | Evarpat : Ident.t -> 'info pattern_desc 
-  | Ewildpat : 'info pattern_desc 
-  | Econstpat : immediate -> 'info pattern_desc 
-  | Econstr0pat : Lident.t -> 'info pattern_desc 
-  | Econstr1pat : Lident.t * 'info pattern list -> 'info pattern_desc 
-  | Ealiaspat : 'info pattern * Ident.t -> 'info pattern_desc 
-  | Eorpat : 'info pattern * 'info pattern -> 'info pattern_desc 
-  | Erecordpat : 'info pattern record list -> 'info pattern_desc 
-  | Etypeconstraintpat : 'info pattern * type_expression -> 'info pattern_desc 
+  | Etuplepat of 'info pattern list
+  | Evarpat of Ident.t 
+  | Ewildpat
+  | Econstpat of immediate 
+  | Econstr0pat of Lident.t 
+  | Econstr1pat of Lident.t * 'info pattern list 
+  | Ealiaspat of 'info pattern * Ident.t 
+  | Eorpat of 'info pattern * 'info pattern 
+  | Erecordpat of 'info pattern record list 
+  | Etypeconstraintpat of 'info pattern * type_expression
+  | Earraypat of 'info pattern list
 
-type ('info, 'exp, 'eq) block =
-  { b_vars: 'exp vardec list;
+type ('info, 'ienv, 'exp, 'eq) block =
+  { b_vars: ('info, 'exp) vardec list;
     b_body: 'eq;
     b_loc: Location.t;
     mutable b_write: Defnames.defnames;
-    b_env: 'info Ident.Env.t;
+    mutable b_env: 'ienv Ident.Env.t;
   }
 
 (* state name of an automaton; possibly parameterized *)
 type statepatdesc =
-  | Estate0pat : Ident.t -> statepatdesc 
-  | Estate1pat : Ident.t * Ident.t list -> statepatdesc
+  | Estate0pat of Ident.t 
+  | Estate1pat of Ident.t * Ident.t list 
 
 type statepat = statepatdesc localized
 
 type 'exp state_desc =
-  | Estate0 : Ident.t -> 'exp state_desc
-  | Estate1 : Ident.t * 'exp list -> 'exp state_desc
-  | Estateif : 'exp * 'exp state * 'exp state -> 'exp state_desc
+  | Estate0 of Ident.t 
+  | Estate1 of Ident.t * 'exp list 
+  | Estateif of 'exp * 'exp state * 'exp state 
 
 and 'exp state = 'exp state_desc localized
 
 (* the body of a pattern matching *)
-type ('info, 'body) match_handler =
-  { m_pat : 'info pattern;
+type ('ienv, 'pattern, 'body) match_handler =
+  { m_pat : 'pattern;
     m_body: 'body;
     m_loc: Location.t;
     m_reset: bool; (* the handler is reset on entry *)
-    m_zero: bool; (* the handler is done at a zero-crossing instant *)
-    m_env: 'info Ident.Env.t;
+    mutable m_zero: bool; (* the handler is done at a zero-crossing instant *)
+    mutable m_env: 'ienv Ident.Env.t;
   }
 
 (* the body of a present handler *)
-type ('info, 'scondpat, 'body) present_handler =
+type ('ienv, 'scondpat, 'body) present_handler =
   { p_cond: 'scondpat;
     p_body: 'body;
     p_loc: Location.t;
-    p_env: 'info Ident.Env.t;
-    p_zero: bool;
+    mutable p_env: 'ienv Ident.Env.t;
+    mutable p_zero: bool;
   }
 
-type ('info, 'scondpat, 'exp, 'leq, 'body) escape =
+type ('ienv, 'scondpat, 'exp, 'leq, 'body) escape =
   { e_cond: 'scondpat;
     e_reset: bool;
     e_let: 'leq list;
     e_body: 'body;
     e_next_state: 'exp state;
     e_loc: Location.t;
-    e_env: 'info Ident.Env.t;
+    e_zero: bool;
+    mutable e_env: 'ienv Ident.Env.t;
   }
 
 type is_weak = bool
 
-(* sizes for arrays and bounded recursions - only multivariate polynomials *)
-type size = size_desc localized
-
-and size_desc =
-  | Sint : int -> size_desc
-  | Sfrac : { num: size; denom: int } -> size_desc
-  | Sident : Ident.t -> size_desc
-  | Splus: size * size -> size_desc
-  | Sminus : size * size -> size_desc
-  | Smult: size * size -> size_desc
-  
-type 'info exp =
-  { e_desc: 'info exp_desc; (* descriptor *)
+type ('info, 'ienv) exp =
+  { e_desc: ('info, 'ienv) exp_desc; (* descriptor *)
     e_loc: Location.t; (* location *)
-    e_info: 'info; (* information *)
+    mutable e_info: 'info; (* type information *)
   }
 
-and 'info exp_desc =
-  | Econst : immediate -> 'info exp_desc
-  | Econstr0 : { mutable lname: Lident.t } -> 'info exp_desc
-  | Econstr1 :
-      { mutable lname: Lident.t; arg_list: 'info exp list } -> 'info exp_desc
-  | Evar : Ident.t -> 'info exp_desc
-  | Eglobal :
-      { mutable lname : Lident.t } -> 'info exp_desc
-  | Elast : Ident.t -> 'info exp_desc
-  | Eop : operator * 'info exp list -> 'info exp_desc
-  | Etuple : 'info exp list -> 'info exp_desc
-  | Eapp : { is_inline: is_inline; f: 'info exp; arg_list: 'info exp list } -> 'info exp_desc
-  | Esizeapp : { f: 'info exp; size_list: size list } -> 'info exp_desc
-  | Elet : 'info leq * 'info exp -> 'info exp_desc
-  | Elocal : ('info, 'info exp, 'info eq) block * 'info exp -> 'info exp_desc
-  | Erecord_access : 'info exp record -> 'info exp_desc
-  | Erecord : 'info exp record list -> 'info exp_desc
-  | Erecord_with : 'info exp * 'info exp record list -> 'info exp_desc
-  | Etypeconstraint : 'info exp * type_expression -> 'info exp_desc
-  | Efun : 'info funexp -> 'info exp_desc
-  | Ematch : { mutable is_total : bool; e : 'info exp;
-               handlers : ('info, 'info exp) match_handler list } -> 
-      'info exp_desc
-  | Epresent :
-      { handlers : ('info, 'info scondpat, 'info exp) present_handler list;
-        default_opt : 'info exp default } -> 'info exp_desc
-  | Ereset : 'info exp * 'info exp -> 'info exp_desc
-  | Eassert : 'info exp -> 'info exp_desc
-  | Eforloop : ('info, 'info exp, 'info for_exp) forloop -> 'info exp_desc
+and ('info, 'ienv) exp_desc =
+  | Econst of immediate
+  | Econstr0 of { mutable lname : Lident.t }
+  | Econstr1 of
+      { mutable lname : Lident.t; arg_list: ('info, 'ienv) exp list }
+  | Evar of Ident.t
+  | Eglobal of
+      { mutable lname : Lident.t }
+  | Elast of last
+  | Eop of operator * ('info, 'ienv) exp list
+  | Etuple of ('info, 'ienv) exp list
+  | Eapp of { is_inline: is_inline; f: ('info, 'ienv) exp;
+              arg_list: ('info, 'ienv) exp list }
+  | Esizeapp of
+      { f: ('info, 'ienv) exp; size_list: size_expression list }
+  | Elet of ('info, 'ienv) leq * ('info, 'ienv) exp
+  | Elocal of ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) eq) block
+              * ('info, 'ienv) exp
+  | Erecord_access of ('info, 'ienv) exp record
+  | Erecord of ('info, 'ienv) exp record list
+  | Erecord_with of ('info, 'ienv) exp * ('info, 'ienv) exp record list
+  | Etypeconstraint of ('info, 'ienv) exp * type_expression 
+  | Efun of ('info, 'ienv) funexp 
+  | Ematch of { is_size: bool; (* is-it a match of a size expression? *)
+                mutable is_total : bool; (* the pattern matching is total *)
+                e : ('info, 'ienv) exp; (* expression to be matched *)
+                handlers : ('ienv, 'info pattern, ('info, 'ienv) exp)
+                             match_handler list } 
+  | Epresent of
+      { handlers : ('ienv, ('info, 'ienv) scondpat, ('info, 'ienv) exp)
+                     present_handler list;
+        default_opt : ('info, 'ienv) exp default } 
+  | Ereset of ('info, 'ienv) exp * ('info, 'ienv) exp 
+  | Eassert of ('info, 'ienv) assertion
+  | Eforloop of
+      ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) for_exp) forloop 
 
-and ('info, 'size, 'body) forloop =
+(* assertions *)
+and ('info, 'ienv) assertion =
+  { a_body: ('info, 'ienv) exp; (* the body of the assertion *)
+    (* an auxiliary mapping for hidden state variables; this appears only *)
+    (* in continuous-time models. It is empty in the surface language (Zelus) *)
+    (* and is generated during some of the rewriting steps *)
+    (* only useful for transparent assertions *)
+    mutable a_hidden_env: 'ienv Ident.Env.t;
+    mutable a_free_vars: Ident.S.t; (* its free variables in [a_body] *)
+  }
+
+and ('info, 'ienv, 'size, 'body) forloop =
   { for_size : 'size option;
-    for_kind : 'info for_kind;
+    for_kind : ('info, 'ienv) exp for_kind;
     for_index : Ident.t option;
-    for_input : 'info for_input_desc localized list;
+    for_input : ('info, 'ienv) exp for_input list;
     for_body : 'body;
     for_resume : bool; (* resume or restart *)
-    for_env : 'info Ident.Env.t;
+    mutable for_env : 'ienv Ident.Env.t; (* names (index and inputs) *)
   }
 
-(* result expression of a loop *)
-and 'info for_exp =
-  | Forexp : { exp : 'info exp; default : 'info exp option } -> 'info for_exp
-  (* [for[each|ward] ... do e done] *)
-  | Forreturns :
-      { returns : 'info exp for_vardec_desc localized list; (* return *)
-        body : ('info, 'info exp, 'info eq) block; (* body *)
-        r_env : 'info Ident.Env.t; (* environment *)
-      } -> 'info for_exp
-(* [for[each|ward] ... returns (...) local ... do eq ... done] *)
+and ('info, 'ienv) for_eq =
+  { for_out : ('info, 'ienv) for_out list; (* outputs *)
+    (* loop body *)
+    for_block : ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) eq) block; 
+    mutable for_out_env: 'ienv Ident.Env.t; (* names in output *)
+  }
 
-and 'exp for_vardec_desc =
+and 'exp for_kind =
+  | Kforeach
+  (* parallel loop *)
+  | Kforward of 'exp for_exit option 
+(* iteration during one instant. The argument is the stoping condition *)
+
+and 'exp for_exit = 
+  { for_exit : 'exp;
+    for_exit_kind : for_exit_kind }
+
+and for_exit_kind = | Ewhile | Euntil | Eunless
+
+(* result expression of a loop *)
+and ('info, 'ienv) for_exp =
+  | Forexp of { exp : ('info, 'ienv) exp; default : ('info, 'ienv) exp option } 
+  (* [for[each|ward] ... do e done] *)
+  | Forreturns of ('info, 'ienv) for_returns 
+
+and ('info, 'ienv) for_returns =
+  { r_returns : ('info, 'ienv) for_vardec list; (* return *)
+    r_block : ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) eq) block;
+    (* body *)
+    mutable r_env : 'ienv Ident.Env.t; (* environment for the return *)
+    (* [for[each|ward] ... returns (...) local ... do eq ... done] *)
+  }
+
+and ('info, 'ienv) for_vardec = ('info, 'ienv) for_vardec_desc localized
+
+and ('info, 'ienv) for_vardec_desc =
   { for_array : int; (* 0 means x; 1 means [|x|]; 2 means [|[| x|]|]; etc *)
-    for_vardec : 'exp vardec; (* [x [init e] [default e]] *)
+    for_vardec : ('info, ('info, 'ienv) exp) vardec;
+    (* [x [init e] [default e]] *)
   }
 
 and is_rec = bool
 
-and 'info leq =
-  { l_kind: vkind;
+and ('info, 'ienv) leq =
+  { mutable l_kind: vkind;
     l_rec: is_rec;
-    l_eq: 'info eq;
+    l_eq: ('info, 'ienv) eq;
     l_loc : Location.t;
-    l_env: 'info Ident.Env.t;
+    mutable l_env: 'ienv Ident.Env.t;
   }
 
-and 'info eq =
-  { eq_desc: 'info eq_desc; (* descriptor *)
+and ('info, 'ienv) eq =
+  { eq_desc: ('info, 'ienv) eq_desc; (* descriptor *)
     mutable eq_write: Defnames.defnames; (* set of defined variables *)
+    eq_index: int;
+    (* a unique index; used to build a partial order between eqs *)
+    eq_safe: bool; (* the equation calls a possibly unsafe computation *)
     eq_loc: Location.t; (* its location *)
   }
 
-and 'info eq_desc =
-  | EQeq : 'info pattern * 'info exp -> 'info eq_desc  (* [p = e] *)
+and ('info, 'ienv) eq_desc =
+  | EQeq of 'info pattern * ('info, 'ienv) exp (* [p = e] *)
   (* a size-parameterized expression [id <n1,...,nk> = e] *)
-  | EQsizefun : 'info sizefun -> 'info eq_desc
-  | EQder :
-      { id: Ident.t; e: 'info exp; e_opt: 'info exp option;
-        handlers: ('info, 'info scondpat, 'info exp) present_handler list }
-      -> 'info eq_desc  (* [der x = e [init e0] [reset z1 -> e1 | ...]] *)
-  | EQinit : Ident.t * 'info exp -> 'info eq_desc  (* [init x = e] *)
-  | EQemit : Ident.t * 'info exp option -> 'info eq_desc  (* [emit x [= e]] *)
+  | EQsizefun of ('info, 'ienv) sizefun 
+  | EQder of
+      { id: Ident.t; e: ('info, 'ienv) exp; e_opt: ('info, 'ienv) exp option;
+        handlers: ('ienv, ('info, 'ienv) scondpat, ('info, 'ienv) exp)
+                    present_handler list }
+    (* [der x = e [init e0] [reset z1 -> e1 | ...]] *)
+  | EQinit of Ident.t * ('info, 'ienv) exp (* [init x = e] *)
+  | EQemit of Ident.t * ('info, 'ienv) exp option (* [emit x [= e]] *)
   (* [if e then eq1 else eq2] *)
-  | EQif : { e: 'info exp; eq_true: 'info eq; eq_false: 'info eq } -> 
-      'info eq_desc 
-  | EQand : 'info eq list -> 'info eq_desc (* [eq1 and...and eqn] *)
-  | EQlocal : ('info, 'info exp, 'info eq) block -> 
-      'info eq_desc (* local x [...] do eq done *)
-  | EQlet : 'info leq * 'info eq -> 'info eq_desc (* let eq in eq *)
-  | EQreset : 'info eq * 'info exp -> 'info eq_desc (* [reset eq every e] *)
-  | EQautomaton :
+  | EQif of { e: ('info, 'ienv) exp;
+              eq_true: ('info, 'ienv) eq;
+              eq_false: ('info, 'ienv) eq } 
+  | EQand of { ordered: bool; eq_list: ('info, 'ienv) eq list } 
+  (* [eq1 and...and eqn] when [ordered], side effects must be done *)
+  (* in order, from left to right *)
+  | EQlocal of ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) eq) block
+  (* local x [...] do eq done *)
+  | EQlet of ('info, 'ienv) leq * ('info, 'ienv) eq (* let eq in eq *)
+  | EQreset of ('info, 'ienv) eq * ('info, 'ienv) exp (* [reset eq every e] *)
+  | EQautomaton of
       { is_weak : bool;
-        handlers : ('info,
-                    ('info, 'info exp, 'info eq) block) automaton_handler list;
-        state_opt : 'info exp state option } -> 'info eq_desc
-  | EQpresent :
-      { handlers : ('info, 'info scondpat, 'info eq) present_handler list;
-        default_opt : 'info eq default } -> 'info eq_desc
-  | EQmatch : { mutable is_total : bool; e : 'info exp;
-                handlers : ('info, 'info eq) match_handler list } -> 
-      'info eq_desc
-  | EQempty : 'info eq_desc
-  | EQassert : 'info exp -> 'info eq_desc
-  | EQforloop : ('info, 'info exp, 'info for_eq) forloop -> 'info eq_desc
+        handlers : ('info, 'ienv,
+                    ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) eq) block)
+                     automaton_handler list;
+        state_opt : ('info, 'ienv) exp state option } 
+  | EQpresent of
+      { handlers : ('ienv, ('info, 'ienv) scondpat, ('info, 'ienv) eq)
+                     present_handler list;
+        default_opt : ('info, 'ienv) eq default } 
+  | EQmatch of { is_size: bool; mutable is_total : bool; e : ('info, 'ienv) exp;
+                 handlers : ('ienv, 'info pattern, ('info, 'ienv) eq)
+                              match_handler list }
+  | EQempty
+  | EQassert of ('info, 'ienv) assertion
+  | EQforloop of
+      ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) for_eq) forloop 
 (* [foreach [e]* [id in e [by e],]* returns (vardec_list) do eq] *)
 (* [forward [resume] [e]* [id in e [by e],]* returns (vardec_list) *)
 (*  do eq [while/unless/until e] e done]  *)
 
-and 'info for_eq =
-  { for_out : 'info for_out_desc localized list;
-    for_block : ('info, 'info exp, 'info eq) block; (* loop body *)
-  }
-
-and 'info for_kind =
-  | Kforeach : 'info for_kind
-  (* parallel loop *)
-  | Kforward : 'info for_exit option -> 'info for_kind
-(* iteration during one instant. The argument is the stoping condition *)
-
-and 'info for_exit = 
-  { for_exit : 'info exp;
-    for_exit_kind : for_exit_kind }
-
-and for_exit_kind = 
-  | Ewhile | Euntil | Eunless
-
 (* input definition for a loop *)
-and 'info for_input_desc =
+and 'exp for_input = 'exp for_input_desc localized
+
+and 'exp for_input_desc =
   (* xi in e1 [by e2], that is, xi = e1.(i * e2) *)
-  | Einput : { id: Ident.t; e : 'info exp; by : 'info exp option } -> 
-      'info for_input_desc
+  | Einput of { id: Ident.t; e : 'exp; by : 'exp option } 
   (* [i in e1 to e2] or [i in e1 downto e2]; [e1] and [e2] must be sizes *)
-  | Eindex :
-      { id: Ident.t; e_left: 'info exp; e_right : 'info exp; dir: bool } -> 
-      'info for_input_desc
+  | Eindex of
+      { id: Ident.t; e_left: 'exp; e_right : 'exp; dir: bool } 
 
 (* output of a for loop in equational form *)
-and 'info for_out_desc =
+and ('info, 'ienv) for_out = ('info, 'ienv) for_out_desc localized
+
+and ('info, 'ienv) for_out_desc =
   { for_name : Ident.t; (* xi [init e] [default e] [out x] *)
     for_out_name : Ident.t option; (* [xi out x] *)
-    for_init : 'info exp option;
-    for_default : 'info exp option;
+    for_init : ('info, 'ienv) exp option;
+    for_default : ('info, 'ienv) exp option;
+    mutable for_info: 'info; (* type information *)
   }
 
 (* signal patterns *)
-and 'info scondpat = 'info scondpat_desc localized
+and ('info, 'ienv) scondpat = ('info, 'ienv) scondpat_desc localized
 
-and 'info scondpat_desc =
-  | Econdand : 'info scondpat * 'info scondpat -> 'info scondpat_desc
-  | Econdor : 'info scondpat * 'info scondpat -> 'info scondpat_desc
-  | Econdexp : 'info exp -> 'info scondpat_desc
-  | Econdpat : 'info exp * 'info pattern -> 'info scondpat_desc
-  | Econdon : 'info scondpat * 'info exp -> 'info scondpat_desc
+and ('info, 'ienv) scondpat_desc =
+  | Econdand of ('info, 'ienv) scondpat * ('info, 'ienv) scondpat 
+  | Econdor of ('info, 'ienv) scondpat * ('info, 'ienv) scondpat 
+  | Econdexp of ('info, 'ienv) exp
+  | Econdpat of ('info, 'ienv) exp * 'info pattern 
+  | Econdon of ('info, 'ienv) scondpat * ('info, 'ienv) exp 
 
-and ('info, 'body) automaton_handler =
+and ('info, 'ienv, 'body) automaton_handler =
   { s_state: statepat;
-    s_let: 'info leq list;
+    s_let: ('info, 'ienv) leq list;
     s_body: 'body;
-    s_trans: ('info, 'info scondpat, 'info exp, 'info leq, 'body) escape list;
+    s_trans: ('ienv, ('info, 'ienv) scondpat, ('info, 'ienv) exp,
+              ('info, 'ienv) leq, 'body) escape list;
     s_loc: Location.t;
     mutable s_reset: bool; (* is the state always entered by reset? *)
-    s_env: 'info Ident.Env.t; (* env. for parameter names in [s_state] *) 
+    mutable s_env: 'ienv Ident.Env.t;
+    (* env. for parameter names in [s_state] *) 
   }
 
-and 'a default =
-  | Init : 'a -> 'a default | Else : 'a -> 'a default | NoDefault
+and 'a default = | Init of 'a | Else of 'a | NoDefault
 
 and is_atomic = bool
 
-and 'info funexp =
+and ('info, 'ienv) funexp =
   { f_vkind: vkind; (* the kind of arguments *)
     f_kind: kind; (* the kind of the body *)
     f_atomic: is_atomic; (* when true, outputs depend strictly on all inputs *)
-    f_args: 'info arg list; (* list of arguments *)
-    f_body: 'info result;
+    f_inline: is_inline; (* when true, the function application is inlined *)
+    f_args: ('info, 'ienv) arg list; (* list of arguments *)
+    f_body: ('info, 'ienv) result;
     f_loc: Location.t;
-    f_env: 'info Ident.Env.t;
+    mutable f_env: 'ienv Ident.Env.t; (* the environment for input variables *)
+    (* an auxiliary mapping for hidden state variables; this appears only *)
+    (* in continuous-time models. It is empty in the surface language (Zelus) *)
+    (* and is generated during some of the rewriting steps *)
+    mutable f_hidden_env: 'ienv Ident.Env.t;
   }
 
-and 'info sizefun =
+and ('info, 'ienv) sizefun =
   { sf_id: Ident.t;
     sf_id_list: Ident.t list;
-    sf_e : 'info exp;
+    sf_e : ('info, 'ienv) exp;
     sf_loc: Location.t;
-    sf_env: 'info Ident.Env.t;
+    mutable sf_env: 'ienv Ident.Env.t;
   }
 
-and 'info arg = 'info exp vardec list
+and ('info, 'ienv) arg = ('info, ('info, 'ienv) exp) vardec list
 
-and 'info result =
-  { r_desc: 'info result_desc;
-    r_loc: Location. t }
+and ('info, 'ienv) result =
+  { r_desc: ('info, 'ienv) result_desc;
+    r_loc: Location.t;
+    mutable r_info: 'info }
 
-and 'info result_desc =
-  | Exp: 'info exp -> 'info result_desc
-  | Returns: ('info, 'info exp, 'info eq) block -> 'info result_desc
+and ('info, 'ienv) result_desc =
+  | Exp of ('info, 'ienv) exp 
+  | Returns of ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) eq) block
 
 
 (** Declarations *)
 type interface = interface_desc localized
 
 and interface_desc =
-  | Einter_open : name -> interface_desc
-  | Einter_typedecl :
-      { name: name; ty_params: name list; size_params: name list;
-        ty_decl: type_decl } -> interface_desc
-  | Einter_constdecl :
+  | Einter_open of name 
+  | Einter_typedecl of
+      { name: name; ty_params: name list; ty_decl: type_decl } 
+  | Einter_constdecl of
       { name: name; const: bool; ty: type_expression; info: name list }
-      -> interface_desc
 
 and type_decl = type_decl_desc localized
 
 and type_decl_desc =
-  | Eabstract_type : type_decl_desc
-  | Eabbrev : type_expression -> type_decl_desc
-  | Evariant_type : constr_decl list -> type_decl_desc
-  | Erecord_type : (name * type_expression) list -> type_decl_desc
+  | Eabstract_type
+  | Eabbrev of type_expression 
+  | Evariant_type of constr_decl list 
+  | Erecord_type of (name * type_expression) list
 
 and constr_decl = constr_decl_desc localized
 
 and constr_decl_desc =
-  | Econstr0decl : name -> constr_decl_desc
-  | Econstr1decl : name * type_expression list -> constr_decl_desc
+  | Econstr0decl of name 
+  | Econstr1decl of name * type_expression list 
 
-type 'info implementation = 'info implementation_desc localized
+type ('info, 'ienv) implementation = ('info, 'ienv) implementation_desc localized
 
-and 'info implementation_desc =
-  | Eopen : name -> 'info implementation_desc
+and ('info, 'ienv) implementation_desc =
+  | Eopen of name 
   (* names defined globally and equations *)
-  | Eletdecl : { d_names: (name * Ident.t) list; d_leq: 'info leq } -> 
-      'info implementation_desc
-  | Etypedecl :
-      { name: name; ty_params: name list; size_params: name list;
-        ty_decl: type_decl } -> 'info implementation_desc
+  | Eletdecl of { d_names: (name * Ident.t) list; d_leq: ('info, 'ienv) leq } 
+  | Etypedecl of
+      { name: name; ty_params: name list;  ty_decl: type_decl } 
 
-type 'info program = 
-  { p_impl_list : 'info implementation list;
+type ('info, 'ienv) program = 
+  { p_impl_list : ('info, 'ienv) implementation list;
     p_index : Ident.num }
 

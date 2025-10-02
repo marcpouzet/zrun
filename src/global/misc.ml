@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2023 Inria Paris                                          *)
+(*  (c) 2020-2025 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -44,6 +44,7 @@ let show_version () =
   Printf.printf "\n";
   ()
 
+
 let verbose = ref false
 let vverbose = ref false
 let debug = ref false
@@ -77,7 +78,8 @@ let number_of_fixpoint_iterations = ref 0
 let print_number_of_fixpoint_iterations = ref false
 let incr_number_of_fixpoint_iterations n =
   number_of_fixpoint_iterations := !number_of_fixpoint_iterations + n
-let reset_number_of_fixpoint_iterations () = number_of_fixpoint_iterations := 0
+let reset_number_of_fixpoint_iterations () = 
+  number_of_fixpoint_iterations := 0
                     
 (* remove the check of assertions during evaluation *)
 let no_assert = ref false
@@ -85,12 +87,25 @@ let no_assert = ref false
 (* remove the check that fix-point equation produce non bottom values *)
 let no_causality = ref false
 
-(* sets the interpretation of the if/then/else to Esterel *)
-let esterel = ref false
-
-(* sets the interpretation of the if/then/else to Lustre *)
+(* sets the interpretation of the if/then/else to be strict w.r.t the first argument *)
+(* this is how the if/then/else is interpreted in Lustre *)
+(* if v1 then v2 else v3 = bot if (v1 = bot) or (v2 = bot) or (v3 = bot) *)
 let lustre = ref false
 
-(* no information associated to expressions *)
-type no_info = unit
-let no_info: no_info = ()
+(* the default mode for the conditional is lazy w.r.t the first argument *)
+(* if v1 then v2 else v3 = bot if v1 = bot *)
+let lazy_ifthenelse = ref false
+
+(* sets the interpretation of the if/then/else to be such that *)
+(* if _ then v1 else v2 = v1 if v1 = v2 *)
+(* this is used to implement the constructive causality of Esterel *)
+let esterel = ref false
+
+(* static reduction *)
+let static_reduction = ref false
+
+let apply_with_close_out f o =
+  try
+    f o;
+    close_out o
+  with x -> close_out o; raise x
