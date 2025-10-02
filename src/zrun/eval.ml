@@ -63,6 +63,7 @@ let do_step comment output step input =
 (* Evaluate all the definition in a file, store values *)
 let main modname filename n_steps is_all l_names =
   let open Genv in
+  let ff = Format.std_formatter in
   (* output file in which values are stored *)
   let obj_name = filename ^ ".zlo" in
   let otc = open_out_bin obj_name in
@@ -97,3 +98,4 @@ let main modname filename n_steps is_all l_names =
   (* evaluate a list of main function/nodes *)
   if is_all then Coiteration.all ff n_steps (Genv.current genv)
   else Coiteration.eval_list ff n_steps genv l_names
+
