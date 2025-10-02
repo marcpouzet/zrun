@@ -2405,7 +2405,7 @@ and apply loc fv v_list =
        else
          return
            (Value(Vfun
-                    { f_arity = actual_arity - f_arity;
+                    { f_arity = f_arity - actual_arity;
                       f_no_input = false;
                       f_fun = fun v_list_extra ->
                               f_fun (v_list @ v_list_extra) }))
