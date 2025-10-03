@@ -1,3 +1,7 @@
-let main45() returns (o)
-  let m = foreach(15) returns ([|xi|]) do xi = false done in
-  do o = m done
+(* recursive functions defined at top level *)
+let rec f<<n>>(x) returns o
+  match size n with
+  | 0 -> do o = x done
+  | _ -> do o = f<<n-1>>(x+1) done
+  
+let main () = f<<20>> (0)
