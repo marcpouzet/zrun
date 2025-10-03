@@ -2535,10 +2535,13 @@ let eval_n n_steps init step v_list =
 
 let eval_node loc output n_steps { n_init; n_step } v  =
   let step s v =
+    Debug.reset_total_number_of_iterations_in_fixpoints ();
     Debug.print_state "State before:" s;
     let* v, s = n_step s v in
     Debug.print_state "State after:" s;
-    output v; return s in
+    output v;
+    Debug.print_total_number_of_iterations_in_fixpoints ();
+    return s in
   eval_n n_steps n_init step v
 
 let print ff (v1, v2) =
@@ -2578,9 +2581,11 @@ let eval ff n_steps name v =
        "@[val %s() for %d steps is: @.@]" name n_steps;
      eval_node Location.no_location (Output.value_flush ff) n_steps si void
   | Vfun { f_no_input = true; f_fun } ->
+     Debug.reset_total_number_of_iterations_in_fixpoints ();
      let v = catch (f_fun [void]) in
      Format.fprintf ff
-       "@[val %s() for one step is %a@.@]" name Output.value v
+       "@[val %s() for one step is %a@.@]" name Output.value v;
+     Debug.print_total_number_of_iterations_in_fixpoints ()
   | _ ->
      Format.fprintf ff "@[val %s = %a@.@]" name Output.pvalue v
 

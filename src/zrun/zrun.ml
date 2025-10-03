@@ -36,8 +36,8 @@ let doc_debug = "\t Set debug mode"
 let doc_no_assert = "\tNo check of assertions"
 let doc_nocausality = "\tTurn off the check that all variables are non bottom"
 let doc_print_values = "\tPrint values"
-let doc_number_of_fixpoint_iterations =
-  "\tPrint the number of steps for fixpoints"
+let doc_total_number_of_iterations_in_fixpoints =
+  "\tPrint the number of iterations in fixpoints"
 let doc_esterel =
   "\tSets the interpretation of if/then/else to be constructive"
 let doc_lustre =
@@ -67,8 +67,8 @@ let main () =
            "-print", Arg.Set Misc.print_values, doc_print_values;
            "-noassert", Arg.Set Misc.no_assert, doc_no_assert;
            "-nocausality", Arg.Set Misc.no_causality, doc_nocausality;
-           "-fix", Arg.Set Misc.print_number_of_fixpoint_iterations,
-           doc_number_of_fixpoint_iterations;
+           "-fix", Arg.Set Misc.compute_total_number_of_iterations_in_fixpoints,
+           doc_total_number_of_iterations_in_fixpoints;
            "-esterel", Arg.Set Misc.esterel, doc_esterel;
            "-lustre", Arg.Set Misc.lustre, doc_lustre;
       ])

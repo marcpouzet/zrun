@@ -74,12 +74,13 @@ let print_values = ref false
 let number_of_steps = ref 0
 let set_number_of_steps n = number_of_steps := n
 
-let number_of_fixpoint_iterations = ref 0
-let print_number_of_fixpoint_iterations = ref false
-let incr_number_of_fixpoint_iterations n =
-  number_of_fixpoint_iterations := !number_of_fixpoint_iterations + n
-let reset_number_of_fixpoint_iterations () = 
-  number_of_fixpoint_iterations := 0
+let total_number_of_iterations_in_fixpoints = ref 0
+let compute_total_number_of_iterations_in_fixpoints = ref false
+let incr_total_number_of_iterations_in_fixpoints n =
+  total_number_of_iterations_in_fixpoints :=
+    !total_number_of_iterations_in_fixpoints + n
+let reset_total_number_of_iterations_in_fixpoints () = 
+  total_number_of_iterations_in_fixpoints := 0
                     
 (* remove the check of assertions during evaluation *)
 let no_assert = ref false
