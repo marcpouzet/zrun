@@ -22,8 +22,8 @@ let h = 0.1
 (* This is not a problem in an interpreter. This program executes with *)
 (* no deadlock *)
 let node sin_cos() returns (sin, cos)
-  do sin = euler_forward(h, 0.0, cos)
-  and cos = euler_forward(h, 1.0, -. sin) done
+  do sin = euler_backward(h, 0.0, cos)
+  and cos = euler_backward(h, 1.0, -. sin) done
 
 (* Note that if euler_forward is used twice, then, the assertion fails! This *)
 (* is because floatting point errors do not compensate with each others. *)
@@ -31,7 +31,7 @@ let node sin_cos() returns (sin, cos)
 (* loop (a causality loop) and zrun complains with a run-time errors *)
 (* Said diffently, there should be at least a pre and at most one *)
 
-let b = 0.1
+let b = 0.06
 
 let node main() returns
     (sin_val, sin_ref, cos_val, cos_ref, diff_sin, diff_cos)
@@ -44,5 +44,10 @@ let node main() returns
   and diff_cos = abs_float (cos_val -. cos_ref)
   and assert (diff_sin <= b) && (diff_cos <= b)
   done
-  
-	
+
+let node main2() returns (sin_val, cos_val, distance)
+  do (sin_val, cos_val) = sin_cos()
+  and distance = sin_val *. sin_val +. cos_val *. cos_val -. 1.0
+  and assert (abs_float(distance) <= b)
+  done
+
