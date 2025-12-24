@@ -41,7 +41,10 @@
 *)
 
 (* Surprisingly, this example is causal using the simple lazy mux, that is,
- *- a simple sequential version of the or and of the && ! *)
+ *- a simple sequential version of the or and of the && ! This is because
+ *- [token_in] is the output of a unit delay, hence looking at its output
+ *- first is enough
+*)
 
 
 let node sequential_and_gate(x,y) returns (z)
