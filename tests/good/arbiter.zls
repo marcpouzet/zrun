@@ -1,15 +1,48 @@
-(* The example of a cyclic token ring arbiter from Robert de Simone (mentionned in
- *- the Esterel primer V5, Berry). Used as an example to illustrate the
- *- fixpoint semantics presented in the paper:
- *- The semantics and execution of a synchronous block-diagram language,
- *- Stephen Edwards and Edward Lee, SCP, 2003 *)
+(* The example of a cyclic token ring arbiter from Robert de Simone *)
+(*- this is an example originaly written in Esterel that is described
+ *- in the Esterel primer V5, by Gerard Berry 
+ *- This example is used to illustrate the "constructive semantics" 
+ *- of Esterel when interpreting an Esterel program as a circuit and 
+ *- using a three-value logic for boolean operations (or, &&) 
+ *- This example is written in a data-flow form in the paper:
+ *- "The semantics and execution of a synchronous block-diagram language",
+ *- by Stephen Edwards and Edward Lee, SCP, 2003
+ *- it is used to illustrate the fix-point semantics given in their paper *)
 
-(* The semantics we have defined is Kahnian. In particular, *)
-(* all imported functions are strict, i.e., if one of the xi in *)
-(* f(x1,...,xn)) is bot, then the result is also bot. *)
-(* This is also true for boolean functions: it is not possible to have *)
-(* or(true, _) = or(_, true) = true nor &(false, _) = &(_, false) *)
-(* even when _ is bot. *)
+(* The program, written here in the syntax of Zelus, is the direct
+ *- transcription of the Edwards and Lee's version.
+ *- Note that, in the ZRun interpreter, all imported functions are strict,
+ *- that is, if f is an imported combinational function, f(e1,...,en)
+ *- evaluates to bottom as soon as one of the ei evaluates to bottom.
+ *- in particular if f is a boolean function (e.g., not, or, &&). *)
+ 
+(* By default, the semantics for the mux [if/then/else] is lazy, i.e.,
+ *- it is strict w.r.t the condition only, that is:
+ *- if_lazy(bot, _, _) = bot
+ *- if_lazy(true, x, _) = x
+ *- if_lazy(false, _, y) = y *)
+
+(* The arbiter.zls is not causal. It would be causal if boolean
+ *- operation were interpreted in three-valued logic:
+ *- true or _ = _ or true = true
+ *- false && _ = _ && false = false
+ *- x && y = x && y = if x then y else false
+ *- x or y = y or x = if x then true else y
+*)
+
+(* To achieve that, replace [or] and [&&] by user-defined versions such that
+ *- or(x, y) = if x then true else y
+ *- &&(x, y) = if x then y else false
+ *-
+ *- and take the -esterel option such that the semantics of the mux is:
+ *-
+ *- if _ then x else x = x
+ *- if x then y else z = if_lazy(x, y, z)
+*)
+
+(* Surprisingly, this example is causal using the simple lazy mux, that is,
+ *- a simple sequential version of the or and of the && ! *)
+
 
 let node sequential_and_gate(x,y) returns (z)
     if x then z = y else z = false
