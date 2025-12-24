@@ -74,12 +74,13 @@ let print_values = ref false
 let number_of_steps = ref 0
 let set_number_of_steps n = number_of_steps := n
 
-let number_of_fixpoint_iterations = ref 0
-let print_number_of_fixpoint_iterations = ref false
-let incr_number_of_fixpoint_iterations n =
-  number_of_fixpoint_iterations := !number_of_fixpoint_iterations + n
-let reset_number_of_fixpoint_iterations () = 
-  number_of_fixpoint_iterations := 0
+let total_number_of_iterations_in_fixpoints = ref 0
+let compute_total_number_of_iterations_in_fixpoints = ref false
+let incr_total_number_of_iterations_in_fixpoints n =
+  total_number_of_iterations_in_fixpoints :=
+    !total_number_of_iterations_in_fixpoints + n
+let reset_total_number_of_iterations_in_fixpoints () = 
+  total_number_of_iterations_in_fixpoints := 0
                     
 (* remove the check of assertions during evaluation *)
 let no_assert = ref false
@@ -91,10 +92,6 @@ let no_causality = ref false
 (* this is how the if/then/else is interpreted in Lustre *)
 (* if v1 then v2 else v3 = bot if (v1 = bot) or (v2 = bot) or (v3 = bot) *)
 let lustre = ref false
-
-(* the default mode for the conditional is lazy w.r.t the first argument *)
-(* if v1 then v2 else v3 = bot if v1 = bot *)
-let lazy_ifthenelse = ref false
 
 (* sets the interpretation of the if/then/else to be such that *)
 (* if _ then v1 else v2 = v1 if v1 = v2 *)

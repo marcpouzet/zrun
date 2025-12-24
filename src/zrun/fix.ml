@@ -163,6 +163,7 @@ let eq genv env sem eq n s_eq bot =
     return ((Env.empty, env_eq), s_eq) in
   let* m, (_, env_eq), s_eq = 
     fixpoint eq.eq_loc n stop sem s_eq bot in
+  Debug.incr_total_number_of_iterations_in_fixpoints m;
   return (env_eq, s_eq)
 
 (* bounded fixpoint (at most [n]) for a local declaration. Equality *)
@@ -184,6 +185,7 @@ let local genv env sem eq n s_eq bot_x =
   Debug.print_ienv "Before fixpoint: bot_x = " bot_x;
   let* m, (env_eq_not_x, env_eq_x), s_eq = 
     fixpoint eq.eq_loc n stop sem s_eq bot_x in
+  Debug.incr_total_number_of_iterations_in_fixpoints m;
   Debug.print_ienv "After fixpoint: env_eq_not_x = " env_eq_not_x;
   Debug.print_ienv "After fixpoint: env_eq_x = " env_eq_x;  
   Debug.print_state "After fixpoint: state = " s_eq;

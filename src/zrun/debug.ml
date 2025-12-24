@@ -49,10 +49,21 @@ let print_state comment s =
 let print_program p =
   if !verbose then Printer.program Format.err_formatter p
 
+let incr_total_number_of_iterations_in_fixpoints n =
+  if !Misc.compute_total_number_of_iterations_in_fixpoints
+  then Misc.incr_total_number_of_iterations_in_fixpoints n
+let reset_total_number_of_iterations_in_fixpoints () =
+  if !Misc.compute_total_number_of_iterations_in_fixpoints
+  then Misc.reset_total_number_of_iterations_in_fixpoints ()
+let print_total_number_of_iterations_in_fixpoints () =
+  if !Misc.compute_total_number_of_iterations_in_fixpoints then
+    Format.eprintf
+      "The total number of iterations for fixpoint computation is: %d\n"
+      !Misc.total_number_of_iterations_in_fixpoints 
+
 let print_nothing _ = ()
 
 let counter = ref 0
-
+let init_counter() = counter := 0
 let incr_counter() = counter := !counter + 1
-
 let print_counter() = Format.eprintf "Counter = %d\n" !counter
