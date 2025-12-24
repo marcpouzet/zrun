@@ -53,6 +53,18 @@ let is_float v =
   match v with
   | Vfloat(i) -> return i | _ -> None
 
+let is_string v =
+  match v with
+  | Vstring(i) -> return i | _ -> None
+
+let is_char v =
+  match v with
+  | Vchar(i) -> return i | _ -> None
+
+let is_void v =
+  match v with
+  | Vvoid -> return () | _ -> None
+
 let is_vfloat v =
   match v with
   | Value(Vfloat(i)) -> return i | _ -> None
@@ -181,6 +193,20 @@ let length_op v =
   match v with
   | Varray(a) -> return (Vint(length a))
   | _ -> none
+
+(* warning: the following primitives are imperative; the semantics *)
+(* does not work correctly when operations have side effect. *)
+(* Experimental; use it carrefully *)
+let do_app is_t print v =
+  let* v = is_t v in
+  print v;
+  return Vvoid
+
+let print_int v = do_app is_int print_int v
+let print_float v = do_app is_float print_float v
+let print_string v = do_app is_string print_string v
+let print_char v = do_app is_char print_char v
+let print_newline v = do_app is_void print_newline v
 
 let rec compare_list compare p_list1 p_list2 =
   match p_list1, p_list2 with
@@ -508,7 +534,12 @@ let list_of_primitives () =
    ">", binop gt_op;
    "<=", binop lte_op;
    ">=", binop gte_op;
-   "length", unop length_op]
+   "length", unop length_op;
+   "print_int", unop print_int;
+   "print_float", unop print_float;
+   "print_string", unop print_string;
+   "print_char", unop print_char;
+   "print_newline", unop print_newline]
 
 let list_of_random_primitives () =
   ["random_bool", zerop random_bool_op;
