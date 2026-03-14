@@ -41,6 +41,7 @@ type type_expression = type_expression_desc localized
 
 and type_expression_desc =
   | Etypevar : name -> type_expression_desc
+  | Etypewildcard : type_expression_desc
   | Etypeconstr : longname * type_expression list -> type_expression_desc
   | Etypetuple : type_expression list -> type_expression_desc
   | Etypefun : kind * name option * type_expression * type_expression ->
@@ -105,7 +106,7 @@ and array_operator =
   (* [e.(e)] *)
   | Eget_with_default : array_operator
   (* [e.(e) default e] *)
-  | Eslice : array_operator
+  | Eslice : slice -> array_operator
   (* [e.(e..e)] *)
   | Eupdate : array_operator
   (* [| e with (e1,...,en) <- e |] *)
@@ -117,6 +118,11 @@ and array_operator =
   (* [reverse e] *)
   | Emake : array_operator
   (* [e^e] *)
+
+and slice =
+  | Slice_both
+  | Slice_left
+  | Slice_right
 
 and is_inline = bool
 

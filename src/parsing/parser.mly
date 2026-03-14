@@ -1030,7 +1030,13 @@ simple_expression_desc:
       { Eop(Earray(Eget), [e1; e2]) }
   | e = simple_expression DOT
       LPAREN e1 = expression DOTDOT e2 = expression RPAREN
-      { Eop(Earray(Eslice), [e; e1; e2]) }
+      { Eop(Earray(Eslice(Slice_both)), [e; e1; e2]) }
+  | e = simple_expression DOT
+      LPAREN e1 = expression DOTDOT RPAREN
+      { Eop(Earray(Eslice(Slice_left)), [e; e1]) }
+  | e = simple_expression DOT
+      LPAREN DOTDOT e2 = expression RPAREN
+      { Eop(Earray(Eslice(Slice_right)), [e; e2]) }
 ;
 
 /* size expression list */
@@ -1057,6 +1063,8 @@ size_expression_desc:
     { Size_op(Size_minus, e1, e2) }
   | e1 = size_expression STAR e2 = size_expression
     { Size_op(Size_mult, e1, e2) }
+  | LPAREN i = size_expression_desc RPAREN
+    { i }
 ;
 
 /* [| e with e1,...,en <- e' |] */
@@ -1458,6 +1466,8 @@ type_expression:
 simple_type:
   | t = type_var
       { make (Etypevar t) $startpos $endpos }
+  | UNDERSCORE
+    { make (Etypewildcard) $startpos $endpos }
   | i = ext_ident
       { make (Etypeconstr(i, [])) $startpos $endpos }
   | t = simple_type i = ext_ident

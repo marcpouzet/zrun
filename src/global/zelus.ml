@@ -40,7 +40,8 @@ and tkind =
 type type_expression = type_expression_desc localized
 
 and type_expression_desc =
-  | Etypevar of name
+  | Etypevar of name (* 'a *)
+  | Etypewildcard (* _ *)
   | Etypeconstr of Lident.t * type_expression list
   | Etypetuple of type_expression list
   | Etypefun of
@@ -118,7 +119,7 @@ and array_operator =
   (* [e.(e)] *)
   | Eget_with_default 
   (* [e.(e) default e] *)
-  | Eslice 
+  | Eslice of slice
   (* [e.(e .. e)] *)
   | Eupdate 
   (* [| e with e <- e |] *)
@@ -130,6 +131,11 @@ and array_operator =
   (* [e.R] *)
   | Emake
   (* [e^e] *)
+
+and slice =
+  | Slice_both
+  | Slice_left
+  | Slice_right
 
 and is_inline = bool
 

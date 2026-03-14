@@ -165,7 +165,12 @@ module Make (Info: INFO) =
       | Eget -> Zelus.Eget
       | Eupdate -> Zelus.Eupdate
       | Eget_with_default -> Zelus.Eget_with_default
-      | Eslice -> Zelus.Eslice
+      | Eslice(slice) ->
+         let slice =
+           match slice with
+           | Slice_both -> Zelus.Slice_both | Slice_left -> Zelus.Slice_left
+           | Slice_right -> Zelus.Slice_right in
+         Zelus.Eslice(slice)
       | Econcat -> Zelus.Econcat
       | Earray_list -> Zelus.Earray_list
       | Etranspose -> Zelus.Etranspose
@@ -177,6 +182,7 @@ module Make (Info: INFO) =
     let rec types env { desc; loc } =
       let desc = match desc with
         | Etypevar(n) -> Zelus.Etypevar(n)
+        | Etypewildcard -> Zelus.Etypewildcard
         | Etypetuple(ty_list) -> Zelus.Etypetuple(List.map (types env) ty_list)
         | Etypeconstr(lname, ty_list) ->
            Zelus.Etypeconstr(longname lname, List.map (types env) ty_list)

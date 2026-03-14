@@ -108,6 +108,7 @@ module Make (Info: INFO) =
     let rec ptype ff { desc } =
       match desc with
       | Etypevar(s) -> fprintf ff "'%s" s
+      | Etypewildcard -> fprintf ff "_"
       | Etypeconstr(ln, ty_list) ->
          fprintf ff "@[<hov2>%a@,%a@]"
            (print_list_r_empty ptype "("","")") ty_list type_longname ln
@@ -127,6 +128,11 @@ module Make (Info: INFO) =
                | Kdiscrete -> "-D->" | Kcont -> "-C->") in
          fprintf ff "@[<hov2>%a %s %a@]" pas (ty_name_opt, ty_arg) s ptype ty_res
       | Etypevec(ty, s) -> fprintf ff "@[[%a]]%a@]" size s ptype ty
+
+    let opt_ptype ff ty_opt =
+      match ty_opt with
+      | None -> ()
+      | Some(ty) -> fprintf ff ":%a" ptype ty
     
     let print_type_params ff pl =
       print_list_r_empty (fun ff s -> fprintf ff "'%s" s) "("","") " ff pl
@@ -174,10 +180,11 @@ module Make (Info: INFO) =
     
     let vardec exp ff
           { var_name = x; var_default = d_opt; var_init = i_opt; var_is_last; 
-            var_init_in_eq } =
-      fprintf ff "@[%s%a%a%a%s@]" 
+            var_init_in_eq; var_typeconstraint } =
+      fprintf ff "@[%s%a%a%a%a%s@]" 
         (if var_is_last then "last " else "")
-        name x (init exp) i_opt (default exp) d_opt
+        name x opt_ptype var_typeconstraint
+        (init exp) i_opt (default exp) d_opt
         (if var_init_in_eq then " init ..." else "")
     
     let vardec_list exp ff vardec_list =
@@ -490,9 +497,18 @@ module Make (Info: INFO) =
       | Eget_with_default, [e1; e2; e3] ->
          fprintf ff "@[<hov2>%a.(%a)@ default@ %a@]" 
            expression e1 expression e2 expression e3
-      | Eslice, [e1; e2; e3] ->
-         fprintf ff "@[<hov2>%a.@,(%a@ ..@ %a)@]" 
-           expression e1 expression e2 expression e3
+      | Eslice(slice), e_list ->
+         (match slice, e_list with
+          | Slice_both, [e1; e2; e3] ->
+             fprintf ff "@[<hov2>%a.@,(%a@ ..@ %a)@]" 
+               expression e1 expression e2 expression e3
+          | Slice_left, [e1; e2] ->
+             fprintf ff "@[<hov2>%a.@,(%a@ ..)@]" 
+               expression e1 expression e2
+          | Slice_right, [e1; e2] ->
+             fprintf ff "@[<hov2>%a.@,(..@ %a)@]" 
+               expression e1 expression e2
+          | _ -> assert false)
       | Eupdate, (e1 :: e2 :: i_list) ->
          (* [| e1 with i_list <- e2 |] *)
          fprintf ff "@[<hov 2>[|%a with@, %a <- %a|]@]"
