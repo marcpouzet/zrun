@@ -104,7 +104,32 @@ let node arbiter_three(request1, request2, request3)
        arbiter(false, request3, pass_out2, token_out2)
   done
 
-let node main() returns (grant1, grant2, grant3) 
+(* the property. No matter is the values for inputs *)
+(* [request1, request2, request3], [grant1, grant2, grant3] are *)
+(* never true at the same time *)
+let safe (request1, request2, request3,
+          grant1, grant2, grant3) returns (ok)
+  ok = match grant1, grant2, grant3 with
+       | (true, true, _) -> false
+       | (false, true, true) -> false
+       | _ -> true
+
+let node main() returns (request1, request2, request3)
+  local grant1, grant2, grant3
+  do
+    request1 = random_bool()
+  and
+    request2 = random_bool()
+  and
+    request3 = random_bool()
+  and
+    grant1, grant2, grant3 =  arbiter_three(request1, request2, request3)
+  and
+    assert safe(request1, request2, request3,
+                grant1, grant2, grant3)
+  done
+  
+let node main1() returns (grant1, grant2, grant3) 
   local request1, request2, request3
   do
     request1 = true
