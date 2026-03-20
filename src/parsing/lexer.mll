@@ -149,11 +149,11 @@ let char_for_decimal_code lexbuf i =
 
 rule main = parse 
   | [' ' '\010' '\013' '\009' '\012'] +   { main lexbuf }
-  | "."  { DOT }
   | ".."  { DOTDOT }
   | ".T" { TRANSPOSE }
   | ".R" { REVERSE }
   | ".F" { FLATTEN }
+  | "."  { DOT }
   | "("  { LPAREN }
   | ")"  { RPAREN }
   | "["  { LBRACKET }

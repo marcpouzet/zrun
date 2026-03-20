@@ -73,17 +73,17 @@ let concat loc v1 v2 =
        return (Value(Varray(Vflat(Array.append v1 v2))))
     | Vmap { m_length = l1; m_u = mu1}, Vmap { m_length = l2; m_u = mu2 } ->
        let m_length = l1 + l2 in
-       let m_u i = if i <= l1 then mu1 i else mu2 (i - l1) in
+       let m_u i = if i < l1 then mu1 i else mu2 (i - l1) in
        return (Value(Varray(Vmap { m_length; m_u })))
     | Vmap { m_length; m_u }, Vflat(v) ->
-       let m_u i = if i <= m_length
+       let m_u i = if i < m_length
                    then m_u i else return (v.(i - m_length)) in
        let m_length = m_length + Array.length v in
        return (Value(Varray(Vmap { m_length; m_u })))
     | Vflat(v), Vmap { m_length; m_u } ->
        let lv = Array.length v in
        let m_length = m_length + lv in
-       let m_u i = if i <= lv then return (v.(i)) else m_u (i - lv) in
+       let m_u i = if i < lv then return (v.(i)) else m_u (i - lv) in
        return (Value(Varray(Vmap { m_length; m_u }))) in
   let+ v1 = v1 and+ v2 = v2 in
   match v1, v2 with
@@ -137,15 +137,16 @@ let get_with_default loc v i default =
 let slice loc v i1 i2 = match v with
   | Vflat(a) ->
      let n = Array.length a in
-     if i1 >= 0 then
+     if (0 <= i1) && (i1 < n) then
        let len = i2 - i1 + 1 in
-       if (len >= 0) && (i1 + len <= n) then
+       if (0 <= i2) && (i2 < n) then
          return (Value(Varray(Vflat(Array.sub a i1 len))))
        else error { kind = Earray_size { size = n; index = i2 }; loc }
      else error { kind = Earray_size { size = n; index = i1 }; loc }
   | Vmap { m_length; m_u } ->
-     if i1 < m_length then
-       if i2 < m_length then
+     if (0 <= i1) && (i1 < m_length) then
+       if (0 <= i2) && (i2 < m_length) then
+         let m_u = fun i -> m_u (i + i1) in
          return (Value(Varray(Vmap { m_length = i2 - i1 + 1; m_u })))
        else
          error { kind = Earray_size { size = m_length; index = i2 }; loc }
