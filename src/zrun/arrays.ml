@@ -137,15 +137,15 @@ let get_with_default loc v i default =
 let slice loc v i1 i2 = match v with
   | Vflat(a) ->
      let n = Array.length a in
-     if (0 <= i1) && (i1 < n) then
+     if (0 <= i1) && (i1 <= n) then
        let len = i2 - i1 + 1 in
-       if (0 <= i2) && (i2 < n) then
+       if (0 <= i2) && (i2 <= n) then
          return (Value(Varray(Vflat(Array.sub a i1 len))))
        else error { kind = Earray_size { size = n; index = i2 }; loc }
      else error { kind = Earray_size { size = n; index = i1 }; loc }
   | Vmap { m_length; m_u } ->
-     if (0 <= i1) && (i1 < m_length) then
-       if (0 <= i2) && (i2 < m_length) then
+     if (0 <= i1) && (i1 <= m_length) then
+       if (0 <= i2) && (i2 <= m_length) then
          let m_u = fun i -> m_u (i + i1) in
          return (Value(Varray(Vmap { m_length = i2 - i1 + 1; m_u })))
        else
