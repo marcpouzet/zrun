@@ -1,0 +1,22 @@
+let f1<<n>>(x:[n]_) returns (o)
+  forward(n)[i]() returns (o)
+    do o = x.(i) done
+
+let f2<<n>>(x:[n]_) returns (o)
+  forward(n)[i]() returns (o)
+    do o = x.(i) done
+
+let f3<<n>>() returns (o)
+  forward(n)[i]() returns (o)
+    local o_left, o_right
+    do
+      forward(i)() returns (oi out o_left)
+        do oi = 0.0 done
+    and
+      forward(n-i)() returns (oi out o_right)
+        do oi = 1.0 done
+    and
+      o = o_left ++ o_right
+    done
+
+let main() = f3<<4>>()
