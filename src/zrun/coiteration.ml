@@ -563,13 +563,41 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
   | Eassert { a_body } ->
      let* s_body = iexp is_fun genv env a_body in
      return s_body
-  | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
-     let* si_list = map (ifor_input is_fun genv env) for_input in
-     let* s_body, sr_list = 
+  (*
+    | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
+     (* if the size is not given there should be at least one input *)
+     match for_size, for_input with
+     | None, [] -> error { kind = Eloop_cannot_determine_size; loc = e_loc }
+     | _ ->
+        (* if the for loop is a forward iteration that is reset *)
+        (* the overal code is considered to be combinational whereas the body *)
+        (* can be stateful *)
+        let* si_list = map (ifor_input is_fun genv env) for_input in
+        let* s_body, sr_list = 
          ifor_exp is_fun for_resume genv env for_body in
        let* s_size, s_body =
          ifor_kind genv env for_size for_kind s_body in
-       return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list))
+       return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list)) *)
+
+  | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
+     (* if the size is not given there should be at least one input *)
+     match for_size, for_input with
+     | None, [] -> error { kind = Eloop_cannot_determine_size; loc = e_loc }
+     | _ ->
+        let* si_list = map (ifor_input is_fun genv env) for_input in
+        (* if the for loop is a [forward restart] iteration *)
+        (* the overal code is considered to be combinational even if *)
+        (* the body is stateful. *)
+        (* The allocation of the state is done at the *)
+        (* begining of every loop iteration, that is, not during this step *)
+        if for_resume then
+          let* s_body, sr_list = 
+            ifor_exp is_fun for_resume genv env for_body in
+          let* s_size, s_body =
+            ifor_kind genv env for_size for_kind s_body in
+          return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list))
+        else
+          return (Slist (Sopt(None) :: Slist (Sempty :: []) :: si_list))
 
 and iexp_opt is_fun genv env e_opt =
   match e_opt with | None -> return Sempty | Some(e) -> iexp is_fun genv env e
@@ -732,7 +760,7 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
   | EQassert { a_body } ->
      let* se = iexp is_fun genv env a_body in
      return se
-  | EQforloop({ for_size; for_kind; for_input;
+  (* | EQforloop({ for_size; for_kind; for_input;
                 for_body = { for_out; for_block }; for_resume }) ->
      (* if the size is not given there should be at least one input *)
      match for_size, for_input with
@@ -747,7 +775,30 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
         let* s_body = iblock (is_fun && for_resume) genv env for_block in
         let* s_size, s_body =
           ifor_kind genv env for_size for_kind s_body in
-        return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
+        return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list)) *)
+
+  | EQforloop({ for_size; for_kind; for_input;
+                for_body = { for_out; for_block }; for_resume }) ->
+     (* if the size is not given there should be at least one input *)
+     match for_size, for_input with
+     | None, [] -> error { kind = Eloop_cannot_determine_size; loc = eq_loc }
+     | _ ->
+        let* s_input_list = map (ifor_input is_fun genv env) for_input in
+        (* if the for iteration is a [forward restart] *)
+        (* the overal code is considered to be combinational even if *)
+        (* the body is stateful. *)
+        (* The allocation of the state is done at the *)
+        (* begining of every loop iteration, that is, not during this step *)
+        if for_resume then
+          let* so_list = 
+            map (ifor_output is_fun for_resume genv env) for_out in
+          let* s_body = iblock (is_fun && for_resume) genv env for_block in
+          let* s_size, s_body =
+            ifor_kind genv env for_size for_kind s_body in
+          return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
+        else
+          return
+            (Slist (Sopt(None) :: Slist (Sempty :: []) :: s_input_list))
 
 and iblock is_fun genv env { b_vars; b_body } =
   let* s_b_vars = map (ivardec is_fun true genv env) b_vars in
@@ -938,6 +989,7 @@ and sexp genv env { e_desc; e_loc } s =
   | Econstr0 { lname }, Sempty ->
      return (Value (Vconstr0(lname)), s)
   | Evar x, Sempty ->
+     let l = Env.to_list env in
      let* v =
        find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = e_loc } in
@@ -955,7 +1007,7 @@ and sexp genv env { e_desc; e_loc } s =
   | Eop(op, e_list), s ->
      begin match op, e_list, s with
      | (* initialized unit-delay with a constant *)
-       Efby, [_; e2], Slist [Sval(v); s2] ->
+     Efby, [_; e2], Slist [Sval(v); s2] ->
         let* v2, s2 = sexp genv env e2 s2  in
         return (v, Slist [Sval(v2); s2])
      | Efby, [e1; e2], Slist [Sopt(v_opt); s1; s2] ->
@@ -1242,9 +1294,7 @@ and sexp genv env { e_desc; e_loc } s =
   | Eforloop ({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist (Sopt(Some(Value(Vint(size)))) as sv ::
              Slist(s_for_body :: sr_list) :: si_list) ->
-     (* the size [size] is known *)
-     (* computes a local environment for variables names introduced *)
-     (* in the index and input list; do it sequentially *)
+     (* the size is known: computes a local environment for the index [i] *)
      let i_env =
        let open Forloop in
        match for_index with
@@ -1838,9 +1888,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQforloop({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist ((Sopt(Some(Value(Vint(size)))) as sv) ::
              Slist(s_for_block :: so_list) :: si_list) ->
-     (* the size is known *)
-     (* computes a local environment for variables introduced *)
-     (* in the index list *)
+     (* the size is known: computes a local environment for the index [i] *)
      let i_env =
        let open Forloop in
        match for_index with
