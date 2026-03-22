@@ -1,10 +1,11 @@
-let f1<<n>>(x:[n]_) returns (o)
-  forward(n)[i]() returns (o)
-    do o = x.(i) done
+let f4<<n>>() returns (o)
+  forward<<n>>[i]() returns (o init 0)
+    do
+      o = (forward(i)[j]() returns (o init 0)
+             do o = last o + 1 done) + last o
+    done
 
-let f2<<n>>(x:[n]_) returns (o)
-  forward(n)[i]() returns (o)
-    do o = x.(i) done
+let main4() = f4<<4>>()
 
 let f3<<n>>() returns (o)
   forward(n)[i]() returns (o)
@@ -19,4 +20,70 @@ let f3<<n>>() returns (o)
       o = o_left ++ o_right
     done
 
-let main() = f3<<4>>()
+let main3() = f3<<4>>()
+
+let f1<<n>>(x:[n]_) returns (o)
+  forward(n)[i]() returns (o)
+    do o = x.(i) done
+
+let f2<<n>>(x:[n]_) returns (o)
+  forward(n)[i]() returns (o)
+    do o = x.(i) done
+
+(* inverser une matrice triangulaire inferieure *)
+(* i: indice de ligne; j: indice de colonne *)
+forall j in [0..n-1].
+     /\
+     b.(j).(j) = 1/l.(j).(j)
+     /\
+     forall i [j+1..n-1].
+      l.(i).(j) = -1/a.(i).(i) *
+        sigma_{k = j}{i-1}(a.(i).(k) * l.(k).(j)
+     /\
+     forall i in [0..j-1]. l.(i).(j) = 0
+
+(*
+Code Python:
+
+Pour j allant de 1 à n :
+    # L'élément diagonal de l'inverse
+    B[j, j] = 1 / L[j, j]
+
+    Pour i allant de j + 1 à n :
+        Somme = 0
+        Pour k allant de j à i - 1 :
+            Somme = Somme + L[i, k] * B[k, j]
+        
+        B[i, j] = -Somme / L[i, i]
+*)
+	
+(* tester la version suivante. Cette forme ne va pas parce que *)
+(* [last b] est, a priori, une copie de b. Ca me semble relativement *)
+(* difficile de se rendre compte que [b] et [last b] sont stockables *)
+(* au meme endroit. Comment utiliser la construction "as" ici ? *)
+let inv_left_triangular<<n>>(l:[n][n]_) returns (b:[n][n]_)
+  forward(n)[j]() returns (b_high ++ [| bjj |] ++ b_low out b)
+    do
+      bjj = 1.0 /. l.(j).(j)
+    and
+      forward(i in j+1 to n-1)( returns ([|b_i_j|] out b_low as b_low_)
+        do b_i_j = -. l.(i).(i) *
+	     forward(k in j to i-1)() returns (sum init 0.0)
+               do sum = last sum -. l.(i).(k) *. b_low_.(k) done
+	done
+    and
+      (* vecteur de zeros *)
+      forward(j-1)() returns ([|b_high_i|] out b_high)
+        do b_high_i = 0.0 done
+    done
+
+(*
+l11 l12 l13 l14 l15 l16
+l21 l22 l23 l24 l25 l26
+l31 l32 l33 l34 l35 l36
+l41 l42 l43 l44 l55 l66
+l51 l52 l53 l54 l55 l56
+l61 l62 l63 l64 l65 l66
+
+b63 = [l63 l64 l65] * [b33 b43 b53]
+*)
