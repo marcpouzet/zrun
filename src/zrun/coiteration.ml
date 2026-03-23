@@ -563,8 +563,7 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
   | Eassert { a_body } ->
      let* s_body = iexp is_fun genv env a_body in
      return s_body
-  (*
-    | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
+  | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
      (* if the size is not given there should be at least one input *)
      match for_size, for_input with
      | None, [] -> error { kind = Eloop_cannot_determine_size; loc = e_loc }
@@ -577,9 +576,9 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
          ifor_exp is_fun for_resume genv env for_body in
        let* s_size, s_body =
          ifor_kind genv env for_size for_kind s_body in
-       return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list)) *)
+       return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list))
 
-  | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
+  (* | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
      (* if the size is not given there should be at least one input *)
      match for_size, for_input with
      | None, [] -> error { kind = Eloop_cannot_determine_size; loc = e_loc }
@@ -597,7 +596,7 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
             ifor_kind genv env for_size for_kind s_body in
           return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list))
         else
-          return (Slist (Sopt(None) :: Slist (Sempty :: []) :: si_list))
+          return (Slist (Sopt(None) :: Slist (Sempty :: []) :: si_list)) *)
 
 and iexp_opt is_fun genv env e_opt =
   match e_opt with | None -> return Sempty | Some(e) -> iexp is_fun genv env e
@@ -760,8 +759,9 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
   | EQassert { a_body } ->
      let* se = iexp is_fun genv env a_body in
      return se
-  (* | EQforloop({ for_size; for_kind; for_input;
-                for_body = { for_out; for_block }; for_resume }) ->
+
+  | EQforloop({ for_size; for_kind; for_input;
+              for_body = { for_out; for_block }; for_resume }) ->
      (* if the size is not given there should be at least one input *)
      match for_size, for_input with
      | None, [] -> error { kind = Eloop_cannot_determine_size; loc = eq_loc }
@@ -775,9 +775,9 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
         let* s_body = iblock (is_fun && for_resume) genv env for_block in
         let* s_size, s_body =
           ifor_kind genv env for_size for_kind s_body in
-        return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list)) *)
+        return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
 
-  | EQforloop({ for_size; for_kind; for_input;
+  (* | EQforloop({ for_size; for_kind; for_input;
                 for_body = { for_out; for_block }; for_resume }) ->
      (* if the size is not given there should be at least one input *)
      match for_size, for_input with
@@ -798,7 +798,7 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
           return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
         else
           return
-            (Slist (Sopt(None) :: Slist (Sempty :: []) :: s_input_list))
+            (Slist (Sopt(None) :: Slist (Sempty :: []) :: s_input_list)) *)
 
 and iblock is_fun genv env { b_vars; b_body } =
   let* s_b_vars = map (ivardec is_fun true genv env) b_vars in

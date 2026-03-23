@@ -1333,28 +1333,36 @@ out_ide:
     { ide }
 ;
 
+/* the value of the array output at the previous iteration */
+as_ide:
+  /* nothing */
+  | { None }
+  | AS i = ide
+    { Some(i) }
+;
+
 output_desc:
   /* xi */
-  | ide = ide
+  | ide = ide as_opt = as_ide
     { { for_name = ide; for_out_name = None;
-        for_init = None; for_default = None } }
+        for_init = None; for_default = None; for_as_name = as_opt } }
   /* xi out x */
-  | ide = ide o = out_ide 
+  | ide = ide o = out_ide as_opt = as_ide
     { { for_name = ide; for_out_name = Some(o);
-	for_init = None; for_default = None } }
+	for_init = None; for_default = None; for_as_name  = as_opt } }
   /* xi init e [out x] */
-  | ide = ide i = init_expression o_opt = optional(out_ide)
+  | ide = ide i = init_expression o_opt = optional(out_ide) as_opt = as_ide
     { { for_name = ide; for_out_name = o_opt;
-	for_init = Some(i); for_default = None } }
+	for_init = Some(i); for_default = None; for_as_name  = as_opt } }
   /* xi default e [out x] */
-  | ide = ide d = default_expression o_opt = optional(out_ide)
+  | ide = ide d = default_expression o_opt = optional(out_ide) as_opt = as_ide
     { { for_name = ide; for_out_name = o_opt;
-	for_init = None; for_default = Some(d) } }
+	for_init = None; for_default = Some(d); for_as_name  = as_opt } }
   /* xi init e default e [out x] */
   | ide = ide i = init_expression d = default_expression 
-  o_opt = optional(out_ide)
+    o_opt = optional(out_ide) as_opt = as_ide
     { { for_name = ide; for_out_name = o_opt;
-	for_init = Some(i); for_default = Some(d) } }
+	for_init = Some(i); for_default = Some(d); for_as_name  = as_opt } }
 ;
 
 /* Periods */

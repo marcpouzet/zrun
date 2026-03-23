@@ -340,11 +340,17 @@ module Make (Info: INFO) =
       (* and visible outside of it. On the contrary *)
       (* [xi [init e] [default e] out x] means that [xi] stay local and *)
       (* [x] is defined by the for loop and visible outside of it *)
+      (* [x_as] defined by [as x_as] is visible only inside the body *)
       let build_for_out
-            (acc_left, acc_right) { desc = { for_name; for_out_name } } =
-        match for_out_name with
+            (acc_left, acc_right)
+            { desc = { for_name; for_out_name; for_as_name } } =
+        let acc_left, acc_right =
+          match for_out_name with
+          | None -> acc_left, acc_right
+          | Some(x) -> S.add for_name acc_left, S.add x acc_right in
+        match for_as_name with
         | None -> acc_left, acc_right
-        | Some(x) -> S.add for_name acc_left, S.add x acc_right in
+        | Some(x_as) -> S.add x_as acc_left, acc_right in
       let acc_left, acc_right =
         List.fold_left build_for_out (S.empty, S.empty) for_out in
       
@@ -543,11 +549,13 @@ module Make (Info: INFO) =
       (* [local_out_env] is the environment for variables defined in the *)
       (* for loop that are associated to an output [xi out x]. In that *)
       (* case, [xi] is local to the loop body; [x] is the only visible *)
-    (* defined variable otherwise, [xi] is defined by the for loop *)
-    (* and visible outside of it *)
+      (* defined variable otherwise, [xi] is defined by the for loop *)
+      (* it is considered as an accumulation that is also visible outside *)
       let for_out_one local_out_env
-            { desc = { for_name; for_init; for_default; for_out_name }; loc } =
-        (* check that output name [xi] is distinct from input names. This is *)
+            { desc =
+                { for_name; for_init; for_default; for_out_name; for_as_name };
+              loc } =
+        (* check that [for_name] is distinct from input names. This is *)
         (* not mandatory but makes loops simpler to understand *)
         if Env.mem for_name i_env
         then Error.error loc (Enon_linear_pat(for_name));
@@ -561,10 +569,13 @@ module Make (Info: INFO) =
         let for_default =
           Util.optional_map (expression env) for_default in
         let for_out_name = Util.optional_map (name loc env) for_out_name in
+        let for_as_name =
+          Util.optional_map (name loc env) for_as_name in
         { Zelus.desc =
             { Zelus.for_name = for_name; Zelus.for_init = for_init;
               Zelus.for_default = for_default;
               Zelus.for_out_name = for_out_name;
+              Zelus.for_as_name = for_as_name;
               Zelus.for_info = Info.no_info  };
           Zelus.loc = loc },
         local_out_env in

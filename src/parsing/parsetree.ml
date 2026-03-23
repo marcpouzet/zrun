@@ -336,10 +336,11 @@ and for_in_pat_desc =
 
 (* output of a for loop in equational form *)
 and for_out_desc =
-  { for_name : name; (* xi [init e] [default e] [out x] *)
+  { for_name : name; (* xi [init e] [default e] [out x] [as xi_] *)
     for_out_name : name option; (* [xi out x] *)
     for_init : exp option;
     for_default : exp option;
+    for_as_name : name option; (* [... as xi_] *)
   }
 
 and 'body escape_desc =

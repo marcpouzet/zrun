@@ -177,6 +177,8 @@ module Make (Info: INFO) =
       match e_opt with | None -> () | Some(e) -> fprintf ff " default %a" exp e
     let out ff o_opt =
       match o_opt with | None -> () | Some(x) -> fprintf ff " out %a" name x
+    let as_name ff as_opt =
+      match as_opt with | None -> () | Some(x) -> fprintf ff " as %a" name x
     
     let vardec exp ff
           { var_name = x; var_default = d_opt; var_init = i_opt; var_is_last; 
@@ -593,10 +595,11 @@ module Make (Info: INFO) =
              ff for_size in
          let print_for_out ff l =
            let for_out ff
-                 { desc = { for_name = x; for_out_name = o_opt;
-                            for_init = i_opt } } =
-             fprintf ff "@[%a%a%a@]" 
-               name x (init expression) i_opt out o_opt in
+                 { desc = { for_name; for_out_name;
+                            for_init; for_as_name } } =
+             fprintf ff "@[%a%a%a%a@]" 
+               name for_name (init expression) for_init out for_out_name
+               as_name for_as_name in
            print_list_r for_out "" "," "" ff l in
          fprintf ff
            "@[<hov 2>%a%a%a%a@ (@[%a@])@ @[%a@]@ returns@ (%a)@ %a@ @[%a@,%a@]@ @]"

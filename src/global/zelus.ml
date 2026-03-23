@@ -420,6 +420,7 @@ and ('info, 'ienv) for_out_desc =
     for_out_name : Ident.t option; (* [xi out x] *)
     for_init : ('info, 'ienv) exp option;
     for_default : ('info, 'ienv) exp option;
+    for_as_name : Ident.t option; (* [* [as xi_] *)
     mutable for_info: 'info; (* type information *)
   }
 
