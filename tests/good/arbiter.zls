@@ -43,7 +43,19 @@
 (* Surprisingly, this example is causal using the simple lazy mux, that is,
  *- a simple sequential version of the or and of the && ! This is because
  *- [token_in] is the output of a unit delay, hence looking at its output
- *- first is enough
+ *- first is enough. That is:
+
+ *- o = sequential_or_gate (token_in, pass_in) first reads the value
+ *- of token_in. If this equation is replaced by:
+ *- o = sequential_or_gate (pass_in, token_in), that is, first read the
+ *- value of pass_in, then there is a causality loop (o = bottom).
+ *- Surprising isn't-it?
+ *- This example of an bus arbiter was (at least, to me) a prototypical
+ *- example of a valid synchronous circuit that needs the expressiveness
+ *- of constructive causality. In fact, no; a lazy semantics is enough.
+ *- yet, the writting with symetric operators (or, and) is far more
+ *- elegant. If we want to model multi-emission, then we need the
+ *- constructive definitions for or and and.
 *)
 
 
@@ -104,9 +116,23 @@ let node arbiter_three(request1, request2, request3)
        arbiter(false, request3, pass_out2, token_out2)
   done
 
-(* the property. No matter is the values for inputs *)
-(* [request1, request2, request3], [grant1, grant2, grant3] are *)
-(* never true at the same time *)
+let node main1() returns (grant1, grant2, grant3) 
+  local request1, request2, request3
+  do
+    request1 = true
+  and
+    request2 = true
+  and
+    request3 = true
+  and
+    grant1, grant2, grant3 =  arbiter_three(request1, request2, request3)
+  done
+
+(* the property that the arbiter must verify *)
+(* No matter is the values for the three inputs *)
+(* [request1, request2, request3] *)
+(* at most one of the three output [grant1, grant2, grant3] can be true *)
+(* at the same time *)
 let safe (request1, request2, request3,
           grant1, grant2, grant3) returns (ok)
   ok = match grant1, grant2, grant3 with
@@ -129,15 +155,4 @@ let node main() returns (request1, request2, request3)
                 grant1, grant2, grant3)
   done
   
-let node main1() returns (grant1, grant2, grant3) 
-  local request1, request2, request3
-  do
-    request1 = true
-  and
-    request2 = true
-  and
-    request3 = true
-  and
-    grant1, grant2, grant3 =  arbiter_three(request1, request2, request3)
-  done
- 
+

@@ -6,6 +6,26 @@ let rec f<<n>>(x) returns o
   
 and g<<n>> (x) = f<<n>> (x-1)
 
-let h = f
+let main1 () returns (o)
+  do o = f<<4>>(0) and assert (o = 0) done
 
-let main1 () = f<<4>>(0)
+(* sum of an array in two ways *)
+let rec sum<<n>>(x:[n]_) returns (s)
+  match size n with
+  | 0 -> do s = 0 done
+  | _ -> do s = x.(0) + sum<<n-1>>(x.(1 ..)) done
+  end
+
+let rec iota<<n>>() returns (o)
+  match size n with
+  | 0 -> do o = [||] done
+  | n -> do o = [|n|] ++ iota<<n-1>>() done
+  end
+  
+let main2 () returns (o1, o2)
+  let i = iota<<4>>() in
+  do o1 = sum<<4>>(i)
+  and o2 = sum<<4>>(i.R)
+  and assert(o1 = o2)
+  done
+  

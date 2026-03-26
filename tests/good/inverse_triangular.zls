@@ -38,10 +38,54 @@ l61 l62 l63 l64 l65 l66
 b63 = [l63 l64 l65] * [b33 b43 b53]
 *)
 
+(* first simple example. takes a matrix mat: [n][n]_ and builds *)
+(* a symetric one mat_sim_low where:
+ *- low.(i).(i) = mat.(i).(i);
+ *- low.(i).(j) = if i>j then mat.(i).(j)
+ *-                      else mat.(j).(i) *)
+
+let symetric_low<<n>>(mat:[n][n]_) returns (low:[n][n]_)
+  forward<<n>>[i]() returns (lowi out low)
+    do forward<<n>>[j]() returns (lowij out lowi)
+      do lowij = if i = j then mat.(i).(j)
+                 else if i>j then mat.(i).(j)
+		 else mat.(j).(i) done done
+
+let x = [|[|1;2;3|];
+          [|4;5;6|];
+	  [|7;8;9|]|]
+	  
+let sym_x =
+        [|[|1;4;7|];
+	  [|4;5;8|];
+	  [|7;8;9|]|]
+	  
+let main() =
+  let y = symetric_low<<3>>(x) in
+  x, y
+
+let symetric_low_with_concat<<n>>(mat:[n][n]_) returns (low:[n][n]_)
+  forward<<n>>[i](mati in mat) returns (lowi out low)
+    local lowi_left, lowi_right
+    do forward(i+1)[j]() returns (l1 out lowi_left)
+          do l1 = mati.(j) done
+    and
+       forward(n-(i+1))() returns (l2 out lowi_right)
+          do l2 = 0 done
+    and lowi = lowi_left ++ lowi_right
+    done
+
+let main_with_concat() =
+  let y = symetric_low_with_concat<<3>>(x) in
+  x, y
+
+
 (* tester la version suivante. Cette forme ne va pas parce que *)
 (* [last b] est, a priori, une copie de b. Ca me semble relativement *)
 (* difficile de se rendre compte que [b] et [last b] sont stockables *)
 (* au meme endroit. Comment utiliser la construction "as" ici ? *)
+
+(*
 let inv_left_triangular<<n>>(l:[n][n]_) returns (b:[n][n]_)
   forward(n)[j]() returns (bj out b)
     local b_high, bjj, b_low, b
@@ -60,4 +104,4 @@ let inv_left_triangular<<n>>(l:[n][n]_) returns (b:[n][n]_)
     and
       bj = b_high ++ [| bjj |] ++ b_low out
     done
-
+*)
