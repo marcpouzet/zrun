@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2025 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -398,20 +398,21 @@ module Make (Info: INFO) =
       | Eassert a -> p_assert ff a
       | Eforloop({ for_size; for_kind; for_index; for_input; for_body;
                    for_env; for_resume }) ->
-         let size ff for_size =
-           Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
-             ff for_size in
          fprintf ff
            "@[<hov 2>%a%a@,%a%a(%a) %a@ %a@ @[%a@]@ @]"
            kind_of_forloop for_kind
            for_resume_or_restart for_resume
-           size for_size
+           (Util.optional_unit for_size_expression) for_size
            index_opt for_index
            input_list for_input
            print_env for_env
            for_exp for_body 
            for_exit_condition for_kind
-    
+
+    and for_size_expression ff { for_size_index; for_size_exp } =
+      if for_size_index then fprintf ff "(%a)@ " expression for_size_exp
+      else fprintf ff "<<%a>>@ " expression for_size_exp
+         
     and p_assert ff { a_body; a_hidden_env; a_free_vars } =
       fprintf ff "@[<hov2>assert@ %a@]" expression a_body;
          print_hidden_env ff a_hidden_env;
@@ -590,9 +591,6 @@ module Make (Info: INFO) =
       | EQforloop
         ({ for_size; for_kind; for_index; for_input; for_env; for_resume;
                     for_body = { for_out; for_block; for_out_env } }) ->
-         let size ff for_size =
-           Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
-             ff for_size in
          let print_for_out ff l =
            let for_out ff
                  { desc = { for_name; for_out_name;
@@ -605,7 +603,7 @@ module Make (Info: INFO) =
            "@[<hov 2>%a%a%a%a@ (@[%a@])@ @[%a@]@ returns@ (%a)@ %a@ @[%a@,%a@]@ @]"
            kind_of_forloop for_kind
            for_resume_or_restart for_resume
-           size for_size
+           (Util.optional_unit for_size_expression) for_size
            index_opt for_index
            input_list for_input
            print_env for_env

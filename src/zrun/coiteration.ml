@@ -558,7 +558,7 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
        (* The alternative (and current) solution recalls function [iexp] *)
        (* In the generated code produced by a compiler, this code is *)
        (* statically scheduled. The reset is obtained by calling a reset method *)
-    (* which set state variable to their initial value *)
+       (* which sets state variable to their initial value *)
        return (Slist[s_body; s_res])
   | Eassert { a_body } ->
      let* s_body = iexp is_fun genv env a_body in
@@ -571,12 +571,12 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
         (* if the for loop is a forward iteration that is reset *)
         (* the overal code is considered to be combinational whereas the body *)
         (* can be stateful *)
-        let* si_list = map (ifor_input is_fun genv env) for_input in
-        let* s_body, sr_list = 
+        let* s_input_list = map (ifor_input is_fun genv env) for_input in
+        let* s_for_body, sr_list = 
          ifor_exp is_fun for_resume genv env for_body in
        let* s_size, s_body =
-         ifor_kind genv env for_size for_kind s_body in
-       return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list))
+         ifor_kind genv env for_size for_kind s_for_body in
+       return (Slist (s_size :: Slist(s_for_body :: sr_list) :: s_input_list))
 
   (* | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
      (* if the size is not given there should be at least one input *)
@@ -603,8 +603,8 @@ and iexp_opt is_fun genv env e_opt =
 
 and ifor_kind genv env for_size for_kind s_body =
   match for_size with
-  | None -> return (Sopt(None), s_body)
-  | Some({ e_loc } as e) ->
+  | None | Some { for_size_index = true } -> return (Sopt(None), s_body)
+  | Some { for_size_exp = { e_loc } as e } ->
      (* [e] must be a static (hence stateless) expression *)
      let* v = vexp genv env e in
      (* and an integer value *)
@@ -989,7 +989,6 @@ and sexp genv env { e_desc; e_loc } s =
   | Econstr0 { lname }, Sempty ->
      return (Value (Vconstr0(lname)), s)
   | Evar x, Sempty ->
-     let l = Env.to_list env in
      let* v =
        find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = e_loc } in
@@ -1291,33 +1290,39 @@ and sexp genv env { e_desc; e_loc } s =
      let* v, s = sexp genv env a_body s in
      let* r = check_assertion e_loc v void in
      return (r, s)
+  (* below is the semantics for for loops; the code is too long and *)
+  (* needs to be factorized *)
   | Eforloop ({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist (Sopt(Some(Value(Vint(size)))) as sv ::
-             Slist(s_for_body :: sr_list) :: si_list) ->
-     (* the size is known: computes a local environment for the index [i] *)
-     let i_env =
-       let open Forloop in
-       match for_index with
-       | None -> Env.empty
-       | Some(id) ->
-          Env.singleton id (Vindex { ve_left = 0;
-                                     ve_right = size - 1; dir = true }) in
-     let* i_env, si_list =
-       mapfold2v { kind = Estate; loc = e_loc }
-         (sfor_input size genv env) i_env for_input si_list in
-     (* step in the body only if [i_env] is not bot or nil *)
-     let* r, s_for_body_new, sr_list =
-       sforloop_exp
-         e_loc genv env size for_kind for_resume for_body
-         i_env s_for_body sr_list in
-     let s_for_body = if for_resume then s_for_body_new
-                      else s_for_body in
-     return (r, Slist(sv :: Slist(s_for_body :: sr_list) :: si_list))
-  | Eforloop ({ for_kind; for_index;
+             Slist(s_for_body :: sr_list) :: s_input_list) ->
+     (* the size is known *)
+     let* r, (s_for_body, sr_list, s_input_list) =
+       sforloop_exp_step e_loc genv env
+         (for_kind, for_index, for_input, for_body, for_resume)
+         (size, s_for_body, sr_list, s_input_list) in
+     return (r, Slist(sv :: Slist(s_for_body :: sr_list) :: s_input_list))
+  | Eforloop ({ for_kind;
+                for_size = Some({ for_size_index = true; for_size_exp });
+                for_index; for_input; for_body; for_resume }),
+    Slist (Sopt(None) :: Slist(s_for_body :: sr_list) :: s_input_list) ->
+     (* the size is not known; the syntax is [for[ward|each](size)(...)...] *)
+     let* v = vexp genv env for_size_exp in
+     (* it must be an integer value *)
+     let* size = is_int for_size_exp.e_loc v in
+     (* allocate the memory if the loop is a foreach loop *)
+     let s_for_body = ialloc_foreach_loop size for_kind s_for_body in
+     let* r, (s_for_body, sr_list, s_input_list) =
+       sforloop_exp_step e_loc genv env 
+         (for_kind, for_index, for_input, for_body, for_resume)
+         (size, s_for_body, sr_list, s_input_list) in
+     return (r, Slist(Sopt(Some(Value(Vint(size)))) ::
+                        Slist(s_for_body :: sr_list) :: s_input_list))
+  | Eforloop ({ for_kind; for_size; for_index;
                 for_input = input :: input_list; for_body; for_resume }),
     Slist (Sopt(None) :: Slist(s_for_body :: sr_list) ::
              s_input :: s_input_list) ->
-     (* the size is not known *)
+     (* the size is not known; the syntax is [for[ward|each](xi in ...,...)...] *)
+     (* there is at least one input *)
      let* size_i_env, si =
        sfor_input_no_size genv env Env.empty input s_input in
      (* step in the body only if the input is not bot or nil *)
@@ -1352,6 +1357,27 @@ and sexp genv env { e_desc; e_loc } s =
      return (r, Slist (Sopt(s_size) :: Slist(s_for_body :: sr_list) ::
                          si :: si_list))
   | _ -> error { kind = Estate; loc = e_loc }
+
+and sforloop_exp_step loc genv env
+      (for_kind, for_index, for_input, for_body, for_resume)
+      (size, s_for_body, sr_list, s_input_list) =
+  let i_env =
+    let open Forloop in
+    match for_index with
+    | None -> Env.empty
+    | Some(id) ->
+       Env.singleton id (Vindex { ve_left = 0;
+                                  ve_right = size - 1; dir = true }) in
+  let* i_env, si_list =
+    mapfold2v { kind = Estate; loc = loc }
+      (sfor_input size genv env) i_env for_input s_input_list in
+  (* step in the body only if [i_env] is not bot or nil *)
+  let* r, s_for_body_new, sr_list =
+    sforloop_exp
+      loc genv env size for_kind for_resume for_body
+      i_env s_for_body sr_list in
+  let s_for_body = if for_resume then s_for_body_new else s_for_body in
+  return (r, (s_for_body, sr_list, s_input_list))
 
 and sforloop_exp
   loc genv env for_size for_kind for_resume for_body i_env s_for_body sr_list =
@@ -1885,32 +1911,38 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      let* ve, s = sexp genv env a_body s in
      let* r = check_assertion eq_loc ve Env.empty in
      return (r, s)
+  (* below is the semantics for for loops; the code is too long and *)
+  (* needs to be factorized *)
   | EQforloop({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist ((Sopt(Some(Value(Vint(size)))) as sv) ::
-             Slist(s_for_block :: so_list) :: si_list) ->
-     (* the size is known: computes a local environment for the index [i] *)
-     let i_env =
-       let open Forloop in
-       match for_index with
-       | None -> Env.empty
-       | Some(id) ->
-          Env.singleton id (Vindex { ve_left = 0;
-                                     ve_right = size - 1; dir = true }) in
-     let* i_env, si_list =
-       mapfold2v { kind = Estate; loc = eq_loc }
-         (sfor_input size genv env) i_env for_input si_list in
-     (* step in the body only if [i_env] is not bot or nil *)
-     let* r, s_for_block_new, so_list =
-       sforloop_eq
-         eq_loc genv env size for_kind for_resume for_body
-         i_env s_for_block so_list in
-     let s_for_block = if for_resume then s_for_block_new
-                            else s_for_block in
-     return (r, Slist(sv :: Slist(s_for_block :: so_list) :: si_list))
+             Slist(s_for_block :: so_list) :: s_input_list) ->
+     (* the size is known *)
+     let* r, (s_for_block, so_list, s_input_list) =
+       sforloop_eq_step eq_loc genv env
+         (for_kind, for_index, for_input, for_body, for_resume)
+         (size, s_for_block, so_list, s_input_list) in
+     return (r, Slist(sv :: Slist(s_for_block :: so_list) :: s_input_list))
+  | EQforloop({ for_kind;
+                for_size = Some({ for_size_index = true; for_size_exp });
+                for_index; for_input; for_body; for_resume }),
+    Slist (Sopt(None) :: Slist(s_for_block :: so_list) :: s_input_list) ->
+     (* the size is not known; the syntax is [for[ward|each](size)(...)...] *)
+     let* v = vexp genv env for_size_exp in
+     (* it must be an integer value *)
+     let* size = is_int for_size_exp.e_loc v in
+     (* allocate the memory if the loop is a foreach loop *)
+     let s_for_block = ialloc_foreach_loop size for_kind s_for_block in
+     let* r, (s_for_block, so_list, s_input_list) =
+       sforloop_eq_step eq_loc genv env 
+         (for_kind, for_index, for_input, for_body, for_resume)
+         (size, s_for_block, so_list, s_input_list) in
+     return (r, Slist(Sopt(Some(Value(Vint(size)))) ::
+                        Slist(s_for_block :: so_list) :: s_input_list))
   | EQforloop ({ for_kind; for_index;
                  for_input = input :: input_list; for_body; for_resume }),
     Slist (Sopt(None) :: Slist(s_for_block :: so_list) :: si :: si_list) ->
-    (* the size is not known. *)
+    (* the size is not known; the syntax is [for[ward|each](xi in ...)...] *)
+    (* there is at least one input *)
     let* size_i_env, si =
        sfor_input_no_size genv env Env.empty input si in
     let* r, s_size, s_for_body, so_list, si, si_list =
@@ -1969,6 +2001,28 @@ and size_of_for_kind for_kind size =
   (* whereas it can change for a forward loop *)
   | Kforward _ -> None
 
+and sforloop_eq_step loc genv env
+      (for_kind, for_index, for_input, for_body, for_resume)
+      (size, s_for_block, so_list, s_input_list) =
+  let i_env =
+    let open Forloop in
+    match for_index with
+    | None -> Env.empty
+    | Some(id) ->
+       Env.singleton id (Vindex { ve_left = 0;
+                                  ve_right = size - 1; dir = true }) in
+  let* i_env, si_list =
+    mapfold2v { kind = Estate; loc = loc }
+      (sfor_input size genv env) i_env for_input s_input_list in
+  (* step in the body only if [i_env] is not bot or nil *)
+  let* r, s_for_block_new, so_list =
+    sforloop_eq
+      loc genv env size for_kind for_resume for_body
+      i_env s_for_block so_list in
+  let s_for_block = if for_resume then s_for_block_new
+                    else s_for_block in
+  return (r, (s_for_block, so_list, si_list))
+  
 and sforloop_eq
   loc genv env size for_kind for_resume { for_out; for_block }
   i_env s_for_block so_list =

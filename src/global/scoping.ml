@@ -342,23 +342,23 @@ module Make (Info: INFO) =
       (* [x] is defined by the for loop and visible outside of it *)
       (* [x_as] defined by [as x_as] is visible only inside the body *)
       let build_for_out
-            (acc_left, acc_right)
+            (acc_xi, acc_right)
             { desc = { for_name; for_out_name; for_as_name } } =
         let acc_left, acc_right =
           match for_out_name with
-          | None -> acc_left, acc_right
-          | Some(x) -> S.add for_name acc_left, S.add x acc_right in
+          | None -> acc_xi, acc_right
+          | Some(x) -> S.add for_name acc_xi, S.add x acc_right in
         match for_as_name with
         | None -> acc_left, acc_right
         | Some(x_as) -> S.add x_as acc_left, acc_right in
-      let acc_left, acc_right =
+      let acc_xi, acc_right =
         List.fold_left build_for_out (S.empty, S.empty) for_out in
       
       (* computes defnames for the block *)
       let _, defnames_body = build_block defnames for_block in
       S.union defnames
         (S.union (* remove [xi] in defnames *)
-           (S.diff defnames_body acc_left) acc_right)
+           (S.diff defnames_body acc_xi) acc_right)
     
     let buildeq eq =
       let defnames = buildeq S.empty eq in
@@ -547,10 +547,13 @@ module Make (Info: INFO) =
     
     and trans_for_out env i_env for_out =
       (* [local_out_env] is the environment for variables defined in the *)
-      (* for loop that are associated to an output [xi out x]. In that *)
-      (* case, [xi] is local to the loop body; [x] is the only visible *)
-      (* defined variable otherwise, [xi] is defined by the for loop *)
-      (* it is considered as an accumulation that is also visible outside *)
+      (* for loop that are associated to an output [xi out o]. In that *)
+      (* case, [xi] is local to the loop body; [o] is the only defined *)
+      (* variable that is visible outside. If no [xi out o] is given *)
+      (* [xi] is both local and global; it is considered to be an *)
+      (* an accumulation *)
+      (* [as o__] defines [o_] to be the value of [last o] but whose size *)
+      (* is [i]. *)
       let for_out_one local_out_env
             { desc =
                 { for_name; for_init; for_default; for_out_name; for_as_name };
@@ -561,16 +564,25 @@ module Make (Info: INFO) =
         then Error.error loc (Enon_linear_pat(for_name));
         let for_name, local_out_env =
           match for_out_name with
-          | None -> name loc env for_name, local_out_env
-          | Some(x) -> let m = fresh for_name in
-                       m, Env.add for_name m local_out_env in
+          | Some _ ->
+             (* if [xi out o] then [xi] is local to the body *)
+             let m = fresh for_name in
+             m, Env.add for_name m local_out_env
+          | None -> (* otherwise [oi] is both local and global *)
+             name loc env for_name, local_out_env in
+        let for_as_name, local_out_env =
+          match for_as_name with
+          | Some(as_name) ->
+             (* if [as o_] then [o_] is local to the body *)
+             let m = fresh as_name in
+             Some(m), Env.add as_name m local_out_env
+          | None -> (* otherwise [oi] is both local and global *)
+             None, local_out_env in
         let for_init =
           Util.optional_map (expression env) for_init in
         let for_default =
           Util.optional_map (expression env) for_default in
         let for_out_name = Util.optional_map (name loc env) for_out_name in
-        let for_as_name =
-          Util.optional_map (name loc env) for_as_name in
         { Zelus.desc =
             { Zelus.for_name = for_name; Zelus.for_init = for_init;
               Zelus.for_default = for_default;
@@ -583,9 +595,9 @@ module Make (Info: INFO) =
     
     (* translation of for loops *)
     and forloop_eq env_pat env
-{ for_size; for_kind; for_index; for_input; for_resume;
-  for_body = { for_out; for_block } } =
-      let for_size = Util.optional_map (expression env) for_size in
+       { for_size; for_kind; for_index; for_input; for_resume;
+         for_body = { for_out; for_block } } =
+      let for_size = Util.optional_map (for_size_expression env) for_size in
       let for_index, i_env =
         match for_index with
         | None -> None, Env.empty
@@ -610,6 +622,11 @@ module Make (Info: INFO) =
         Zelus.for_body = { for_out; for_block; for_out_env = Ident.Env.empty };
         Zelus.for_resume = for_resume;
         Zelus.for_env = Ident.Env.empty }
+
+    (* translating a size expression in a for loop *)
+    and for_size_expression env { for_size_index; for_size_exp } =
+      { Zelus.for_size_index = for_size_index;
+        Zelus.for_size_exp = expression env for_size_exp }
     
     (** Translating a sequence of local declarations *)
     and leqs env l = Util.mapfold letin env l
@@ -866,7 +883,7 @@ module Make (Info: INFO) =
     
     and forloop_exp env 
           { for_size; for_kind; for_index; for_input; for_body; for_resume } =
-      let for_size = Util.optional_map (expression env) for_size in
+      let for_size = Util.optional_map (for_size_expression env) for_size in
       let for_index, i_env =
         match for_index with
       | None -> None, Env.empty

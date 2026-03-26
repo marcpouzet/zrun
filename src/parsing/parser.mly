@@ -1224,7 +1224,7 @@ expression_desc:
 /* Loops for equations */
 foreach_loop_exp:
   /* foreach (size) [i] (xi in ei,...) do e [default e] */
-  | s_opt = optional_size_expression
+  | s_opt = optional(for_size_expression)
     i_opt = optional(index)
     li = input_list
     DO e = expression
@@ -1233,7 +1233,7 @@ foreach_loop_exp:
     { (s_opt, i_opt, li, Forexp { exp = e; default = d_opt }) }
   | /* foreach (size) [i] (xi in ei,...) returns (...) do
        eq done */
-    s_opt = optional_size_expression
+    s_opt = optional (for_size_expression)
     i_opt = optional(index)
     li = input_list
     RETURNS p = for_returns
@@ -1244,7 +1244,7 @@ foreach_loop_exp:
 
 forward_loop_exp:
   /* forward (size) [i] (xi in ei,...) do e [default e] [while/unless/until e] done */
-  | s_opt = optional_size_expression
+  | s_opt = optional(for_size_expression)
     i_opt = optional(index)
     li = input_list
     DO e = expression
@@ -1254,7 +1254,7 @@ forward_loop_exp:
     { (s_opt, i_opt, li, o_opt, Forexp { exp = e; default = d_opt }) }
   | /* forward (size) [i] (xi in ei,...) returns (...) do
        eq [while/unless/until e] done */
-    s_opt = optional_size_expression
+    s_opt = optional(for_size_expression)
     i_opt = optional(index)
     li = input_list
     RETURNS p = for_returns
@@ -1266,7 +1266,7 @@ forward_loop_exp:
 
 /* Loops for equations */
 foreach_loop_eq:
-  s_opt = optional_size_expression i_opt = optional(index)
+  s_opt = optional(for_size_expression) i_opt = optional(index)
     li = input_list RETURNS 
     lo = output_list f = block(equation_empty_and_list)
     DONE
@@ -1274,7 +1274,7 @@ foreach_loop_eq:
 ;
 
 forward_loop_eq:
-  | s_opt = optional_size_expression i_opt = optional(index)
+  | s_opt = optional(for_size_expression) i_opt = optional(index)
     li = input_list RETURNS 
     lo = output_list 
     f = block(equation_empty_and_list)
@@ -1283,9 +1283,11 @@ forward_loop_eq:
     { (s_opt, i_opt, li, o_opt, { for_out = lo; for_block = f }) }
 ;
  
-%inline optional_size_expression:
-  | { None }
-  | LPAREN e = expression RPAREN { Some(e) }
+%inline for_size_expression:
+  | LPAREN e = expression RPAREN
+    { { for_size_index = true; for_size_exp = e } }
+  | LLESSER e = expression GGREATER
+    { { for_size_index = false; for_size_exp = e } }
 ;
 
 index:

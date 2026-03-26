@@ -270,12 +270,20 @@ and eq_desc =
      [until/unless e] done] *)
 
 and 'body forloop =
-  { for_size : exp option;
+  { for_size : for_size option;
     for_kind : for_kind;
     for_index : name option;
     for_input : for_input_desc localized list;
     for_body : 'body;
     for_resume : bool; (* resume or restart *)
+  }
+
+(* the number of iteration of a loop *)
+and for_size =
+  { for_size_index: bool; (* true when [for(ward|foreach(e) ...] or *)
+                           (* false when [for(ward|foreach<<e>> ...] *)
+    for_size_exp: exp; (* (e): can depend on a loop index that is dynamic *)
+                       (* but statically bounded by a size *) 
   }
 
 (* result expression of a loop *)
