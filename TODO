@@ -1,0 +1,8 @@
+26 mars 2026:
+- simplify/factorise the code for the forward/foreach loop. Too much
+repetition. The code is difficult to understand!
+
+Two cases:
+- either the size is already computed or not;
+- it can be computed during the initialization or during the very
+first reaction.
