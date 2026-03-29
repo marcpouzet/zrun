@@ -1,9 +1,5 @@
-let main1() returns (low)
-  low = foreach <<2>>[i]() returns ([|low_i|])
-    do low_i = i done
-    
 let main2() returns (low)
-  foreach <<2>>[i]() returns (low_i out low)
+  forward <<0>>[i]() returns (low_i out low)
     do low_i = i done
 
 (* 0; 1; 2
