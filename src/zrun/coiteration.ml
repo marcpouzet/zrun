@@ -574,7 +574,7 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
         let* s_input_list = map (ifor_input is_fun genv env) for_input in
         let* s_for_body, sr_list = 
          ifor_exp is_fun for_resume genv env for_body in
-       let* s_size, s_body =
+       let* s_size, s_for_body =
          ifor_kind genv env for_size for_kind s_for_body in
        return (Slist (s_size :: Slist(s_for_body :: sr_list) :: s_input_list))
 
@@ -2081,10 +2081,10 @@ and set_foreq_out env_eq { desc = { for_name }; loc } s =
   match s with
   | Slist [Sempty; _] -> return s
   | Slist [Slist [Sopt _; s_init]; s_default] ->
-     (* store the current value of [var_name] into the state *)
+     (* store the current value of [for_name] into the state *)
      return (Slist [Slist [Sopt(Some(v)); s_init]; s_default])
   | Slist [_; s_default] ->
-     (* store the current value of [var_name] into the state *)
+     (* store the current value of [for_name] into the state *)
      return (Slist [Sval(v); s_default])
   | _ ->
      error { kind = Estate; loc }
