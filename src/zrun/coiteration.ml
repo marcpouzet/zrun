@@ -578,26 +578,6 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
          ifor_kind genv env for_size for_kind s_for_body in
        return (Slist (s_size :: Slist(s_for_body :: sr_list) :: s_input_list))
 
-  (* | Eforloop({ for_size; for_kind; for_input; for_body; for_resume }) ->
-     (* if the size is not given there should be at least one input *)
-     match for_size, for_input with
-     | None, [] -> error { kind = Eloop_cannot_determine_size; loc = e_loc }
-     | _ ->
-        let* si_list = map (ifor_input is_fun genv env) for_input in
-        (* if the for loop is a [forward restart] iteration *)
-        (* the overal code is considered to be combinational even if *)
-        (* the body is stateful. *)
-        (* The allocation of the state is done at the *)
-        (* begining of every loop iteration, that is, not during this step *)
-        if for_resume then
-          let* s_body, sr_list = 
-            ifor_exp is_fun for_resume genv env for_body in
-          let* s_size, s_body =
-            ifor_kind genv env for_size for_kind s_body in
-          return (Slist (s_size :: Slist(s_body :: sr_list) :: si_list))
-        else
-          return (Slist (Sopt(None) :: Slist (Sempty :: []) :: si_list)) *)
-
 and iexp_opt is_fun genv env e_opt =
   match e_opt with | None -> return Sempty | Some(e) -> iexp is_fun genv env e
 
@@ -776,29 +756,6 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
         let* s_size, s_body =
           ifor_kind genv env for_size for_kind s_body in
         return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
-
-  (* | EQforloop({ for_size; for_kind; for_input;
-                for_body = { for_out; for_block }; for_resume }) ->
-     (* if the size is not given there should be at least one input *)
-     match for_size, for_input with
-     | None, [] -> error { kind = Eloop_cannot_determine_size; loc = eq_loc }
-     | _ ->
-        let* s_input_list = map (ifor_input is_fun genv env) for_input in
-        (* if the for iteration is a [forward restart] *)
-        (* the overal code is considered to be combinational even if *)
-        (* the body is stateful. *)
-        (* The allocation of the state is done at the *)
-        (* begining of every loop iteration, that is, not during this step *)
-        if for_resume then
-          let* so_list = 
-            map (ifor_output is_fun for_resume genv env) for_out in
-          let* s_body = iblock (is_fun && for_resume) genv env for_block in
-          let* s_size, s_body =
-            ifor_kind genv env for_size for_kind s_body in
-          return (Slist (s_size :: Slist (s_body :: so_list) :: s_input_list))
-        else
-          return
-            (Slist (Sopt(None) :: Slist (Sempty :: []) :: s_input_list)) *)
 
 and iblock is_fun genv env { b_vars; b_body } =
   let* s_b_vars = map (ivardec is_fun true genv env) b_vars in
