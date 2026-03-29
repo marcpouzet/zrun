@@ -1,3 +1,19 @@
+let main1() returns (low)
+  low = foreach <<2>>[i]() returns ([|low_i|])
+    do low_i = i done
+    
+let main2() returns (low)
+  foreach <<2>>[i]() returns (low_i out low)
+    do low_i = i done
+
+(* 0; 1; 2
+[| low0; low1; low2 |]
+
+[||];
+[|0|]
+[|0;1|] *)
+
+(*
 let x = [|[|1;2;3|];
           [|4;5;6|];
 	  [|7;8;9|]|]
@@ -9,10 +25,12 @@ let sym_x =
 
 let ff<<n>>() returns (low)
   forward<<n>>[i]() returns (lowi out low)
-    do forward(i)[j]() returns (l1 out lowi)
+    do foreach(i)[j]() returns (l1 out lowi)
           do l1 = j done
     done
 
-let main2() =
-  let y = ff<<3>>(x) in
-  x, y
+let fff<<n>>() returns (low)
+  forward<<n>>[i]() returns (lowi out low)
+    do lowi = i done
+
+*)
