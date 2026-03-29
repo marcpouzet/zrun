@@ -1533,6 +1533,8 @@ and sfor_out genv env acc_env
         Slist [s_init; s_default])
   | _ -> error { kind = Estate; loc}
 
+(* TODO: use the version below and remove the two others. *)
+
 (* evaluate an index returns a local environment *)
 and sfor_input_short genv env (size_opt, i_env) { desc; loc } s =
   match desc, s with
