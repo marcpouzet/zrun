@@ -1534,6 +1534,56 @@ and sfor_out genv env acc_env
   | _ -> error { kind = Estate; loc}
 
 (* evaluate an index returns a local environment *)
+and sfor_input_short genv env (size_opt, i_env) { desc; loc } s =
+  match desc, s with
+  | Einput { id; e; by = None }, Slist [se; se_opt] ->
+     (* [id in e] means that in iteration [i], [id = e.(i)] *)
+     let* ve, se = sexp genv env e se in
+     let* entry = Forloop.input loc ve None in
+     let* size_opt_i_env =
+       let+ a_size, entry = entry in
+       match size_opt with
+       | None -> return (Value(Some(a_size), Env.add id entry i_env))
+       | Some(size) ->
+          if a_size = size then
+            return (Value(Some(size), Env.add id entry i_env))
+          else
+            error { kind = Earray_size { size = a_size; index = size }; loc } in
+     return (size_opt_i_env, Slist [se; se_opt])
+  | Einput { id; e; by = Some _ }, Slist [se; Sval(Value(Vint(k)))] ->
+     (* [id in e by k] means that in iteration [i], [id = e.(k * i)] *)
+     (* [k] must be static *)
+     let* ve, se = sexp genv env e se in
+     let* entry = Forloop.input loc ve (Some(k)) in
+     let* size_opt_i_env =
+       let+ a_size, entry = entry in
+       match size_opt with
+       | None -> return (Value(Some(a_size), Env.add id entry i_env))
+       | Some(size) ->
+          if a_size = size * k
+          then return (Value(Some(size), Env.add id entry i_env))
+          else
+            error
+              { kind = Earray_size { size = a_size; index = size * k }; loc } in
+     return (size_opt_i_env, Slist [se; Sval(Value(Vint(k)))])
+  | Eindex { id; e_left; e_right; dir }, Slist [se_left; se_right] ->
+     let* ve_left, se_left = sexp genv env e_left se_left in
+     let* ve_right, se_right = sexp genv env e_right se_right in
+     let* entry = Forloop.index loc ve_left ve_right dir in
+     let* i_env =
+       let+ a_size, entry = entry in
+       match size_opt with
+       | None -> return (Value(Some(a_size), Env.add id entry i_env))
+       | Some(size) ->
+          if a_size = size
+          then return (Value(Some(size), Env.add id entry i_env))
+          else error { kind = Earray_size { size; index = a_size }; loc } in
+     return (i_env, Slist [se_left; se_right])
+  | _ ->
+     error { kind = Estate; loc }
+                
+
+(* evaluate an index returns a local environment *)
 and sfor_input size genv env i_env { desc; loc } s =
   let open Forloop in
   match desc, s with
