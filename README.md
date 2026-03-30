@@ -39,7 +39,7 @@ semantically correct but are statically rejected by the compiler.
 ZRun illustrates key differences in the treatment of causality between
 different synchronous languages, namely Lustre, Lucid
 Synchrone/Scade/Zelus and Esterel. Those differences can be observed
-on the same program with a simple command-line option (-lustre and
+on the same program with a command-line option (-lustre and
 -esterel). Lustre is the most restrictive in term of causality
 constraints; the most permissive being Esterel; the languages Lucid
 Synchrone, Scade 6 and Zelus are in between, where by-case definitions
