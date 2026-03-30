@@ -1,7 +1,7 @@
 # The ZRun Synchronous Language Interpreter
 
 ZRun is an executable reference semantics for a synchronous data-flow
-language. It takes the form of an interpreted expressed in a purely
+language. It takes the form of an interpreter expressed in a purely
 functional manner and is implemented in OCaml. The input of Zrun is a
 large subset of the language [Zélus](https://zelus.di.ens.fr). Only
 the discrete-time (synchronous) subset is considered for the moment,
