@@ -6,18 +6,20 @@ functional manner and is implemented in OCaml. The input of Zrun is a
 large subset of the language [Zélus](https://zelus.di.ens.fr). Only
 the discrete-time (synchronous) subset is considered for the moment,
 that is, signals are infinite streams and systems are stream
-functions. The basic primitives and the semantics principles of the language are those
-of [Lustre](https://www-verimag.imag.fr/The-Lustre-Programming-Language-and?lang=en)
+functions. The basic primitives and the semantics principles of the
+language are those of
+[Lustre](https://www-verimag.imag.fr/The-Lustre-Programming-Language-and?lang=en)
 (e.g., the non initialized unit delay (pre), initialization operator
 (->)). The language provides richer programming constructs that were
-introduced in [Lucid Synchrone](https://www.di.ens.fr/~pouzet/lucid-synchrone/index.html)
+introduced in [Lucid
+Synchrone](https://www.di.ens.fr/~pouzet/lucid-synchrone/index.html)
 and [Scade
 6](https://www.college-de-france.fr/media/gerard-berry/UPL9185028255611736393_BP_CollegeDeFrance_23_avril_2013.pdf):
 by-case definitions of streams and pattern matching; an operator
 "last" which refers to the previous value of a stream, hierarchical
 automata and array operations. Functions can take as argument values
 that can be specified to be statically known, at compile-time or
-instanciation time. The language provides a more experimental features
+instanciation time. The language provides more experimental features
 like higher-order an functional recursion parameterized by a size.
 
 The goal of this prototype is to define a reference executable
