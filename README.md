@@ -98,8 +98,8 @@ This will generate a `zrun.exe` executable.
 
 ```bash
  ./zrun.exe --help
-Options are:
- -s            The main node to evaluate
+ Options are:
+  -s            The main node to evaluate
   -all          Evaluate all nodes
   -n            The number of steps
   -v            Verbose mode
@@ -107,14 +107,11 @@ Options are:
   -debug        Set debug mode
   -print        Print values
   -noassert     No check of assertions
-  -nocausality  Turn off the check that are variables are non bottom
-  -fix          Print the number of steps for fixpoints
+  -nocausality  Turn off the check that all variables are non bottom
+  -fix          Print the number of iterations in fixpoints
   -esterel      Sets the interpretation of if/then/else to be constructive
-  -lustre       Sets the interpretation of if/then/else to be strict 
-		(that of Lustre)
-  -reduce       Reduce compile-time expressions
-  -check        Check equivalence at every program transformation 
-		for the number of steps
+  -lustre       Sets the interpretation of if/then/else to be strict w.r.t any argument 
+		(by default, it is lazy, i.e., strict w.r.t the first argument)
   -help         Display this list of options
   --help        Display this list of options
 ```
