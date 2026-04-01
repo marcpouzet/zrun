@@ -15,11 +15,11 @@ let main1 () = h1<<10>>(0)
 let rec f2<<n>>(x) returns o
   match size n with
   | 0 -> do o = x done
-  | _ -> do o = g2<<n>>(x+1) done
+  | _ -> do o = g2<<n-1>>(x+1) done
   
 and g2<<n>> (x) = f3<<n>>(x-1)
 
-and f3<<n>>(x) = g2<<n>>(x)
+and f3<<n>>(x) = f2<<n>>(x)
 
 let h2 = f2
 
