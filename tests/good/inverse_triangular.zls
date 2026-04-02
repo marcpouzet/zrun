@@ -100,7 +100,7 @@ let inv_left_triangular<<n>>(l:[n][n]_) returns (b:[n][n]_)
     do
       (* a vector of zeros for the high part *)
       forward(j)() returns (b_high_j out b_high)
-        do b__high_j = 0.0 done
+        do b_high_j = 0.0 done
     and
       bjj = 1.0 /. l.(j).(j)
     and
@@ -109,12 +109,17 @@ let inv_left_triangular<<n>>(l:[n][n]_) returns (b:[n][n]_)
       forward(i in j+1 to n-1) returns (b_low_i out b_low as b_low_)
         local sum
 	do
-	  forward(k in j to i-1)() returns (sum init 0.0)
+	  forward(k in j to i-1) returns (sum init 0.0)
             do sum = last sum -. l.(i).(k) *. b_low_.(k) done
 	and
 	  b_low_i = -. sum /. l.(i).(i)
 	done
     and
-      bj = b_high ++ [| bjj |] ++ b_low out
+      bj = b_high ++ [| bjj |] ++ b_low
     done
 
+let xx = [|[|1.0;2.0;3.0|];
+          [|4.0;5.0;6.0|];
+	  [|7.0;8.0;9.0|]|]
+
+let main_with_inv_triangular() = inv_left_triangular<<3>>(xx)
