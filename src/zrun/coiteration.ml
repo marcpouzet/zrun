@@ -741,7 +741,6 @@ and ieq is_fun genv env { eq_desc; eq_loc  } =
   | EQassert { a_body } ->
      let* se = iexp is_fun genv env a_body in
      return se
-
   | EQforloop({ for_size; for_kind; for_input;
               for_body = { for_out; for_block }; for_resume }) ->
      (* if the size is not given there should be at least one input *)
@@ -1274,7 +1273,9 @@ and sexp genv env { e_desc; e_loc } s =
        sforloop_exp_step e_loc genv env 
          (for_kind, for_index, for_input, for_body, for_resume)
          (size, s_for_body, sr_list, s_input_list) in
-     return (r, Slist(Sopt(Some(Value(Vint(size)))) ::
+     (* is the size kept or not? *)
+     let size = size_of_for_kind for_kind size in
+     return (r, Slist(Sopt(size) ::
                         Slist(s_for_body :: sr_list) :: s_input_list))
   | Eforloop ({ for_kind; for_size; for_index;
                 for_input = input :: input_list; for_body; for_resume }),
@@ -1311,8 +1312,9 @@ and sexp genv env { e_desc; e_loc } s =
           (* if [for_resume = true] keep the final state *)
           let s_for_body = if for_resume then s_for_body_new
                             else s_for_body in
-          return (r, size_of_for_kind for_kind size,
-                  s_for_body, sr_list, si, si_list) in
+          (* is the size kept or not? *)
+          let size = size_of_for_kind for_kind size in
+          return (r, size, s_for_body, sr_list, si, si_list) in
      return (r, Slist (Sopt(s_size) :: Slist(s_for_body :: sr_list) ::
                          si :: si_list))
   | _ -> error { kind = Estate; loc = e_loc }
@@ -1931,7 +1933,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQforloop({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist ((Sopt(Some(Value(Vint(size)))) as sv) ::
              Slist(s_for_block :: so_list) :: s_input_list) ->
-     (* the size is known *)
+     (* the size is a static constant size expression *)
      let* r, (s_for_block, so_list, s_input_list) =
        sforloop_eq_step eq_loc genv env
          (for_kind, for_index, for_input, for_body, for_resume)
@@ -1951,8 +1953,9 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
        sforloop_eq_step eq_loc genv env 
          (for_kind, for_index, for_input, for_body, for_resume)
          (size, s_for_block, so_list, s_input_list) in
-     return (r, Slist(Sopt(Some(Value(Vint(size)))) ::
-                        Slist(s_for_block :: so_list) :: s_input_list))
+     (* is the size kept or not? *)
+     let size = size_of_for_kind for_kind size in
+     return (r, Slist(Sopt(size) :: Slist(s_for_block :: so_list) :: s_input_list))
   | EQforloop ({ for_kind; for_index;
                  for_input = input :: input_list; for_body; for_resume }),
     Slist (Sopt(None) :: Slist(s_for_block :: so_list) :: si :: si_list) ->
@@ -1988,8 +1991,9 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
              i_env s_for_body so_list in
          let s_for_body = if for_resume then s_for_body_new
                             else s_for_body in
-         return (r, size_of_for_kind for_kind size,
-                 s_for_body, so_list, si, si_list) in
+         (* is the size kept or not? *)
+         let size = size_of_for_kind for_kind size in
+         return (r, size, s_for_body, so_list, si, si_list) in
     return (r, Slist (Sopt(s_size) :: Slist(s_for_block :: so_list) ::
                         si :: si_list))
   | EQemit(x, e_opt), s ->
