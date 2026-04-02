@@ -1,0 +1,8 @@
+(* o_0 = 1 /\ oi = Sigma_{k = 0}^{i-1} o_k *)
+
+let main() returns (o)
+  forward<<4>>[i]() returns (oi out o as o_)
+    do
+      oi = forward(i)[k] returns (oi init 0)
+             do oi = last oi + o_.(k) done
+    done
