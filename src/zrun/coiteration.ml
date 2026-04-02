@@ -583,7 +583,9 @@ and iexp_opt is_fun genv env e_opt =
 
 and ifor_kind genv env for_size for_kind s_body =
   match for_size with
+  (* [for[each|ward](...)] or [for[each|ward](n)(...)] *)
   | None | Some { for_size_index = true } -> return (Sopt(None), s_body)
+  (* [for[each|ward]<<n>>(...)] *)
   | Some { for_size_exp = { e_loc } as e } ->
      (* [e] must be a static (hence stateless) expression *)
      let* v = vexp genv env e in
