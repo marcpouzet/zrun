@@ -44,7 +44,7 @@ b63 = [l63 l64 l65] * [b33 b43 b53]
  *- low.(i).(j) = if i>j then mat.(i).(j)
  *-                      else mat.(j).(i) *)
 
-let symetric_low<<n>>(mat:[n][n]_) returns (low:[n][n]_)
+let symetric_low_with_if<<n>>(mat:[n][n]_) returns (low:[n][n]_)
   forward<<n>>[i]() returns (lowi out low)
     do forward<<n>>[j]() returns (lowij out lowi)
       do lowij = if i = j then mat.(i).(j)
@@ -61,18 +61,26 @@ let sym_x =
 	  [|7;8;9|]|]
 	  
 let main() =
-  let y = symetric_low<<3>>(x) in
+  let y = symetric_low_with_if<<3>>(x) in
   x, y
+
+let rec scalar_prod<<n>>(x:[n]_,y:[n]_) returns (o)
+  match size i with
+  | 0 -> do o = 0.0 done
+  | _ -> do
+           o = (x.(0) *. y.(0)) + (scalar_prod<<n-1>>(x.(1 ..), y.(1 ..)))
+	 done
+  end
 
 let symetric_low_with_concat<<n>>(mat:[n][n]_) returns (low:[n][n]_)
   forward<<n>>[i](mati in mat) returns (lowi out low)
     local lowi_left, lowi_right
-    do forward(i+1)[j]() returns (l1 out lowi_left)
-          do l1 = mati.(j) done
+    do forward(i)[j]() returns (l out lowi_left)
+          do l = mati.(j) done
     and
-       forward(n-(i+1))() returns (l2 out lowi_right)
-          do l2 = 0 done
-    and lowi = lowi_left ++ lowi_right
+       forward(n-(i+1))() returns (l out lowi_right)
+          do l = 0 done
+    and lowi = lowi_left ++ [| mat.(i).(i) |] ++ lowi_right
     done
 
 let main_with_concat() =
@@ -85,23 +93,33 @@ let main_with_concat() =
 (* difficile de se rendre compte que [b] et [last b] sont stockables *)
 (* au meme endroit. Comment utiliser la construction "as" ici ? *)
 
-(*
 let inv_left_triangular<<n>>(l:[n][n]_) returns (b:[n][n]_)
+  (* for every column of index [j] *)
   forward(n)[j]() returns (bj out b)
     local b_high, bjj, b_low, b
     do
+      (* a vector of zeros for the high part *)
+      forward(j)() returns (b_high_j out b_high)
+        do b_high_j = 0.0 done
+    and
       bjj = 1.0 /. l.(j).(j)
     and
-      forward(i in j+1 to n-1)( returns ([|b_i_j|] out b_low as b_low_)
-        do b_i_j = -. l.(i).(i) *
-	     forward(k in j to i-1)() returns (sum init 0.0)
-               do sum = last sum -. l.(i).(k) *. b_low_.(k) done
+      (* the bottom part *)
+      (* for every line between [j+1] and [n-1] *)
+      forward(i in j+1 to n-1) returns (b_low_i out b_low as b_low_)
+        local sum
+	do
+	  forward(k in j to i-1) returns (sum init 0.0)
+            do sum = last sum -. l.(i).(k) *. b_low_.(k) done
+	and
+	  b_low_i = -. sum /. l.(i).(i)
 	done
     and
-      (* vecteur de zeros *)
-      forward(j-1)() returns ([|b_high_i|] out b_high)
-        do b_high_i = 0.0 done
-    and
-      bj = b_high ++ [| bjj |] ++ b_low out
+      bj = b_high ++ [| bjj |] ++ b_low
     done
-*)
+
+let xx = [|[|1.0;2.0;3.0|];
+          [|4.0;5.0;6.0|];
+	  [|7.0;8.0;9.0|]|]
+
+let main_with_inv_triangular() = inv_left_triangular<<3>>(xx)

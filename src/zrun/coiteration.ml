@@ -1538,6 +1538,10 @@ and sfor_out genv env acc_env
 (* TODO: use the version below and remove the two others. *)
 
 (* evaluate an index returns a local environment *)
+(* [size_opt] is an optional size. The function computes and returns *)
+(* a size. This size must be equal [size_opt] if it is not None *)
+(* [i_env] is the current environment for input; the function *)
+(* updates it with an extra entry *)
 and sfor_input_short genv env (size_opt, i_env) { desc; loc } s =
   match desc, s with
   | Einput { id; e; by = None }, Slist [se; se_opt] ->
