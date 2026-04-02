@@ -1,0 +1,4 @@
+let uncons<<n>>(v: [n+1]_) returns (left: [n]_, right:_)
+  do left = v.(1 ..) and right = v.(0) done
+
+let main2 = uncons<<2>>([|1.0;2.0;3.0|])
