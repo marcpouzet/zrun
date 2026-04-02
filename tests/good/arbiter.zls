@@ -136,8 +136,7 @@ let node main1() returns (grant1, grant2, grant3)
 let safe (request1, request2, request3,
           grant1, grant2, grant3) returns (ok)
   ok = match grant1, grant2, grant3 with
-       | (true, true, _) -> false
-       | (false, true, true) -> false
+       | (true, true, _) | (false, true, true) | (true, _, true) -> false
        | _ -> true
 
 let node main() returns (request1, request2, request3)
