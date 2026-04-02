@@ -4,4 +4,4 @@ let uncons<<n>>(v: [n+1]_) returns (left: [n]_, right:_)
 let main2 = uncons<<2>>([|1.0;2.0;3.0|])
 
 
-let main = 1 +. 2.0
+let main = 1 + 2
