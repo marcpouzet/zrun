@@ -121,8 +121,8 @@ let message loc kind =
             | Etyp_record_with -> fprintf ff "record" in
      let typ_error_opt ff ty_opt =
        match ty_opt with
-       | None -> () | Some(ty) -> fprintf ff " (%a) " typ_error ty in
-     eprintf "@[%aZrun: actual and expected types%a do not match.@.@]"
+       | None -> () | Some(ty) -> fprintf ff " (%a)" typ_error ty in
+     eprintf "@[%aZrun: the actual and the expected type%a do not match.@.@]"
        output_location loc typ_error_opt ty_opt
   | Estate ->
      eprintf "@[%aZrun: actual and expected state do not match.@.@]"

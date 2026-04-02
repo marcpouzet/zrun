@@ -2529,7 +2529,7 @@ and apply loc fv v_list =
      let v = Primitives.atomic v in
      let+ v = v in
      let* fv =
-       op v |> Opt.to_result ~none:{ kind = Etype(Some(Etyp_fun)); loc = loc } in
+       op v |> Opt.to_result ~none:{ kind = Etype(None); loc = loc } in
      apply loc fv v_list
   | Vfun { f_arity; f_fun }, v_list ->
      let actual_arity = List.length v_list in
