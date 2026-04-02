@@ -159,7 +159,7 @@ let check_equality loc v0 v1 =
   | Value(v0), Value(v1) ->
      let* v =
        Primitives.compare_pvalue v0 v1 |> 
-         Opt.to_result ~none: { kind = Etype(None); loc } in
+         Opt.to_result ~none: { kind = Eequal; loc } in
      return (v = 0)
   | (Value _, Vnil) | (Vnil, Value _) -> error { kind = Enil; loc }
   | (Value _, Vbot) | (Vbot, Value _) -> error { kind = Ebot; loc }
@@ -466,7 +466,8 @@ let rec iexp is_fun genv env { e_desc; e_loc  } =
           (* [e1] is evaluated statically *)
           let* v = vexp genv env e1 in
           let* v = Primitives.pvalue v |>
-                   Opt.to_result ~none: { kind = Etype(None); loc = e_loc1} in
+                     Opt.to_result ~none: { kind = Etype(Some(Etyp_pvalue));
+                                            loc = e_loc1} in
           let* v =
             Primitives.get_node v |>
             Opt.to_result ~none: { kind = Eshould_be_a_node; loc = e_loc1} in
@@ -995,7 +996,7 @@ and sexp genv env { e_desc; e_loc } s =
         let* v2, s2 = sexp genv env e2 s2  in
         let* v_out =
           Primitives.ifthenelse v v1 v2 |>
-            Opt.to_result ~none:{ kind = Etype(None); loc = e_loc } in
+            Opt.to_result ~none:{ kind = Estate; loc = e_loc } in
         return (v_out, Slist [Sval(Value(Vbool(false))); s1; s2])
      | Eifthenelse, [e1; e2; e3], Slist [s1; s2; s3] ->
         let* v1, s1 = sexp genv env e1 s1 in

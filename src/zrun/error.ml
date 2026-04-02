@@ -77,7 +77,8 @@ and typ_error =
   | Etyp_signal (* a signal is expected *)
   | Etyp_record of typ_record_error
   | Etyp_state_in_automaton (* it should be a state of the automaton *)
-
+  | Etyp_pvalue (* it should be a value (that is, neither bot nor nil *)
+                   
 and typ_record_error =
   | Etyp_record_access of Lident.t (* a record is expected with label [l] *)
   | Etyp_record_build
@@ -113,6 +114,7 @@ let message loc kind =
        | Etyp_fun -> fprintf ff "function"
        | Etyp_signal -> fprintf ff "signal"
        | Etyp_state_in_automaton -> fprintf ff "state in an automaton"
+       | Etyp_pvalue -> fprintf ff "value must be neither nil nor bot"
        | Etyp_record(error) ->
           match error with
           | Etyp_record_access(lname) ->
@@ -162,7 +164,7 @@ let message loc kind =
   | Ebot ->
      eprintf "@[%aZrun: value is bottom.@.@]" output_location loc
   | Eequal ->
-     eprintf "@[%aZrun: expressions expected to be equal are not.@.@]"
+     eprintf "@[%aZrun: equality is not defined for these inputs.@.@]"
        output_location loc
   | Eassert_failure ->
      eprintf "@[%aZrun: assertion is not true.@.@]" output_location loc
