@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -24,6 +24,9 @@ open Value
 open Find
 open Primitives
 open Match
+
+(* type error for arrays *)
+let typ_error_array = Etype(Some(Etyp_array))
 
 let (let+) v f =
   match v with
@@ -141,7 +144,7 @@ let input loc v by =
   | Varray(a) ->
      let actual_size = Primitives.length a in
      return (Value(actual_size, Vinput { ve = a; by }))
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = typ_error_array; loc }
 
 let index loc ve_left ve_right dir =
   let+ ve_left = ve_left and+ ve_right = ve_right in
@@ -150,7 +153,7 @@ let index loc ve_left ve_right dir =
      let actual_size =
        (if dir then ve_right - ve_left else ve_left - ve_right) + 1 in
      return (Value(actual_size, Vindex { ve_left; ve_right; dir }))
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = typ_error_array; loc }
 
 
 (* loop iteration *)

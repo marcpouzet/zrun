@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -19,6 +19,9 @@ open Error
 open Monad
 open Result
 open Value
+
+(* type error for arrays *)
+let typ_error_array = Etype(Some(Etyp_array))
 
 (* [let+ x = e in e'] returns [bot] if [e] returns bot; *)
 (* nil if e returns nil; [e'] otherwise *)
@@ -39,7 +42,7 @@ let (and+) v1 v2 =
 let is_array loc v =
   match v with
   | Varray(a) -> return a
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = typ_error_array; loc }
 
 let size loc a =
   let s = match a with
@@ -50,7 +53,7 @@ let size loc a =
 let dim loc v =
   match v with
   | Varray v -> size loc v
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = typ_error_array; loc }
 
 let dim_dim loc v =
   match v with
@@ -64,7 +67,7 @@ let dim_dim loc v =
           let* m = dim loc v in
           return (m_length, m) in
      r
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = typ_error_array; loc }
 
 let concat loc v1 v2 =
   let concat v1 v2 =
@@ -89,7 +92,7 @@ let concat loc v1 v2 =
   match v1, v2 with
   | Varray(v1), Varray(v2) ->
      concat v1 v2
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = Etype(Some(Etyp_array)); loc }
 
 let get_in_array loc a i =
   match a with
@@ -105,7 +108,7 @@ let geti loc v i =
   match v with
   | Varray(a) ->
      get_in_array loc a i
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = Etype(Some(Etyp_array)); loc }
 
 let get loc v i =
   let+ v = v and+ i = i in
@@ -113,7 +116,7 @@ let get loc v i =
   | Varray(a), Vint(i) ->
      let* v = get_in_array loc a i in
      return (Value(v))
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = Etype(Some(Etyp_array)); loc }
 
 let get_with_default loc v i default =
   let get a i =
@@ -129,7 +132,7 @@ let get_with_default loc v i default =
   let+ v = v and+ i = i in
   match v, i with
   | Varray(a), Vint(i) -> get a i
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = Etype(Some(Etyp_array)); loc }
 
 (* x.(i1 .. i2) returns a slices of [x] between index [i1] and [i2] *)
 (* if [i2 < i1], the result array is empty, that is, [||] *)
@@ -156,10 +159,11 @@ let slice_both loc v i1 i2 =
   let+ v = v and+ i1 = i1 and+ i2 = i2 in
   match v, i1, i2 with
   | Varray(v), Vint(i1), Vint(i2) -> slice loc v i1 i2
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = Etype(Some(Etyp_array)); loc }
 
 let is_int loc i =
-  match i with | Vint(i) -> return i | _ -> error { kind = Etype; loc }
+  match i with
+  | Vint(i) -> return i | _ -> error { kind = Etype(Some(Etyp_int)); loc }
 
 (* x.(e1..) *)
 let slice_left loc v i1 =
@@ -196,7 +200,7 @@ let update loc v i w =
   | Varray(a), Vint(i) ->
      let* a = update a i w in
      return (Value(Varray(a)))
-  | _ -> error { kind = Etype; loc }
+  | _ -> error { kind = Etype(Some(Etyp_array)); loc }
 
 (* [| v with i1,..., in <- w |] is a shortcut for *)
 (* [| v with i1 <- [| v.(i1) with i2,...,in <- w |] |] *)

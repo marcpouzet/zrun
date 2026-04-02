@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -18,7 +18,7 @@ open Location
 open Format
 
 type kind =
-  | Etype : kind (* type error for values *)
+  | Etype : typ_error option -> kind (* type error for values *)
   | Estate : kind (* type error for states *)
   | Eunbound_ident : Ident.t -> kind (* unbound variable *)
   | Eunbound_last_ident : Ident.t -> kind (* unbound last variable *)
@@ -68,7 +68,21 @@ type kind =
   | Eunexpected_failure : { print : formatter -> 'a -> unit; arg : 'a } -> kind
   (* an error that should not arrive *)
   | Enot_implemented : kind (* not implemented *)
-                  
+
+(* the possible type errors *)
+and typ_error =
+  | Etyp_bool | Etyp_int | Etyp_float (* a boolean, int, float is expected *)
+  | Etyp_array (* an array is expected *)
+  | Etyp_fun (* a function is expected *)
+  | Etyp_signal (* a signal is expected *)
+  | Etyp_record of typ_record_error
+  | Etyp_state_in_automaton (* it should be a state of the automaton *)
+
+and typ_record_error =
+  | Etyp_record_access of Lident.t (* a record is expected with label [l] *)
+  | Etyp_record_build
+  | Etyp_record_with
+
 type error = { kind : kind; loc : Location.t }
 
 let unexpected_failure =
@@ -89,9 +103,27 @@ let message loc kind =
      eprintf
        "@[%aZrun: the identifier %s is declared but it has no definition.@.@]"
        output_location loc (Ident.source name)
-  | Etype ->
-     eprintf "@[%aZrun: actual and expected types do not match.@.@]"
-       output_location loc 
+  | Etype(ty_opt) ->
+     let typ_error ff ty =
+       match ty with
+       | Etyp_bool -> fprintf ff "bool"
+       | Etyp_int -> fprintf ff "int"
+       | Etyp_float -> fprintf ff "float"
+       | Etyp_array -> fprintf ff "array"
+       | Etyp_fun -> fprintf ff "function"
+       | Etyp_signal -> fprintf ff "signal"
+       | Etyp_state_in_automaton -> fprintf ff "state in an automaton"
+       | Etyp_record(error) ->
+          match error with
+          | Etyp_record_access(lname) ->
+             fprintf ff "label %s in record is missing" (Lident.modname lname)
+          | Etyp_record_build 
+            | Etyp_record_with -> fprintf ff "record" in
+     let typ_error_opt ff ty_opt =
+       match ty_opt with
+       | None -> () | Some(ty) -> fprintf ff " (%a) " typ_error ty in
+     eprintf "@[%aZrun: actual and expected types%a do not match.@.@]"
+       output_location loc typ_error_opt ty_opt
   | Estate ->
      eprintf "@[%aZrun: actual and expected state do not match.@.@]"
        output_location loc 
@@ -130,7 +162,8 @@ let message loc kind =
   | Ebot ->
      eprintf "@[%aZrun: value is bottom.@.@]" output_location loc
   | Eequal ->
-     eprintf "@[%aZrun: expressions expected to be equal are not.@.@]" output_location loc
+     eprintf "@[%aZrun: expressions expected to be equal are not.@.@]"
+       output_location loc
   | Eassert_failure ->
      eprintf "@[%aZrun: assertion is not true.@.@]" output_location loc
   | Emerge_env { init; id } ->
