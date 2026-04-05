@@ -559,8 +559,11 @@ for_returns:
 ;
 
 for_vardec:
-  | p = array_of(vardec)
-    { make { for_array = fst p; for_vardec = snd p } $startpos $endpos }
+  | p = array_of(vardec) as_opt = as_ide
+    { make { for_array = fst p;
+	     for_vardec = snd p;
+	     for_as = as_opt }
+      $startpos $endpos }
 ;
 
 equation_and_list:
@@ -1344,23 +1347,23 @@ as_ide:
 ;
 
 output_desc:
-  /* xi */
+  /* xi [as o_] */
   | ide = ide as_opt = as_ide
     { { for_name = ide; for_out_name = None;
         for_init = None; for_default = None; for_as_name = as_opt } }
-  /* xi out x */
+  /* xi out x [as o_] */
   | ide = ide o = out_ide as_opt = as_ide
     { { for_name = ide; for_out_name = Some(o);
 	for_init = None; for_default = None; for_as_name  = as_opt } }
-  /* xi init e [out x] */
+  /* xi init e [out x] [as o_] */
   | ide = ide i = init_expression o_opt = optional(out_ide) as_opt = as_ide
     { { for_name = ide; for_out_name = o_opt;
 	for_init = Some(i); for_default = None; for_as_name  = as_opt } }
-  /* xi default e [out x] */
+  /* xi default e [out x] [as o_] */
   | ide = ide d = default_expression o_opt = optional(out_ide) as_opt = as_ide
     { { for_name = ide; for_out_name = o_opt;
 	for_init = None; for_default = Some(d); for_as_name  = as_opt } }
-  /* xi init e default e [out x] */
+  /* xi init e default e [out x] [as o_] */
   | ide = ide i = init_expression d = default_expression 
     o_opt = optional(out_ide) as_opt = as_ide
     { { for_name = ide; for_out_name = o_opt;

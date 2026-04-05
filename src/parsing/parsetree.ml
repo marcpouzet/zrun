@@ -298,7 +298,9 @@ and for_exp =
 and for_vardec_desc =
   { for_array : int; (* 0 means x; 1 means [|x|]; 2 means [|[| x|]|]; etc *)
     for_vardec : exp vardec; (* [x [init e] [default e]] *)
+    for_as: name option; (* [as o_]: the partial array *) 
   }
+
 and for_eq =
   { for_out : for_out_desc localized list;
     (* [xi init vi] *)

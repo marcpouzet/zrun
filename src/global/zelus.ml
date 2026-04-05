@@ -348,6 +348,7 @@ and ('info, 'ienv) for_vardec_desc =
   { for_array : int; (* 0 means x; 1 means [|x|]; 2 means [|[| x|]|]; etc *)
     for_vardec : ('info, ('info, 'ienv) exp) vardec;
     (* [x [init e] [default e]] *)
+    for_as : Ident.t option; (* [as o_] *)
   }
 
 and is_rec = bool

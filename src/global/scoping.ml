@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2025 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -301,7 +301,12 @@ module Make (Info: INFO) =
       then Error.error loc (Enon_linear_pat(var_name));
       S.add var_name defnames
     
-    and build_for_vardec defnames { desc = { for_vardec } } =
+    and build_for_vardec defnames { desc = { for_vardec; for_as }; loc } =
+      let defnames =
+        Util.optional
+          (fun acc n ->
+            if S.mem n acc then Error.error loc (Enon_linear_pat(n))
+            else S.add n acc) defnames for_as in
       build_vardec defnames for_vardec
     
     and build_match_handler defnames { desc = { m_body } } =
@@ -671,10 +676,12 @@ module Make (Info: INFO) =
       let v_list = List.map (vardec env) v_list in
       v_list, env_v_list 
     
-    and for_vardec env { desc = { for_array; for_vardec }; loc } =
+    and for_vardec env { desc = { for_array; for_vardec; for_as }; loc } =
       let for_vardec = vardec env for_vardec in
+      let for_as = Util.optional_map (fun n -> name loc env n) for_as in
       { Zelus.desc = { Zelus.for_array = for_array;
-                       Zelus.for_vardec = for_vardec };
+                       Zelus.for_vardec = for_vardec;
+                       Zelus.for_as = for_as };
         Zelus.loc = loc }
     
     and for_vardec_list env for_v_list =
