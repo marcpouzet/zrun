@@ -180,6 +180,7 @@ rule main = parse
   | "-A->" { AFUN }
   | "-D->" { DFUN }
   | "-C->" { CFUN }
+  | "last*" { LAST_STAR }
   | "<-" { LESSMINUS }
   | "|"  { BAR }
   | "/"  { DIV }
@@ -193,7 +194,6 @@ rule main = parse
   | "<"  { LESSER }
   | "<<"  { LLESSER }
   | ">>"  { GGREATER }
-  | "last*" { LAST_STAR }
   | (['A'-'Z']('_' ? ['A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 
       {CONSTRUCTOR id}
   | (['A'-'Z' 'a'-'z'](['_' 'A'-'Z' 'a'-'z' ''' '0'-'9']) * as id) 
