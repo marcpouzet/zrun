@@ -14,7 +14,7 @@ let main2() returns (o)
                       do ok = last ok + (last o).(k) done |]
     done
 
-(* o_0 = 1 /\ oi = Sigma_{k = 0}^{i-1} o_k *)
+(* o_0 = 0 /\ oi = i+Sigma_{k = 0}^{i-1} o_k *)
 
 (* a better solution. *)
 let main1() returns (o)
@@ -22,7 +22,7 @@ let main1() returns (o)
     (* in iteration i, [o_ = o.(0 .. i-2)] *)
     (* that is, when [i = 0], [o_ = [||]] *)
     do
-      oi = forward(i)[k] returns (ok init 0)
-             do ok = last ok + o_.(k) done
+      oi = i + forward(i)[k] returns (ok init 0)
+                  do ok = last ok + o_.(k) done
     done
 
