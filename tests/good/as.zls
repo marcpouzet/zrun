@@ -10,7 +10,7 @@ let main2() returns (o)
   forward<<4>>[i]() returns (o init (zero<<4>>()))
     do
       o = [| last o with i <-
-               i + forward(i)[k] returns (ok init 0)
+               i + forward(i)[k]() returns (ok init 0)
                       do ok = last ok + (last o).(k) done |]
     done
 
@@ -19,10 +19,10 @@ let main2() returns (o)
 (* a better solution. *)
 let main1() returns (o)
   o = forward<<4>>[i]() returns ([|oi|] as o_)
-    (* in iteration i, [o_ = o.(0 .. i-2)] *)
-    (* that is, when [i = 0], [o_ = [||]] *)
-    do
-      oi = i + forward(i)[k] returns (ok init 0)
-                  do ok = last ok + o_.(k) done
-    done
+        (* in iteration i, [o_ = o.(0 .. i-2)] *)
+        (* that is, when [i = 0], [o_ = [||]] *)
+        do
+          oi = i + forward(i)[k]() returns (ok init 0)
+                      do ok = last ok + o_.(k) done
+        done
 
