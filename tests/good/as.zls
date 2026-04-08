@@ -1,12 +1,29 @@
-(* o_0 = 1 /\ oi = Sigma_{k = 0}^{i-1} o_k *)
+let zero<<n>>() returns (o)
+  forward<<n>>() returns (oi out o)
+    do oi = 0.0 done
 
+(* a solution that I find not very elegant. It consists in *)
+(* initializing an array with 0s and to update it sequentially *)
+(* if the compiler is smart enough, there is no copy; the update *)
+(* [o = [| last o with i <- e|] is a simple assignment *)
+let main2() returns (o)
+  forward<<4>>[i]() returns (o init (zero<<4>>()))
+    do
+      o = [| last o with i <-
+               i + forward(i)[k] returns (ok init 0)
+                      do ok = last ok + (last o).(k) done |]
+    done
+
+(* o_0 = 0 /\ oi = i+Sigma_{k = 0}^{i-1} o_k *)
+
+(* a better solution. *)
 let main1() returns (o)
   o = forward<<4>>[i]() returns ([|oi|] as o_)
     (* in iteration i, [o_ = o.(0 .. i-1)] *)
     (* that is, when [i = 0], [o_ = [||]] *)
     do
-      oi = forward(i)[k] returns (ok init 0)
-             do ok = last ok + o_.(k) done
+      oi = i + forward(i)[k] returns (ok init 0)
+                  do ok = last ok + o_.(k) done
     done
 
 let zero<<n>>() returns (o)
