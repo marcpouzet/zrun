@@ -1,0 +1,4 @@
+let f() returns (o)
+  forward<<4>>[i]() returns (o init 0)
+    do o = last o + i done
+

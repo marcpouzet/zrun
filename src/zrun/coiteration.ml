@@ -1351,7 +1351,6 @@ and sforloop_exp_step loc genv env
   let* i_env, si_list =
     mapfold2v { kind = Estate; loc = loc }
       (sfor_input size genv env) i_env for_input s_input_list in
-  (* step in the body only if [i_env] is not bot or nil *)
   let* r, s_for_body_new, sr_list =
     sforloop_exp
       loc genv env size for_kind for_resume for_body
@@ -1361,6 +1360,7 @@ and sforloop_exp_step loc genv env
 
 and sforloop_exp
   loc genv env for_size for_kind for_resume for_body i_env s_for_body sr_list =
+  (* step in the body only if [i_env] is not bot or nil *)
   match i_env with
   | Vbot -> return (Vbot, s_for_body, sr_list)
   | Vnil -> return (Vnil, s_for_body, sr_list)
@@ -1406,6 +1406,9 @@ and sforloop_exp
           (* are accumulated values such that *)
           (* [acc_env(last x)(i) = acc_env(x)(i-1)] where [i] is the *)
           (* iteration index. *)
+          (* when [as x_] is declared, [x_(0) = [||]] and *)
+          (* [x_(i) = \j:[i].if j = i then xi else x_(i-1)] *)
+          (* where [xi] is the output at iteration [i] *)
           let* acc_env, sr_list =
             mapfold3 { kind = Estate; loc }
               (sfor_vardec genv env) Env.empty r_returns sr_list
@@ -1536,8 +1539,16 @@ and vresult genv env r =
   let* v, _ = sresult genv env r s in
   return v
 
-and sfor_vardec genv env acc_env { desc = { for_vardec } } s v =
-  svardec genv env acc_env for_vardec s v
+and sfor_vardec genv env acc_env { desc = { for_vardec; for_as } } s v =
+  let* acc_env, s = svardec genv env acc_env for_vardec s v in
+  (* for a for loop with a return [... returns([|xi|] as x)] *)
+  (* [x] can be used in the body. Its value is an array *)
+  match for_as with
+  | None -> return (acc_env, s)
+  | Some(x) ->
+     let entry = { empty with cur = Some(Value(Arrays.empty));
+                              last = None; default = None } in
+     return (Env.add x entry acc_env, s)
 
 (* compute the initial value of accumulated variables *)
 (* when { for_name = xi; for_init = v } returns *)

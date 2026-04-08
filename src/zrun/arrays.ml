@@ -39,6 +39,8 @@ let (and+) v1 v2 =
 
 (* Array operations - slice, concat, etc. *)
 (* array operations *)
+let empty = Varray(Vflat([||]))
+
 let is_array loc v =
   match v with
   | Varray(a) -> return a
