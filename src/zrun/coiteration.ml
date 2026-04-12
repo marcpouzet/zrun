@@ -13,26 +13,33 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* This file defines a functional (executable) semantics for a
- *- synchronous language like Lustre, Scade, Lucid Synchrone and Zelus.
- *- It is based on a companion file and working notes on the co-iterative
- *- semantics presented at the SYNCHRON workshop, December 2019,
+(* This file defines a functional and executable semantics for a
+ *- synchronous languagelike Lustre, Scade, Lucid Synchrone and Zelus.
+ *-
+ *- It is based on working notes on the co-iterative semantics presented
+ *- at the SYNCHRON workshop, December 2019;
  *- the class on "Advanced Functional Programming" given at Bamberg
- *- Univ. in June-July 2019 and slides for Master MPRI - M2, Fall 2019, 2020, 2021
+ *- Univ. in June-July 2019 and
+ *- slides for class at the  MPRI - M2, Fall 2019, 2020, 2021
+ *-
  *- The original version of this code is taken from the GitHub ZRun repo:
  *- https://github.com/marcpouzet/zrun
  *- ZRun was programmed right after the COVID confinment, in May-June 2020
+ *-
  *- This second version includes some of the Zelus constructs:
  *- ODEs and zero-crossing; higher order functions;
+ *-
  *- the implem. was done in 2021 and updated since then;
+ *-
  *- first update during summer 2022 with array constructs inspired by the
  *- loop construct from SISAL language expressed in a purely-functional form;
  *- a first version of loop iteration (the "foreach" was named "forall" and was
  *- implemented in Zelus V2 in 2017).
  *- Two style of loop iterations are provided:
- *- 1/ The "foreach" loop iteration runs several instances of a stream
+ *- 1/ The "foreach" loop iteration (previously called "forall" in Zelus V2 (2017).
+ *- it runs several instances of a stream
  *- function (say f); in operational terms, every application has it own state; it
- *- corresponds to the classical "map" operation:
+ *- corresponds to the classical "map" operation from functional languages:
  *- the input is an array of streams and the output is an array of streams.
  *- 2/ The forward loop is an "hyper-serial" loop iteration: the array of input
  *- stream is interpreted as a faster stream passed to [f] and whose result
@@ -43,12 +50,12 @@
  *- of ReactiveML (PPDP'13 and SCP'15; by L. Mandel, C. Pasteur and M. Pouzet)
  *- and the work on temporal refinement studied by Caspi and Mikac. It
  *- performs several successive synchronous reactions but a single one is
- *- observable. In term of generated code, it generated a for loop.
+ *- observable. In term of generated code, it generates a for loop.
  *- In this work, the size of arrays and maximum number of iterations must 
  *- be known statically.
  *-
  *- If you find the work on ZRun work useful for your research, please cite
- *- the [EMSOFT'2023] paper. Do not hesitate to send us a mail: 
+ *- the [EMSOFT'2023] paper. Do not hesitate to send me a mail: 
  *- [Marc.Pouzet@ens.fr]
  *)
 

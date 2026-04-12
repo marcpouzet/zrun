@@ -83,6 +83,7 @@ let geti_env loc i_env i =
          return (Env.add x (entry vi) acc))
     Env.empty s_env
 
+ 
 (* [x_to_last_x acc_env local_env] returns [acc_env'] where *)
 (* [Dom(acc_env) = Dom(acc_env')] and *)
 (* [acc_env'(x) = { cur = bot; last = v }] if [local_env(x) = v] *)
@@ -204,6 +205,7 @@ let forward loc sbody env i_env n default s =
 (* One step of the evaluation of the body of a loop *)
 let step loc sbody env i_env i acc_env s =
   Debug.print_state "For loop: state before step = " s;
+  (* take the projection on index [i] of the input environment [i_env] *)
   let* env_0 = geti_env loc i_env i in
   let env = Env.append env_0 env in
   Debug.print_ienv "For loop: acc_env = " acc_env;
