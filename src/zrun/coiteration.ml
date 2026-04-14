@@ -1416,23 +1416,23 @@ and sforloop_exp
           (* when [as x_] is declared, [x_(0) = [||]] and *)
           (* [x_(i) = \j:[i].if j = i then xi else x_(i-1)] *)
           (* where [xi] is the output at iteration [i] *)
-          let* acc_env, sr_list =
+          let* (acc_env, as_env), sr_list =
             mapfold3 { kind = Estate; loc }
-              (sfor_vardec genv env) Env.empty r_returns sr_list
+              (sfor_vardec genv env) (Env.empty, Env.empty) r_returns sr_list
               (bot_list r_returns) in
           (* 2/ runs the body *)
           let* missing, env_list, acc_env, s_for_body =
             match for_kind, s_for_body with
             | Kforeach, Slist(s_list) ->
                let sbody env acc_env s =
-                 sforblock genv env acc_env r_block None s in
+                 sforblock genv env acc_env as_env r_block None s in
                let* env_list, acc_env, s_list =
                  Forloop.foreach_eq loc
                    sbody env i_env acc_env s_list in
                return (0, env_list, acc_env, Slist(s_list))
             | Kforward(exit), _ ->
                let sbody env acc_env s =
-                 sforblock genv env acc_env r_block exit s in
+                 sforblock genv env acc_env as_env r_block exit s in
                let* env_list, acc_env, s_for_body_new =
                  Forloop.forward_eq loc
                    sbody env i_env acc_env for_size s_for_body in
@@ -1546,16 +1546,17 @@ and vresult genv env r =
   let* v, _ = sresult genv env r s in
   return v
 
-and sfor_vardec genv env acc_env { desc = { for_vardec; for_as } } s v =
+(* [oi [init e1] [default e2] as o] *)
+and sfor_vardec genv env (acc_env, as_env)
+  { desc = { for_vardec = { var_name } as for_vardec; for_as } } s v =
   let* acc_env, s = svardec genv env acc_env for_vardec s v in
   (* for a for loop with a return [... returns([|xi|] as x)] *)
   (* [x] can be used in the body. Its value is an array *)
-  match for_as with
-  | None -> return (acc_env, s)
-  | Some(x) ->
-     let entry = { empty with cur = Some(Value(Arrays.empty));
-                              last = None; default = None } in
-     return (Env.add x entry acc_env, s)
+  let as_env =
+    match for_as with
+    | None -> as_env
+    | Some(x) -> Env.add x var_name as_env in
+  return ((acc_env, as_env), s)
 
 (* compute the initial value of accumulated variables *)
 (* when { for_name = xi; for_init = v } returns *)
@@ -1563,16 +1564,22 @@ and sfor_vardec genv env acc_env { desc = { for_vardec; for_as } } s v =
 (* when { for_name = xi; for_init = v; for_default = d } returns *)
 (*                       [xi = { cur = bot; last = v; default = d }] *)
 (* otherwise [xi = { cur = bot; last = None; default = None }] *)
-and sfor_out genv env acc_env
-  { desc = { for_name; for_init; for_default }; loc } s =
-  match s with
-  | Slist [s_init; s_default] ->
-     let* last, s_init = sexp_init_opt loc genv env for_init s_init in
-     let* default, s_default = sexp_opt genv env for_default s_default in
-     return
-       (Env.add for_name { empty with cur = Some Vbot; last; default } acc_env,
-        Slist [s_init; s_default])
-  | _ -> error { kind = Estate; loc}
+and sfor_out genv env (acc_env, as_env)
+  { desc = { for_name; for_init; for_default; for_as_name }; loc } s =
+  let* acc_env, s =
+    match s with
+    | Slist [s_init; s_default] ->
+       let* last, s_init = sexp_init_opt loc genv env for_init s_init in
+       let* default, s_default = sexp_opt genv env for_default s_default in
+       return
+         (Env.add for_name { empty with cur = Some Vbot; last; default } acc_env,
+          Slist [s_init; s_default])
+    | _ -> error { kind = Estate; loc} in
+  let as_env =
+    match for_as_name with
+    | None -> as_env
+    | Some(x) -> Env.add x for_name as_env in
+  return ((acc_env, as_env), s)
 
 (* TODO: use the version below and remove the two others. *)
 
@@ -2088,22 +2095,22 @@ and sforloop_eq
      (* are accumulated values such that *)
      (* [acc_env(last x)(i) = acc_env(x)(i-1)] where [i] is the *)
      (* iteration index. *)
-     let* acc_env, so_list =
+     let* (acc_env, as_env), so_list =
        mapfold2 { kind = Estate; loc }
-         (sfor_out genv env) Env.empty for_out so_list in
+         (sfor_out genv env) (Env.empty, Env.empty) for_out so_list in
      (* 2/ runs the body *)
      let* missing, env_list, acc_env, s_for_block =
        match for_kind, s_for_block with
        | Kforeach, Slist(s_list) ->
           let sbody env acc_env s =
-            sforblock genv env acc_env for_block None s in
+            sforblock genv env acc_env as_env for_block None s in
           let* env_list, acc_env, s_list =
             Forloop.foreach_eq loc
               sbody env i_env acc_env s_list in
           return (0, env_list, acc_env, Slist(s_list))
        | Kforward(exit), _ ->
           let sbody env acc_env s =
-            sforblock genv env acc_env for_block exit s in
+            sforblock genv env acc_env as_env for_block exit s in
           let* env_list, acc_env, s_for_block_new =
             Forloop.forward_eq loc
               sbody env i_env acc_env size s_for_block in
@@ -2210,7 +2217,7 @@ and sblock_with_reset genv env b_eq s_eq r =
 (* computes one step for the body of a for loop *)
 (* for[ward|each] [resume] (n)[i](...) returns (acc_env)
      local x1,...,xm do eq [[while|until|unless] c] *)
-and sforblock genv env acc_env b for_exit s_b =
+and sforblock genv env acc_env as_env b for_exit s_b =
   (* the semantics for a block [local x1,...,xn do eq] *)
   let sbody genv env b s_b acc_env =
     let sem s_b env_in =
