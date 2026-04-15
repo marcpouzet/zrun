@@ -348,14 +348,20 @@ module Make (Info: INFO) =
       (* [x_as] defined by [as x_as] is visible only inside the body *)
       let build_for_out
             (acc_xi, acc_right)
-            { desc = { for_name; for_out_name; for_as_name } } =
+            { desc = { for_name; for_out_name; for_as_name }; loc } =
         let acc_left, acc_right =
           match for_out_name with
           | None -> acc_xi, acc_right
-          | Some(x) -> S.add for_name acc_xi, S.add x acc_right in
+          | Some(x) ->
+             if S.mem x acc_xi then Error.error loc (Enon_linear_pat(x))
+             else if S.mem x acc_right then Error.error loc (Enon_linear_pat(x))
+             else S.add for_name acc_xi, S.add x acc_right in
         match for_as_name with
         | None -> acc_left, acc_right
-        | Some(x_as) -> S.add x_as acc_left, acc_right in
+        | Some(x_as) ->
+           if S.mem x_as acc_xi then Error.error loc (Enon_linear_pat(x_as))
+           else if S.mem x_as acc_right then Error.error loc (Enon_linear_pat(x_as))
+           else S.add x_as acc_left, acc_right in
       let acc_xi, acc_right =
         List.fold_left build_for_out (S.empty, S.empty) for_out in
       

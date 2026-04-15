@@ -1,9 +1,9 @@
-let node main0() returns (o)
-  forward<<4>>() returns (o init 0 as o, o init 1)
+let node main0(o1) returns (o)
+  forward<<4>>(o1 in o1) returns (o init 0 out o, o init 1 out o)
     do o = 1 done
 
 let node main1(i) =
-  forward<<4>>(o in i) returns ([|o1|] as o)
+  forward<<4>>(o in i) returns ([|o|] as oj)
     do o = 1 done
 (*
 let zero<<n>>() returns (o)
