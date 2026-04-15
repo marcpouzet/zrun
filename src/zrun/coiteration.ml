@@ -1381,7 +1381,7 @@ and sforloop_exp
             | Kforeach, Slist(s_list) ->
                (* parallel loop; every iteration has its own state *)
                let* ve, s_list =
-                 Forloop.foreach loc
+                 Forloop.foreach_exp loc
                    (fun env s -> sexp genv env e s) env i_env s_list in
                return (ve, Slist(s_list))
             | Kforward(None), _ ->
@@ -1400,7 +1400,7 @@ and sforloop_exp
                  | Some(e) -> vexp genv env e in
                (* the final state is discarded *)
                let* ve, s_for_body_new =
-                 Forloop.forward loc (fun env s -> sexp genv env e s)
+                 Forloop.forward_exp loc (fun env s -> sexp genv env e s)
                    env i_env for_size default s_for_body in
                let s_for_body =
                  if for_resume then s_for_body_new else s_for_body in
@@ -1424,18 +1424,18 @@ and sforloop_exp
           let* missing, env_list, acc_env, s_for_body =
             match for_kind, s_for_body with
             | Kforeach, Slist(s_list) ->
-               let sbody env acc_env s =
+               let sbody env acc_env as_env s =
                  sforblock genv env acc_env as_env r_block None s in
                let* env_list, acc_env, s_list =
                  Forloop.foreach_eq loc
-                   sbody env i_env acc_env s_list in
+                   sbody env i_env acc_env as_env s_list in
                return (0, env_list, acc_env, Slist(s_list))
             | Kforward(exit), _ ->
-               let sbody env acc_env s =
+               let sbody env acc_env as_env s =
                  sforblock genv env acc_env as_env r_block exit s in
                let* env_list, acc_env, s_for_body_new =
                  Forloop.forward_eq loc
-                   sbody env i_env acc_env for_size s_for_body in
+                   sbody env i_env acc_env as_env for_size s_for_body in
                (* was-it a complete iteration? *)
                let missing = for_size - List.length env_list in
                let s_for_body =
@@ -2102,18 +2102,18 @@ and sforloop_eq
      let* missing, env_list, acc_env, s_for_block =
        match for_kind, s_for_block with
        | Kforeach, Slist(s_list) ->
-          let sbody env acc_env s =
+          let sbody env acc_env as_env s =
             sforblock genv env acc_env as_env for_block None s in
           let* env_list, acc_env, s_list =
             Forloop.foreach_eq loc
-              sbody env i_env acc_env s_list in
+              sbody env i_env acc_env as_env s_list in
           return (0, env_list, acc_env, Slist(s_list))
        | Kforward(exit), _ ->
-          let sbody env acc_env s =
+          let sbody env acc_env as_env s =
             sforblock genv env acc_env as_env for_block exit s in
           let* env_list, acc_env, s_for_block_new =
             Forloop.forward_eq loc
-              sbody env i_env acc_env size s_for_block in
+              sbody env i_env acc_env as_env size s_for_block in
           (* was-it a complete iteration? *)
           let missing = size - List.length env_list in
           let s_for_block =

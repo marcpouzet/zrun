@@ -90,10 +90,10 @@ let geti_env loc i_env i =
 let x_to_lastx acc_env local_env =
   let acc_env =
     Env.mapi
-    (fun x entry ->
-      let v = Find.find_value_opt x local_env in
-      { entry with cur = Some(Vbot); last = v })
-    acc_env in
+      (fun x entry ->
+        let v = Find.find_value_opt x local_env in
+        { entry with cur = Some(Vbot); last = v })
+      acc_env in
   acc_env
 
 (* copy [last x] into [x] *)
@@ -102,6 +102,36 @@ let lastx_to_x acc_env =
     (fun x ({ last } as entry) -> 
        let v = match last with | None -> Vbot | Some(v) -> v in
        { entry with last = None; cur = Some(v) }) acc_env
+
+(* update [acc_env] from [local_env] and [as_env] *)
+(* every entry [x\{ cur = bot; last = v }] from [acc_env] for which [x\xi] *)
+(* is in [as_env] and [xi\{ cur = vi }] is in [local_env] becomes *)
+(* [x\{ cur = bot; last = \j:[i+1].if j = i then vi else v }] *)
+let update_acc_env_from_as_env i acc_env local_env as_env =
+  let acc_env =
+    Env.mapi
+      (fun x ({ last } as entry) ->
+        try
+          let xi = Env.find x as_env in
+          let vi = Find.find_value_opt xi local_env in
+          match vi, last with
+          | Some(Value(vi)), Some(Value(v)) ->
+             { entry with last = Some(Value(Arrays.extend_at i vi v)) }
+          | _ -> entry
+          with
+        | Not_found -> entry)
+      acc_env in
+  acc_env
+
+(* initialize [acc_env] from [as_env] with empty arrays *)
+let initialize_acc_env_from_as_env_with_empty_arrays acc_env as_env =
+  let acc_env =
+    Env.fold
+      (fun x xi acc_env ->
+        Env.add x { cur = None; last = Some(Value(Arrays.empty));
+                    default = None; reinit = false } acc_env)
+      as_env acc_env in
+  acc_env
 
 (* given [x] and [env_list], returns array [v] st [v.(i) = env_list.(i).(x)] *)
 (* when [missing <> 0] complete with a default element *)
@@ -182,7 +212,7 @@ let forward_i n default f s =
 
 (* parallel loop: the step function is iterated with different states;
  *- output is an array. *)
-let foreach loc sbody env i_env s_list =
+let foreach_exp loc sbody env i_env s_list =
   let* ve_list, s_list =
     foreach_i
       (fun i se ->
@@ -195,7 +225,7 @@ let foreach loc sbody env i_env s_list =
 
 (* hyperserial loop: the step function is iterated on the very same state;
  *- output is the last value *)
-let forward loc sbody env i_env n default s =
+let forward_exp loc sbody env i_env n default s =
   forward_i n default
       (fun i se ->
         let* env_0 = geti_env loc i_env i in
@@ -203,15 +233,19 @@ let forward loc sbody env i_env n default s =
         sbody env se) s
 
 (* One step of the evaluation of the body of a loop *)
-let step loc sbody env i_env i acc_env s =
+let step loc sbody env i_env i acc_env as_env s =
   Debug.print_state "For loop: state before step = " s;
   (* take the projection on index [i] of the input environment [i_env] *)
   let* env_0 = geti_env loc i_env i in
   let env = Env.append env_0 env in
   Debug.print_ienv "For loop: acc_env = " acc_env;
-  let* is_exit, local_env, s = sbody env acc_env s in
-  (* every entry [x\v] from [acc_env] becomes [x \ { cur = bot; last = v }] *)
+  let* is_exit, local_env, s = sbody env acc_env as_env s in
+  (* every entry [x\v] from [acc_env] becomes [x\{ cur = bot; last = v }] *)
   let acc_env = x_to_lastx acc_env local_env in
+  (* every entry [x\{ cur = bot; last = v }] from [acc_env] for which [x\xi] *)
+  (* is in [as_env] and [xi\{ cur = vi }] is in [local_env] becomes *)
+  (* [x\{ cur = bot; last = \j:[i+1].if j = i then vi else v }] *)
+  let acc_env = update_acc_env_from_as_env i acc_env local_env as_env in
   Debug.print_ienv "For loop: local_env = " local_env;
   Debug.print_ienv "For loop: acc_env = " acc_env;
   Debug.print_state "For loop: state after step = " s;
@@ -221,7 +255,7 @@ let step loc sbody env i_env i acc_env s =
 (* a step function, an accumulated environment; returns both a list of *)
 (* environments and a new accumulated environment. *)
 (* The [foreach] corresponds to the mapfold with [n] distinct states *)
-let foreach_eq f acc_env0 s_list = 
+let foreach_eq f acc_env0 as_env0 s_list = 
   let rec for_rec i acc_env s_list =
     match s_list with
     | [] -> return ([], acc_env, [])
@@ -235,7 +269,7 @@ let foreach_eq f acc_env0 s_list =
 (* an accumulated environment; returns a list of *)
 (* environments, a new accumulated environment and new state. *)
 (* The [forward] corresponds to a mapfold with a single state *)
-let forward_eq n f acc_env0 s =
+let forward_eq n f acc_env0 as_env0 s =
   let rec for_rec i acc_env s =
     if i = n then return ([], acc_env, s)
     else begin
@@ -249,13 +283,15 @@ let forward_eq n f acc_env0 s =
   for_rec 0 acc_env0 s
 
 (* The main entries *)
-let foreach_eq loc sbody env i_env acc_env0 s_list =
+let foreach_eq loc sbody env i_env acc_env0 as_env0 s_list =
   let f i acc_env s =
-    let* _, local_env, acc_env, s = step loc sbody env i_env i acc_env s in
+    let* _, local_env, acc_env, s = step loc sbody env i_env i acc_env as_env0 s in
     return (local_env, acc_env, s) in
-  foreach_eq f acc_env0 s_list
+  let acc_env0 = initialize_acc_env_from_as_env_with_empty_arrays acc_env0 as_env0 in
+  foreach_eq f acc_env0 as_env0 s_list
 
-let forward_eq loc sbody env i_env acc_env0 n s =
-  let f = step loc sbody env i_env in
-  forward_eq n f acc_env0 s
+let forward_eq loc sbody env i_env acc_env0 as_env0 n s =
+  let f i acc_env s = step loc sbody env i_env i acc_env as_env0 s in
+  let acc_env0 = initialize_acc_env_from_as_env_with_empty_arrays acc_env0 as_env0 in
+  forward_eq n f acc_env0 as_env0 s
 

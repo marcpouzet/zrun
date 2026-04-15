@@ -46,17 +46,20 @@ let is_array loc v =
   | Varray(a) -> return a
   | _ -> error { kind = typ_error_array; loc }
 
+(* size/dimension of an array *)
 let size loc a =
   let s = match a with
     | Vflat(a) -> Array.length a
     | Vmap { m_length } -> m_length in
   return s
 
+(* dimension of a value that must be an array *)
 let dim loc v =
   match v with
   | Varray v -> size loc v
   | _ -> error { kind = typ_error_array; loc }
 
+(* dimension of a matrix *)
 let dim_dim loc v =
   match v with
   | Varray(v) ->
@@ -71,6 +74,13 @@ let dim_dim loc v =
      r
   | _ -> error { kind = typ_error_array; loc }
 
+(* extend an array of length [i-1] with an element at index [i] *)
+(* returns \j:[i+1].if j = i then vi else v *)
+let extend_at i vi v =
+  Varray(Vmap { m_length = i+1;
+                m_u = fun j -> if j = i then return vi else return v })
+
+(* concat two arrays [v1] and [v2] *)
 let concat loc v1 v2 =
   let concat v1 v2 =
     match v1, v2 with
