@@ -118,7 +118,7 @@ let matchsig vstate p =
   match vstate with
   | Vabsent -> return (Vbool(false), Env.empty)
   | Vpresent(v) ->
-     let* env = pmatcheq v p in
+     let* env = pmatch v p in
      return (Vbool(true), env)
   | _ -> none
 
@@ -178,12 +178,13 @@ let matcheq (v: 'a star) (p: _ pattern) : 'a star ientry Env.t Opt.t =
     match v with
     | Vbot -> return (Env.append (liftid (pbot p)) acc)
     | Vnil -> return (Env.append (liftid (pnil p)) acc)
-    | Value(v) ->
-       match v, pat_desc with
+    | Value(v_p) ->
+       match v_p, pat_desc with
        | Vtuple(v_list), Etuplepat(l_list) ->
           match_list acc v_list l_list
+       | _, Etypeconstraintpat(p, _) -> matchrec acc v p
        | _ ->
-          let* env = pmatch v p in
+          let* env = pmatch v_p p in
           return (Env.append (liftv env) acc)
   and match_list acc v_list l_list =
     Opt.fold2 matchrec acc v_list l_list in
