@@ -1781,7 +1781,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQeq(p, e), s ->
      let* v, s = sexp genv env e s in
      let* env_p =
-       matcheq v p |>
+       Match.matcheq v p |>
          Opt.to_result ~none:{ kind = Epattern_matching_failure;
                                loc = eq_loc } in
      return (env_p, s)
