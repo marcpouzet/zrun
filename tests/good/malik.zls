@@ -29,13 +29,15 @@ let node constructive1(c, x) returns (y)
 let node constructive2(c, x) returns (y)
   y =  mux (c, g(f(x)), f( g(x)))
 
-let node main() returns (ok)
-  local c, x, y1, y2
+(* generate a random boolean sequence *)
+(* and check that both functions compute the same result *)
+let node main() returns (c)
+  local x, y1, y2
   do  y1 =  constructive1(c, x)
   and y2 =  constructive2(c, x)
-  and c = true fby true fby not c
-  and x = 0 -> pre x + 1
-  and ok = (y1 = y2)
+  and c = random_bool ()
+  and x = random_int 42 (* 0 -> pre x + 1 *)
+  and assert (y1 = y2)
   done
 
 

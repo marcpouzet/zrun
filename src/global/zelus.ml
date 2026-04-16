@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2025 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -40,7 +40,8 @@ and tkind =
 type type_expression = type_expression_desc localized
 
 and type_expression_desc =
-  | Etypevar of name
+  | Etypevar of name (* 'a *)
+  | Etypewildcard (* _ *)
   | Etypeconstr of Lident.t * type_expression list
   | Etypetuple of type_expression list
   | Etypefun of
@@ -118,7 +119,7 @@ and array_operator =
   (* [e.(e)] *)
   | Eget_with_default 
   (* [e.(e) default e] *)
-  | Eslice 
+  | Eslice of slice
   (* [e.(e .. e)] *)
   | Eupdate 
   (* [| e with e <- e |] *)
@@ -130,6 +131,11 @@ and array_operator =
   (* [e.R] *)
   | Emake
   (* [e^e] *)
+
+and slice =
+  | Slice_both
+  | Slice_left
+  | Slice_right
 
 and is_inline = bool
 
@@ -270,7 +276,7 @@ and ('info, 'ienv) exp_desc =
   | Ereset of ('info, 'ienv) exp * ('info, 'ienv) exp 
   | Eassert of ('info, 'ienv) assertion
   | Eforloop of
-      ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) for_exp) forloop 
+      ('info, 'ienv, ('info, 'ienv) for_exp) forloop 
 
 (* assertions *)
 and ('info, 'ienv) assertion =
@@ -283,14 +289,24 @@ and ('info, 'ienv) assertion =
     mutable a_free_vars: Ident.S.t; (* its free variables in [a_body] *)
   }
 
-and ('info, 'ienv, 'size, 'body) forloop =
-  { for_size : 'size option;
+and ('info, 'ienv, 'body) forloop =
+  { for_size : ('info, 'ienv) for_size option;
     for_kind : ('info, 'ienv) exp for_kind;
     for_index : Ident.t option;
     for_input : ('info, 'ienv) exp for_input list;
     for_body : 'body;
     for_resume : bool; (* resume or restart *)
     mutable for_env : 'ienv Ident.Env.t; (* names (index and inputs) *)
+  }
+
+(* the number of iteration of a loop *)
+(* true when [for(ward|foreach(e) ...] or *)
+(* false when [for(ward|foreach<<e>> ...] *)
+(* (e): can depend on a loop index *)
+(* that is dynamic but statically bounded by a size *) 
+and ('info, 'ienv) for_size =
+  { for_size_index: bool; 
+    for_size_exp: ('info, 'ienv) exp; 
   }
 
 and ('info, 'ienv) for_eq =
@@ -332,6 +348,7 @@ and ('info, 'ienv) for_vardec_desc =
   { for_array : int; (* 0 means x; 1 means [|x|]; 2 means [|[| x|]|]; etc *)
     for_vardec : ('info, ('info, 'ienv) exp) vardec;
     (* [x [init e] [default e]] *)
+    for_as : Ident.t option; (* [as o_] *)
   }
 
 and is_rec = bool
@@ -391,7 +408,7 @@ and ('info, 'ienv) eq_desc =
   | EQempty
   | EQassert of ('info, 'ienv) assertion
   | EQforloop of
-      ('info, 'ienv, ('info, 'ienv) exp, ('info, 'ienv) for_eq) forloop 
+      ('info, 'ienv, ('info, 'ienv) for_eq) forloop 
 (* [foreach [e]* [id in e [by e],]* returns (vardec_list) do eq] *)
 (* [forward [resume] [e]* [id in e [by e],]* returns (vardec_list) *)
 (*  do eq [while/unless/until e] e done]  *)
@@ -414,6 +431,7 @@ and ('info, 'ienv) for_out_desc =
     for_out_name : Ident.t option; (* [xi out x] *)
     for_init : ('info, 'ienv) exp option;
     for_default : ('info, 'ienv) exp option;
+    for_as_name : Ident.t option; (* [* [as xi_] *)
     mutable for_info: 'info; (* type information *)
   }
 

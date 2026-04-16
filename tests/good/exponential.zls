@@ -1,5 +1,5 @@
 (* An example where the fix-point computation is exponential *)
-let node main () =
+let main () =
   let rec x1 =
     let rec x2 =
       let rec x3 =

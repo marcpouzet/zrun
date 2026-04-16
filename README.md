@@ -20,32 +20,34 @@ by-case definitions of streams and pattern matching; an operator
 automata and array operations. Functions can take as argument values
 that can be specified to be statically known, at compile-time or
 instanciation time. The language provides more experimental features
-like higher-order an functional recursion parameterized by a size.
+like higher-order and functional recursion parameterized by a size.
 
-The goal of this prototype is to define a reference executable
-semantics. Its first intension is to be used independently of a
-compiler to serve as an oracle for compiler testing. It serves to specify what
-are the correctness properties on the various dedicated type systems
-done by the compiler, that is, that a well typed/causal/clocked/initialized
-program does not lead to an error; to
-prove semantics preservation of source-to-source transformations
-performed by the compiler (static scheduling or the compilation of automata, etc.).
+The goal of this prototype is to define a reference semantics that is
+executable and can serve as an oracle, e.g., for compiler testing. It
+is independent of a compiler. It can be used to establish the correctness
+properties of dedicated type systems done by the compiler, that is,
+that a well typed/causal/clocked/initialized program does not lead to
+an error; to prove semantics preservation of source-to-source
+transformations performed by the compiler (static scheduling or the
+compilation of automata, for example).
 
 The ZRun interpreter makes no a priori hypothesis on typing and other
 type-based static analyses performed by a synchronous language
 compiler. Hence, ZRun can execute "unfinished programs" or programs that are
 semantically correct but are statically rejected by the compiler.
 
-ZRun illustrates key differences in the treatment of
-causality between Lustre, Lucid Synchrone/Scade/Zelus and Esterel. Those
-differences can be observed on the same program with a simple
-command-line option (-lustre and -esterel). Lustre is the most restrictive in term of
-feed-back loops while Esterel is the most permissive; the languages Lucid Synchrone, Scade 6 and Zelus are
-in between, with a particular treatment of by-case definitions of streams.
+ZRun illustrates key differences in the treatment of causality between
+different synchronous languages, namely Lustre, Lucid
+Synchrone/Scade/Zelus and Esterel. Those differences can be observed
+on the same program with a command-line option (-lustre and
+-esterel). Lustre is the most restrictive in term of causality
+constraints; the most permissive being Esterel; the languages Lucid
+Synchrone, Scade 6 and Zelus are in between, where by-case definitions
+of streams are treated specifically.
 
 Finally, being independent of a compiler, this semantics
-can be used to prototype new language constructs before considering
-their compilation.
+can be used to prototype new language constructs before (or independently)
+considering their compilation.
 
 The long term objective is to define an executable semantics that deal
 with all the language features of Zélus. For the moment, 
@@ -96,8 +98,8 @@ This will generate a `zrun.exe` executable.
 
 ```bash
  ./zrun.exe --help
-Options are:
- -s            The main node to evaluate
+ Options are:
+  -s            The main node to evaluate
   -all          Evaluate all nodes
   -n            The number of steps
   -v            Verbose mode
@@ -105,11 +107,11 @@ Options are:
   -debug        Set debug mode
   -print        Print values
   -noassert     No check of assertions
-  -nocausality  Turn off the check that are variables are non bottom
-  -fix          Print the number of steps for fixpoints
+  -nocausality  Turn off the check that all variables are non bottom
+  -fix          Print the number of iterations in fixpoints
   -esterel      Sets the interpretation of if/then/else to be constructive
-  -lustre       Sets the interpretation of if/then/else to be strict 
-		(that of Lustre)
+  -lustre       Sets the interpretation of if/then/else to be strict w.r.t any argument 
+		(by default, it is lazy, i.e., strict w.r.t the first argument)
   -help         Display this list of options
   --help        Display this list of options
 ```

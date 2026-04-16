@@ -41,6 +41,7 @@ type type_expression = type_expression_desc localized
 
 and type_expression_desc =
   | Etypevar : name -> type_expression_desc
+  | Etypewildcard : type_expression_desc
   | Etypeconstr : longname * type_expression list -> type_expression_desc
   | Etypetuple : type_expression list -> type_expression_desc
   | Etypefun : kind * name option * type_expression * type_expression ->
@@ -105,7 +106,7 @@ and array_operator =
   (* [e.(e)] *)
   | Eget_with_default : array_operator
   (* [e.(e) default e] *)
-  | Eslice : array_operator
+  | Eslice : slice -> array_operator
   (* [e.(e..e)] *)
   | Eupdate : array_operator
   (* [| e with (e1,...,en) <- e |] *)
@@ -117,6 +118,11 @@ and array_operator =
   (* [reverse e] *)
   | Emake : array_operator
   (* [e^e] *)
+
+and slice =
+  | Slice_both
+  | Slice_left
+  | Slice_right
 
 and is_inline = bool
 
@@ -264,12 +270,20 @@ and eq_desc =
      [until/unless e] done] *)
 
 and 'body forloop =
-  { for_size : exp option;
+  { for_size : for_size option;
     for_kind : for_kind;
     for_index : name option;
     for_input : for_input_desc localized list;
     for_body : 'body;
     for_resume : bool; (* resume or restart *)
+  }
+
+(* the number of iteration of a loop *)
+and for_size =
+  { for_size_index: bool; (* true when [for(ward|foreach(e) ...] or *)
+                           (* false when [for(ward|foreach<<e>> ...] *)
+    for_size_exp: exp; (* (e): can depend on a loop index that is dynamic *)
+                       (* but statically bounded by a size *) 
   }
 
 (* result expression of a loop *)
@@ -284,7 +298,9 @@ and for_exp =
 and for_vardec_desc =
   { for_array : int; (* 0 means x; 1 means [|x|]; 2 means [|[| x|]|]; etc *)
     for_vardec : exp vardec; (* [x [init e] [default e]] *)
+    for_as: name option; (* [as o_]: the partial array *) 
   }
+
 and for_eq =
   { for_out : for_out_desc localized list;
     (* [xi init vi] *)
@@ -330,10 +346,11 @@ and for_in_pat_desc =
 
 (* output of a for loop in equational form *)
 and for_out_desc =
-  { for_name : name; (* xi [init e] [default e] [out x] *)
+  { for_name : name; (* xi [init e] [default e] [out x] [as xi_] *)
     for_out_name : name option; (* [xi out x] *)
     for_init : exp option;
     for_default : exp option;
+    for_as_name : name option; (* [... as xi_] *)
   }
 
 and 'body escape_desc =

@@ -1,0 +1,52 @@
+let node main1() =
+  forward<<4>>() returns ([|o1|] as o2)
+    do o1 = forward(xi in last o2) returns (o init 0) do o = last o + xi done
+    done
+
+let node main0(o1) returns (o3)
+  forward<<4>>(o in o1) returns (o2 init 0 out o3, o2 init 1 out o3)
+    do o = 1 done
+
+(*
+let zero<<n>>() returns (o)
+  forward<<n>>() returns (oi out o)
+    do oi = 0.0 done
+
+
+(* a solution that I find not very elegant. It consists in *)
+(* initializing an array with 0s and to update it sequentially *)
+(* if the compiler is smart enough, there is no copy, that is *)
+(* the update *)
+(* [o = [| last o with i <- e|] is a simple assignment *)
+let main2() returns (o)
+  forward<<4>>[i]() returns (o init (zero<<4>>()))
+    do
+      o = [| last o with i <-
+               i + forward(i)[k]() returns (ok init 0)
+                      do ok = last ok + (last o).(k) done |]
+    done
+
+(* o_0 = 0 /\ oi = i+Sigma_{k = 0}^{i-1} o_k *)
+
+(* a better solution. *)
+let main1() returns (o)
+  o = forward<<4>>[i]() returns ([|oi|] as o_)
+    (* in iteration i, [o_ = o.(0 .. i-1)] *)
+    (* that is, when [i = 0], [o_ = [||]] *)
+    do
+      oi = i + forward(i)[k] returns (ok init 0)
+                  do ok = last ok + last o_.(k) done
+    done
+
+
+let zero<<n>>() returns (o)
+  forward<<n>>() returns (oi out o)
+    do oi = 0.0 done
+
+let main2() returns (o)
+  forward<<4>>[i]() returns (oi init 0 out o as o_)
+    do
+      oi = forward(i)[k] returns (ok init 0)
+             do ok = last ok + o_.(k) done
+    done
+*)

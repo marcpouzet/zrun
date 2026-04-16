@@ -1,0 +1,125 @@
+(* inverser une matrice triangulaire inferieure *)
+(* i: indice de ligne; j: indice de colonne *)
+(*
+forall j in [0..n-1].
+     /\
+     b.(j).(j) = 1/l.(j).(j)
+     /\
+     forall i [j+1..n-1].
+      l.(i).(j) = -1/a.(i).(i) *
+        sigma_{k = j}{i-1}(a.(i).(k) * l.(k).(j)
+     /\
+     forall i in [0..j-1]. l.(i).(j) = 0
+*)
+
+(*
+Code Python:
+
+Pour j allant de 1 à n :
+    # L'élément diagonal de l'inverse
+    B[j, j] = 1 / L[j, j]
+
+    Pour i allant de j + 1 à n :
+        Somme = 0
+        Pour k allant de j à i - 1 :
+            Somme = Somme + L[i, k] * B[k, j]
+        
+        B[i, j] = -Somme / L[i, i]
+*)
+	
+(*
+l11 l12 l13 l14 l15 l16
+l21 l22 l23 l24 l25 l26
+l31 l32 l33 l34 l35 l36
+l41 l42 l43 l44 l55 l66
+l51 l52 l53 l54 l55 l56
+l61 l62 l63 l64 l65 l66
+
+b63 = [l63 l64 l65] * [b33 b43 b53]
+*)
+
+(* first simple example. takes a matrix mat: [n][n]_ and builds *)
+(* a symetric one mat_sim_low where:
+ *- low.(i).(i) = mat.(i).(i);
+ *- low.(i).(j) = if i>j then mat.(i).(j)
+ *-                      else mat.(j).(i) *)
+
+let symetric_low_with_if<<n>>(mat:[n][n]_) returns (low:[n][n]_)
+  forward<<n>>[i]() returns (lowi out low)
+    do forward<<n>>[j]() returns (lowij out lowi)
+      do lowij = if i = j then mat.(i).(j)
+                 else if i>j then mat.(i).(j)
+		 else mat.(j).(i) done done
+
+let x = [|[|1;2;3|];
+          [|4;5;6|];
+	  [|7;8;9|]|]
+	  
+let sym_x =
+        [|[|1;4;7|];
+	  [|4;5;8|];
+	  [|7;8;9|]|]
+	  
+let main() =
+  let y = symetric_low_with_if<<3>>(x) in
+  x, y
+
+let rec scalar_prod<<n>>(x:[n]_,y:[n]_) returns (o)
+  match size i with
+  | 0 -> do o = 0.0 done
+  | _ -> do
+           o = (x.(0) *. y.(0)) + (scalar_prod<<n-1>>(x.(1 ..), y.(1 ..)))
+	 done
+  end
+
+let symetric_low_with_concat<<n>>(mat:[n][n]_) returns (low:[n][n]_)
+  forward<<n>>[i](mati in mat) returns (lowi out low)
+    local lowi_left, lowi_right
+    do forward(i)[j]() returns (l out lowi_left)
+          do l = mati.(j) done
+    and
+       forward(n-(i+1))() returns (l out lowi_right)
+          do l = 0 done
+    and lowi = lowi_left ++ [| mat.(i).(i) |] ++ lowi_right
+    done
+
+let main_with_concat() =
+  let y = symetric_low_with_concat<<3>>(x) in
+  x, y
+
+
+(* tester la version suivante. Cette forme ne va pas parce que *)
+(* [last b] est, a priori, une copie de b. Ca me semble relativement *)
+(* difficile de se rendre compte que [b] et [last b] sont stockables *)
+(* au meme endroit. Comment utiliser la construction "as" ici ? *)
+
+let inv_left_triangular<<n>>(l:[n][n]_) returns (b:[n][n]_)
+  (* for every column of index [j] *)
+  forward(n)[j]() returns (bj out b)
+    local b_high, bjj, b_low, b
+    do
+      (* a vector of zeros for the high part *)
+      forward(j)() returns (b_high_j out b_high)
+        do b_high_j = 0.0 done
+    and
+      bjj = 1.0 /. l.(j).(j)
+    and
+      (* the bottom part *)
+      (* for every line between [j+1] and [n-1] *)
+      forward(i in j+1 to n-1) returns (b_low_i out b_low as b_low_)
+        local sum
+	do
+	  forward(k in j to i-1) returns (sum init 0.0)
+            do sum = last sum -. l.(i).(k) *. b_low_.(k) done
+	and
+	  b_low_i = -. sum /. l.(i).(i)
+	done
+    and
+      bj = b_high ++ [| bjj |] ++ b_low
+    done
+
+let xx = [|[|1.0;2.0;3.0|];
+          [|4.0;5.0;6.0|];
+	  [|7.0;8.0;9.0|]|]
+
+let main_with_inv_triangular() = inv_left_triangular<<3>>(xx)

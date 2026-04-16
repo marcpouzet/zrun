@@ -559,8 +559,11 @@ for_returns:
 ;
 
 for_vardec:
-  | p = array_of(vardec)
-    { make { for_array = fst p; for_vardec = snd p } $startpos $endpos }
+  | p = array_of(vardec) as_opt = as_ide
+    { make { for_array = fst p;
+	     for_vardec = snd p;
+	     for_as = as_opt }
+      $startpos $endpos }
 ;
 
 equation_and_list:
@@ -1030,7 +1033,13 @@ simple_expression_desc:
       { Eop(Earray(Eget), [e1; e2]) }
   | e = simple_expression DOT
       LPAREN e1 = expression DOTDOT e2 = expression RPAREN
-      { Eop(Earray(Eslice), [e; e1; e2]) }
+      { Eop(Earray(Eslice(Slice_both)), [e; e1; e2]) }
+  | e = simple_expression DOT
+      LPAREN e1 = expression DOTDOT RPAREN
+      { Eop(Earray(Eslice(Slice_left)), [e; e1]) }
+  | e = simple_expression DOT
+      LPAREN DOTDOT e2 = expression RPAREN
+      { Eop(Earray(Eslice(Slice_right)), [e; e2]) }
 ;
 
 /* size expression list */
@@ -1057,6 +1066,8 @@ size_expression_desc:
     { Size_op(Size_minus, e1, e2) }
   | e1 = size_expression STAR e2 = size_expression
     { Size_op(Size_mult, e1, e2) }
+  | LPAREN i = size_expression_desc RPAREN
+    { i }
 ;
 
 /* [| e with e1,...,en <- e' |] */
@@ -1216,7 +1227,7 @@ expression_desc:
 /* Loops for equations */
 foreach_loop_exp:
   /* foreach (size) [i] (xi in ei,...) do e [default e] */
-  | s_opt = optional_size_expression
+  | s_opt = optional(for_size_expression)
     i_opt = optional(index)
     li = input_list
     DO e = expression
@@ -1225,7 +1236,7 @@ foreach_loop_exp:
     { (s_opt, i_opt, li, Forexp { exp = e; default = d_opt }) }
   | /* foreach (size) [i] (xi in ei,...) returns (...) do
        eq done */
-    s_opt = optional_size_expression
+    s_opt = optional (for_size_expression)
     i_opt = optional(index)
     li = input_list
     RETURNS p = for_returns
@@ -1236,7 +1247,7 @@ foreach_loop_exp:
 
 forward_loop_exp:
   /* forward (size) [i] (xi in ei,...) do e [default e] [while/unless/until e] done */
-  | s_opt = optional_size_expression
+  | s_opt = optional(for_size_expression)
     i_opt = optional(index)
     li = input_list
     DO e = expression
@@ -1246,7 +1257,7 @@ forward_loop_exp:
     { (s_opt, i_opt, li, o_opt, Forexp { exp = e; default = d_opt }) }
   | /* forward (size) [i] (xi in ei,...) returns (...) do
        eq [while/unless/until e] done */
-    s_opt = optional_size_expression
+    s_opt = optional(for_size_expression)
     i_opt = optional(index)
     li = input_list
     RETURNS p = for_returns
@@ -1258,7 +1269,7 @@ forward_loop_exp:
 
 /* Loops for equations */
 foreach_loop_eq:
-  s_opt = optional_size_expression i_opt = optional(index)
+  s_opt = optional(for_size_expression) i_opt = optional(index)
     li = input_list RETURNS 
     lo = output_list f = block(equation_empty_and_list)
     DONE
@@ -1266,7 +1277,7 @@ foreach_loop_eq:
 ;
 
 forward_loop_eq:
-  | s_opt = optional_size_expression i_opt = optional(index)
+  | s_opt = optional(for_size_expression) i_opt = optional(index)
     li = input_list RETURNS 
     lo = output_list 
     f = block(equation_empty_and_list)
@@ -1275,9 +1286,11 @@ forward_loop_eq:
     { (s_opt, i_opt, li, o_opt, { for_out = lo; for_block = f }) }
 ;
  
-%inline optional_size_expression:
-  | { None }
-  | LPAREN e = expression RPAREN { Some(e) }
+%inline for_size_expression:
+  | LPAREN e = expression RPAREN
+    { { for_size_index = true; for_size_exp = e } }
+  | LLESSER e = expression GGREATER
+    { { for_size_index = false; for_size_exp = e } }
 ;
 
 index:
@@ -1325,28 +1338,36 @@ out_ide:
     { ide }
 ;
 
+/* the value of the array output at the previous iteration */
+as_ide:
+  /* nothing */
+  | { None }
+  | AS i = ide
+    { Some(i) }
+;
+
 output_desc:
-  /* xi */
-  | ide = ide
+  /* xi [as o_] */
+  | ide = ide as_opt = as_ide
     { { for_name = ide; for_out_name = None;
-        for_init = None; for_default = None } }
-  /* xi out x */
-  | ide = ide o = out_ide 
+        for_init = None; for_default = None; for_as_name = as_opt } }
+  /* xi out x [as o_] */
+  | ide = ide o = out_ide as_opt = as_ide
     { { for_name = ide; for_out_name = Some(o);
-	for_init = None; for_default = None } }
-  /* xi init e [out x] */
-  | ide = ide i = init_expression o_opt = optional(out_ide)
+	for_init = None; for_default = None; for_as_name  = as_opt } }
+  /* xi init e [out x] [as o_] */
+  | ide = ide i = init_expression o_opt = optional(out_ide) as_opt = as_ide
     { { for_name = ide; for_out_name = o_opt;
-	for_init = Some(i); for_default = None } }
-  /* xi default e [out x] */
-  | ide = ide d = default_expression o_opt = optional(out_ide)
+	for_init = Some(i); for_default = None; for_as_name  = as_opt } }
+  /* xi default e [out x] [as o_] */
+  | ide = ide d = default_expression o_opt = optional(out_ide) as_opt = as_ide
     { { for_name = ide; for_out_name = o_opt;
-	for_init = None; for_default = Some(d) } }
-  /* xi init e default e [out x] */
+	for_init = None; for_default = Some(d); for_as_name  = as_opt } }
+  /* xi init e default e [out x] [as o_] */
   | ide = ide i = init_expression d = default_expression 
-  o_opt = optional(out_ide)
+    o_opt = optional(out_ide) as_opt = as_ide
     { { for_name = ide; for_out_name = o_opt;
-	for_init = Some(i); for_default = Some(d) } }
+	for_init = Some(i); for_default = Some(d); for_as_name  = as_opt } }
 ;
 
 /* Periods */
@@ -1458,6 +1479,8 @@ type_expression:
 simple_type:
   | t = type_var
       { make (Etypevar t) $startpos $endpos }
+  | UNDERSCORE
+    { make (Etypewildcard) $startpos $endpos }
   | i = ext_ident
       { make (Etypeconstr(i, [])) $startpos $endpos }
   | t = simple_type i = ext_ident

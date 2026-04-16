@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2025 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -108,6 +108,7 @@ module Make (Info: INFO) =
     let rec ptype ff { desc } =
       match desc with
       | Etypevar(s) -> fprintf ff "'%s" s
+      | Etypewildcard -> fprintf ff "_"
       | Etypeconstr(ln, ty_list) ->
          fprintf ff "@[<hov2>%a@,%a@]"
            (print_list_r_empty ptype "("","")") ty_list type_longname ln
@@ -127,6 +128,11 @@ module Make (Info: INFO) =
                | Kdiscrete -> "-D->" | Kcont -> "-C->") in
          fprintf ff "@[<hov2>%a %s %a@]" pas (ty_name_opt, ty_arg) s ptype ty_res
       | Etypevec(ty, s) -> fprintf ff "@[[%a]]%a@]" size s ptype ty
+
+    let opt_ptype ff ty_opt =
+      match ty_opt with
+      | None -> ()
+      | Some(ty) -> fprintf ff ":%a" ptype ty
     
     let print_type_params ff pl =
       print_list_r_empty (fun ff s -> fprintf ff "'%s" s) "("","") " ff pl
@@ -171,13 +177,16 @@ module Make (Info: INFO) =
       match e_opt with | None -> () | Some(e) -> fprintf ff " default %a" exp e
     let out ff o_opt =
       match o_opt with | None -> () | Some(x) -> fprintf ff " out %a" name x
+    let as_name ff as_opt =
+      match as_opt with | None -> () | Some(x) -> fprintf ff " as %a" name x
     
     let vardec exp ff
           { var_name = x; var_default = d_opt; var_init = i_opt; var_is_last; 
-            var_init_in_eq } =
-      fprintf ff "@[%s%a%a%a%s@]" 
+            var_init_in_eq; var_typeconstraint } =
+      fprintf ff "@[%s%a%a%a%a%s@]" 
         (if var_is_last then "last " else "")
-        name x (init exp) i_opt (default exp) d_opt
+        name x opt_ptype var_typeconstraint
+        (init exp) i_opt (default exp) d_opt
         (if var_init_in_eq then " init ..." else "")
     
     let vardec_list exp ff vardec_list =
@@ -389,20 +398,21 @@ module Make (Info: INFO) =
       | Eassert a -> p_assert ff a
       | Eforloop({ for_size; for_kind; for_index; for_input; for_body;
                    for_env; for_resume }) ->
-         let size ff for_size =
-           Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
-             ff for_size in
          fprintf ff
            "@[<hov 2>%a%a@,%a%a(%a) %a@ %a@ @[%a@]@ @]"
            kind_of_forloop for_kind
            for_resume_or_restart for_resume
-           size for_size
+           (Util.optional_unit for_size_expression) for_size
            index_opt for_index
            input_list for_input
            print_env for_env
            for_exp for_body 
            for_exit_condition for_kind
-    
+
+    and for_size_expression ff { for_size_index; for_size_exp } =
+      if for_size_index then fprintf ff "(%a)@ " expression for_size_exp
+      else fprintf ff "<<%a>>@ " expression for_size_exp
+         
     and p_assert ff { a_body; a_hidden_env; a_free_vars } =
       fprintf ff "@[<hov2>assert@ %a@]" expression a_body;
          print_hidden_env ff a_hidden_env;
@@ -490,9 +500,18 @@ module Make (Info: INFO) =
       | Eget_with_default, [e1; e2; e3] ->
          fprintf ff "@[<hov2>%a.(%a)@ default@ %a@]" 
            expression e1 expression e2 expression e3
-      | Eslice, [e1; e2; e3] ->
-         fprintf ff "@[<hov2>%a.@,(%a@ ..@ %a)@]" 
-           expression e1 expression e2 expression e3
+      | Eslice(slice), e_list ->
+         (match slice, e_list with
+          | Slice_both, [e1; e2; e3] ->
+             fprintf ff "@[<hov2>%a.@,(%a@ ..@ %a)@]" 
+               expression e1 expression e2 expression e3
+          | Slice_left, [e1; e2] ->
+             fprintf ff "@[<hov2>%a.@,(%a@ ..)@]" 
+               expression e1 expression e2
+          | Slice_right, [e1; e2] ->
+             fprintf ff "@[<hov2>%a.@,(..@ %a)@]" 
+               expression e1 expression e2
+          | _ -> assert false)
       | Eupdate, (e1 :: e2 :: i_list) ->
          (* [| e1 with i_list <- e2 |] *)
          fprintf ff "@[<hov 2>[|%a with@, %a <- %a|]@]"
@@ -572,21 +591,19 @@ module Make (Info: INFO) =
       | EQforloop
         ({ for_size; for_kind; for_index; for_input; for_env; for_resume;
                     for_body = { for_out; for_block; for_out_env } }) ->
-         let size ff for_size =
-           Util.optional_unit (fun ff e -> fprintf ff "(%a)@ " expression e)
-             ff for_size in
          let print_for_out ff l =
            let for_out ff
-                 { desc = { for_name = x; for_out_name = o_opt;
-                            for_init = i_opt } } =
-             fprintf ff "@[%a%a%a@]" 
-               name x (init expression) i_opt out o_opt in
+                 { desc = { for_name; for_out_name;
+                            for_init; for_as_name } } =
+             fprintf ff "@[%a%a%a%a@]" 
+               name for_name (init expression) for_init out for_out_name
+               as_name for_as_name in
            print_list_r for_out "" "," "" ff l in
          fprintf ff
            "@[<hov 2>%a%a%a%a@ (@[%a@])@ @[%a@]@ returns@ (%a)@ %a@ @[%a@,%a@]@ @]"
            kind_of_forloop for_kind
            for_resume_or_restart for_resume
-           size for_size
+           (Util.optional_unit for_size_expression) for_size
            index_opt for_index
            input_list for_input
            print_env for_env
