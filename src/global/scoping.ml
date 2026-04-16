@@ -298,15 +298,15 @@ module Make (Info: INFO) =
     
     and build_vardec defnames { desc = { var_name }; loc } =
       if S.mem var_name defnames
-      then Error.error loc (Enon_linear_pat(var_name));
+      then Error.error loc (Error.Enon_linear_pat(var_name));
       S.add var_name defnames
     
     and build_for_vardec defnames { desc = { for_vardec; for_as }; loc } =
       let defnames =
         Util.optional
-          (fun acc n ->
-            if S.mem n acc then Error.error loc (Enon_linear_pat(n))
-            else S.add n acc) defnames for_as in
+          (fun acc as_name ->
+            if S.mem as_name acc then Error.error loc (Error.Enon_linear_pat(as_name))
+            else S.add as_name acc) defnames for_as in
       build_vardec defnames for_vardec
     
     and build_match_handler defnames { desc = { m_body } } =
@@ -571,7 +571,7 @@ module Make (Info: INFO) =
         (* check that [for_name] is distinct from input names. This is *)
         (* not mandatory but makes loops simpler to understand *)
         if Env.mem for_name i_env
-        then Error.error loc (Enon_linear_pat(for_name));
+        then Error.error loc (Error.Enon_linear_forloop(for_name));
         let for_name, local_out_env =
           match for_out_name with
           | Some _ ->
@@ -585,10 +585,10 @@ module Make (Info: INFO) =
           | Some(as_name) ->
              (* check that [as_name] is distinct from input names *)
              if Env.mem as_name i_env
-             then Error.error loc (Enon_linear_pat(as_name));
+             then Error.error loc (Error.Enon_linear_forloop(as_name));
              (* and other output names *)
              if Env.mem as_name local_out_env
-             then Error.error loc (Enon_linear_pat(as_name));
+             then Error.error loc (Error.Enon_linear_forloop(as_name));
              let m = fresh as_name in
              Some(m), Env.add as_name m local_out_env
           | None -> (* otherwise [oi] is both local and global *)
@@ -686,13 +686,18 @@ module Make (Info: INFO) =
       let v_list = List.map (vardec env) v_list in
       v_list, env_v_list 
     
-    and for_vardec env i_env { desc = { for_array; for_vardec; for_as }; loc } =
+    and for_vardec env i_env
+      { desc = { for_array; for_vardec = ({ desc = { var_name } } as for_vardec);
+                                          for_as }; loc } =
+      (* check that [var_name] is distinct from input names *)
+      if Env.mem var_name i_env then Error.error loc (Enon_linear_forloop(var_name));
       let for_vardec = vardec env for_vardec in
       let for_as =
         Util.optional_map
-          (fun n -> (* check that [n] is distinct from input names *)
-            if Env.mem n i_env then Error.error loc (Enon_linear_pat(n));
-            name loc env n) for_as in
+          (fun as_name -> (* check that [as_name] is distinct from input names *)
+            if Env.mem as_name i_env
+            then Error.error loc (Enon_linear_forloop(as_name));
+            name loc env as_name) for_as in
       { Zelus.desc = { Zelus.for_array = for_array;
                        Zelus.for_vardec = for_vardec;
                        Zelus.for_as = for_as };
