@@ -234,6 +234,10 @@ let forward_exp loc sbody env i_env n default s =
 
 (* One step of the evaluation of the body of a loop *)
 let step loc sbody env i_env i acc_env as_env s =
+  let l1 = Env.to_list env in
+  let l2 = Env.to_list i_env in
+  let l3 = Env.to_list acc_env in
+  let l4 = Env.to_list as_env in
   Debug.print_state "For loop: state before step = " s;
   (* take the projection on index [i] of the input environment [i_env] *)
   let* env_0 = geti_env loc i_env i in
@@ -242,10 +246,12 @@ let step loc sbody env i_env i acc_env as_env s =
   let* is_exit, local_env, s = sbody env acc_env as_env s in
   (* every entry [x\v] from [acc_env] becomes [x\{ cur = bot; last = v }] *)
   let acc_env = x_to_lastx acc_env local_env in
+  let l3 = Env.to_list acc_env in
   (* every entry [x\{ cur = bot; last = v }] from [acc_env] for which [x\xi] *)
   (* is in [as_env] and [xi\{ cur = vi }] is in [local_env] becomes *)
   (* [x\{ cur = bot; last = \j:[i+1].if j = i then vi else v }] *)
   let acc_env = update_acc_env_from_as_env i acc_env local_env as_env in
+  let l3 = Env.to_list acc_env in
   Debug.print_ienv "For loop: local_env = " local_env;
   Debug.print_ienv "For loop: acc_env = " acc_env;
   Debug.print_state "For loop: state after step = " s;

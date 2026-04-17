@@ -2179,6 +2179,7 @@ and sresult genv env { r_desc; r_loc } s =
 
 (* block [local x1 [init e1 | default e1 | ],..., xn [...] do eq done *)
 and sblock genv env { b_vars; b_body; b_loc } s_b =
+  let l = Env.to_list env in
   match s_b with
   | Slist (s_eq :: s_list) ->
      let* bot_x, s_list =
@@ -2216,14 +2217,18 @@ and sblock_with_reset genv env b_eq s_eq r =
 
 (* computes one step for the body of a for loop *)
 (* for[ward|each] [resume] (n)[i](...) returns (acc_env)
-     local x1,...,xm do eq [[while|until|unless] c] *)
+     b [[while|until|unless] c] *)
 and sforblock genv env acc_env as_env b for_exit s_b =
   (* the semantics for a block [local x1,...,xn do eq] *)
   let sbody genv env b s_b acc_env =
+    let l = Env.to_list acc_env in
     let sem s_b env_in =
-      let* env, env_eq_not_x, s_b =
+      let l = Env.to_list env_in in
+      let* env, env_not_x, s_b =
         sblock genv (Env.append env_in env) b s_b in
-      let new_env_in = Fix.complete env_in env_eq_not_x in
+      let new_env_in = Fix.complete env_in env_not_x in
+      let l1 = Env.to_list env_in in
+      let l2 = Env.to_list new_env_in in
       return ((env, new_env_in), s_b) in
     let* _, (env, new_acc_env), s_b =
       Fix.fixpoint b.b_loc (Env.cardinal acc_env + 1) Fix.stop sem s_b acc_env

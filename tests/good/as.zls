@@ -1,14 +1,14 @@
-(* let node main1() =
-  forward<<4>>[i] returns ([|oi] as o)
+let node main1() =
+  forward<<4>>[i] returns ([|oi|] as o)
     do oi = forward(xi in last o) returns (oi init 0)
               do oi = last oi + xi done
-    done *)
-
-let node main0(o1) returns (o2)
-  forward<<4>>(o in o1) returns (o2)
-    do o2 = 1 done
+    done
 
 (*
+let main0() returns (o2)
+  forward<<4>>() returns (o2)
+    do o2 = 1 done
+
 let zero<<n>>() returns (o)
   forward<<n>>() returns (oi out o)
     do oi = 0.0 done
