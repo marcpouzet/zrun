@@ -261,7 +261,7 @@ let step loc sbody env i_env i acc_env as_env s =
 (* a step function, an accumulated environment; returns both a list of *)
 (* environments and a new accumulated environment. *)
 (* The [foreach] corresponds to the mapfold with [n] distinct states *)
-let foreach_eq f acc_env0 as_env0 s_list = 
+let foreach_eq f acc_env0 s_list = 
   let rec for_rec i acc_env s_list =
     match s_list with
     | [] -> return ([], acc_env, [])
@@ -275,7 +275,7 @@ let foreach_eq f acc_env0 as_env0 s_list =
 (* an accumulated environment; returns a list of *)
 (* environments, a new accumulated environment and new state. *)
 (* The [forward] corresponds to a mapfold with a single state *)
-let forward_eq n f acc_env0 as_env0 s =
+let forward_eq n f acc_env0 s =
   let rec for_rec i acc_env s =
     if i = n then return ([], acc_env, s)
     else begin
@@ -290,14 +290,16 @@ let forward_eq n f acc_env0 as_env0 s =
 
 (* The main entries *)
 let foreach_eq loc sbody env i_env acc_env0 as_env0 s_list =
-  let f i acc_env s =
+  let step_i i acc_env s =
     let* _, local_env, acc_env, s = step loc sbody env i_env i acc_env as_env0 s in
     return (local_env, acc_env, s) in
-  let acc_env0 = initialize_acc_env_from_as_env_with_empty_arrays acc_env0 as_env0 in
-  foreach_eq f acc_env0 as_env0 s_list
+  let acc_env0 =
+    initialize_acc_env_from_as_env_with_empty_arrays acc_env0 as_env0 in
+  foreach_eq step_i acc_env0 s_list
 
 let forward_eq loc sbody env i_env acc_env0 as_env0 n s =
-  let f i acc_env s = step loc sbody env i_env i acc_env as_env0 s in
-  let acc_env0 = initialize_acc_env_from_as_env_with_empty_arrays acc_env0 as_env0 in
-  forward_eq n f acc_env0 as_env0 s
+  let step_i i acc_env s = step loc sbody env i_env i acc_env as_env0 s in
+  let acc_env0 =
+    initialize_acc_env_from_as_env_with_empty_arrays acc_env0 as_env0 in
+  forward_eq n step_i acc_env0 s
 
