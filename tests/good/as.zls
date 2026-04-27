@@ -1,7 +1,7 @@
 let node main1() =
   forward<<4>>[i] returns ([|oi|] as o)
-    do oi = forward(xi in last o) returns (oi init 0)
-              do oi = last oi + xi done
+    do oi = forward[j](xi in last o) returns (oi init 0)
+              do oi = last oi + xi + 1 done
     done
 
 (*
