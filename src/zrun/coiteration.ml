@@ -1409,7 +1409,7 @@ and sforloop_exp
           return (ve, s_for_body, sr_list)
        | Forreturns { r_returns; r_block } ->
           (* 1/ computes the environment from the [returns] *)
-          (* environment [env_v + acc_env]. Vars in [acc_env] *)
+          (* environment [acc_env] and [as_env]. Vars in [acc_env] *)
           (* are accumulated values such that *)
           (* [acc_env(last x)(i) = acc_env(x)(i-1)] where [i] is the *)
           (* iteration index. *)
@@ -1424,15 +1424,15 @@ and sforloop_exp
           let* missing, env_list, acc_env, s_for_body =
             match for_kind, s_for_body with
             | Kforeach, Slist(s_list) ->
-               let sbody env acc_env as_env s =
-                 sforblock genv env acc_env as_env r_block None s in
+               let sbody env acc_env s =
+                 sforblock genv env acc_env r_block None s in
                let* env_list, acc_env, s_list =
                  Forloop.foreach_eq loc
                    sbody env i_env acc_env as_env s_list in
                return (0, env_list, acc_env, Slist(s_list))
             | Kforward(exit), _ ->
-               let sbody env acc_env as_env s =
-                 sforblock genv env acc_env as_env r_block exit s in
+               let sbody env acc_env s =
+                 sforblock genv env acc_env r_block exit s in
                let* env_list, acc_env, s_for_body_new =
                  Forloop.forward_eq loc
                    sbody env i_env acc_env as_env for_size s_for_body in
@@ -2094,7 +2094,7 @@ and sforloop_eq
   | Vnil -> return (Match.nil_env for_block.b_write, s_for_block, so_list)
   | Value(i_env) ->
      (* 1/ computes the environment from the [returns] *)
-     (* environment [env_v + acc_env]. Vars in [acc_env] *)
+     (* environment [acc_env + as_env]. Vars in [acc_env] *)
      (* are accumulated values such that *)
      (* [acc_env(last x)(i) = acc_env(x)(i-1)] where [i] is the *)
      (* iteration index. *)
@@ -2105,15 +2105,15 @@ and sforloop_eq
      let* missing, env_list, acc_env, s_for_block =
        match for_kind, s_for_block with
        | Kforeach, Slist(s_list) ->
-          let sbody env acc_env as_env s =
-            sforblock genv env acc_env as_env for_block None s in
+          let sbody env acc_env s =
+            sforblock genv env acc_env for_block None s in
           let* env_list, acc_env, s_list =
             Forloop.foreach_eq loc
               sbody env i_env acc_env as_env s_list in
           return (0, env_list, acc_env, Slist(s_list))
        | Kforward(exit), _ ->
-          let sbody env acc_env as_env s =
-            sforblock genv env acc_env as_env for_block exit s in
+          let sbody env acc_env s =
+            sforblock genv env acc_env for_block exit s in
           let* env_list, acc_env, s_for_block_new =
             Forloop.forward_eq loc
               sbody env i_env acc_env as_env size s_for_block in
@@ -2221,12 +2221,11 @@ and sblock_with_reset genv env b_eq s_eq r =
 (* computes one step for the body of a for loop *)
 (* for[ward|each] [resume] (n)[i](...) returns (acc_env)
      b [[while|until|unless] c] *)
-and sforblock genv env acc_env as_env b for_exit s_b =
+and sforblock genv env acc_env b for_exit s_b =
   (* the semantics for a block [local x1,...,xn do eq] *)
   let l1 = Env.to_list env in
   let l2 = Env.to_list acc_env in
-  let l3 = Env.to_list as_env in
-  let sbody genv env b s_b acc_env =
+  let sbody genv env b s_b env_in =
     let l1 = Env.to_list env in
     let l2 = Env.to_list acc_env in
     let sem s_b env_in =
@@ -2240,7 +2239,7 @@ and sforblock genv env acc_env as_env b for_exit s_b =
       let l4 = Env.to_list env_not_x in
       return ((env, new_env_in), s_b) in
     let* _, (env, new_acc_env), s_b =
-      Fix.fixpoint b.b_loc (Env.cardinal acc_env + 1) Fix.stop sem s_b acc_env
+      Fix.fixpoint b.b_loc (Env.cardinal acc_env + 1) Fix.stop sem s_b env_in
     in
     return (env, new_acc_env, s_b) in
   (* evaluation function for the exit condition; the condition *)
