@@ -74,12 +74,6 @@ let dim_dim loc v =
      r
   | _ -> error { kind = typ_error_array; loc }
 
-(* extend an array of length [i-1] with an element at index [i] *)
-(* returns \j:[i+1].if j = i then vi else v *)
-let extend_at i vi v =
-  Varray(Vmap { m_length = i+1;
-                m_u = fun j -> if j = i then return vi else return v })
-
 (* concat two arrays [v1] and [v2] *)
 let concat loc v1 v2 =
   let concat v1 v2 =
@@ -129,6 +123,12 @@ let get loc v i =
      let* v = get_in_array loc a i in
      return (Value(v))
   | _ -> error { kind = Etype(Some(Etyp_array)); loc }
+
+(* extend an array of length [i-1] with an element at index [i] *)
+(* returns \j:[i+1].if j = i then vi else v *)
+let extend_at loc i vi v =
+  Varray(Vmap { m_length = i+1;
+                m_u = fun j -> if j = i then return vi else geti loc v j })
 
 let get_with_default loc v i default =
   let get a i =

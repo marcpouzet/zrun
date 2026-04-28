@@ -657,11 +657,11 @@ module Make (Info: INFO) =
     
     and for_exp ff r =
       let for_returns ff for_vardec_list =
-        let for_vardec ff { desc = { for_array; for_vardec } } =
+        let for_vardec ff { desc = { for_array; for_vardec; for_as } } =
           let rec print_array_of n ff x =
             if n = 0 then vardec expression ff x
             else fprintf ff "@[<hov 1>[|@,%a@,|]@]" (print_array_of (n-1)) x in
-          print_array_of for_array ff for_vardec in
+          fprintf ff "@[%a%a@]" (print_array_of for_array) for_vardec as_name for_as in
         print_list_r for_vardec "(" "" ")" ff for_vardec_list in
       match r with
       | Forexp { exp; default = d} ->
