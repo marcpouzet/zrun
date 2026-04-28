@@ -110,7 +110,7 @@ let inv_left_triangular<<n>>(l:[n][n]_) returns (b:[n][n]_)
         local sum
 	do
 	  forward(k in j to i-1) returns (sum init 0.0)
-            do sum = last sum -. l.(i).(k) *. b_low_.(k) done
+            do sum = last sum -. l.(i).(k) *. (last b_low_).(k) done
 	and
 	  b_low_i = -. sum /. l.(i).(i)
 	done
