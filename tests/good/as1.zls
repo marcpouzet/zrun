@@ -6,20 +6,35 @@
 (* and a form with an update of a vector or matrix that is first initialized *)
 
 (* input: x: [n]int *)
-(* output: s: [n]int such that s.(i) = sum_{j = 0}{i-1} s.(j) + x.(i) *)
+(* output: s: [n]int such that s.(i) = (sum_{j = 0}{i-1} s.(j)) + x.(i) *)
 let sum_sum<<n>>(x:[n]_) =
   forward<<n>>[i] (xi in x) returns ([|si|] as s)
     (* inside the body, [s] is undefined. *)
     (* in iteration [i], [last s] is the partial array of length [i] that *)
     (* contains [|s.(0);...;s.(i-1)|] *)
-    do si = forward[j](sj in last s) returns (si init 0)
-              do si = last si + sj + xi done
+    do si = (forward[j](sj in last s) returns (si init 0)
+              do si = last si + sj + xi done) + xi
+    done
+
+let x = [|1;2;3;4;5|]
+let main1_x = [|1;3;7;15;31|]
+        
+let main1() = sum_sum<<5>>(x)
+
+(* an equivalent form but with a slightly different syntax. *)
+let sum_sum_eq<<n>>(x:[n]_) returns (s)
+  forward<<n>>[i] (xi in x) returns (si out s as s_)
+    (* inside the body, [s_] is undefined. *)
+    (* in iteration [i], [last s_] is the partial array of length [i] that *)
+    (* contains [|s.(0);...;s.(i-1)|] *)
+    do si = (forward[j](sj in last s') returns (si init 0)
+              do si = last si + sj + xi done) + xi
     done
 
 let x = [|1;2;3;4;5|]
 
-let main1() = sum_sum<<5>>(x)
-  
+let main11() = sum_sum_eq<<5>>(x)
+
 (* initialize a vector with 0s *)
 let zero<<n>>() returns (o)
   forward<<n>>() returns (oi out o)
@@ -35,8 +50,8 @@ let sum_sum_with_update<<n>>(x:[n]_) returns (s)
   forward<<n>>[i](xi in x) returns (s init (zero<<n>>()))
     do
       s = [| last s with i <-
-               forward(i)[j]() returns (si init 0)
-                      do si = last si + (last s).(j) + xi done |]
+               (forward(i)[j]() returns (si init 0)
+                  do si = last si + (last s).(j) done) + xi |]
     done
 
 let main2() = sum_sum_with_update<<5>>(x)
