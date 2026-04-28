@@ -65,7 +65,8 @@ let dim_dim loc v =
   | Varray(v) ->
      let r = match v with
        | Vflat(a) ->
-          let* m = dim loc (a.(0)) in
+          let* m = if Array.length a > 0 then dim loc (a.(0))
+                   else error { kind = typ_error_array; loc } in
           return (Array.length a, m)
        | Vmap { m_length; m_u } ->
           let* v = m_u 0 in

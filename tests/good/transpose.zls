@@ -1,5 +1,5 @@
 let main() =
-  let x:[0][2]_ = [||] in
+  let x = ([||]:[0][2]_) in
   let y = x.T in
   x, y,
   forward(2)[j](xi in x.T) returns ([|oi|])
