@@ -3,3 +3,11 @@ let sum() returns s
     do si = (forward[j](sj in last s_) returns (si init 0)
               do si = last si + sj done) + 1
     done
+
+let main1 () =
+  let s = sum () in
+  s
+
+let main2 () =
+  let s = sum () in
+  assert (s = [| 1; 2; 4; 8 |])
