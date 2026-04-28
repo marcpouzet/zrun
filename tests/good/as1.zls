@@ -1,0 +1,44 @@
+(* simple uses of the construct [as ...] in for loops *)
+(* this construct is useful to program some classical algorithms of *)
+(* linear algebra; the typical algorithm is the inversion of a triangular matrix *)
+
+(* we illustrate here with very simple examples; with a form that use [as ...] *)
+(* and a form with an update of a vector or matrix that is first initialized *)
+
+(* input: x: [n]int *)
+(* output: s: [n]int such that s.(i) = sum_{j = 0}{i-1} s.(j) + x.(i) *)
+let sum_sum<<n>>(x:[n]_) =
+  forward<<n>>[i] (xi in x) returns ([|si|] as s)
+    (* inside the body, [s] is undefined. *)
+    (* in iteration [i], [last s] is the partial array of length [i] that *)
+    (* contains [|s.(0);...;s.(i-1)|] *)
+    do si = forward[j](sj in last s) returns (si init 0)
+              do si = last si + sj + xi done
+    done
+
+let x = [|1;2;3;4;5|]
+
+let main1() = sum_sum<<5>>(x)
+  
+(* initialize a vector with 0s *)
+let zero<<n>>() returns (o)
+  forward<<n>>() returns (oi out o)
+    do oi = 0.0 done
+
+(* a solution that is less elegant that the solution that uses [as ...] *)
+(* It consists in initializing the output array [s] with 0s and to update it *)
+(* sequentially in every iteration of the nested for loop *)
+(* if the compiler is smart enough, there is no copy in the generated code, *)
+(* that is, the update [o = [| last o with i <- e|] is implemented by an *)
+(* assignment *)
+let sum_sum_with_update<<n>>(x:[n]_) returns (s)
+  forward<<n>>[i](xi in x) returns (s init (zero<<n>>()))
+    do
+      s = [| last s with i <-
+               forward(i)[j]() returns (si init 0)
+                      do si = last si + (last s).(j) + xi done |]
+    done
+
+let main2() = sum_sum_with_update<<5>>(x)
+
+let main() = assert (main1() = main2())
