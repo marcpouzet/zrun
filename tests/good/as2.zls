@@ -1,0 +1,5 @@
+let sum() returns s
+  forward<<4>>[i] returns (si out s as s_)
+    do si = (forward[j](sj in last s_) returns (si init 0)
+              do si = last si + sj done) + 1
+    done

@@ -305,7 +305,8 @@ module Make (Info: INFO) =
       let defnames =
         Util.optional
           (fun acc as_name ->
-            if S.mem as_name acc then Error.error loc (Error.Enon_linear_pat(as_name))
+            if S.mem as_name acc
+            then Error.error loc (Error.Enon_linear_pat(as_name))
             else S.add as_name acc) defnames for_as in
       build_vardec defnames for_vardec
     
@@ -358,9 +359,10 @@ module Make (Info: INFO) =
           let acc_xi_local_names, acc_out_names =
             match for_out_name with
             | None ->
-               (* if no [out x] is given, [xi] is considered to be an accumulation *)
-               (* that is also an output of the for loop. Otherwise, it is local *)
-               (* [for_name] is an accumulator and output *)
+               (* if no [out x] is given, [xi] is considered to be an *)
+               (* accumulation and an output of the loop *)
+               (* Otherwise, it is local *)
+               (* [for_name] is an accumulator and an output *)
                acc_xi_local_names, S.add for_name acc_out_names
             | Some(x) ->
                (* only [x] is an output; [for_name] is local to the loop body *)
@@ -572,51 +574,54 @@ module Make (Info: INFO) =
       Util.mapfold input acc i_list
     
     and for_out_t env i_env for_out =
-      (* [local_env] is the environment for variables defined in the *)
-      (* for loop that are associated to an output [oi out o]. In that *)
-      (* case, [oi] is local to the loop body; [o] is the only defined *)
-      (* variable that is visible outside. If no [oi out o] is given *)
-      (* [oi] is both local and global; it is considered to be an accumulation *)
-      (* [as o] defines [last o] to be the partial array of size [i] *)
-      (* in iteration [i] *)
-      let for_out_one (local_env, acc_names)
+      (* [local_out_env] is the environment of variables defined *)
+      (* in the [returns] clause *)
+      (* [oi out o] or [o init e]: o must be declared globally *)
+      (* [oi out o] or [oi as o_] : oi and o_ are local to the loop *)
+      let for_out_one local_out_env
             { desc =
                 { for_name; for_init; for_default; for_out_name; for_as_name };
               loc } =
         (* check that [for_name] is distinct from input names. This is *)
         (* not mandatory but makes loops simpler to understand *)
-        if Env.mem for_name i_env || S.mem for_name acc_names
+        if Env.mem for_name i_env || Env.mem for_name local_out_env
         then Error.error loc (Error.Enon_linear_forloop(for_name))
         else
-          let acc_names = S.add for_name acc_names in
-          let for_name, local_env, acc_names =
+          let for_name, for_out_name, local_out_env =
             match for_out_name with
             | Some(out_name) ->
-               if Env.mem out_name i_env || S.mem out_name acc_names
+               (* check that [out_name] is distinct from inputs *)
+               (* and names in the [return] clause *)
+               if Env.mem out_name i_env || Env.mem out_name local_out_env
                then Error.error loc (Error.Enon_linear_forloop(for_name))
                else
                  (* if [oi out o] then [oi] is local to the body *)
-                 let m = fresh for_name in
-                 m, Env.add for_name m local_env, S.add out_name acc_names
-            | None -> (* otherwise [oi] is both local and global *)
-               name loc env for_name, local_env, acc_names in
-          let for_as_name, local_out_env, acc_names =
+                 (* and [o] must already exist in the environment *)
+                 let m_for_name = fresh for_name in
+                 let m_out_name = name loc env out_name in
+                 m_for_name, Some(m_out_name),
+                 Env.add for_name m_for_name
+                   (Env.add out_name m_out_name local_out_env)
+            | None ->
+               (* [oi] is an accumulation *)
+               let m_for_name = name loc env for_name in
+               m_for_name, None, Env.add for_name m_for_name local_out_env in
+          let for_as_name, local_out_env =
             match for_as_name with
             | Some(as_name) ->
-               (* check that [as_name] is distinct from input names and *)
-               (* other names of the return *)
-               if Env.mem as_name i_env || S.mem as_name acc_names
+               (* check that [as_name] is distinct from inputs *)
+               (* and names in the [return] clause *)
+               if Env.mem as_name i_env || Env.mem as_name local_out_env
                then Error.error loc (Error.Enon_linear_forloop(as_name))
                else
-                 let m = fresh as_name in
-                 Some(m), Env.add as_name m local_env, acc_names
-            | None -> (* otherwise [oi] is both local and global *)
-               None, local_env, acc_names in
+                 let m_as_name = fresh as_name in
+                 Some(m_as_name), Env.add as_name m_as_name local_out_env
+            | None -> 
+               None, local_out_env in
           let for_init =
             Util.optional_map (expression env) for_init in
           let for_default =
             Util.optional_map (expression env) for_default in
-          let for_out_name = Util.optional_map (name loc env) for_out_name in
           { Zelus.desc =
               { Zelus.for_name = for_name; Zelus.for_init = for_init;
                 Zelus.for_default = for_default;
@@ -624,10 +629,10 @@ module Make (Info: INFO) =
                 Zelus.for_as_name = for_as_name;
                 Zelus.for_info = Info.no_info  };
             Zelus.loc = loc },
-          (local_env, acc_names) in
-      let for_out_list, (local_env, _) =
-        Util.mapfold for_out_one (Env.empty, S.empty) for_out in
-      for_out_list, local_env
+          local_out_env in
+      let for_out_list, local_out_env =
+        Util.mapfold for_out_one Env.empty for_out in
+      for_out_list, local_out_env
     
     (* translation of for loops *)
     and forloop_eq env_pat env
@@ -641,6 +646,8 @@ module Make (Info: INFO) =
       let for_input, i_env =
         for_input_t env i_env for_input in
       let env = Env.append i_env env in
+      (* here, we check that names introduces in the [returns] clause *)
+      (* are pair-wise distinct from names for inputs *)
       let for_out, local_out_env =
         for_out_t env i_env for_out in
       let env = Env.append local_out_env env in

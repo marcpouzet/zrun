@@ -1,6 +1,9 @@
 (* simple uses of the construct [as ...] in for loops *)
-(* this construct is useful to program some classical algorithms of *)
-(* linear algebra; the typical algorithm is the inversion of a triangular matrix *)
+(* this construct is useful to program classical algorithms of *)
+(* linear algebra; the typical ones are the triangular matrix inversion *)
+(* and Cholesky decomposition. In some cases, it allows replacing a sequence *)
+(* of updates of an array or matrix initialized with 0s and have a more *)
+(* declarative form, with a single definition per element *)
 
 (* we illustrate here with very simple examples; with a form that use [as ...] *)
 (* and a form with an update of a vector or matrix that is first initialized *)
