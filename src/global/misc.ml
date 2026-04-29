@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2025 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -88,7 +88,8 @@ let no_assert = ref false
 (* remove the check that fix-point equation produce non bottom values *)
 let no_causality = ref false
 
-(* sets the interpretation of the if/then/else to be strict w.r.t the first argument *)
+(* sets the interpretation of the if/then/else to be strict *)
+(* w.r.t the first argument *)
 (* this is how the if/then/else is interpreted in Lustre *)
 (* if v1 then v2 else v3 = bot if (v1 = bot) or (v2 = bot) or (v3 = bot) *)
 let lustre = ref false
@@ -96,10 +97,23 @@ let lustre = ref false
 (* sets the interpretation of the if/then/else to be such that *)
 (* if _ then v1 else v2 = v1 if v1 = v2 *)
 (* this is used to implement the constructive causality of Esterel *)
+(* instead of using the three-valued interpretation of the boolean *)
+(* operations or and and *)
 let esterel = ref false
 
 (* static reduction *)
 let static_reduction = ref false
+
+(* attributes annotations in the source. They turn on/off compiler flags *)
+let apply_attribute a_list =
+  let attribute a =
+    (* for the moment, only some of the attributes are taken into account *)
+    (* warning: they change the flags globally. This is a temporary choice; *)
+    (* this may change in further versions *)
+    if a = "esterel" then esterel := true
+    else if a = "lustre" then lustre := true
+    else if a = "no_assert" then no_assert := true in
+  List.iter attribute a_list
 
 let apply_with_close_out f o =
   try

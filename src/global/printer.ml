@@ -675,11 +675,14 @@ module Make (Info: INFO) =
     
     and block_of_equation ff b_eq =
       block expression equation ff b_eq
+
+    and attribute ff a_list =
+      print_list_r_empty (fun ff s -> fprintf ff "%s" s) "[@" "" "]" ff a_list
     
-    and leq ff { l_rec; l_kind; l_eq; l_env } =
+    and leq ff { l_rec; l_kind; l_eq; l_env; l_attribute } =
       let s = if l_rec then " rec " else "" in
-      fprintf ff "@[<v0>@[<hov2>let%a%s@ %a@ %a@]@]" 
-        vkind l_kind s equation l_eq print_env l_env 
+      fprintf ff "@[<v0>@[<hov2>let%a%a%s@ %a@ %a@]@]" 
+        attribute l_attribute vkind l_kind s equation l_eq print_env l_env 
     
     and leqs ff l = print_list_r_empty leq "" "in" "in " ff l
     

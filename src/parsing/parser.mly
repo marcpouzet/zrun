@@ -210,6 +210,7 @@ let annotate_with_type t_opt ({ desc; loc = Loc(start_pos, _) } as e) =
 %token RBRACKET       /* "]" */
 %token LBRACKETBAR    /* "[|" */
 %token RBRACKETBAR    /* "|]" */
+%token LBRACKETAT     /* "[@" */
 %token LET            /* "let" */
 %token LESSMINUS      /* "<-" */
 %token LOCAL          /* "local" */
@@ -485,9 +486,21 @@ implementation:
     td = localized(type_declaration_desc)
     { Etypedecl
 	{ name = id; ty_params = tp; ty_decl = td } }
-  | LET v = vkind_opt i = is_rec let_eq = equation_and_list
+  | LET at = attribute_opt v = vkind_opt i = is_rec
+        let_eq = equation_and_list
     { Eletdecl(make 
-                 { l_rec = i; l_kind = v; l_eq = let_eq } $startpos $endpos) }
+                 { l_rec = i; l_kind = v; l_eq = let_eq; l_attribute = at }
+	       $startpos $endpos) }
+;
+
+attribute_opt:
+  | at_opt = optional(attribute)
+    { match at_opt with None -> [] | Some(l) -> l }
+;
+
+attribute:
+  | LBRACKETAT id_list = list_no_sep_of(IDENT) RBRACKET
+    { id_list }
 ;
 
 vkind:
@@ -528,9 +541,9 @@ result:
     EQUAL seq = seq_expression %prec prec_result
     { make (Exp(annotate_with_type t_opt seq)) $startpos(seq) $endpos(seq) }
   | t_opt = optional(colon_type_expression)
-    EQUAL seq = seq_expression WHERE 
+    EQUAL seq = seq_expression WHERE
       v = vkind_opt i = is_rec eq = where_equation_and_list %prec prec_result
-    { make (Exp(make (Elet(make { l_rec = i; l_kind = v; l_eq = eq }
+    { make (Exp(make (Elet(make { l_rec = i; l_kind = v; l_eq = eq; l_attribute = [] }
 			   $startpos(eq) $endpos(eq),
 			   annotate_with_type t_opt seq))
 		$startpos(seq) $endpos(eq)))
@@ -606,7 +619,7 @@ stream_equation_desc:
   | RESET eq = equation_and_list EVERY e = expression
     { EQreset(eq, e) }
   | LET v = vkind_opt i = is_rec let_eq = equation_and_list IN eq = equation
-    { EQlet(make { l_rec = i; l_kind = v; l_eq = let_eq}
+    { EQlet(make { l_rec = i; l_kind = v; l_eq = let_eq; l_attribute = [] }
 	    $startpos $endpos(let_eq), eq) }
   | AUTOMATON opt_bar a = automaton_handlers(equation_empty_and_list) opt_end
     { EQautomaton(List.rev a, None) } 
@@ -790,7 +803,7 @@ let_list:
 
 one_let:
   | LET v = vkind_opt i = is_rec eq = equation_and_list
-    { make { l_rec = i; l_kind = v; l_eq = eq } $startpos $endpos }
+    { make { l_rec = i; l_kind = v; l_eq = eq; l_attribute = [] } $startpos $endpos }
 ;
 
 local_list:
@@ -1169,7 +1182,8 @@ expression_desc:
   | p = PREFIX e = expression
       { unop p e ($startpos(p)) ($endpos(p)) }
   | LET v = vkind_opt i = is_rec eq = equation_and_list IN e = seq_expression
-    { Elet(make { l_rec = i; l_kind = v; l_eq = eq } $startpos $endpos(eq), e) }
+    { Elet(make { l_rec = i; l_kind = v; l_eq = eq; l_attribute = [] }
+	   $startpos $endpos(eq), e) }
   | LOCAL v_list = vardec_comma_list
     DO eq = equation_and_list IN e = seq_expression
     { Elocal(v_list, eq, e) }  

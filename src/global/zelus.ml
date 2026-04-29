@@ -13,7 +13,7 @@
 (*                                                                     *)
 (* *********************************************************************)
 
-(* The mais ast. types are parameterized by two types variables *)
+(* The main ast. types are parameterized by two types variables *)
 (* ['info] and ['env]; the first is the information attached to expressions *)
 (* the second is the containt of an environment (a map from *)
 (* names to values *)
@@ -358,8 +358,11 @@ and ('info, 'ienv) leq =
     l_rec: is_rec;
     l_eq: ('info, 'ienv) eq;
     l_loc : Location.t;
+    l_attribute : attribute;
     mutable l_env: 'ienv Ident.Env.t;
   }
+
+and attribute = name list
 
 and ('info, 'ienv) eq =
   { eq_desc: ('info, 'ienv) eq_desc; (* descriptor *)

@@ -377,7 +377,9 @@ and 'a default =
   | Init : 'a -> 'a default | Else : 'a -> 'a default | NoDefault
 
 and leq = leq_desc localized
-and leq_desc = { l_kind: vkind; l_rec: is_rec; l_eq: eq }
+and leq_desc = { l_kind: vkind; l_rec: is_rec; l_eq: eq; l_attribute: attribute }
+
+and attribute = name list
 
 and is_atomic = bool
 
