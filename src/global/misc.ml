@@ -115,6 +115,8 @@ let apply_attribute a_list =
     else if a = "no_assert" then no_assert := true in
   List.iter attribute a_list
 
+let apply_attribute a_list = ()
+
 let apply_with_close_out f o =
   try
     f o;
