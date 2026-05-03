@@ -825,9 +825,7 @@ and ileq_list is_fun genv env leq_list =
     Env.empty leq_list
   
 (* initial state of a local declaration [let eq in e] *)
-and ileq is_fun genv env ({ l_kind; l_eq; l_rec; l_attribute } as leq) =
-  (* apply the list of attributes *)
-  apply_attribute l_attribute;
+and ileq is_fun genv env ({ l_kind; l_eq; l_rec } as leq) =
   match l_kind with
   | Kconst | Kstatic ->
      (* if the declaration is constant/static, its value is computed during *)
@@ -1508,9 +1506,7 @@ and vexp genv env e =
 
 (* computing the environment defined by a local definition *)
 (* the expression [l_eq] is expected to be combinational *)
-and vleq genv env ({ l_rec; l_eq; l_attribute } as leq) =
-  (* apply the list of attributes *)
-  apply_attribute l_attribute;
+and vleq genv env ({ l_rec; l_eq } as leq) =
   (* for the moment, recursive functions are only allowed when they *)
   (* are size functions *)
   if l_rec then
@@ -2673,7 +2669,7 @@ let implementation genv { desc; loc } =
            let* v = Env.find_opt id env |>
                       Opt.to_result ~none:{ kind = Eunbound_ident(id); loc = loc }
            in return (n, v)) d_names in
-     (* debug info (a bit of imperative code here!) *)
+     (* debug info (a bit of imperative code here) *)
      if !print_values then Output.letdecl Format.std_formatter f_pvalue_list;
      (* add all entries in the current global environment *)
      let genv =

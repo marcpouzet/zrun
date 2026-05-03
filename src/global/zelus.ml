@@ -527,8 +527,10 @@ type ('info, 'ienv) implementation = ('info, 'ienv) implementation_desc localize
 
 and ('info, 'ienv) implementation_desc =
   | Eopen of name 
-  (* names defined globally and equations *)
-  | Eletdecl of { d_names: (name * Ident.t) list; d_leq: ('info, 'ienv) leq } 
+  | Eletdecl of
+      { d_leq: ('info, 'ienv) leq; (* equations *)
+        d_names: (name * Ident.t) list; (* globally defined names *)
+      } 
   | Etypedecl of
       { name: name; ty_params: name list;  ty_decl: type_decl } 
 

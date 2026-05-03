@@ -1058,7 +1058,7 @@ module Make (Info: INFO) =
           | Eletdecl(d_leq) ->
              let d_leq, env = letin Env.empty d_leq in
              let d_names = Env.to_list env in
-             Zelus.Eletdecl { d_names = d_names; d_leq = d_leq }
+             Zelus.Eletdecl { d_leq = d_leq; d_names = d_names }
           | Etypedecl { name; ty_params; ty_decl } ->
              let ty_decl = type_decl ty_decl in
              Zelus.Etypedecl { name = name; ty_params; ty_decl } in
