@@ -286,6 +286,16 @@ and compare_array compare a1 a2 =
   | Vmap({ m_u = a1 }), Vmap({ m_u = a2 }) -> 
     compare_array_n n (get_i, a1) (get_i, a2)
 
+and eq_pvalue pv1 pv2 =
+  let* r = compare_pvalue pv1 pv2 in
+  return (r = 0)
+
+and eq_value v1 v2 =
+  match v1, v2 with
+  | (Vbot, Vbot) | (Vnil, Vnil) -> return true
+  | (Value(pv1), Value(pv2)) -> eq_pvalue pv1 pv2
+  | _ -> none
+
 and compare_value v1 v2 =
   match v1, v2 with
   | (Vbot, Vbot) | (Vnil, Vnil) -> return 0
@@ -311,7 +321,6 @@ let lte_op v1 v2 =
 let gte_op v1 v2 =
   let* v = compare_pvalue v1 v2 in
   return (Vbool(v >= 0))
-
        
 (* ifthenelse. this one is strict w.r.t all arguments *)
 let lustre_ifthenelse v1 v2 v3 =
@@ -371,8 +380,12 @@ let esterel_ifthenelse v1 v2 v3 =
   | _ -> return (if v2 = v3 then v2 else v1)
 
 let esterel_ifthenelse v1 v2 v3 =
-  if v2 = v3 then return v2
-  else lazy_ifthenelse v1 v2 v3
+  match v1 with
+  | Value(v1) -> ifthenelse_op v1 v2 v3
+  | _ ->
+     let r = eq_value v2 v3 in
+     return (if Opt.value r ~default:false then v2 else v1)
+
 (* with it, we can define [or_gate] and [and_gate] *)
 (* with three values:
  *- or(x, true) = or(true, x) = true
@@ -492,6 +505,24 @@ let unop_process op s =
         fun s v -> let* v = lift1 (op s) v in return (v, s) }
  *)
 
+let binop_vfun f =
+  let open Error in
+  let typ_error = { kind = Etype None; loc = Location.no_location } in
+  let f_fun v_list =
+    match v_list with
+    | [v1;v2] -> f v1 v2 |> Opt.to_result ~none: typ_error
+    | _-> Result.error typ_error in
+  Vfun { f_arity = 2; f_no_input = false; f_fun }
+
+let ternop_vfun f =
+  let open Error in
+  let typ_error = { kind = Etype None; loc = Location.no_location } in
+  let f_fun v_list =
+    match v_list with
+    | [v1;v2;v3] -> f v1 v2 v3 |> Opt.to_result ~none: typ_error
+    | _-> Result.error typ_error in
+  Vfun { f_arity = 3; f_no_input = false; f_fun }
+
 let _ = Random.init 0
 
 let random_bool_op _ =
@@ -548,12 +579,22 @@ let list_of_random_primitives () =
 
 let to_env acc l = List.fold_left (fun acc (n, v) -> Genv.E.add n v acc) acc l
 
-let list_of_esterel_primitives =
-  if !esterel then ["or", esterel_or_op; "&", esterel_and_op] else []
+let esterel_or_and_primitives () =
+  if !esterel then
+    ["or", binop_vfun esterel_or_op;
+     "&", binop_vfun esterel_and_op] else []
 
 let stdlib_env () =
+  let values =
+    to_env (to_env Genv.E.empty (list_of_primitives ()))
+      (list_of_random_primitives ()) in
+  (* change the interpretation of the [if/then/else] *)
+  (* if the compiler flag [-lustre] or [-esterel] is set *)
+  let values =
+    Genv.E.add "_ifthenelse"
+      (ternop_vfun (if !lustre then lustre_ifthenelse
+                    else if !esterel then esterel_ifthenelse
+                    else lazy_ifthenelse)) values in
   { Genv.name = "Stdlib";
-    Genv.values =
-      to_env (to_env Genv.E.empty (list_of_primitives ()))
-        (list_of_random_primitives ()) }
-
+    Genv.values = values }
+      
