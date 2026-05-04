@@ -106,10 +106,10 @@ let get_in_array loc a i =
   | Vflat(a) ->
      let n = Array.length a in
      if (i >= 0) && (i < n) then return (a.(i))
-     else error { kind = Earray_size { size = n; index = i }; loc }
+     else error { kind = Earray_index { size = n; index = i }; loc }
   | Vmap { m_length; m_u } ->
      if (i >= 0) && (i < m_length) then m_u i
-     else error { kind = Earray_size { size = m_length; index = i }; loc }
+     else error { kind = Earray_index { size = m_length; index = i }; loc }
 
 let geti loc v i =
   match v with
@@ -150,23 +150,19 @@ let get_with_default loc v i default =
 (* x.(i1 .. i2) returns a slices of [x] between index [i1] and [i2] *)
 (* if [i2 < i1], the result array is empty, that is, [||] *)
 (* if [x: [n]a] then x.(i1 .. i2) : [i2-i1+1]a *)
-let slice loc v i1 i2 = match v with
-  | Vflat(a) ->
-     let n = Array.length a in
-     if (0 <= i1) && (i1 <= n) then
-       let len = i2 - i1 + 1 in
-       if (0 <= i2) && (i2 <= n) then
-         return (Value(Varray(Vflat(Array.sub a i1 len))))
-       else error { kind = Earray_size { size = n; index = i2 }; loc }
-     else error { kind = Earray_size { size = n; index = i1 }; loc }
-  | Vmap { m_length; m_u } ->
-     if (0 <= i1) && (i1 <= m_length) then
-       if (0 <= i2) && (i2 <= m_length) then
-         let m_u = fun i -> m_u (i + i1) in
-         return (Value(Varray(Vmap { m_length = i2 - i1 + 1; m_u })))
-       else
-         error { kind = Earray_size { size = m_length; index = i2 }; loc }
-     else error { kind = Earray_size { size = m_length; index = i1 }; loc }
+let slice loc v i1 i2 =
+  let a = i1 in
+  let b = i2 + 1 in
+  match v with
+  | Vflat(arr) ->
+     let n = Array.length arr in
+     if (0 <= a) && (a <= b) && (b <= n) then
+       return (Value(Varray(Vflat(Array.sub arr a (b - a)))))
+     else error { kind = Earray_slice { size = n; i1 = i1; i2 = i2 }; loc }
+  | Vmap { m_length = n; m_u } ->
+     if (0 <= a) && (a <= b) && (b <= n) then
+       return (Value(Varray(Vmap { m_length = (b - a); m_u = (fun i -> m_u (i + i1)) })))
+     else error { kind = Earray_slice { size = n; i1 = i1; i2 = i2 }; loc }
 
 let slice_both loc v i1 i2 =
   let+ v = v and+ i1 = i1 and+ i2 = i2 in

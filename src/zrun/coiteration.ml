@@ -1605,7 +1605,7 @@ and sfor_input_short genv env (size_opt, i_env) { desc; loc } s =
           if a_size = size then
             return (Value(Some(size), Env.add id entry i_env))
           else
-            error { kind = Earray_size { size = a_size; index = size }; loc } in
+            error { kind = Earray_index { size = a_size; index = size }; loc } in
      return (size_opt_i_env, Slist [se; se_opt])
   | Einput { id; e; by = Some _ }, Slist [se; Sval(Value(Vint(k)))] ->
      (* [id in e by k] means that in iteration [i], [id = e.(k * i)] *)
@@ -1621,7 +1621,7 @@ and sfor_input_short genv env (size_opt, i_env) { desc; loc } s =
           then return (Value(Some(size), Env.add id entry i_env))
           else
             error
-              { kind = Earray_size { size = a_size; index = size * k }; loc } in
+              { kind = Earray_index { size = a_size; index = size * k }; loc } in
      return (size_opt_i_env, Slist [se; Sval(Value(Vint(k)))])
   | Eindex { id; e_left; e_right; dir }, Slist [se_left; se_right] ->
      let* ve_left, se_left = sexp genv env e_left se_left in
@@ -1634,7 +1634,7 @@ and sfor_input_short genv env (size_opt, i_env) { desc; loc } s =
        | Some(size) ->
           if a_size = size
           then return (Value(Some(size), Env.add id entry i_env))
-          else error { kind = Earray_size { size; index = a_size }; loc } in
+          else error { kind = Earray_index { size; index = a_size }; loc } in
      return (i_env, Slist [se_left; se_right])
   | _ ->
      error { kind = Estate; loc }
@@ -1653,7 +1653,7 @@ and sfor_input size genv env i_env { desc; loc } s =
        if a_size = size
        then return (Value(Env.add id entry i_env))
        else
-         error { kind = Earray_size { size = a_size; index = size }; loc } in
+         error { kind = Earray_index { size = a_size; index = size }; loc } in
      return (i_env, Slist [se; se_opt])
   | Einput { id; e; by = Some _ }, Slist [se; Sval(Value(Vint(k)))] ->
      (* [id in e by k] means that in iteration [i], [id = e.(k * i)] *)
@@ -1666,7 +1666,7 @@ and sfor_input size genv env i_env { desc; loc } s =
        then return (Value(Env.add id entry i_env))
        else
          error
-           { kind = Earray_size { size = a_size; index = size * k }; loc } in
+           { kind = Earray_index { size = a_size; index = size * k }; loc } in
      return (i_env, Slist [se; Sval(Value(Vint(k)))])
   | Eindex { id; e_left; e_right; dir }, Slist [se_left; se_right] ->
      let* ve_left, se_left = sexp genv env e_left se_left in
@@ -1676,7 +1676,7 @@ and sfor_input size genv env i_env { desc; loc } s =
        let+ a_size, entry = entry in
        if a_size = size
        then return (Value(Env.add id entry i_env))
-       else error { kind = Earray_size { size; index = a_size }; loc } in
+       else error { kind = Earray_index { size; index = a_size }; loc } in
      return (i_env, Slist [se_left; se_right])
   | _ ->
      error { kind = Estate; loc }
@@ -1705,7 +1705,7 @@ and sfor_input_no_size genv env i_env { desc; loc } s =
          if r = 0 then return (a_size / k)
          else
            error
-             { kind = Earray_size { size = a_size; index = a_size + r };
+             { kind = Earray_index { size = a_size; index = a_size + r };
                loc } in
        return (Value(size, Env.add id entry i_env)) in
      return (size_i_env, Slist [se; sv])

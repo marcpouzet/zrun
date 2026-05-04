@@ -43,7 +43,8 @@ type kind =
   (* two equations define a common name *)
   | Erecursive_value : kind (* recursive value definition *)
   | Enot_causal : Ident.S.t -> kind (* a set of variables whose value is bot *)
-  | Earray_size : { size : int; index : int } -> kind
+  | Earray_index : { size : int; index : int } -> kind
+  | Earray_slice : { size : int; i1 : int; i2 : int } -> kind
   (* the array is of size [size] but accessed out-of-bound, at index > size *)
   | Eloop_index : { size : int; index : int } -> kind
   (* the loop has [size] iterations but the index is of a different size *)
@@ -184,9 +185,12 @@ let message loc kind =
               %a@.@]"
        output_location loc
        pnames bot_names
-  | Earray_size { size; index } ->
+  | Earray_index { size; index } ->
      eprintf "@[%aZrun: the array is of length %d but accessed at index %d.@.@]"
        output_location loc size index
+  | Earray_slice { size; i1; i2 } ->
+     eprintf "@[%aZrun: the array is of length %d but sliced from %d to %d.@.@]"
+       output_location loc size i1 i2
   | Eloop_index { size; index } ->
      eprintf
        "@[%aZrun: the loop has %d iterations but the index is of lenfth %d.@.@]"
