@@ -47,16 +47,15 @@ let is_array loc v =
   | _ -> error { kind = typ_error_array; loc }
 
 (* size/dimension of an array *)
-let size loc a =
-  let s = match a with
-    | Vflat(a) -> Array.length a
-    | Vmap { m_length } -> m_length in
-  return s
+let size a =
+  match a with
+  | Vflat(a) -> Array.length a
+  | Vmap { m_length } -> m_length
 
 (* dimension of a value that must be an array *)
 let dim loc v =
   match v with
-  | Varray v -> size loc v
+  | Varray v -> return (size v)
   | _ -> error { kind = typ_error_array; loc }
 
 (* dimension of a matrix *)
@@ -181,7 +180,7 @@ let slice_left loc v i1 =
   let+ i1 = i1 in
   let* i1 = is_int loc i1 in
   let* a = is_array loc v in
-  let* l = size loc a in
+  let l = size a in
   slice loc a i1 (l-1)
 
 (* x.(..e2) *)
@@ -190,7 +189,6 @@ let slice_right loc v i2 =
   let+ i2 = i2 in
   let* i2 = is_int loc i2 in
   let* a = is_array loc v in
-  let* l = size loc a in
   slice loc a 0 i2
 
 (* [| v with i <- w |] *)
