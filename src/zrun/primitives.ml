@@ -323,7 +323,7 @@ let gte_op v1 v2 =
   return (Vbool(v >= 0))
        
 (* ifthenelse. this one is strict w.r.t all arguments *)
-let lustre_ifthenelse v1 v2 v3 =
+let strict_ifthenelse v1 v2 v3 =
   let (let-) v f =
   match v with
   | Vbot -> return Vbot
@@ -332,6 +332,8 @@ let lustre_ifthenelse v1 v2 v3 =
   let- v2 = v2 in
   let- v3 = v3 in
   ifthenelse_op v1 v2 v3
+
+let lustre_ifthenelse = strict_ifthenelse
 
 (* ifthenelse. this one is strict w.r.t the first argument *)
 let lazy_ifthenelse v1 v2 v3 =
@@ -397,10 +399,6 @@ let or_gate(x,y) = if x then true else y
 let and_gate(x,y) = if x then y else false
 Hence, [x = x or true] == [x = if x then true else true = true]
 *)
-let ifthenelse v1 v2 v3 =
-  if !lustre then lustre_ifthenelse v1 v2 v3 else
-    if !esterel then esterel_ifthenelse v1 v2 v3
-    else lazy_ifthenelse v1 v2 v3
 
 (* lift a unary operator: [op bot = bot]; [op nil = nil] *)
 let lift1 op v =
@@ -591,10 +589,11 @@ let stdlib_env () =
   (* change the interpretation of the [if/then/else] *)
   (* if the compiler flag [-lustre] or [-esterel] is set *)
   let values =
-    Genv.E.add "_ifthenelse"
-      (ternop_vfun (if !lustre then lustre_ifthenelse
-                    else if !esterel then esterel_ifthenelse
-                    else lazy_ifthenelse)) values in
+    if !lustre then
+      Genv.E.add "_ifthenelse" (ternop_vfun lustre_ifthenelse) values
+    else if !esterel then
+      Genv.E.add "_ifthenelse" (ternop_vfun esterel_ifthenelse) values
+    else values in
   { Genv.name = "Stdlib";
     Genv.values = values }
       

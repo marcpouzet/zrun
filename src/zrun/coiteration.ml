@@ -1002,17 +1002,19 @@ and sexp genv env { e_desc; e_loc } s =
         let* v1, s1 = sexp genv env e1 s1  in
         let* v2, s2 = sexp genv env e2 s2  in
         let* v_out =
-          Primitives.ifthenelse v v1 v2 |>
+          Primitives.strict_ifthenelse v v1 v2 |>
             Opt.to_result ~none:{ kind = Estate; loc = e_loc } in
         return (v_out, Slist [Sval(Value(Vbool(false))); s1; s2])
      | Eifthenelse, [e1; e2; e3], Slist [s1; s2; s3] ->
         let* v1, s1 = sexp genv env e1 s1 in
         let* v2, s2 = sexp genv env e2 s2 in
         let* v3, s3 = sexp genv env e3 s3 in
-        let* v =
-          ifthenelse v1 v2 v3 |>
-            Opt.to_result ~none:{ kind = Etype(Some(Etyp_bool)); loc = e1.e_loc }
-        in
+        (* by default, the interpretation of the [if/then/else] is lazy *)
+        (* unless it is changed, either with a compiler flag or an attribute *)
+        let ifthenelse =
+          Opt.value (find_gvalue_opt (Name "_ifthenelse") genv)
+          ~default: (Primitives.ternop_vfun Primitives.lazy_ifthenelse) in
+        let* v = apply e_loc ifthenelse [v1; v2; v3] in
         return (v, Slist [s1; s2; s3])
      | Eseq, [e1; e2], Slist [s1; s2] ->
         let* _, s1 = sexp genv env e1 s1 in
@@ -2555,7 +2557,7 @@ and sstate genv env { desc; loc } s =
      let* s1, se1 = sstate genv env s1 se1 in
      let* s2, se2 = sstate genv env s2 se2 in
      let* v =
-       Primitives.ifthenelse v s1 s2 |>
+       Primitives.lazy_ifthenelse v s1 s2 |>
          Opt.to_result ~none:{ kind = Etype(Some(Etyp_bool)); loc = loc } in
      return (v, Slist [se; se1; se2])
   | _ -> error { kind = Estate; loc = loc }
