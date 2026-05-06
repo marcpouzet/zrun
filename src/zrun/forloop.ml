@@ -119,8 +119,8 @@ let update_as_env loc i local_env as_env =
           try
             let vi = Find.find_value_opt xi local_env in
             match vi, last with
-            | Some(Value(vi)), Some(Value(v)) ->
-               { entry with last = Some(Value(Arrays.extend_at loc i vi v)) }
+            | Some(Value(vi)), Some(Value(Varray(v))) ->
+               { entry with last = Some(Value(Varray(Arrays.extend loc vi v))) }
             | _ -> entry
           with
           | Not_found -> entry in

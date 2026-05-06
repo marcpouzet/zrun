@@ -125,11 +125,11 @@ let get loc v i =
      return (Value(v))
   | _ -> error { kind = Etype(Some(Etyp_array)); loc }
 
-(* extend an array of length [i-1] with an element at index [i] *)
-(* returns \j:[i+1].if j = i then vi else v *)
-let extend_at loc i vi v =
-  Varray(Vmap { m_length = i+1;
-                m_u = fun j -> if j = i then return vi else geti loc v j })
+(* extend an array with an element at the end *)
+let extend loc vi v =
+  let i = size v in
+  Vmap { m_length = i + 1;
+         m_u = fun j -> if j = i then return vi else get_in_array loc v j }
 
 let get_with_default loc v i default =
   let get a i =
