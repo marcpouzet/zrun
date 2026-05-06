@@ -61,11 +61,11 @@ let geti loc v i =
   | Vflat(v) ->
      let n = Array.length v in
      if (i < n) && (i >= 0) then return (Value(v.(i)))
-     else error { kind = Earray_size { size = n; index = i }; loc }
+     else error { kind = Earray_index { size = n; index = i }; loc }
   | Vmap { m_length; m_u } ->
      if (i < m_length) && (i >= 0) then
        let* v = m_u i in return (Value(v))
-     else error { kind = Earray_size { size = m_length; index = i }; loc }
+     else error { kind = Earray_index { size = m_length; index = i }; loc }
 
 let geti_env loc i_env i =
   let s_env = Env.to_seq i_env in
