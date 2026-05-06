@@ -60,6 +60,7 @@ let dim loc v =
   | _ -> error { kind = typ_error_array; loc }
 
 (* dimension of a matrix *)
+(* fails if outer dimension is 0 *)
 let dim_dim loc v =
   match v with
   | Varray(v) ->
@@ -147,9 +148,9 @@ let get_with_default loc v i default =
   | Varray(a), Vint(i) -> get a i
   | _ -> error { kind = Etype(Some(Etyp_array)); loc }
 
-(* x.(i1 .. i2) returns a slices of [x] between index [i1] and [i2] *)
-(* if [i2 < i1], the result array is empty, that is, [||] *)
-(* if [x: [n]a] then x.(i1 .. i2) : [i2-i1+1]a *)
+(* [x.(i1 .. i2)] returns a slices of [x] between index [i1] and [i2] *)
+(* if [x: [n]a] then [x.(i1 .. i2) : [i2-i1+1]a] *)
+(* if [0 > i1] or [i1 > i2+1] or [i2+1 > n], the function fails *)
 let slice loc v i1 i2 =
   let a = i1 in
   let b = i2 + 1 in
@@ -193,6 +194,7 @@ let slice_right loc v i2 =
   slice loc a 0 i2
 
 (* [| v with i <- w |] *)
+(* returns v if i is out-of-bounds *)
 let update loc v i w =
   let update v i w =
     match v with
@@ -251,6 +253,7 @@ let get_get loc v i j =
 
 (* transpose: input: ['n]['m]t. output: ['m]['n]t such that *)
 (* output.(j).(i) = input.(i).(j) [i < 'n, j < 'm] *)
+(* fails if outer dimension in 0 *)
 let transpose loc v =
   let+ v = v in
   let* n_i, m_j = dim_dim loc v in
@@ -264,10 +267,11 @@ let transpose loc v =
                                            m_u = fun i -> get_get loc v i j }))
     })))
 
-(* flatten: imposes that the size of internal arrays are the same, that is *)
+(* flatten: assumes that the size of internal arrays are the same, that is *)
 (* flatten : 'n,'m. ['n]['m]'a -> ['n * 'm]'a *)
 (* flatten [|[| x_11; ...; x_1m |];...; [|x_n1;...;x_nm|]|] =
                              x_11; ...; x_1m; x_21;...; x_n1;...;x_nm *)
+(* fails if outer dimension in 0 *)
 let flatten loc v =
   let+ v = v in
   let* n_i, m_j = dim_dim loc v in
