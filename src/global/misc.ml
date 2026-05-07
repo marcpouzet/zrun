@@ -94,7 +94,6 @@ let no_causality = ref false
 (* this is how the if/then/else is interpreted in Lustre *)
 (* if v1 then v2 else v3 = bot if (v1 = bot) or (v2 = bot) or (v3 = bot) *)
 let lustre = ref false
-let old_lustre = ref false
 
 (* sets the interpretation of the if/then/else to be such that *)
 (* if _ then v1 else v2 = v1 if v1 = v2 *)
@@ -102,27 +101,9 @@ let old_lustre = ref false
 (* instead of using the three-valued interpretation of the boolean *)
 (* operations or and and *)
 let esterel = ref false
-let old_esterel = ref false
 
 (* static reduction *)
 let static_reduction = ref false
-
-(* attributes annotations in the source. They turn on/off compiler flags *)
-let do_attribute a_list =
-  let attribute a =
-    (* for the moment, only some of the attributes are taken into account *)
-    if a = "esterel" then (old_esterel := !esterel; esterel := true)
-    else if a = "lustre" then (old_lustre := !lustre; lustre := true)
-    else if a = "no_assert" then
-      (old_no_assert := !no_assert; no_assert := true) in
-  List.iter attribute a_list
-
-let undo_attribute a_list =
-  let attribute a =
-    if a = "esterel" then esterel := !old_esterel
-    else if a = "lustre" then lustre := !old_lustre
-    else if a = "no_assert" then no_assert := !old_no_assert in
-  List.iter attribute a_list
 
 let apply_with_close_out f o =
   try

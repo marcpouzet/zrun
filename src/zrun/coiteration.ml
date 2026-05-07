@@ -1508,7 +1508,9 @@ and vexp genv env e =
 
 (* computing the environment defined by a local definition *)
 (* the expression [l_eq] is expected to be combinational *)
-and vleq genv env ({ l_rec; l_eq } as leq) =
+and vleq genv env ({ l_rec; l_eq; l_attribute } as leq) =
+  (* read attributes that control the interpretation of the [if/then/else] *)
+  let genv = Primitives.do_attribute l_attribute genv in
   (* for the moment, recursive functions are only allowed when they *)
   (* are size functions *)
   if l_rec then
@@ -1742,7 +1744,10 @@ and sexp_list loc genv env e_list s_list =
 and sarg_list loc genv env e_list s_list =
   slist loc genv env sarg e_list s_list
 
-and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
+and sleq genv env
+  { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_attribute; l_loc } s_eq =
+  (* read attributes that control the interpretation of the [if/then/else] *)
+  let genv = Primitives.do_attribute l_attribute genv in
   match l_kind, s_eq with
   | (Kconst | Kstatic), Senv(l_env) ->
      return (l_env, s_eq)

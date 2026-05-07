@@ -53,18 +53,18 @@ and pvalue =
   | Vstate0 of Ident.t
   | Vstate1 of Ident.t * pvalue list
   | Varray of pvalue array
-  (* imported stateless functions; they must verify that *)
+  (* imported stateless functions; they are strict, that is *)
   (* f(atomic v) not= bot *)
   | Vifun of (pvalue -> pvalue option)
   (* user defined functions and nodes *)
   | Vfun of vfun
   | Vnode of vnode
-  (* function parameterized by sizes *)
+  (* functions parameterized by a tuple of sizes *)
   | Vsizefun of sizefun
 
 and 'a array =
-  | Vflat of 'a Array.t
-  | Vmap of 'a map
+  | Vflat of 'a Array.t (* the array is explicit *)
+  | Vmap of 'a map (* or implicit *)
 
 (* bounded maps *)
 (* [get x i = v if x.left <= i <= right then x i
@@ -79,27 +79,28 @@ and sizefun =
     s_bound: int list option; (* the maximum number of iterations *)
   }
 
-(* abstraction is curried; of the form [fun (x1,...) ... (xn,...) -> e] *)
-(* combinatorial function *)
+(* combinational function definitions are currified; *)
+(* they are of the form [fun (x1,...) ... (xn,...) -> e] *)
 and vfun =
   { f_arity: int;
     f_no_input: bool; (* [fun () -> e] *)
     f_fun : value list -> value result (* [f (e1,...) ... (en,...)] *)
   }
 
-(* abstraction is uncurried; of the form [node|hybrid (x1,...,xn) -> e] *)
-(* stateful function (called "node") *)
+(* stateful (node or hybrid) functions are uncurryfied *)
+(* [node|hybrid (x1,...,xn) -> e] *)
 and vnode =
-  { n_tkind: Zelus.tkind; (* discrete only or discrete/continuous-time state *)
+  { n_tkind: Zelus.tkind; (* either discrete-time or continuous-time *)
     n_arity: int;
     n_no_input: bool; (* [node|hybrid () -> e] *)
     n_init : state; (* current state *)
     (* step function *)
-    n_step : state -> value -> (value * state) result; (* [f (e1,..., en)] *)
+    n_step : state -> value -> (value * state) result; (* [f s v] *)
   }
 
 and instance = vnode
 
+(* the type for a state *)
 and state =
   | Sbot 
   | Snil 

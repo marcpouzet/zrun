@@ -4,7 +4,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -582,6 +582,12 @@ let esterel_or_and_primitives () =
     ["or", binop_vfun esterel_or_op;
      "&", binop_vfun esterel_and_op] else []
 
+let add_lustre_ifthenelse_to_values values =
+  Genv.E.add "_ifthenelse" (ternop_vfun lustre_ifthenelse) values
+
+let add_esterel_ifthenelse_to_values values =
+  Genv.E.add "_ifthenelse" (ternop_vfun esterel_ifthenelse) values
+  
 let stdlib_env () =
   let values =
     to_env (to_env Genv.E.empty (list_of_primitives ()))
@@ -589,11 +595,18 @@ let stdlib_env () =
   (* change the interpretation of the [if/then/else] *)
   (* if the compiler flag [-lustre] or [-esterel] is set *)
   let values =
-    if !lustre then
-      Genv.E.add "_ifthenelse" (ternop_vfun lustre_ifthenelse) values
-    else if !esterel then
-      Genv.E.add "_ifthenelse" (ternop_vfun esterel_ifthenelse) values
-    else values in
+    if !lustre then add_lustre_ifthenelse_to_values values else values in
+  let values =
+    if !esterel then add_esterel_ifthenelse_to_values values else values in
   { Genv.name = "Stdlib";
     Genv.values = values }
-      
+
+(* attributes in the source. They control the interpretation of *)
+(* the [@esterel] and [@lustre] flags *)
+let do_attribute a_list ({ Genv.current = { values } as current } as genv) =
+  let do_attribute values a =
+    if a = "lustre" then add_lustre_ifthenelse_to_values values
+    else if a = "esterel" then add_esterel_ifthenelse_to_values values
+    else values in
+  let values = List.fold_left do_attribute values a_list in
+  { genv with current = { current with values } }
