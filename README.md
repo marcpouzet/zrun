@@ -1,13 +1,11 @@
 # The ZRun Synchronous Language Interpreter
 
-ZRun is an executable reference semantics for a synchronous data-flow
+ZRun is an executable semantics for a synchronous data-flow
 language. It takes the form of an interpreter expressed in a purely
-functional manner and is implemented in OCaml. The input of Zrun is a
-large subset of the language [Zélus](https://zelus.di.ens.fr). Only
-the discrete-time (synchronous) subset is considered for the moment,
-that is, signals are infinite streams and systems are stream
-functions. The basic primitives and the semantics principles of the
-language are those of
+functional manner that is implemented in OCaml. The input of ZRun is
+the [Zélus](https://zelus.di.ens.fr) language but limited to discrete-time.
+Hence, signals are streams and systems are stream
+functions. The basic stream primitives are those of
 [Lustre](https://www-verimag.imag.fr/The-Lustre-Programming-Language-and?lang=en)
 (e.g., the non initialized unit delay (pre), initialization operator
 (->)). The language provides richer programming constructs that were
@@ -15,45 +13,42 @@ introduced in [Lucid
 Synchrone](https://www.di.ens.fr/~pouzet/lucid-synchrone/index.html)
 and [Scade
 6](https://www.college-de-france.fr/media/gerard-berry/UPL9185028255611736393_BP_CollegeDeFrance_23_avril_2013.pdf):
-by-case definitions of streams and pattern matching; an operator
-"last" which refers to the previous value of a stream, hierarchical
+the by-case definitions of streams, pattern matching, the
+operator "last" which refers to the previous value of a stream, hierarchical
 automata and array operations. Functions can take as argument values
 that can be specified to be statically known, at compile-time or
 instanciation time. The language provides more experimental features
 like higher-order and functional recursion parameterized by a size.
 
-The goal of this prototype is to define a reference semantics that is
-executable and can serve as an oracle, e.g., for compiler testing. It
-is independent of a compiler. It can be used to establish the correctness
-properties of dedicated type systems done by the compiler, that is,
+The goal of this prototype is to be reference executable semantics that is
+is independent of a compiler and can serve as an oracle, e.g., for
+compiler testing. It can be used to establish the correctness
+properties of dedicated type systems done by the compiler (e.g.,
 that a well typed/causal/clocked/initialized program does not lead to
-an error; to prove semantics preservation of source-to-source
-transformations performed by the compiler (static scheduling or the
-compilation of automata, for example).
+an error).
 
-The ZRun interpreter makes no a priori hypothesis on typing and other
-type-based static analyses performed by a synchronous language
-compiler. Hence, ZRun can execute "unfinished programs" or programs that are
+The ZRun interpreter purposely makes no hypothesis on typing and other
+type-based static analyses usually done by a synchronous language
+compiler. It can execute "unfinished programs" or programs that are
 semantically correct but are statically rejected by the compiler.
 
-ZRun illustrates key differences in the treatment of causality between
-different synchronous languages, namely Lustre, Lucid
-Synchrone/Scade/Zelus and Esterel. Those differences can be observed
-on the same program with a command-line option (-lustre and
--esterel). Lustre is the most restrictive in term of causality
-constraints; the most permissive being Esterel; the languages Lucid
-Synchrone, Scade 6 and Zelus are in between, where by-case definitions
-of streams are treated specifically.
+ZRun can illustrate the different ways causality is addressed by the
+different synchronous languages: Lustre, Lucid Synchrone/Scade/Zelus,
+and Esterel. Those differences can be observed on the same program
+with a command-line option (-lustre and -esterel or attributes in the
+source ([@esterel] and [@lustre]).  Lustre is the most restrictive;
+the most permissive is Esterel; the languages Lucid Synchrone, Scade 6
+and Zelus are in between, where by-case definitions of streams are
+treated specifically.
 
-Finally, being independent of a compiler, this semantics
-can be used to prototype new language constructs before (or independently)
-considering their compilation.
+Finally, being independent of a compiler, ZRun can be used to
+prototype new language constructs before considering their
+compilation.
 
-The long term objective is to define an executable semantics that deal
-with all the language features of Zélus. For the moment, 
+The long term objective is to that deal
+with all the language features of Zélus, including
 "hybrid" nodes where continuous-time signals are defined by Ordinary
-Differential Equations (ODEs) and zero-crossing events are
-not treated.
+Differential Equations (ODEs) and zero-crossing events.
 
 ZRun was inspired by several works. The PhD. thesis of Gonthier 1/
 "Sémantiques et modèles d'exécution des langages réactifs synchrones :
@@ -68,7 +63,7 @@ that is done at every reaction. The present work builds directly on
 4/, reformulating the semantics so that it can be implemented in a
 statically typed, call-by-value and purely functional language that
 has strong normalization property (e.g., the programming language of
-Coq). In comparison, the original version in 4/ was a shallow
+Coq or Lean). In comparison, the original version in 4/ was a shallow
 embedding in a language with call-by-need (precisely Haskell). You can
 read the companion paper "[A Constructive State-based Semantics and
 Interpreter for a Synchronous Data-flow Language with State
