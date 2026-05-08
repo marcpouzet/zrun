@@ -431,7 +431,7 @@ Esterel (and the SCP'2003 paper), type:
 
 the program is now causally correct. The interpreter provides three different
 interpretation of the conditional `if/then/else` that can be choosen
-on the command line.
+on the command line or attribute.
 
 To see simple examples that illustrate the treatment of causality
   between Lustre on one side, Lucid Synchrone/Scade/Zelus that sits in between
