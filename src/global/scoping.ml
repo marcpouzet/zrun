@@ -673,12 +673,12 @@ module Make (Info: INFO) =
     (** Translating a sequence of local declarations *)
     and leqs env l = Util.mapfold letin env l
     
-    and letin env { desc = { l_kind; l_rec; l_eq }; loc } =
+    and letin env { desc = { l_kind; l_rec; l_eq; l_attribute }; loc } =
       let env_pat = buildeq l_eq in
       let new_env = Env.append env_pat env in
       let l_eq = equation new_env (if l_rec then new_env else env) l_eq in
       let l_kind = vkind l_kind in
-      { l_kind; l_rec; l_eq; l_loc = loc; l_env = Ident.Env.empty }, new_env
+      { l_kind; l_rec; l_eq; l_loc = loc; l_env = Ident.Env.empty; l_attribute }, new_env
     
     and vardec env { desc = { var_name; var_init; var_default;
                               var_typeconstraint; var_clock; var_is_last };
@@ -1058,7 +1058,7 @@ module Make (Info: INFO) =
           | Eletdecl(d_leq) ->
              let d_leq, env = letin Env.empty d_leq in
              let d_names = Env.to_list env in
-             Zelus.Eletdecl { d_names = d_names; d_leq = d_leq }
+             Zelus.Eletdecl { d_leq = d_leq; d_names = d_names }
           | Etypedecl { name; ty_params; ty_decl } ->
              let ty_decl = type_decl ty_decl in
              Zelus.Etypedecl { name = name; ty_params; ty_decl } in

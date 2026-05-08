@@ -1002,17 +1002,19 @@ and sexp genv env { e_desc; e_loc } s =
         let* v1, s1 = sexp genv env e1 s1  in
         let* v2, s2 = sexp genv env e2 s2  in
         let* v_out =
-          Primitives.ifthenelse v v1 v2 |>
+          Primitives.strict_ifthenelse v v1 v2 |>
             Opt.to_result ~none:{ kind = Estate; loc = e_loc } in
         return (v_out, Slist [Sval(Value(Vbool(false))); s1; s2])
      | Eifthenelse, [e1; e2; e3], Slist [s1; s2; s3] ->
         let* v1, s1 = sexp genv env e1 s1 in
         let* v2, s2 = sexp genv env e2 s2 in
         let* v3, s3 = sexp genv env e3 s3 in
-        let* v =
-          ifthenelse v1 v2 v3 |>
-            Opt.to_result ~none:{ kind = Etype(Some(Etyp_bool)); loc = e1.e_loc }
-        in
+        (* by default, the interpretation of the [if/then/else] is lazy *)
+        (* unless it is changed, either with a compiler flag or an attribute *)
+        let ifthenelse =
+          Opt.value (find_gvalue_opt (Name "_ifthenelse") genv)
+          ~default: (Primitives.ternop_vfun Primitives.lazy_ifthenelse) in
+        let* v = apply e_loc ifthenelse [v1; v2; v3] in
         return (v, Slist [s1; s2; s3])
      | Eseq, [e1; e2], Slist [s1; s2] ->
         let* _, s1 = sexp genv env e1 s1 in
@@ -1506,7 +1508,9 @@ and vexp genv env e =
 
 (* computing the environment defined by a local definition *)
 (* the expression [l_eq] is expected to be combinational *)
-and vleq genv env ({ l_rec; l_eq } as leq) =
+and vleq genv env ({ l_rec; l_eq; l_attribute } as leq) =
+  (* read attributes that control the interpretation of the [if/then/else] *)
+  let genv = Primitives.do_attribute l_attribute genv in
   (* for the moment, recursive functions are only allowed when they *)
   (* are size functions *)
   if l_rec then
@@ -1556,9 +1560,6 @@ and sfor_vardec genv env (acc_env, as_env)
     match for_as with
     | None -> as_env
     | Some(x) -> Env.add x var_name as_env in
-  let l1 = Env.to_list env in
-  let l2 = Env.to_list acc_env in
-  let l3 = Env.to_list as_env in
   return ((acc_env, as_env), s)
 
 (* compute the initial value of accumulated variables *)
@@ -1605,7 +1606,7 @@ and sfor_input_short genv env (size_opt, i_env) { desc; loc } s =
           if a_size = size then
             return (Value(Some(size), Env.add id entry i_env))
           else
-            error { kind = Earray_size { size = a_size; index = size }; loc } in
+            error { kind = Earray_index { size = a_size; index = size }; loc } in
      return (size_opt_i_env, Slist [se; se_opt])
   | Einput { id; e; by = Some _ }, Slist [se; Sval(Value(Vint(k)))] ->
      (* [id in e by k] means that in iteration [i], [id = e.(k * i)] *)
@@ -1621,7 +1622,7 @@ and sfor_input_short genv env (size_opt, i_env) { desc; loc } s =
           then return (Value(Some(size), Env.add id entry i_env))
           else
             error
-              { kind = Earray_size { size = a_size; index = size * k }; loc } in
+              { kind = Earray_index { size = a_size; index = size * k }; loc } in
      return (size_opt_i_env, Slist [se; Sval(Value(Vint(k)))])
   | Eindex { id; e_left; e_right; dir }, Slist [se_left; se_right] ->
      let* ve_left, se_left = sexp genv env e_left se_left in
@@ -1634,7 +1635,7 @@ and sfor_input_short genv env (size_opt, i_env) { desc; loc } s =
        | Some(size) ->
           if a_size = size
           then return (Value(Some(size), Env.add id entry i_env))
-          else error { kind = Earray_size { size; index = a_size }; loc } in
+          else error { kind = Earray_index { size; index = a_size }; loc } in
      return (i_env, Slist [se_left; se_right])
   | _ ->
      error { kind = Estate; loc }
@@ -1653,7 +1654,7 @@ and sfor_input size genv env i_env { desc; loc } s =
        if a_size = size
        then return (Value(Env.add id entry i_env))
        else
-         error { kind = Earray_size { size = a_size; index = size }; loc } in
+         error { kind = Earray_index { size = a_size; index = size }; loc } in
      return (i_env, Slist [se; se_opt])
   | Einput { id; e; by = Some _ }, Slist [se; Sval(Value(Vint(k)))] ->
      (* [id in e by k] means that in iteration [i], [id = e.(k * i)] *)
@@ -1666,7 +1667,7 @@ and sfor_input size genv env i_env { desc; loc } s =
        then return (Value(Env.add id entry i_env))
        else
          error
-           { kind = Earray_size { size = a_size; index = size * k }; loc } in
+           { kind = Earray_index { size = a_size; index = size * k }; loc } in
      return (i_env, Slist [se; Sval(Value(Vint(k)))])
   | Eindex { id; e_left; e_right; dir }, Slist [se_left; se_right] ->
      let* ve_left, se_left = sexp genv env e_left se_left in
@@ -1676,7 +1677,7 @@ and sfor_input size genv env i_env { desc; loc } s =
        let+ a_size, entry = entry in
        if a_size = size
        then return (Value(Env.add id entry i_env))
-       else error { kind = Earray_size { size; index = a_size }; loc } in
+       else error { kind = Earray_index { size; index = a_size }; loc } in
      return (i_env, Slist [se_left; se_right])
   | _ ->
      error { kind = Estate; loc }
@@ -1705,7 +1706,7 @@ and sfor_input_no_size genv env i_env { desc; loc } s =
          if r = 0 then return (a_size / k)
          else
            error
-             { kind = Earray_size { size = a_size; index = a_size + r };
+             { kind = Earray_index { size = a_size; index = a_size + r };
                loc } in
        return (Value(size, Env.add id entry i_env)) in
      return (size_i_env, Slist [se; sv])
@@ -1740,7 +1741,10 @@ and sexp_list loc genv env e_list s_list =
 and sarg_list loc genv env e_list s_list =
   slist loc genv env sarg e_list s_list
 
-and sleq genv env { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_loc } s_eq =
+and sleq genv env
+  { l_kind; l_rec; l_eq = ({ eq_write } as l_eq); l_attribute; l_loc } s_eq =
+  (* read attributes that control the interpretation of the [if/then/else] *)
+  let genv = Primitives.do_attribute l_attribute genv in
   match l_kind, s_eq with
   | (Kconst | Kstatic), Senv(l_env) ->
      return (l_env, s_eq)
@@ -2182,7 +2186,6 @@ and sresult genv env { r_desc; r_loc } s =
 
 (* block [local x1 [init e1 | default e1 | ],..., xn [...] do eq done *)
 and sblock genv env { b_vars; b_body; b_loc } s_b =
-  let l = Env.to_list env in
   match s_b with
   | Slist (s_eq :: s_list) ->
      let* bot_x, s_list =
@@ -2223,20 +2226,11 @@ and sblock_with_reset genv env b_eq s_eq r =
      b [[while|until|unless] c] *)
 and sforblock genv env acc_env b for_exit s_b =
   (* the semantics for a block [local x1,...,xn do eq] *)
-  let l1 = Env.to_list env in
-  let l2 = Env.to_list acc_env in
   let sbody genv env b s_b env_in =
-    let l1 = Env.to_list env in
-    let l2 = Env.to_list acc_env in
     let sem s_b env_in =
-      let l = Env.to_list env_in in
       let* env, env_not_x, s_b =
         sblock genv (Env.append env_in env) b s_b in
       let new_env_in = Fix.complete env_in env_not_x in
-      let l1 = Env.to_list env in
-      let l2 = Env.to_list env_in in
-      let l3 = Env.to_list new_env_in in
-      let l4 = Env.to_list env_not_x in
       return ((env, new_env_in), s_b) in
     let* _, (env, new_acc_env), s_b =
       Fix.fixpoint b.b_loc (Env.cardinal acc_env + 1) Fix.stop sem s_b env_in
@@ -2555,7 +2549,7 @@ and sstate genv env { desc; loc } s =
      let* s1, se1 = sstate genv env s1 se1 in
      let* s2, se2 = sstate genv env s2 se2 in
      let* v =
-       Primitives.ifthenelse v s1 s2 |>
+       Primitives.lazy_ifthenelse v s1 s2 |>
          Opt.to_result ~none:{ kind = Etype(Some(Etyp_bool)); loc = loc } in
      return (v, Slist [se; se1; se2])
   | _ -> error { kind = Estate; loc = loc }
@@ -2669,7 +2663,7 @@ let implementation genv { desc; loc } =
            let* v = Env.find_opt id env |>
                       Opt.to_result ~none:{ kind = Eunbound_ident(id); loc = loc }
            in return (n, v)) d_names in
-     (* debug info (a bit of imperative code here!) *)
+     (* debug info (a bit of imperative code here) *)
      if !print_values then Output.letdecl Format.std_formatter f_pvalue_list;
      (* add all entries in the current global environment *)
      let genv =

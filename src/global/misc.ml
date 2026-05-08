@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2025 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -84,11 +84,13 @@ let reset_total_number_of_iterations_in_fixpoints () =
                     
 (* remove the check of assertions during evaluation *)
 let no_assert = ref false
+let old_no_assert = ref false
 
 (* remove the check that fix-point equation produce non bottom values *)
 let no_causality = ref false
 
-(* sets the interpretation of the if/then/else to be strict w.r.t the first argument *)
+(* sets the interpretation of the if/then/else to be strict *)
+(* w.r.t the first argument *)
 (* this is how the if/then/else is interpreted in Lustre *)
 (* if v1 then v2 else v3 = bot if (v1 = bot) or (v2 = bot) or (v3 = bot) *)
 let lustre = ref false
@@ -96,6 +98,8 @@ let lustre = ref false
 (* sets the interpretation of the if/then/else to be such that *)
 (* if _ then v1 else v2 = v1 if v1 = v2 *)
 (* this is used to implement the constructive causality of Esterel *)
+(* instead of using the three-valued interpretation of the boolean *)
+(* operations or and and *)
 let esterel = ref false
 
 (* static reduction *)
