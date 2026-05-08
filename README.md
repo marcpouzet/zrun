@@ -20,17 +20,18 @@ that can be specified to be statically known, at compile-time or
 instanciation time. The language provides more experimental features
 like higher-order and functional recursion parameterized by a size.
 
-The goal of this prototype is to be reference executable semantics that is
+The goal of this prototype is to be a reference semantics that is
 is independent of a compiler and can serve as an oracle, e.g., for
 compiler testing. It can be used to establish the correctness
-properties of dedicated type systems done by the compiler (e.g.,
+of dedicated type systems done by the compiler (e.g.,
 that a well typed/causal/clocked/initialized program does not lead to
 an error).
 
 The ZRun interpreter purposely makes no hypothesis on typing and other
 type-based static analyses usually done by a synchronous language
-compiler. It can execute "unfinished programs" or programs that are
-semantically correct but are statically rejected by the compiler.
+compiler. Hence, it can execute "unfinished programs" or programs that are
+semantically correct but are statically rejected by the compiler because
+the typing they implement are not powerful enough.
 
 ZRun can illustrate the different ways causality is addressed by the
 different synchronous languages: Lustre, Lucid Synchrone/Scade/Zelus,
