@@ -75,9 +75,14 @@ and parray ff a =
        (fun ff v ->
          Array.iter (fun x -> fprintf ff "%a;@," pvalue x) v)
        v
-  | Vmap(m) -> pmap ff m
-
-and pmap ff { m_length; m_u } = fprintf ff "@[[%d] -> ...@]" m_length
+  | Vmap{ m_length; m_u } ->
+      fprintf ff "@[<hov1>'[|%a|]@]"
+        (fun ff v -> List.iter (fun x ->
+          match x with
+          | Ok(x) -> fprintf ff "%a;@," pvalue x
+          | Error(_) -> fprintf ff "error;@,"
+        ) v)
+        (List.init m_length m_u)
 
 and value ff v =
   match v with
