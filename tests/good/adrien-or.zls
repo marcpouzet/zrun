@@ -17,14 +17,22 @@
 *)
 
 (* to compute 10 steps, type: zrun.exe -n 10 -esterel -s main *)
-let node h x = o where
+
+(* the attribute [@esterel] turns on the flag -esterel *)
+(* warning; for the moment, this is a global switch *)
+
+let [@esterel] node h x = o where
   rec y1 = if true fby y1 then true else y1
   and y2 = if y2 then true else true fby y2
   and o = if x then y1 else y2
 
-(* the attribute [@esterel] turns on the flag -esterel *)
-(* warning; for the moment, this is a global switch *)
-let [@esterel] node main () =
+let  node main () =
   let rec i = true fby not i in
   h i
+
+let [@esterel] main2() =
+  let rec o = if o then true else true in o
+  
+let [@lustre] node main3() =
+  let rec o = true -> if pre o then true else pre o in o
   
