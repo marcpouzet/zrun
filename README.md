@@ -30,25 +30,26 @@ The ZRun interpreter purposely makes no hypothesis on typing and other
 type-based static analyses usually done by a synchronous language
 compiler. Hence, it can execute "unfinished programs" or programs that are
 semantically correct but are statically rejected by the compiler because
-the typing they implement are not powerful enough.
+the type verifications they implement are not expressive enough.
 
-ZRun can illustrate the different ways causality is addressed by the
-different synchronous languages: Lustre, Lucid Synchrone/Scade/Zelus,
-and Esterel. Those differences can be observed on the same program
-with a command-line option (-lustre and -esterel or attributes in the
-source ([@esterel] and [@lustre]).  Lustre is the most restrictive;
-the most permissive is Esterel; the languages Lucid Synchrone, Scade 6
-and Zelus are in between, where by-case definitions of streams are
-treated specifically.
-
-Finally, being independent of a compiler, ZRun can be used to
+Being independent of a compiler, ZRun can be used (and was used) to
 prototype new language constructs before considering their
 compilation.
 
-The long term objective is to that deal
-with all the language features of Zélus, including
-"hybrid" nodes where continuous-time signals are defined by Ordinary
-Differential Equations (ODEs) and zero-crossing events.
+ZRun can illustrate the way causality is treated by the
+different synchronous languages: Lustre, Lucid Synchrone/Scade 6/Zelus,
+and Esterel. Lustre is the most restrictive;
+the most permissive is Esterel; the languages Lucid Synchrone, Scade 6
+and Zelus are in between: by-case definitions of streams are
+treated specifically. Those differences can be observed on the same program
+by changing the interpretation of the mux [if/then/else], trough a
+command-line option (-lustre and -esterel) or and attributes in the
+source (let [@esterel] id = ... and let [@lustre] id = ...).  
+
+The long term objective is to treat all the language features of
+Zélus, including "hybrid" nodes where continuous-time signals are
+defined by Ordinary Differential Equations (ODEs) and zero-crossing
+events.
 
 ZRun was inspired by several works. The PhD. thesis of Gonthier 1/
 "Sémantiques et modèles d'exécution des langages réactifs synchrones :
@@ -332,7 +333,7 @@ primer V5.91 of 2000. The data-flow representation given below is
 adapted from that of SCP'2003 paper.
 
 ```ocaml
-(* file arbiter.zls *)
+(* file tests/good/arbiter.zls *)
 
 let node or_gate(x,y) returns (z)
     z = x || y
@@ -369,11 +370,28 @@ let node arbiter_three(i, request1, request2, request3) returns (grant1, grant2,
     grant3, pass_out3, token_out3 = arbiter(request3, pass_out2, token_out2)
   done
 
-let node main() returns (grant1, grant2, grant3) local request1,
-  request2, request3 do request1 = true and request2 = true and
-  request3 = true and grant1, grant2, grant3 = arbiter_three(request1,
-  request2, request3) 
-done 
+(* A safety property *)
+(* at most one of the three output [grant1, grant2, grant3] is true *)
+(* at the same time *)
+let safe (request1, request2, request3, grant1, grant2, grant3) returns (ok)
+  ok = match grant1, grant2, grant3 with
+       | (true, true, _) | (false, true, true) | (true, _, true) -> false
+       | _ -> true
+
+let node main() returns (request1, request2, request3)
+  local grant1, grant2, grant3
+  do
+    request1 = random_bool()
+  and
+    request2 = random_bool()
+  and
+    request3 = random_bool()
+  and
+    grant1, grant2, grant3 =  arbiter_three(request1, request2, request3)
+  and
+    assert safe(request1, request2, request3,
+                grant1, grant2, grant3)
+  done
 ``` 
 
 Depending on the way the `or` and `and` operator are defined, outputs
