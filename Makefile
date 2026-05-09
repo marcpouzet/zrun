@@ -17,7 +17,7 @@ clean:
 	dune clean;
 	(cd tests/good/; rm -f *.zlo);
 	(cd tests/bad/; rm -f *.zlo);
-	rm zrun.exe
+	rm -f zrun.exe
 
 wc:
 	(cd src;
