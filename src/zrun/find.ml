@@ -20,6 +20,7 @@ open Value
    
 (* access function to the symbol table *)
 let find_value_opt x env =
+  let l = Env.to_list env in
   let* { cur } = Env.find_opt x env in
   let* cur = cur in return cur
 

@@ -2116,6 +2116,7 @@ and sforloop_eq
               sbody env i_env acc_env as_env s_list in
           return (0, env_list, acc_env, Slist(s_list))
        | Kforward(exit), _ ->
+          let l = Env.to_list env in
           let sbody env acc_env s =
             sforblock genv env acc_env for_block exit s in
           let* env_list, acc_env, s_for_block_new =
