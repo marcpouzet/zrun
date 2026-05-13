@@ -1981,6 +1981,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQforloop({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist ((Sopt(Some(Value(Vint(size)))) as sv) ::
              Slist(s_for_block :: so_list) :: s_input_list) ->
+     let l = Env.to_list env in
      (* the size is a static constant size expression *)
      let* r, (s_for_block, so_list, s_input_list) =
        sforloop_eq_step eq_loc genv env
@@ -2187,6 +2188,7 @@ and sresult genv env { r_desc; r_loc } s =
 
 (* block [local x1 [init e1 | default e1 | ],..., xn [...] do eq done *)
 and sblock genv env { b_vars; b_body; b_loc } s_b =
+  let l1 = Env.to_list env in
   match s_b with
   | Slist (s_eq :: s_list) ->
      let* bot_x, s_list =
@@ -2198,6 +2200,8 @@ and sblock genv env { b_vars; b_body; b_loc } s_b =
      let n = 2 * Env.cardinal bot_x + 1 in
      let* (env_eq_not_x, env_eq_x), s_eq = 
        Fix.local genv env seq b_body n s_eq bot_x in
+     let l1 = Env.to_list env_eq_not_x in
+     let l2 = Env.to_list env_eq_x in
      (* a dynamic check of causality: all locally defined names *)
      (* [x1,...,xn] must be non bottom provided that the value of *)
      (* all free variables is not bottom *)
