@@ -256,7 +256,7 @@ let matching_out env { b_vars; b_loc } =
   let* v_list =
     map
       (fun { var_name } ->
-        find_value_opt var_name env |>
+        Find.find_value_opt var_name env |>
           Opt.to_result
             ~none:{ kind = Eunbound_ident(var_name); loc = b_loc }) b_vars in
   match v_list with
@@ -274,7 +274,7 @@ let matching_out env { b_vars; b_loc } =
 (* [last x] is initialized with nil *)
 (* [|x|] : returns an array such that [x.(i) = env_list.(i).(x)] *)
 (* [non_filled] is the number of iterations not done in case of a forward loop *)
-let for_matching_out missing env_list acc_env returns =
+let for_matching_out nb_of_missing_iterations env_list acc_env returns =
   let* v_list =
     map
       (fun { desc = { for_array;
@@ -286,7 +286,7 @@ let for_matching_out missing env_list acc_env returns =
           find_last_opt var_name acc_env |>
           Opt.to_result ~none:{ kind = Eunbound_ident(var_name); loc }
         | 1 ->
-          Forloop.array_of missing loc
+          Forloop.array_of nb_of_missing_iterations loc
             (var_name, var_init, var_default) acc_env env_list
         | _ -> (* this case is not treated for the moment *)
           (* loop iteration only crosses a single dimension *)
@@ -305,7 +305,7 @@ let for_matching_out missing env_list acc_env returns =
 (* return the environment [env'] computed by a for loop *)
 (* [env'(x) = acc_env(last x)] if x in Dom(acc_env) and *)
 (* [env'(x).(i) = env_list.(i).(x) otherwise *)
-let for_env_out missing env_list acc_env loc for_out =
+let for_env_out nb_of_missing_iterations env_list acc_env loc for_out =
   fold
     (fun acc { desc = { for_name; for_init; for_default; for_out_name }; loc } ->
       match for_out_name with
@@ -316,7 +316,7 @@ let for_env_out missing env_list acc_env loc for_out =
              Opt.to_result ~none:{ kind = Eunbound_last_ident(for_name); loc } in
          return (Env.add for_name { empty with cur = Some v } acc)
       | Some(x) ->
-         let* v = Forloop.array_of missing loc
+         let* v = Forloop.array_of nb_of_missing_iterations loc
                     (for_name, for_init, for_default) acc_env env_list in
          return (Env.add x { empty with cur = Some v } acc))
     Env.empty for_out
@@ -340,7 +340,7 @@ let rec size env { desc; loc } =
       return (v / denom)
   | Size_var(x) ->
       let* v =
-       find_value_opt x env |>
+       Find.find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc } in
       let* v = star_value_is_int loc v in
       return v
@@ -946,7 +946,8 @@ and funexp genv env ({ f_kind; f_args } as f) =
          let* env = Match.matching_arg_in_list f_loc env f_args v_list in
          let* v = co_node f_loc genv env tkind arg_list f_body in
          return (Value(v)) in
-       return (Vfun { f_arity = List.length f_args; f_no_input = false; f_fun }) in
+       return
+         (Vfun { f_arity = List.length f_args; f_no_input = false; f_fun }) in
     
   (* the functional value *)
   match f_kind with
@@ -968,7 +969,7 @@ and sexp genv env { e_desc; e_loc } s =
      return (Value (Vconstr0(lname)), s)
   | Evar x, Sempty ->
      let* v =
-       find_value_opt x env |>
+       Find.find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = e_loc } in
      return (v, s)
   | Eglobal { lname }, Sempty ->
@@ -1423,7 +1424,7 @@ and sforloop_exp
               (sfor_vardec genv env) (Env.empty, Env.empty) r_returns sr_list
               (bot_list r_returns) in
           (* 2/ runs the body *)
-          let* missing, env_list, acc_env, s_for_body =
+          let* nb_of_missing_iterations, env_list, acc_env, s_for_body =
             match for_kind, s_for_body with
             | Kforeach, Slist(s_list) ->
                let sbody env acc_env s =
@@ -1439,10 +1440,10 @@ and sforloop_exp
                  Forloop.forward_eq loc
                    sbody env i_env acc_env as_env for_size s_for_body in
                (* was-it a complete iteration? *)
-               let missing = for_size - List.length env_list in
+               let nb_of_missing_iterations = for_size - List.length env_list in
                let s_for_body =
                  if for_resume then s_for_body_new else s_for_body in
-               return (missing, env_list, acc_env, s_for_body)
+               return (nb_of_missing_iterations, env_list, acc_env, s_for_body)
             | _ -> error { kind = Estate; loc } in
           (* store the next last value for [returns] - only necessary *)
           (* when [resume = true] *)
@@ -1452,7 +1453,9 @@ and sforloop_exp
                 (set_forexp_out acc_env) r_returns sr_list
             else return sr_list in
           (* return the result of the for loop *)
-          let* v = for_matching_out missing env_list acc_env r_returns in
+          let* v =
+            for_matching_out
+              nb_of_missing_iterations env_list acc_env r_returns in
           return (v, s_for_body, sr_list) in
      return (v, s_for_body, sr_list)
 
@@ -1760,9 +1763,9 @@ and sleq genv env
             return (env_eq, s_eq)
          | Either.Left(l_eq) ->
             (* compute a bounded fix-point in [n] steps *)
-            let bot = Match.bot_env eq_write in
+            let bot_env = Match.bot_env eq_write in
             let n = (Fix.size l_eq) + 1 in
-            let* env_eq, s_eq = Fix.eq genv env seq l_eq n s_eq bot in
+            let* env_eq, s_eq = Fix.eq genv env seq l_eq n s_eq bot_env in
             (* a dynamic check of causality: all defined names in [eq] *)
             (* must be non bottom provided that all free vars. are non bottom *)
             let* _ = Fix.causal l_loc env env_eq (names eq_write) in
@@ -1837,14 +1840,14 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      (* first step *)
      let* v, se = sexp genv env e se in
      let* cur =
-       find_value_opt x env |>
+       Find.find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
      return (Env.singleton x { empty with last = Some(v); reinit = true },
              Slist [Sopt(Some(cur)); se])
   | EQinit(x, e), Slist [Sopt(Some(v)); se] ->
      (* remaining steps *)
      let* cur =
-       find_value_opt x env |>
+       Find.find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
      return (Env.singleton x { empty with last = Some(v); reinit = true },
              Slist [Sopt(Some(cur)); se])
@@ -2089,13 +2092,24 @@ and sforloop_eq_step loc genv env
   let s_for_block = if for_resume then s_for_block_new
                     else s_for_block in
   return (r, (s_for_block, so_list, si_list))
-  
+
 and sforloop_eq
   loc genv env size for_kind for_resume { for_out; for_block }
   i_env s_for_block so_list =
+  let init_for_out_env v for_out =
+    let init_env acc
+          { desc = { for_name; for_init; for_default; for_out_name } } =
+      let name =
+        match for_out_name with
+        | None -> for_name | Some(name) -> name in
+      Env.add name { empty with cur = Some(v) } acc in
+    List.fold_left init_env Env.empty for_out in
+  let bot_for_out_env for_out = init_for_out_env Vbot for_out in
+  let nil_for_out_env for_out = init_for_out_env Vnil for_out in
+
   match i_env with
-  | Vbot -> return (Match.bot_env for_block.b_write, s_for_block, so_list)
-  | Vnil -> return (Match.nil_env for_block.b_write, s_for_block, so_list)
+  | Vbot -> return (bot_for_out_env for_out, s_for_block, so_list)
+  | Vnil -> return (nil_for_out_env for_out, s_for_block, so_list)
   | Value(i_env) ->
      (* 1/ computes the environment from the [returns] *)
      (* environment [acc_env + as_env]. Vars in [acc_env] *)
@@ -2106,7 +2120,7 @@ and sforloop_eq
        mapfold2 { kind = Estate; loc }
          (sfor_out genv env) (Env.empty, Env.empty) for_out so_list in
      (* 2/ runs the body *)
-     let* missing, env_list, acc_env, s_for_block =
+     let* nb_of_missing_iterations, env_list, acc_env, s_for_block =
        match for_kind, s_for_block with
        | Kforeach, Slist(s_list) ->
           let sbody env acc_env s =
@@ -2122,10 +2136,10 @@ and sforloop_eq
             Forloop.forward_eq loc
               sbody env i_env acc_env as_env size s_for_block in
           (* was-it a complete iteration? *)
-          let missing = size - List.length env_list in
+          let nb_of_missing_iterations = size - List.length env_list in
           let s_for_block =
             if for_resume then s_for_block_new else s_for_block in
-          return (missing, env_list, acc_env, s_for_block)
+          return (nb_of_missing_iterations, env_list, acc_env, s_for_block)
        | _ -> error { kind = Estate; loc } in
      (* store the next last value for [for_out] - only necessary *)
      (* when [resume = true] *)
@@ -2134,7 +2148,8 @@ and sforloop_eq
          map2 { kind = Estate; loc } (set_foreq_out acc_env) for_out so_list
        else return so_list in
      let* env =
-       for_env_out missing env_list acc_env loc for_out in
+       for_env_out nb_of_missing_iterations env_list acc_env loc for_out in
+     Debug.print_ienv "For loop: output env = " env;
      return (env, s_for_block, so_list)
 
 (* store the next value for [last x] in the state of [for_out] *)
@@ -2188,25 +2203,25 @@ and sresult genv env { r_desc; r_loc } s =
 and sblock genv env { b_vars; b_body; b_loc } s_b =
   match s_b with
   | Slist (s_eq :: s_list) ->
-     let* bot_x, s_list =
+     let* bot_env_for_x, s_list =
        mapfold3 { kind = Estate; loc = b_loc }
          (svardec genv env) Env.empty b_vars s_list (bot_list b_vars) in
-     let names = Match.names_env bot_x in
+     let names = Match.names_env bot_env_for_x in
      (* double the number of iterations because a variable [x] *)
      (* can be defined by an equation [x = ...] and [init x = ...] *)
-     let n = 2 * Env.cardinal bot_x + 1 in
-     let* (env_eq_not_x, env_eq_x), s_eq = 
-       Fix.local genv env seq b_body n s_eq bot_x in
+     let n = 2 * Env.cardinal bot_env_for_x + 1 in
+     let* (env_eq_not_in_x, env_eq_in_x), s_eq = 
+       Fix.local genv env seq b_body n s_eq bot_env_for_x in
      (* a dynamic check of causality: all locally defined names *)
      (* [x1,...,xn] must be non bottom provided that the value of *)
      (* all free variables is not bottom *)
-     let* _ = Fix.causal b_loc env env_eq_x names in
+     let* _ = Fix.causal b_loc env env_eq_in_x names in
      (* store the next last value for [svardec] *)
      let* s_list = map2 { kind = Estate; loc = b_loc }
-                     (set_vardec env_eq_x) b_vars s_list in
+                     (set_vardec env_eq_in_x) b_vars s_list in
      (* add local variables to [env] *)
-     let env = Env.append env_eq_x (Env.append env_eq_not_x env) in
-     return (env, env_eq_not_x, Slist (s_eq :: s_list))
+     let env = Env.append env_eq_in_x (Env.append env_eq_not_in_x env) in
+     return (env, env_eq_not_in_x, Slist (s_eq :: s_list))
   | _ ->
      error { kind = Estate; loc = b_loc }
 
@@ -2228,9 +2243,9 @@ and sforblock genv env acc_env b for_exit s_b =
   (* the semantics for a block [local x1,...,xn do eq] *)
   let sbody genv env b s_b env_in =
     let sem s_b env_in =
-      let* env, env_not_x, s_b =
+      let* env, env_not_in_x, s_b =
         sblock genv (Env.append env_in env) b s_b in
-      let new_env_in = Fix.complete env_in env_not_x in
+      let new_env_in = Fix.complete env_in env_not_in_x in
       return ((env, new_env_in), s_b) in
     let* _, (env, new_acc_env), s_b =
       Fix.fixpoint b.b_loc (Env.cardinal acc_env + 1) Fix.stop sem s_b env_in

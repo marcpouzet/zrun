@@ -4,6 +4,8 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
+(*  (c) 2020-2026 Inria Paris                                          *)
+(*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
 (*  the terms of the INRIA Non-Commercial License Agreement (see the   *)
@@ -43,7 +45,9 @@ let print_ienv comment env =
   if !debug then Format.eprintf "%a" (fprint_ienv comment) env;
   flush stderr; flush stdout
 
-let print_state comment s =
+let do_if f x = if !debug then f x
+
+  let print_state comment s =
   if !debug then Format.eprintf "%s: %a@." comment Output.pstate s  
 
 let print_program p =

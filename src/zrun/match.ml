@@ -109,11 +109,16 @@ let bot_env (eq_write: Defnames.defnames) : 'a star ientry Env.t =
     (fun x acc -> Env.add x { empty with cur = Some(Vbot) } acc)
     (names eq_write) Env.empty
 
-(* the nil environment *)
-let nil_env (eq_write: Defnames.defnames) : 'a star ientry Env.t =
+(* initialize an environment with a value *)
+let init_env_with_value v eq_write =
   S.fold
-    (fun x acc -> Env.add x { empty with cur = Some(Vnil) } acc)
+    (fun x acc -> Env.add x { empty with cur = Some(v) } acc)
     (names eq_write) Env.empty
+
+(* the bottom environment *)
+let bot_env eq_write = init_env_with_value Vbot eq_write
+(* the nil environment *)
+let nil_env eq_write = init_env_with_value Vnil eq_write
 
 (* a bot/nil value lifted to lists *)
 let bot_list l = List.map (fun _ -> Vbot) l

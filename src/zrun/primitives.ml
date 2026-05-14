@@ -93,98 +93,53 @@ let get_record r =
   | Vrecord(l) -> return l
   | _ -> None
 
+let do_unop is_t box_t f v =
+  let* v = is_t v in
+  return (box_t (f v))
+
+let do_binop is_t box_t f v1 v2 =
+  let* v1 = is_t v1 in
+  let* v2 = is_t v2 in
+  return (box_t (f v1 v2))
+
 let ifthenelse_op v v1 v2 =
   let* b = is_bool v in
   if b then return v1 else return v2
 
-let not_op v =
-  let* v = is_bool v in
-  return (Vbool(not v))
-
-let uminus_op v =
-  let* v = is_int v in
-  return (Vint(- v))
-
-let and_op v1 v2 =
-  let* v1 = is_bool v1 in
-  let* v2 = is_bool v2 in
-  return (Vbool(v1 && v2))
-
-let or_op v1 v2 =
-  let* v1 = is_bool v1 in
-  let* v2 = is_bool v2 in
-  return (Vbool(v1 || v2))
-
+(* Boolean operators *)
+let not_op = do_unop is_bool (fun v -> Vbool(v)) Stdlib.not
+let and_op = do_binop is_bool (fun v -> Vbool(v)) Stdlib.(&&)
+let or_op = do_binop is_bool (fun v -> Vbool(v)) Stdlib.(||)
 let on_op v1 v2 = or_op v1 v2
 
-let add_op v1 v2 =
-  let* v1 = is_int v1 in
-  let* v2 = is_int v2 in
-  return (Vint(v1 + v2))
+(* Integer operators *)
+let uminus_int_op = do_unop is_int (fun v -> Vint(v)) Stdlib.(~-)
+let add_int_op = do_binop is_int (fun v -> Vint(v)) Stdlib.(+)
+let minus_int_op = do_binop is_int (fun v -> Vint(v)) Stdlib.(-)
+let mult_int_op = do_binop is_int (fun v -> Vint(v)) Stdlib.( * )
+let div_int_op = do_binop is_int (fun v -> Vint(v)) Stdlib.( / )
+let abs_int_op = do_unop is_int (fun v -> Vint(v)) Stdlib.(abs)
+let mod_int_op = do_binop is_int (fun v -> Vint(v)) Stdlib.(mod)
 
-let minus_op v1 v2 =
-  let* v1 = is_int v1 in
-  let* v2 = is_int v2 in
-  return (Vint(v1 - v2))
+(* Floatting point operators *)
+let uminus_float_op = do_unop is_float (fun v -> Vfloat(v)) Stdlib.(~-.)
+let add_float_op = do_binop is_float (fun v -> Vfloat(v)) Stdlib.(+.)
+let minus_float_op = do_binop is_float (fun v -> Vfloat(v)) Stdlib.(-.)
+let mult_float_op = do_binop is_float (fun v -> Vfloat(v)) Stdlib.( *. )
+let div_float_op = do_binop is_float (fun v -> Vfloat(v)) Stdlib.( /. )
+let sqrt_float_op = do_unop is_float (fun v -> Vfloat(v)) Float.sqrt
+let sin_float_op = do_unop is_float (fun v -> Vfloat(v)) Float.sin
+let cos_float_op = do_unop is_float (fun v -> Vfloat(v)) Float.cos
+let abs_float_op = do_unop is_float (fun v -> Vfloat(v)) Float.abs
+let is_nan_float_op = do_unop is_float (fun v -> Vbool(v)) Float.is_nan
+let is_infinite_float_op = do_unop is_float (fun v -> Vbool(v)) Float.is_infinite
 
-let mult_op v1 v2 =
-  let* v1 = is_int v1 in
-  let* v2 = is_int v2 in
-  return (Vint(v1 * v2))
-
-let div_op v1 v2 =
-  let* v1 = is_int v1 in
-  let* v2 = is_int v2 in
-  return (Vint(v1 / v2))
-
-let add_float_op v1 v2 =
-  let* v1 = is_float v1 in
-  let* v2 = is_float v2 in
-  return (Vfloat(v1 +. v2))
-
-let uminus_float_op v =
-  let* v = is_float v in
-  return (Vfloat(-. v))
-
-let minus_float_op v1 v2 =
-  let* v1 = is_float v1 in
-  let* v2 = is_float v2 in
-  return (Vfloat(v1 -. v2))
-
-let mult_float_op v1 v2 =
-  let* v1 = is_float v1 in
-  let* v2 = is_float v2 in
-  return (Vfloat(v1 *. v2))
-
-let div_float_op v1 v2 =
-  let* v1 = is_float v1 in
-  let* v2 = is_float v2 in
-  return (Vfloat(v1 /. v2))
-
-let sqrt_op v =
-  let* v = is_float v in
-  return (Vfloat(sqrt v))
-
-let sin_op v =
-  let* v = is_float v in
-  return (Vfloat(sin v))
-
-let cos_op v =
-  let* v = is_float v in
-  return (Vfloat(cos v))
-
-let abs_float_op v =
-  let* v = is_float v in
-  return (Vfloat(abs_float v))
-
-let abs_op v =
-  let* v = is_int v in
-  return (Vint(abs v))
-
-let mod_op v1 v2 =
-  let* v1 = is_int v1 in
-  let* v2 = is_int v2 in
-  return (Vint(v1 mod v2))
+(* Random generation for testing *)
+let _ = Random.init 0
+let random_bool_op () =
+  return (Vbool(Random.bool()))
+let random_int_op = do_unop is_int (fun v -> Vint(v)) Random.int
+let random_float_op = do_unop is_float (fun v -> Vfloat(v)) Random.float
 
 let length v =
   match v with
@@ -521,43 +476,33 @@ let ternop_vfun f =
     | _-> Result.error typ_error in
   Vfun { f_arity = 3; f_no_input = false; f_fun }
 
-let _ = Random.init 0
-
-let random_bool_op _ =
-  return (Vbool(Random.bool()))
-let random_int_op v =
-  let* v = is_int v in
-  return (Vint(Random.int v))
-let random_float_op v =
-  let* v = is_float v in
-  return (Vfloat(Random.float v))
-
-
 (* The initial Stdlib *)
 let list_of_primitives () =
-  ["+", binop add_op;
-   "-", binop minus_op;
-   "~-", unop uminus_op;
-   "-", binop minus_op;
-   "/", binop div_op;
-   "*", binop mult_op;
+  ["+", binop add_int_op;
+   "-", binop minus_int_op;
+   "~-", unop uminus_int_op;
+   "-", binop minus_int_op;
+   "/", binop div_int_op;
+   "*", binop mult_int_op;
    "+.", binop add_float_op;
    "-.", binop minus_float_op;
    "~-.", unop uminus_float_op;
    "-.", binop minus_float_op;
    "/.", binop div_float_op;
    "*.", binop mult_float_op;
-   "sqrt", unop sqrt_op;
-   "sin", unop sin_op;
-   "cos", unop cos_op;
+   "sqrt", unop sqrt_float_op;
+   "sin", unop sin_float_op;
+   "cos", unop cos_float_op;
    "abs_float", unop abs_float_op;
-   "abs", unop abs_op;
+   "is_nan", unop is_nan_float_op;
+   "is_infinite", unop is_infinite_float_op;
+   "abs", unop abs_int_op;
    "not", unop not_op;
    "&&", binop and_op;
    "&", binop and_op;
    "or", binop or_op;
    "||", binop or_op;
-   "mod", binop mod_op;
+   "mod", binop mod_int_op;
    "=", binop eq_op;
    "<", binop lt_op;
    ">", binop gt_op;

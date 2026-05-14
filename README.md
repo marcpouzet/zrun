@@ -1,3 +1,6 @@
+<!-- [![Actions Status](https://github.com/marcpouzet/zrun/workflows/Build/badge.svg)](https://github.com/marcpouzet/zrun/actions)
+[![Actions Status](https://github.com/marcpouzet/zrun/workflows/Opam/badge.svg)](https://github.com/marcpouzet/zrun/actions) -->
+
 # The ZRun Synchronous Language Interpreter
 
 ZRun is an executable semantics for a synchronous data-flow

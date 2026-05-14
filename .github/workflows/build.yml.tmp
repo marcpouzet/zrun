@@ -8,16 +8,29 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-     
+
     steps:
+      # 1. Récupération du code
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
 
-      - name: Install OCaml dependencies
-        run: opam install -y graphics menhir alcotest
+      # 2. Installation d'Opam et OCaml
+      - name: Use OCaml
+        uses: ocaml/setup-ocaml@v2
+        with:
+          ocaml-compiler: 5.2.0 
 
+      # 3. Installation des dépendances via Opam
+      - name: Install dependencies
+        run: |
+          opam depext alcotest menhir
+          opam install -y graphics alcotest menhir
+
+      # 4. Compilation (généralement via Dune)
+      - name: Build project
+        run: opam exec -- dune build
+
+      # 5. Exécution des tests
       - name: Test examples 
         run: |
           cd tests
