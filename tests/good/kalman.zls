@@ -4,13 +4,10 @@ let transpose<<n,m>>(x:[n][m]_) returns (o:[m][n]_)
            do oji = x.(i).(j) done
     done
 
-
 let test_transpose_empty =
-  assert (
+  assert(
     transpose<<0,2>>([||])
-    = [| [||]; [||] |]
-  )
-
+    = [| [||]; [||] |])
 
 let zeros_vec<<n>>() returns (o: [n]_)
   forward<<n>> returns (oi out o)
@@ -166,10 +163,12 @@ let test_inverse_LDLt_3x3 () =
 let test_inverse_P_3x3 () =
   let m = [|[|367.25;12.75;-6.75|];
                     [|12.75;0.75;-0.25|]; [|-6.75;-0.25;0.125|]|] in
+  ()
   (* TODO: assertion fails because of precision error *)
-  (* assert ( *)
+  (* assert
   inverse_P<<3>>(m)
-    (*  = [|[|2.0;6.0;120.0|];[|6.0;22.0;368.0|];[|120.0;368.0;7224.0|]|] *)
+    = [|[|2.0;6.0;120.0|];[|6.0;22.0;368.0|];[|120.0;368.0;7224.0|]|]
+  *)
   
 let isnan(x: float) = is_nan x
 
