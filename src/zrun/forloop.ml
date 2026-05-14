@@ -139,8 +139,10 @@ let initialize_as_env_with_empty_arrays as_env =
   as_env
 
 (* given [x] and [env_list], returns array [v] st [v.(i) = env_list.(i).(x)] *)
-(* when [missing <> 0] complete with a default element *)
-let array_of missing loc (var_name, var_init, var_default) acc_env env_list =
+(* when [nb_of_missing_iterations <> 0] complete with a default element *)
+let array_of
+      nb_of_missing_iterations loc (var_name, var_init, var_default)
+      acc_env env_list =
   let* v_list =
     map
       (fun env ->
@@ -149,15 +151,16 @@ let array_of missing loc (var_name, var_init, var_default) acc_env env_list =
       env_list in
   (* if one is bot or nil, the result is bot or nil *)
   let v_list = Primitives.slist v_list in
-  if missing = 0 then
+  if nb_of_missing_iterations = 0 then
     return (Primitives.lift (fun v -> Varray(Vflat(Array.of_list v))) v_list)
   else
     let* default =
       match var_init, var_default with
       | None, None ->
-         let size = List.length env_list + missing in
+         let size = List.length env_list + nb_of_missing_iterations in
          error { kind = Earray_cannot_be_filled { name = var_name;
-                                                  size = size; missing };
+                                                  size = size;
+                                                  nb_of_missing_iterations };
                  loc }
       | _, Some _ ->
          find_default_opt var_name acc_env |>
@@ -169,7 +172,7 @@ let array_of missing loc (var_name, var_init, var_default) acc_env env_list =
     | Vbot -> return Vbot
     | Vnil -> return Vnil
     | Value(d) ->
-       let d_list = Util.list_of missing d in
+       let d_list = Util.list_of nb_of_missing_iterations d in
        return (Primitives.lift
                  (fun v -> Varray(Vflat(Array.of_list (v @ d_list)))) v_list)
 
