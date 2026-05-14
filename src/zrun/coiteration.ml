@@ -256,7 +256,7 @@ let matching_out env { b_vars; b_loc } =
   let* v_list =
     map
       (fun { var_name } ->
-        find_value_opt var_name env |>
+        Find.find_value_opt var_name env |>
           Opt.to_result
             ~none:{ kind = Eunbound_ident(var_name); loc = b_loc }) b_vars in
   match v_list with
@@ -340,7 +340,7 @@ let rec size env { desc; loc } =
       return (v / denom)
   | Size_var(x) ->
       let* v =
-       find_value_opt x env |>
+       Find.find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc } in
       let* v = star_value_is_int loc v in
       return v
@@ -946,7 +946,8 @@ and funexp genv env ({ f_kind; f_args } as f) =
          let* env = Match.matching_arg_in_list f_loc env f_args v_list in
          let* v = co_node f_loc genv env tkind arg_list f_body in
          return (Value(v)) in
-       return (Vfun { f_arity = List.length f_args; f_no_input = false; f_fun }) in
+       return
+         (Vfun { f_arity = List.length f_args; f_no_input = false; f_fun }) in
     
   (* the functional value *)
   match f_kind with
@@ -968,7 +969,7 @@ and sexp genv env { e_desc; e_loc } s =
      return (Value (Vconstr0(lname)), s)
   | Evar x, Sempty ->
      let* v =
-       find_value_opt x env |>
+       Find.find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = e_loc } in
      return (v, s)
   | Eglobal { lname }, Sempty ->
@@ -1839,14 +1840,14 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
      (* first step *)
      let* v, se = sexp genv env e se in
      let* cur =
-       find_value_opt x env |>
+       Find.find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
      return (Env.singleton x { empty with last = Some(v); reinit = true },
              Slist [Sopt(Some(cur)); se])
   | EQinit(x, e), Slist [Sopt(Some(v)); se] ->
      (* remaining steps *)
      let* cur =
-       find_value_opt x env |>
+       Find.find_value_opt x env |>
          Opt.to_result ~none:{ kind = Eunbound_ident(x); loc = eq_loc } in
      return (Env.singleton x { empty with last = Some(v); reinit = true },
              Slist [Sopt(Some(cur)); se])
