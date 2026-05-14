@@ -4,7 +4,7 @@ let zeros_vec<<n>>() =
 let bug() returns ()
   local a, b
   do a = zeros_vec<<3>>()
-  and forward<<3>> [i] (ai in a) returns (bi out b)
+  and forward<<3>> [i] (ai in a) returns (bi out b as b_)
     do bi = 1.0 done
   done
 
