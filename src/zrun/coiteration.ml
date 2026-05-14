@@ -1878,15 +1878,11 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQand { eq_list }, Slist(s_list) ->
      let seq genv env acc eq s =
        let* env_eq, s = seq genv env eq s in
-       let l1 = Env.to_list env_eq in
-       let l11 = Env.to_list acc in
        let* acc = merge eq_loc env_eq acc in
-       let l2 = Env.to_list acc in
        return (acc, s) in
      let* env_eq, s_list =
        mapfold2 { kind = Estate; loc = eq_loc }
          (seq genv env) Env.empty eq_list s_list in
-     let l3 = Env.to_list env_eq in
      return (env_eq, Slist(s_list))
   | EQreset(eq, e), Slist [s_eq; se] ->
      let* v, se = sexp genv env e se in
@@ -1901,9 +1897,7 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
           reset (ieq false) seq genv env eq s_eq v in
      return (env_eq, Slist [s_eq; se])
   | EQlocal(b_eq), s_eq ->
-     let l = Env.to_list env in
      let* _, env_visible, s_eq = sblock genv env b_eq s_eq in
-     let l = Env.to_list env_visible in
      return (env_visible, s_eq)
   | EQlet(leq, eq), Slist [s_leq; s_eq] ->
      let* env_eq, s_leq = sleq genv env leq s_leq in
@@ -1989,13 +1983,11 @@ and seq genv env { eq_desc; eq_write; eq_loc } s =
   | EQforloop({ for_kind; for_index; for_input; for_body; for_resume }),
     Slist ((Sopt(Some(Value(Vint(size)))) as sv) ::
              Slist(s_for_block :: so_list) :: s_input_list) ->
-     let l = Env.to_list env in
      (* the size is a static constant size expression *)
      let* r, (s_for_block, so_list, s_input_list) =
        sforloop_eq_step eq_loc genv env
          (for_kind, for_index, for_input, for_body, for_resume)
          (size, s_for_block, so_list, s_input_list) in
-     let l = Env.to_list r in
      return (r, Slist(sv :: Slist(s_for_block :: so_list) :: s_input_list))
   | EQforloop({ for_kind;
                 for_size = Some({ for_size_index = true; for_size_exp });
@@ -2137,7 +2129,6 @@ and sforloop_eq
               sbody env i_env acc_env as_env s_list in
           return (0, env_list, acc_env, Slist(s_list))
        | Kforward(exit), _ ->
-          let l = Env.to_list env in
           let sbody env acc_env s =
             sforblock genv env acc_env for_block exit s in
           let* env_list, acc_env, s_for_block_new =
@@ -2158,7 +2149,6 @@ and sforloop_eq
      let* env =
        for_env_out nb_of_missing_iterations env_list acc_env loc for_out in
      Debug.print_ienv "For loop: output env = " env;
-     let l = Env.to_list env in
      return (env, s_for_block, so_list)
 
 (* store the next value for [last x] in the state of [for_out] *)
@@ -2210,22 +2200,17 @@ and sresult genv env { r_desc; r_loc } s =
 
 (* block [local x1 [init e1 | default e1 | ],..., xn [...] do eq done *)
 and sblock genv env { b_vars; b_body; b_loc } s_b =
-  let l1 = Env.to_list env in
   match s_b with
   | Slist (s_eq :: s_list) ->
      let* bot_env_for_x, s_list =
        mapfold3 { kind = Estate; loc = b_loc }
          (svardec genv env) Env.empty b_vars s_list (bot_list b_vars) in
-     let l = Env.to_list bot_env_for_x in
      let names = Match.names_env bot_env_for_x in
-     let l = S.to_list names in
      (* double the number of iterations because a variable [x] *)
      (* can be defined by an equation [x = ...] and [init x = ...] *)
      let n = 2 * Env.cardinal bot_env_for_x + 1 in
      let* (env_eq_not_in_x, env_eq_in_x), s_eq = 
        Fix.local genv env seq b_body n s_eq bot_env_for_x in
-     let l1 = Env.to_list env_eq_not_in_x in
-     let l2 = Env.to_list env_eq_in_x in
      (* a dynamic check of causality: all locally defined names *)
      (* [x1,...,xn] must be non bottom provided that the value of *)
      (* all free variables is not bottom *)
@@ -2235,9 +2220,6 @@ and sblock genv env { b_vars; b_body; b_loc } s_b =
                      (set_vardec env_eq_in_x) b_vars s_list in
      (* add local variables to [env] *)
      let env = Env.append env_eq_in_x (Env.append env_eq_not_in_x env) in
-     let l1 = Env.to_list env in
-     let l2 = Env.to_list env_eq_not_in_x in
-     let l3 = Env.to_list env_eq_in_x in
      return (env, env_eq_not_in_x, Slist (s_eq :: s_list))
   | _ ->
      error { kind = Estate; loc = b_loc }
@@ -2263,8 +2245,6 @@ and sforblock genv env acc_env b for_exit s_b =
       let* env, env_not_in_x, s_b =
         sblock genv (Env.append env_in env) b s_b in
       let new_env_in = Fix.complete env_in env_not_in_x in
-      let l1 = Env.to_list new_env_in in
-      let l2 = Env.to_list env_in in
       return ((env, new_env_in), s_b) in
     let* _, (env, new_acc_env), s_b =
       Fix.fixpoint b.b_loc (Env.cardinal acc_env + 1) Fix.stop sem s_b env_in

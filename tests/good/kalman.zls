@@ -103,10 +103,13 @@ let decompose_LDLt<<n>>(m: [n][n]int) returns (l: [n][n]_, d: [n]_)
 let inverse_L<<n>>(l: [n][n]int) returns (lI: [n][n]int)
   forward<<n>>[i] (li in l) returns (lIi out lI as lI_)
     local lIiLi, lIii, lIiRi
-    do forward(i)[j] (lI_Tj in (transpose<<i, n>>(last lI_)).(.. (i-1)), lij in li.(.. (i-1))) returns (lIij out lIiLi)
-      do forward(i-j-1)[k] (lIkj in lI_Tj.((j+1) ..), lik in li.((j+1) .. (i-1))) returns (lIij init (-. lij))
-        do lIij = last lIij -. lik *. lIkj done
-      done
+    do forward(i)[j]
+        (lI_Tj in (transpose<<i, n>>(last lI_)).(.. (i-1)), lij in li.(.. (i-1)))
+       returns (lIij out lIiLi)
+        do forward(i-j-1)[k] (lIkj in lI_Tj.((j+1) ..), lik in li.((j+1) .. (i-1)))
+           returns (lIij init (-. lij))
+            do lIij = last lIij -. lik *. lIkj done
+        done
     and lIii = 1.0
     and forward(n-i-1)[j] returns (lIij out lIiRi)
       do lIij = 0.0 done
@@ -161,14 +164,13 @@ let test_inverse_LDLt_3x3 () =
   )
 
 let test_inverse_P_3x3 () =
+  let m = [|[|367.25;12.75;-6.75|];
+                    [|12.75;0.75;-0.25|]; [|-6.75;-0.25;0.125|]|] in
   (* TODO: assertion fails because of precision error *)
-  (*assert ( *)
-    inverse_D<<3>>([|[|367.25;12.75;-6.75|];
-                    [|12.75;0.75;-0.25|]; [|-6.75;-0.25;0.125|]|])
-  (*  = [|[|2.0;6.0;120.0|];[|6.0;22.0;368.0|];[|120.0;368.0;7224.0|]|]
-  )*)
-
-
+  (* assert ( *)
+  inverse_P<<3>>(m)
+    (*  = [|[|2.0;6.0;120.0|];[|6.0;22.0;368.0|];[|120.0;368.0;7224.0|]|] *)
+  
 let isnan(x: float) = is_nan x
 
 let node kalman_filter (z_k: [2]_, u_k: [3]_) returns (x_k_k: [6]_, p_k_k: [6][6]_)
@@ -179,9 +181,12 @@ let node kalman_filter (z_k: [2]_, u_k: [3]_) returns (x_k_k: [6]_, p_k_k: [6][6
     let sigma_thdg = 0.01 in
     let sigma_bias_initial = 0.5 in
     let sigma_bias_drift = 0.0001 in
-    let h = [|[|1.0; 0.0; 0.0; 0.0; 0.0; 0.0|]; [|0.0; 1.0; 0.0; 0.0; 0.0; 0.0|]|] in
-    let r = [|[|(sigma_gps *. sigma_gps); 0.0|]; [|0.0; (sigma_gps *. sigma_gps)|]|] in
-    let q_pos = (sigma_process *. dt *. dt /. 2.0) *. (sigma_process *. dt *. dt /. 2.0) in
+    let h = [|[|1.0; 0.0; 0.0; 0.0; 0.0; 0.0|];
+              [|0.0; 1.0; 0.0; 0.0; 0.0; 0.0|]|] in
+    let r = [|[|(sigma_gps *. sigma_gps); 0.0|];
+              [|0.0; (sigma_gps *. sigma_gps)|]|] in
+    let q_pos = (sigma_process *. dt *. dt /. 2.0) *.
+                  (sigma_process *. dt *. dt /. 2.0) in
     let q_vel = (sigma_process *. dt) *. (sigma_process *. dt) in
     let q_bias = sigma_bias_drift *. sigma_bias_drift *. dt in
     let q = [|[|q_pos; 0.0; 0.0; 0.0; 0.0; 0.0|];
@@ -240,16 +245,22 @@ let node kalman_filter (z_k: [2]_, u_k: [3]_) returns (x_k_k: [6]_, p_k_k: [6][6
         [|0.0; 0.0; 0.0; 0.0; 0.0; 1.0|]
     |] in
 
-    let p_k_km1 = add_mat<<6, 6>>(mul_mat_mat<<6, 6, 6>>(mul_mat_mat<<6, 6, 6>>(f_k, p_km1_km1), f_k.T), q) in
+    let p_k_km1 =
+      add_mat<<6, 6>>
+        (mul_mat_mat<<6, 6, 6>>
+	  (mul_mat_mat<<6, 6, 6>>(f_k, p_km1_km1), f_k.T), q) in
 
-    let h_prot, z_k_prot = forward<<2>> (hi in h, zi in z_k) returns ([|hi_prot|], [|zi_prot|])
+    let h_prot, z_k_prot =
+      forward<<2>> (hi in h, zi in z_k) returns ([|hi_prot|], [|zi_prot|])
         do forward<<6>> (hij in hi) returns (hij_prot out hi_prot)
             do hij_prot = if isnan(zi) then 0 else hij done
         and zi_prot = if isnan(zi) then 0 else zi done
     in
 
     let y_k = sub_vec<<2>>(z_k_prot, mul_mat_vec<<2, 6>>(h_prot, x_k_km1)) in
-    let s_k = add_mat<<2, 2>>(mul_mat_mat<<2, 6, 2>>(mul_mat_mat<<2, 6, 6>>(h_prot, p_k_km1), h_prot.T), r) in
+    let s_k = add_mat<<2, 2>>
+                (mul_mat_mat<<2, 6, 2>>
+		   (mul_mat_mat<<2, 6, 6>>(h_prot, p_k_km1), h_prot.T), r) in
     let (l, d) = decompose_LDLt<<2>>(s_k) in
 
     let protect = forward<<2>> (dii in d) returns (acc init false)
@@ -260,12 +271,17 @@ let node kalman_filter (z_k: [2]_, u_k: [3]_) returns (x_k_k: [6]_, p_k_k: [6][6
 
     let si_k = inverse_LDLt<<2>>(l_prot, d_prot) in
     let si_kp = if protect then zeros_mat<<2, 2>>() else si_k in
-    let k_k = mul_mat_mat<<6, 2, 2>>(mul_mat_mat<<6, 6, 2>>(p_k_km1, h_prot.T), si_kp) in
+    let k_k =
+      mul_mat_mat<<6, 2, 2>>(mul_mat_mat<<6, 6, 2>>(p_k_km1, h_prot.T), si_kp) in
 
     do x_k_k = add_vec<<6>>(x_k_km1, mul_mat_vec<<6, 2>>(k_k, y_k))
 
-    and let gamma_k = sub_mat<<6, 6>>(eye<<6>>(), mul_mat_mat<<6, 2, 6>>(k_k, h_prot)) in
-    p_k_k = add_mat<<6, 6>>(mul_mat_mat<<6, 6, 6>>(mul_mat_mat<<6, 6, 6>>(gamma_k, p_k_km1), gamma_k.T), mul_mat_mat<<6, 2, 6>>(mul_mat_mat<<6, 2, 2>>(k_k, r), k_k.T))
+    and let gamma_k =
+          sub_mat<<6, 6>>(eye<<6>>(), mul_mat_mat<<6, 2, 6>>(k_k, h_prot)) in
+    p_k_k = add_mat<<6, 6>>
+               (mul_mat_mat<<6, 6, 6>>
+	         (mul_mat_mat<<6, 6, 6>>(gamma_k, p_k_km1), gamma_k.T),
+		  mul_mat_mat<<6, 2, 6>>(mul_mat_mat<<6, 2, 2>>(k_k, r), k_k.T))
     done
 
 let node test_kalman_filter () =

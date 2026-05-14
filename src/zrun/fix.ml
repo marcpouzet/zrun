@@ -173,42 +173,31 @@ let eq genv env sem eq n s_eq bot =
 (* to start the fix point *)
 let local genv env sem eq n s_eq bot_env_for_x =
   let sem s_eq env_in_x =
-    let l1 = Env.to_list env_in_x in
-    let l2 = Env.to_list env in
     let env = Env.append env_in_x env in
     let* env_eq, s_eq = sem genv env eq s_eq in
-    let l3 = Env.to_list env_eq in
     (* split the resulting environment *)
     let env_eq_in_x, env_eq_not_in_x = 
       Env.partition (fun x _ -> Env.mem x env_in_x) env_eq in
-    let l4 = Env.to_list env_eq_in_x in
-    let l5 = Env.to_list env_eq_not_in_x in
     let env_eq_in_x = complete env_in_x env_eq_in_x in
-    let l6 = Env.to_list env_eq_in_x in
-
+    
     (* debug info *)
     Debug.print_ienv "Before step: env_eq = " env_eq;
     Debug.print_ienv "Before step: env_in_x = " env_in_x;
     Debug.print_ienv "After step: env_eq_in_x = " env_eq_in_x;
     Debug.print_ienv "After step: env_eq_not_in_x = " env_eq_not_in_x;
-
-    assert
-      (let set1 = S.domain S.empty env_in_x in
-       let set2 = S.domain S.empty env_eq_in_x in
-       let l1 = S.to_list set1 in
-       let l2 = S.to_list set2 in
-       S.equal set1 set2);
+    Debug.do_if
+      (fun _ ->
+        assert
+          (let set1 = S.domain S.empty env_in_x in
+           let set2 = S.domain S.empty env_eq_in_x in
+           S.equal set1 set2)) ();
     
     return ((env_eq_not_in_x, env_eq_in_x), s_eq) in
   
   Debug.print_ienv "Before fixpoint: bot_env_for_x = " bot_env_for_x;
 
-  let l0 = Env.to_list bot_env_for_x in
   let* m, (env_eq_not_in_x, env_eq_in_x), s_eq = 
     fixpoint eq.eq_loc n stop sem s_eq bot_env_for_x in
-
-  let l1 = Env.to_list env_eq_not_in_x in
-  let l2 = Env.to_list env_eq_in_x in
 
   Debug.incr_total_number_of_iterations_in_fixpoints m;
   Debug.print_ienv "After fixpoint: env_eq_not_in_x = " env_eq_not_in_x;
