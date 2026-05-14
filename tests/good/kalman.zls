@@ -12,7 +12,6 @@ let test_transpose_empty =
   )
 
 
-
 let zeros_vec<<n>>() returns (o: [n]_)
   forward<<n>> returns (oi out o)
     do oi = 0.0 done
@@ -89,11 +88,12 @@ let decompose_LDLt<<n>>(m: [n][n]int) returns (l: [n][n]_, d: [n]_)
     and forward(j)[i] returns (lij out lTjLj)
       do lij = 0.0 done
 
-    and lTjj = 1
+    and lTjj = 1.0
     and forward(n-j-1)[ji] (liLj in lRjLj, mij in mTjRj) returns (lij out lTjRj)
       local lij_dj
-      do forward(j)[k] (ljk in ljLj, lik in liLj, dk in last d_) returns (lij_dj init mij)
-        do lij_dj = last lij_dj -. lik *. ljk *. dk done
+      do forward(j)[k] (ljk in ljLj, lik in liLj, dk in last d_)
+           returns (lij_dj init mij)
+          do lij_dj = last lij_dj -. lik *. ljk *. dk done
       and lij = lij_dj /. dj done
     done
   and
@@ -132,15 +132,13 @@ let test_inverse_L_3x3 () =
     = [|[|1.0;0.0;0.0|]; [|-3.0;1.0;0.0|]; [|-54.0;-2.0;1.0|]|]
   )
 
-(** Marc: 14/05. j'ai complete; il manquait des elements a la matrice *)
-(* resultat *)
 let test_decompose_LDLt_3x3 () =
   let l, d = decompose_LDLt<<3>>([|[|2.0;6.0;120.0|];
                                    [|6.0;22.0;368.0|];
 			           [|120.0;368.0;7224.0|]|]) in
   let expected_l = [|[|1.0;0.0;0.0|]; [|3.0;1.0;0.0|]; [|60.0;2.0;1.0|]|] in
-  let expected_d = [|[|2.0;4.0;8.0|]|] in
-  l, expected_l, d, expected_d
+  let expected_d = [|2.0;4.0;8.0|] in
+  assert (l = expected_l && d = expected_d)
 
 let test_inverse_D_3 () =
   assert (
@@ -150,20 +148,23 @@ let test_inverse_D_3 () =
 
 let test_mul_mat_diag_3x3 () =
   assert (
-    mul_mat_diag<<3, 3>>([|[|1.0;0.0;0.0|]; [|3.0;1.0;0.0|]; [|60.0;2.0;1.0|]|], [|2.0;4.0;8.0|])
+    mul_mat_diag<<3, 3>>([|[|1.0;0.0;0.0|]; [|3.0;1.0;0.0|];
+                         [|60.0;2.0;1.0|]|], [|2.0;4.0;8.0|])
     = [|[|2.0;0.0;0.0|];[|6.0;4.0;0.0|];[|120.0;8.0;8.0|]|]
   )
 
 let test_inverse_LDLt_3x3 () =
   assert (
-    inverse_LDLt<<3>>([|[|1.0;0.0;0.0|]; [|3.0;1.0;0.0|]; [|60.0;2.0;1.0|]|], [|2.0;4.0;8.0|])
+    inverse_LDLt<<3>>([|[|1.0;0.0;0.0|]; [|3.0;1.0;0.0|];
+                      [|60.0;2.0;1.0|]|], [|2.0;4.0;8.0|])
     = [|[|367.25;12.75;-6.75|]; [|12.75;0.75;-0.25|]; [|-6.75;-0.25;0.125|]|]
   )
 
 let test_inverse_P_3x3 () =
   (* TODO: assertion fails because of precision error *)
   (*assert ( *)
-    inverse_P<<3>>([|[|367.25;12.75;-6.75|]; [|12.75;0.75;-0.25|]; [|-6.75;-0.25;0.125|]|])
+    inverse_D<<3>>([|[|367.25;12.75;-6.75|];
+                    [|12.75;0.75;-0.25|]; [|-6.75;-0.25;0.125|]|])
   (*  = [|[|2.0;6.0;120.0|];[|6.0;22.0;368.0|];[|120.0;368.0;7224.0|]|]
   )*)
 
