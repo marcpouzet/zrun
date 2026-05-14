@@ -59,7 +59,7 @@ type kind =
   (* the size is not given and there is no input *)
   | Earray_cannot_be_filled : { name: Ident.t;
                                 size : int;
-                                missing : int } -> kind
+                                nb_of_missing_iterations : int } -> kind
   (* the returned value for [id] should be an array of size [size]; *)
   (* [missing] elements are missing *)
   | Earray_dimension_in_iteration : { expected_dimension: int;
@@ -218,11 +218,11 @@ let message loc kind =
     eprintf
        "@[%aZrun: the number of iterations of the loop cannot be determined.@.@]"
        output_location loc
-  | Earray_cannot_be_filled { name; size; missing } ->
+  | Earray_cannot_be_filled { name; size; nb_of_missing_iterations } ->
      eprintf
      "@[%aZrun: the result should be an array of size %d but %d elements are\
         missing. Either declare %s with an init or a default value.@.@]"
-      output_location loc size missing (Ident.source name)
+      output_location loc size nb_of_missing_iterations (Ident.source name)
   | Earray_dimension_in_iteration { expected_dimension; actual_dimension } ->
     eprintf
       "@[%aZrun: the number of dimensions for the result is %d\n
