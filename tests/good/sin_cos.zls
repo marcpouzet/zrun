@@ -1,8 +1,7 @@
 (* sinus/cosinus *)
 (* file sin_cos.zls *)
 (* test with ../../zrun.exe -s main -n 100 sin_cos.zls *)
-(* to draw: ../../zrun.exe -s main -n 100 sin_cos.zls |
-                   feedgnuplot --stream --domain --lines
+(* to draw: ../../zrun.exe -s main -n 100 sin_cos.zls | feedgnuplot --stream --domain --lines
 *)
 
 (* forward Euler *)
@@ -37,9 +36,9 @@ let node sin_cos() returns (sin, cos)
 let b = 0.1
 
 let node main() returns
-    (sin_val, sin_ref, cos_val, cos_ref, diff_sin, diff_cos)
-  local time
+    (time, sin_val, sin_ref, cos_val, cos_ref, diff_sin, diff_cos)
   do (sin_val, cos_val) = sin_cos()
+
   and sin_ref = sin time
   and cos_ref = cos time
   and time = 0.0 -> pre time +. h
