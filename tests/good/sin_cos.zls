@@ -38,7 +38,6 @@ let b = 0.1
 let node main() returns
     (time, sin_val, sin_ref, cos_val, cos_ref, diff_sin, diff_cos)
   do (sin_val, cos_val) = sin_cos()
-
   and sin_ref = sin time
   and cos_ref = cos time
   and time = 0.0 -> pre time +. h
@@ -47,4 +46,3 @@ let node main() returns
   and assert (diff_sin <= b) && (diff_cos <= b)
   done
   
-	
