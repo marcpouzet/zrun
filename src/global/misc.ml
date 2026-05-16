@@ -45,8 +45,10 @@ let show_version () =
   ()
 
 
+(* verbose *)
 let verbose = ref false
 let vverbose = ref false
+(* debug *)
 let debug = ref false
 
 let set_verbose () =
@@ -84,7 +86,6 @@ let reset_total_number_of_iterations_in_fixpoints () =
                     
 (* remove the check of assertions during evaluation *)
 let no_assert = ref false
-let old_no_assert = ref false
 
 (* remove the check that fix-point equation produce non bottom values *)
 let no_causality = ref false
