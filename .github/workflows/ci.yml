@@ -1,0 +1,28 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - "2026"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: ocaml/setup-ocaml@v3
+        with:
+          ocaml-compiler: "5.2"
+          dune-cache: true
+
+      - run: opam install -y --deps-only --with-test .
+
+      - run: opam exec -- dune build
+
+      # Detect drift between dune-project and the committed zrun.opam.
+      # `dune build` regenerates zrun.opam silently; this fails CI if a
+      # contributor edited dune-project without rebuilding locally.
+      - run: git diff --exit-code zrun.opam
+
+      - run: opam exec -- dune runtest
