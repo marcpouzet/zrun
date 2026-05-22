@@ -5,7 +5,7 @@
 (*                                                                     *)
 (*                             Marc Pouzet                             *)
 (*                                                                     *)
-(*  (c) 2020-2024 Inria Paris                                          *)
+(*  (c) 2020-2026 Inria Paris                                          *)
 (*                                                                     *)
 (*  Copyright Institut National de Recherche en Informatique et en     *)
 (*  Automatique. All rights reserved. This file is distributed under   *)
@@ -25,12 +25,14 @@ let lident ff lid =
   | Name(s) -> fprintf ff "%s" s
   | Modname { qual; id } -> fprintf ff "%s.%s" qual id
                           
-let rec print_list value ff l =
-  match l with
-  | [] -> assert false
-  | [x] -> value ff x
-  | x :: l -> printf "@[%a,@ %a@]" value x (print_list value) l
-            
+let print_list print po sep pf ff l =
+  let rec printrec ff l =
+    match l with
+    | [] -> ()
+    | [x] -> print ff x
+    | x :: l -> printf "@[%a%s@ %a@]" print x sep printrec l in
+  fprintf ff "@[%s%a%s@]" po printrec l pf
+
 let rec pvalue ff v =
   match v with
   | Vint(i) -> fprintf ff "%i" i
@@ -40,16 +42,18 @@ let rec pvalue ff v =
   | Vstring(s) -> fprintf ff "%s" s
   | Vvoid -> fprintf ff "()"
   | Vtuple(l) ->
-     fprintf ff "@[<hov 1>(%a)@]" value_list l
+     print_list value "(" "," ")" ff l
   | Vstuple(l) ->
-     fprintf ff "@[<hov 1>(%a)@]" pvalue_list l
+     print_list pvalue "(" "," ")" ff l
   | Vconstr0(lid) -> lident ff lid
   | Vconstr1(lid, l) ->
-     fprintf ff "@[<hov1>%a(%a)@]" lident lid pvalue_list l 
+     fprintf ff "@[<hov1>%a%a@]" lident lid
+       (print_list pvalue "(" "," ")") l 
   | Vstate0(id) -> Ident.fprint_t ff id
   | Vstate1(id, l) ->
      fprintf
-       ff "@[<hov 1>%a(%a)@]" Ident.fprint_t id pvalue_list l
+       ff "@[<hov 1>%a(%a)@]" Ident.fprint_t id
+       (print_list pvalue "(" "," ")")  l
   | Vifun _ ->
      fprintf ff "<fun>"
   | Vfun _ -> fprintf ff "<fun>"
@@ -61,7 +65,7 @@ let rec pvalue ff v =
      let one ff { Zelus.arg; Zelus.label } =
        fprintf ff "@[<hov2>%a =@ %a@]"
          pvalue arg Lident.fprint_t label in
-     (Pp_tools.print_list_r one "{" ";" "}") ff l
+     print_list one "{" ";" "}" ff l
   | Vabsent ->
      fprintf ff "abs"
   | Vpresent(v) ->
@@ -90,11 +94,6 @@ and value ff v =
   | Vbot -> fprintf ff "bot"
   | Value(v) -> pvalue ff v                 
               
-and pvalue_list ff l = print_list pvalue ff l
-                     
-and value_list ff l = print_list value ff l
-                    
-
 (* print a state *)
 let rec pstate ff s =
   match s with
@@ -104,7 +103,7 @@ let rec pstate ff s =
   | Sval(v) -> value ff v
   | Sstatic(v) -> fprintf ff "@[(static %a)@]" pvalue v
   | Slist(s_list) ->
-      (Pp_tools.print_list_l pstate "[" ";" "]") ff s_list
+      print_list pstate "[" ";" "]" ff s_list
   | Sopt(None) -> 
      fprintf ff "none" | Sopt(Some(v)) -> fprintf ff "(some %a)" value v
   | Sinstance { n_init } ->
@@ -130,3 +129,16 @@ let letdecl ff n_v_list =
   let onedecl ff (name, v) =
     fprintf ff "@[<hov 2>val %s =@ %a@]@." name pvalue v in
   List.iter (onedecl ff) n_v_list
+
+(* output values for plotting - use with gnuplot *)
+(* for an output that is a tuple, remove the "(", ")" and "," *)
+let value_list_flush ff v =
+  let pvalue ff v =
+    match v with
+    | Vtuple(l) -> print_list value "" "" "" ff l
+    | Vstuple(l) -> print_list pvalue "" "" "" ff l
+    | _ -> pvalue ff v in
+  match v with
+  | Vnil -> fprintf ff "nil"
+  | Vbot -> fprintf ff "bot"
+  | Value(v) -> pvalue ff v
