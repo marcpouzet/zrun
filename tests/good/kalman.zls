@@ -1,3 +1,4 @@
+(* tester with: ../../zrun.exe -all -n 10 kalman.zls *)
 let transpose<<n,m>>(x:[n][m]_) returns (o:[m][n]_)
   forward<<m>> [j] returns (oj out o)
     do forward<<n>> [i] returns (oji out oj)
