@@ -979,7 +979,7 @@ and sexp genv env { e_desc; e_loc } s =
      return (Value(v), s)
   | Elast { id }, Sempty ->
      let* v =
-       find_last_opt id env  |>
+       Find.find_last_opt id env  |>
          Opt.to_result ~none:{ kind = Eunbound_last_ident(id); loc = e_loc } in
      return (v, s)
   | Eop(op, e_list), s ->
